@@ -153,9 +153,14 @@ function AddRolesWizard({ onClose }) {
   const [installing, setInstalling] = useState(false)
   const [done, setDone] = useState(false)
   const pages = ['Before You Begin', 'Installation Type', 'Server Selection', 'Server Roles', 'Features', 'Confirmation', 'Results']
+  const FEATURES = ['.NET Framework 3.5 Features', '.NET Framework 4.8 Features', 'BitLocker Drive Encryption', 'Data Center Bridging', 'Failover Clustering', 'Group Policy Management', 'Network Load Balancing', 'Remote Server Administration Tools', 'SMB 1.0/CIFS File Sharing Support', 'SNMP Service', 'Telnet Client', 'Windows PowerShell', 'Windows Server Backup', 'WoW64 Support']
+  const DEFAULT_FEATURES = new Set(['Group Policy Management', '.NET Framework 4.8 Features', 'Windows PowerShell', 'WoW64 Support', 'Remote Server Administration Tools'])
+  const [features, setFeatures] = useState(() => new Set(DEFAULT_FEATURES))
 
   const toggle = (r) => setChecked((s) => { const n = new Set(s); n.has(r) ? n.delete(r) : n.add(r); return n })
+  const toggleFeature = (f) => setFeatures((s) => { const n = new Set(s); n.has(f) ? n.delete(f) : n.add(f); return n })
   const newRoles = [...checked].filter((r) => !os.roles.find((x) => x.name === r && x.installed))
+  const newFeatures = [...features].filter((f) => !DEFAULT_FEATURES.has(f) || !os.roles.find((x) => x.name === f && x.installed))
 
   const install = async () => {
     setInstalling(true)
@@ -167,6 +172,11 @@ function AddRolesWizard({ onClose }) {
           await os.labAction('install_role', { role: role.id })
         }
         os.setRoleInstalled(role.id, true)
+      }
+      for (const feat of newFeatures) {
+        if (os.labAction) {
+          await os.labAction('install_feature', { name: feat })
+        }
       }
       setDone(true)
       setPage(7)
@@ -221,8 +231,10 @@ function AddRolesWizard({ onClose }) {
           {page === 5 && <>
             <p style={{ fontWeight: 600 }}>Select one or more features to install.</p>
             <div style={{ border: '1px solid #ddd', height: 250, overflow: 'auto', marginTop: 6 }}>
-              {['.NET Framework 3.5 Features', '.NET Framework 4.8 Features', 'BitLocker Drive Encryption', 'Data Center Bridging', 'Failover Clustering', 'Group Policy Management', 'Network Load Balancing', 'Remote Server Administration Tools', 'SMB 1.0/CIFS File Sharing Support', 'SNMP Service', 'Telnet Client', 'Windows PowerShell', 'Windows Server Backup', 'WoW64 Support'].map((feat) => (
-                <label key={feat} style={{ display: 'block', padding: '3px 8px' }}><input type="checkbox" defaultChecked={['Group Policy Management', '.NET Framework 4.8 Features', 'Windows PowerShell', 'WoW64 Support', 'Remote Server Administration Tools'].includes(feat)} /> {feat}</label>
+              {FEATURES.map((feat) => (
+                <label key={feat} style={{ display: 'block', padding: '3px 8px' }}>
+                  <input type="checkbox" checked={features.has(feat)} onChange={() => toggleFeature(feat)} /> {feat}
+                </label>
               ))}
             </div>
           </>}
@@ -230,18 +242,34 @@ function AddRolesWizard({ onClose }) {
             <p style={{ fontWeight: 600 }}>Confirm installation selections.</p>
             <label style={{ display: 'block', margin: '8px 0' }}><input type="checkbox" /> Restart the destination server automatically if required</label>
             <div style={{ border: '1px solid #ddd', padding: 10, minHeight: 120 }}>
-              {newRoles.length ? newRoles.map((r) => <div key={r}>• {r}</div>) : <span style={{ color: '#888' }}>No new roles selected. Select roles on the Server Roles page.</span>}
+              {newRoles.length || newFeatures.length ? (
+                <>
+                  {newRoles.map((r) => <div key={r}>• Role: {r}</div>)}
+                  {newFeatures.map((f) => <div key={f}>• Feature: {f}</div>)}
+                </>
+              ) : <span style={{ color: '#888' }}>No new roles or features selected.</span>}
             </div>
           </>}
           {page === 7 && <>
             <p style={{ fontWeight: 600 }}>Installation progress</p>
-            {newRoles.length === 0 ? <p>No changes were made.</p> : newRoles.map((r) => (
-              <div key={r} style={{ marginTop: 8 }}>
-                <div>{r}</div>
-                <div style={{ height: 8, background: '#e6e6e6', borderRadius: 3, overflow: 'hidden' }}><div style={{ width: '100%', height: '100%', background: '#107c10' }} /></div>
-                <div style={{ color: '#107c10', fontSize: 11 }}>Installation succeeded</div>
-              </div>
-            ))}
+            {newRoles.length === 0 && newFeatures.length === 0 ? <p>No changes were made.</p> : (
+              <>
+                {newRoles.map((r) => (
+                  <div key={r} style={{ marginTop: 8 }}>
+                    <div>{r}</div>
+                    <div style={{ height: 8, background: '#e6e6e6', borderRadius: 3, overflow: 'hidden' }}><div style={{ width: '100%', height: '100%', background: '#107c10' }} /></div>
+                    <div style={{ color: '#107c10', fontSize: 11 }}>Installation succeeded</div>
+                  </div>
+                ))}
+                {newFeatures.map((f) => (
+                  <div key={f} style={{ marginTop: 8 }}>
+                    <div>{f}</div>
+                    <div style={{ height: 8, background: '#e6e6e6', borderRadius: 3, overflow: 'hidden' }}><div style={{ width: '100%', height: '100%', background: '#107c10' }} /></div>
+                    <div style={{ color: '#107c10', fontSize: 11 }}>Installation succeeded</div>
+                  </div>
+                ))}
+              </>
+            )}
           </>}
         </div>
       </div>

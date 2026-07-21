@@ -230,6 +230,54 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         tfc.setdefault("agent_pools", []).append(row)
         return {"ok": True, "message": f"Agent pool {name} created", "pool": row}
 
+    if action == "tfc_create_team":
+        name = (payload.get("name") or f"team-{len(tfc.get('teams') or []) + 1}").strip()
+        if any(t.get("name") == name for t in tfc.get("teams") or []):
+            return {"ok": False, "error": f"Team '{name}' already exists"}
+        row = {
+            "id": f"t-{len(tfc.get('teams') or []) + 1}",
+            "name": name,
+            "access": payload.get("access") or "write",
+            "members": int(payload.get("members") or 1),
+        }
+        tfc.setdefault("teams", []).append(row)
+        return {"ok": True, "message": f"Team {name} created", "team": row}
+
+    if action in ("tfc_set_team_access", "tfc_grant_team_access"):
+        team = (payload.get("team") or "").strip()
+        workspace = payload.get("workspace") or "lab-workspace"
+        permission = payload.get("permission") or payload.get("access") or "Write"
+        if not team:
+            return {"ok": False, "error": "Team name required"}
+        access = tfc.setdefault("team_access", [])
+        existing = next((a for a in access if a.get("team") == team and a.get("workspace") == workspace), None)
+        if existing:
+            existing["permission"] = permission
+            existing["inherited"] = bool(payload.get("inherited", False))
+            row = existing
+        else:
+            row = {
+                "team": team,
+                "permission": permission,
+                "inherited": bool(payload.get("inherited", False)),
+                "workspace": workspace,
+            }
+            access.append(row)
+        return {"ok": True, "message": f"Granted {permission} to {team} on {workspace}", "access": row}
+
+    if action == "tfc_create_ws_notification":
+        name = (payload.get("name") or f"Notify {len(tfc.get('ws_notifications') or []) + 1}").strip()
+        workspace = payload.get("workspace") or "lab-workspace"
+        row = {
+            "id": f"wn-{len(tfc.get('ws_notifications') or []) + 1}",
+            "workspace": workspace,
+            "name": name,
+            "triggers": payload.get("triggers") or "Errored runs",
+            "status": payload.get("status") or "enabled",
+        }
+        tfc.setdefault("ws_notifications", []).append(row)
+        return {"ok": True, "message": f"Notification {name} created", "notification": row}
+
     if action == "tfc_update_org_setting":
         section = payload.get("section") or "general"
         key = payload.get("key") or ""

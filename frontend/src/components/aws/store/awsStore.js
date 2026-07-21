@@ -637,6 +637,56 @@ export const useAwsStore = create(
       toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),
       resetSimulation: () => set({ ...seedState() }),
 
+      /** Seed a private subnet + NAT + private RT missing 0.0.0.0/0 (vpc-routing-broken lab). */
+      hydrateVpcRoutingBroken: () => {
+        const s = get()
+        const region = s.region
+        const vpc = (s.vpcs || [])[0]
+        if (!vpc) return
+        const publicSubnet = (s.subnets || []).find((sn) => sn.mapPublicIp) || (s.subnets || [])[0]
+        if (!publicSubnet) return
+        const privId = 'subnet-privatebroken01'
+        const natId = 'nat-0broken00000001'
+        const rtbPriv = 'rtb-privatebroken01'
+        const eipAlloc = 'eipalloc-natbroken01'
+        set({
+          subnets: [
+            ...(s.subnets || []).filter((sn) => sn.id !== privId),
+            {
+              id: privId, region, vpcId: vpc.id, cidr: '172.31.48.0/20', az: `${region}a`,
+              availableIps: 4091, mapPublicIp: false, isDefault: false, name: 'private-app',
+            },
+          ],
+          elasticIps: [
+            ...(s.elasticIps || []).filter((e) => e.allocationId !== eipAlloc),
+            {
+              allocationId: eipAlloc, region, publicIp: '54.210.200.10',
+              associationId: null, instanceId: null, domain: 'vpc',
+            },
+          ],
+          natGateways: [
+            ...(s.natGateways || []).filter((n) => n.id !== natId),
+            {
+              id: natId, region, subnetId: publicSubnet.id, vpcId: vpc.id,
+              allocationId: eipAlloc, publicIp: '54.210.200.10', state: 'available',
+            },
+          ],
+          routeTables: [
+            ...(s.routeTables || []).filter((r) => r.id !== rtbPriv),
+            {
+              id: rtbPriv, region, vpcId: vpc.id, main: false,
+              associations: [privId],
+              routes: [{ dest: vpc.cidr, target: 'local' }],
+            },
+          ],
+          instances: (s.instances || []).map((inst, idx) => (
+            idx === 1
+              ? { ...inst, subnetId: privId, publicIp: '', privateIp: '172.31.50.10' }
+              : inst
+          )),
+        })
+      },
+
       // ---------- Lab action sync ----------
       // Arm/disarm mirroring of GUI mutations to the server-side action log for
       // grading. Called by AwsLabOverlay with the LabSession id (armed on mount,

@@ -204,7 +204,17 @@ export default function TerraformCloudShell({
             </div>
           )}
           {wsTab === 'notifications' && (
-            <div className="p-5">
+            <div className="p-5 space-y-3">
+              <div className="flex justify-end">
+                <button type="button" className="tfc-btn-primary" disabled={busy}
+                  onClick={() => run(() => terraformApi.createWsNotification(sessionId, {
+                    name: `Notify ${Date.now().toString(36).slice(-4)}`,
+                    workspace: ws?.name || 'lab-workspace',
+                    triggers: 'Errored runs',
+                  }), 'Notification created')}>
+                  + Add notification
+                </button>
+              </div>
               <SimDataTable columns={[
                 { key: 'name', label: 'Destination', sortable: true },
                 { key: 'triggers', label: 'Triggers', sortable: true },
@@ -213,7 +223,17 @@ export default function TerraformCloudShell({
             </div>
           )}
           {wsTab === 'team access' && (
-            <div className="p-5">
+            <div className="p-5 space-y-3">
+              <div className="flex justify-end">
+                <button type="button" className="tfc-btn-primary" disabled={busy}
+                  onClick={() => run(() => terraformApi.setTeamAccess(sessionId, {
+                    team: (tfc.teams || [{ name: 'developers' }])[0]?.name || 'developers',
+                    workspace: ws?.name || 'lab-workspace',
+                    permission: 'Write',
+                  }), 'Team access updated')}>
+                  + Grant access
+                </button>
+              </div>
               <SimDataTable columns={[
                 { key: 'team', label: 'Team', sortable: true },
                 { key: 'permission', label: 'Permission', sortable: true },
@@ -278,8 +298,14 @@ export default function TerraformCloudShell({
     }
     if (nav === 'settings-teams') {
       return (
-        <div className="p-5">
-          <h1 className="text-xl font-semibold text-white mb-4">Teams</h1>
+        <div className="p-5 space-y-3">
+          <div className="flex justify-between items-center">
+            <h1 className="text-xl font-semibold text-white">Teams</h1>
+            <button type="button" className="tfc-btn-primary" disabled={busy}
+              onClick={() => run(() => terraformApi.createTeam(sessionId, `team-${Date.now().toString(36).slice(-4)}`, 'write', 1), 'Team created')}>
+              + New team
+            </button>
+          </div>
           <SimDataTable columns={[
             { key: 'name', label: 'Team', sortable: true },
             { key: 'access', label: 'Organization Access', sortable: true },

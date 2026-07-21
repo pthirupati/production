@@ -44,13 +44,17 @@ export default function AwsLabOverlay({
   useEffect(() => {
     if (!sessionId) return undefined
     try { useAwsStore.getState().resetSimulation() } catch { /* ignore */ }
+    const slug = `${scenario?.slug || ''}`.toLowerCase()
+    if (/vpc-routing|vpc_routing/.test(slug)) {
+      try { useAwsStore.getState().hydrateVpcRoutingBroken() } catch { /* ignore */ }
+    }
     try { useAwsStore.getState().armLabSync(sessionId) } catch { /* ignore */ }
     try { useAwsStore.getState().setLabSessionId(sessionId) } catch { /* ignore */ }
     return () => {
       try { useAwsStore.getState().disarmLabSync() } catch { /* ignore */ }
       try { useAwsStore.getState().setLabSessionId(null) } catch { /* ignore */ }
     }
-  }, [sessionId])
+  }, [sessionId, scenario?.slug])
 
   // Defensive: never let a console render throw escape to the parent boundary
   // without a chance to remount. Key forces a clean MemoryRouter on session change.

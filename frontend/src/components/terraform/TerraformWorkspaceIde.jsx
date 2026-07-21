@@ -11,6 +11,7 @@ import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab, VscActivityBut
 import { getIacProfile } from '../../utils/iacFlavor'
 import { LabChromeControls } from '../lab/LabChromeBar'
 import { syncTerraformApplyToAwsConsole } from '../../utils/terraformAwsBridge'
+import { useAwsStore } from '../aws/store/awsStore'
 import {
   FileCode, FolderOpen, Play, Plus, Trash2, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History, ExternalLink, LayoutDashboard,
 } from 'lucide-react'
@@ -53,6 +54,17 @@ export default function TerraformWorkspaceIde({
   const sendCancelRef = useRef(null)
 
   useEffect(() => () => { sendCancelRef.current?.() }, [])
+
+  // Seed AWS console with private subnet / NAT / missing default route for vpc-routing labs.
+  useEffect(() => {
+    const slug = `${scenario?.slug || ''}`.toLowerCase()
+    if (!/vpc-routing|vpc_routing/.test(slug)) return
+    try {
+      useAwsStore.getState().resetSimulation()
+      useAwsStore.getState().hydrateVpcRoutingBroken()
+      if (sessionId) useAwsStore.getState().armLabSync(sessionId)
+    } catch { /* ignore */ }
+  }, [scenario?.slug, sessionId])
 
   // Fired by <LabTerminal> once its shell is ready (backend shell_ready or the
   // sim/cloud fallback timer). Flush any command queued while the pane was

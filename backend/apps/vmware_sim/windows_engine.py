@@ -968,6 +968,10 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
     if act in ("install_role", "install_feature", "add_role"):
         role_id = payload.get("role") or payload.get("role_id") or payload.get("name")
         role = _find_role(world, role_id)
+        if not role and act == "install_feature" and role_id:
+            role = _role(str(role_id), str(role_id), False, category="feature",
+                         description=payload.get("description") or str(role_id))
+            world.setdefault("roles", []).append(role)
         if not role:
             return {"ok": False, "error": f"Unknown role or feature '{role_id}'"}
         if role["installed"]:
@@ -1072,6 +1076,84 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
         world["ad"]["users"] = [u for u in users if u is not user and u.get("name") != user.get("name")]
         _event(state, f"Deleted AD user: {user['name']}")
         return {"ok": True, "message": f"Deleted user {user['name']}"}
+
+    # ---- File Explorer / VFS (lab grading dual-write) ----
+    if act in ("write_file", "create_file"):
+        path = (payload.get("path") or "").strip()
+        if not path:
+            return {"ok": False, "error": "Path required"}
+        content = payload.get("content")
+        if content is None:
+            content = ""
+        content = str(content)[:8192]
+        explorer = world.setdefault("explorer", {})
+        files = explorer.setdefault("files", {})
+        folders = explorer.setdefault("folders", {})
+        parent = path.rsplit("\\", 1)[0] if "\\" in path else path[:3]
+        name = path.rsplit("\\", 1)[-1]
+        files[path] = {"content": content, "size": len(content)}
+        children = folders.setdefault(parent, [])
+        if name and name not in children:
+            children.append(name)
+        _event(state, f"Wrote file {path}")
+        return {"ok": True, "message": f"Wrote {path}", "path": path}
+
+    if act in ("create_directory", "mkdir"):
+        path = (payload.get("path") or "").strip()
+        if not path:
+            return {"ok": False, "error": "Path required"}
+        explorer = world.setdefault("explorer", {})
+        folders = explorer.setdefault("folders", {})
+        parent = path.rsplit("\\", 1)[0] if "\\" in path else path[:3]
+        name = path.rsplit("\\", 1)[-1]
+        folders.setdefault(path, [])
+        children = folders.setdefault(parent, [])
+        if name and name not in children:
+            children.append(name)
+        _event(state, f"Created directory {path}")
+        return {"ok": True, "message": f"Created {path}", "path": path}
+
+    if act in ("delete_item", "remove_item", "delete_file", "rmdir"):
+        path = (payload.get("path") or "").strip()
+        if not path:
+            return {"ok": False, "error": "Path required"}
+        explorer = world.setdefault("explorer", {})
+        files = explorer.setdefault("files", {})
+        folders = explorer.setdefault("folders", {})
+        parent = path.rsplit("\\", 1)[0] if "\\" in path else path[:3]
+        name = path.rsplit("\\", 1)[-1]
+        files.pop(path, None)
+        folders.pop(path, None)
+        for key in list(folders.keys()):
+            if key.startswith(path + "\\"):
+                folders.pop(key, None)
+        for key in list(files.keys()):
+            if key.startswith(path + "\\"):
+                files.pop(key, None)
+        if parent in folders:
+            folders[parent] = [n for n in folders[parent] if n != name]
+        _event(state, f"Deleted {path}")
+        return {"ok": True, "message": f"Deleted {path}"}
+
+    if act in ("rename_item", "rename_file"):
+        path = (payload.get("path") or "").strip()
+        new_name = (payload.get("new_name") or payload.get("name") or "").strip()
+        if not path or not new_name:
+            return {"ok": False, "error": "path and new_name required"}
+        explorer = world.setdefault("explorer", {})
+        files = explorer.setdefault("files", {})
+        folders = explorer.setdefault("folders", {})
+        parent = path.rsplit("\\", 1)[0] if "\\" in path else path[:3]
+        old_name = path.rsplit("\\", 1)[-1]
+        new_path = f"{parent}\\{new_name}"
+        if path in files:
+            files[new_path] = files.pop(path)
+        if path in folders:
+            folders[new_path] = folders.pop(path)
+        if parent in folders:
+            folders[parent] = [new_name if n == old_name else n for n in folders[parent]]
+        _event(state, f"Renamed {path} → {new_path}")
+        return {"ok": True, "message": f"Renamed to {new_name}", "path": new_path}
 
     if act in ("unlock_ad_user", "unlock_user", "unlock_account"):
         user = _find_user(world, payload.get("user") or payload.get("name"))

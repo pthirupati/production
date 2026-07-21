@@ -67,6 +67,103 @@ output "public_ip" {
 """,
 }
 
+# Broken VPC routing lab: private RT has no 0.0.0.0/0 → NAT Gateway.
+VPC_ROUTING_BROKEN_FILES = {
+    "main.tf": """terraform {
+  required_version = ">= 1.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+}
+""",
+    "variables.tf": """variable "aws_region" {
+  type    = string
+  default = "us-east-1"
+}
+""",
+    "network.tf": """resource "aws_vpc" "lab" {
+  cidr_block = "10.40.0.0/16"
+  tags       = { Name = "lab-vpc" }
+}
+
+resource "aws_subnet" "public" {
+  vpc_id                  = aws_vpc.lab.id
+  cidr_block              = "10.40.1.0/24"
+  map_public_ip_on_launch = true
+  availability_zone       = "us-east-1a"
+  tags                    = { Name = "public" }
+}
+
+resource "aws_subnet" "private" {
+  vpc_id                  = aws_vpc.lab.id
+  cidr_block              = "10.40.2.0/24"
+  map_public_ip_on_launch = false
+  availability_zone       = "us-east-1a"
+  tags                    = { Name = "private" }
+}
+
+resource "aws_internet_gateway" "gw" {
+  vpc_id = aws_vpc.lab.id
+}
+
+resource "aws_eip" "nat" {
+  domain = "vpc"
+}
+
+resource "aws_nat_gateway" "nat" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public.id
+}
+
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.lab.id
+}
+
+resource "aws_route" "public_default" {
+  route_table_id         = aws_route_table.public.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.gw.id
+}
+
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.lab.id
+}
+
+# BUG: private subnet has no default route to the NAT Gateway.
+# Add something like:
+# resource "aws_route" "private_default" {
+#   route_table_id         = aws_route_table.private.id
+#   destination_cidr_block = "0.0.0.0/0"
+#   nat_gateway_id         = aws_nat_gateway.nat.id
+# }
+
+resource "aws_route_table_association" "private" {
+  subnet_id      = aws_subnet.private.id
+  route_table_id = aws_route_table.private.id
+}
+""",
+    "outputs.tf": """output "private_subnet_id" {
+  value = aws_subnet.private.id
+}
+
+output "nat_id" {
+  value = aws_nat_gateway.nat.id
+}
+""",
+}
+
 
 def _session_key(session_id: str) -> str:
     return f"terraform_session:{session_id}"
@@ -224,9 +321,38 @@ def _base_state() -> dict:
     }
 
 
+def _hcl_has_private_nat_route(files: dict) -> bool:
+    """True when HCL declares a 0.0.0.0/0 route via nat_gateway_id attribute (uncommented)."""
+    import re
+    joined = "\n".join(str(v) for v in (files or {}).values() if isinstance(v, str))
+    lines = []
+    for line in joined.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+        lines.append(stripped)
+    body = "\n".join(lines)
+    has_nat_attr = bool(re.search(r"(?m)^\s*nat_gateway_id\s*=", body))
+    has_default = '"0.0.0.0/0"' in body or "'0.0.0.0/0'" in body
+    return has_nat_attr and has_default
+
+
 def _apply_preset(state: dict, slug: str) -> None:
     slug = (slug or "").lower()
     tool = _iac_tool(slug)
+    if "vpc-routing" in slug or "vpc_routing" in slug:
+        state["files"] = copy.deepcopy(VPC_ROUTING_BROKEN_FILES)
+        state["active_file"] = "network.tf"
+        state["goal"] = {
+            "title": "Fix private subnet internet access",
+            "objective": (
+                "The private route table is missing 0.0.0.0/0 → NAT Gateway. "
+                "Add the aws_route, then terraform plan/apply (or add the route in the AWS Console)."
+            ),
+        }
+        state["broken"] = {"missing_nat_route": True, "plan_required": True}
+        state["terraform"]["initialized"] = False
+        return
     if "lock" in slug:
         state["goal"] = {
             "title": "Unlock state",
@@ -336,6 +462,9 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 files[path] = content
         if payload.get("active_file") in files:
             state["active_file"] = payload["active_file"]
+        if broken.get("missing_nat_route") and _hcl_has_private_nat_route(files):
+            broken["missing_nat_route"] = False
+            state["broken"] = broken
         state["events"].insert(0, {"time": _now_iso(), "message": "Terraform files saved", "severity": "info"})
         _sync_files_to_sim_shell(session_id, files)
         _save(session_id, entry)
@@ -451,23 +580,36 @@ def validate_terraform_lab(session_id: str, scenario_slug: str = "") -> tuple[bo
     broken = state.get("broken") or {}
     tf = state.get("terraform") or {}
     slug = (scenario_slug or entry.get("scenario_slug") or "").lower()
+    files = state.get("files") or {}
 
     if broken.get("stale_lock"):
         return False, "State lock still held — run terraform force-unlock"
-    if broken.get("plan_required"):
+    if broken.get("plan_required") and not tf.get("last_plan") and "vpc-routing" not in slug:
         return False, "Run terraform plan before apply"
     if broken.get("drift") or tf.get("drift_detected"):
         if not tf.get("last_apply"):
             return False, "Run terraform plan and apply to reconcile drift"
     if "lock" in slug and not tf.get("last_apply"):
         return False, "Unlock state and complete plan/apply"
+    if "vpc-routing" in slug or broken.get("missing_nat_route"):
+        if not _hcl_has_private_nat_route(files):
+            return False, "Add a 0.0.0.0/0 route targeting the NAT Gateway on the private route table"
+        if not tf.get("initialized"):
+            return False, "Run terraform init first"
+        if not tf.get("last_plan"):
+            return False, "Run terraform plan"
+        if not tf.get("last_apply"):
+            return False, "Run terraform apply after adding the NAT route"
+        broken["missing_nat_route"] = False
+        state["broken"] = broken
+        _save(session_id, entry)
+        return True, "Private subnet routes 0.0.0.0/0 via NAT Gateway"
     if not tf.get("initialized"):
         return False, "Run terraform init first"
     if not tf.get("last_plan"):
         return False, "Run terraform plan"
     if not tf.get("last_apply"):
         return False, "Run terraform apply to provision resources"
-    files = state.get("files") or {}
     main_tf = files.get("main.tf", "")
     if "lock" in slug and "resource" not in main_tf and "aws_instance" not in main_tf:
         pass  # lock scenario may not require file edits

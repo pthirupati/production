@@ -180,6 +180,7 @@ export function RouteTableList() {
   const vpcs = scoped(useAwsStore((s) => s.vpcs), region)
   const subnets = scoped(useAwsStore((s) => s.subnets), region)
   const igws = scoped(useAwsStore((s) => s.internetGateways), region)
+  const nats = scoped(useAwsStore((s) => s.natGateways), region)
   const createRtb = useAwsStore((s) => s.createRouteTable)
   const createRoute = useAwsStore((s) => s.createRoute)
   const associateRtb = useAwsStore((s) => s.associateRouteTable)
@@ -196,10 +197,18 @@ export function RouteTableList() {
       render: (r) => (
         <span className="flex gap-2 flex-wrap">
           <Button variant="link" onClick={() => {
+            const associated = (r.associations || [])
+              .map((id) => subnets.find((sn) => sn.id === id))
+              .filter(Boolean)
+            const looksPrivate = associated.length
+              ? associated.every((sn) => !sn.mapPublicIp)
+              : !r.main
+            const nat = nats.find((n) => n.vpcId === r.vpcId) || nats[0]
             const igw = igws.find((g) => g.vpcId === r.vpcId && g.state === 'attached') || igws[0]
-            const res = createRoute(r.id, { dest: '0.0.0.0/0', target: igw?.id || 'igw-local' })
+            const target = (looksPrivate && nat?.id) ? nat.id : (igw?.id || 'igw-local')
+            const res = createRoute(r.id, { dest: '0.0.0.0/0', target })
             if (res?.ok === false) return
-            pushFlash('success', `Added default route on ${r.id}`)
+            pushFlash('success', `Added default route on ${r.id} → ${target}`)
           }}>Add 0.0.0.0/0</Button>
           <Button variant="link" onClick={() => {
             const subnet = subnets.find((s) => s.vpcId === r.vpcId && !(r.associations || []).includes(s.id)) || subnets.find((s) => s.vpcId === r.vpcId)

@@ -28,6 +28,15 @@ export const terraformApi = {
   createAgentPool(sessionId, name, agents = 1) {
     return terraformApi.action(sessionId, 'tfc_create_agent_pool', { name, agents })
   },
+  createTeam(sessionId, name, access = 'write', members = 1) {
+    return terraformApi.action(sessionId, 'tfc_create_team', { name, access, members })
+  },
+  setTeamAccess(sessionId, { team, workspace = 'lab-workspace', permission = 'Write', inherited = false } = {}) {
+    return terraformApi.action(sessionId, 'tfc_set_team_access', { team, workspace, permission, inherited })
+  },
+  createWsNotification(sessionId, { name, workspace = 'lab-workspace', triggers = 'Errored runs' } = {}) {
+    return terraformApi.action(sessionId, 'tfc_create_ws_notification', { name, workspace, triggers })
+  },
   updateOrgSetting(sessionId, section, key, value) {
     return terraformApi.action(sessionId, 'tfc_update_org_setting', { section, key, value })
   },

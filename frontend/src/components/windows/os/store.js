@@ -95,49 +95,65 @@ export const useOS = create((set, get) => ({
   isDir: (path) => get().vfs.dirs[normPath(path)] !== undefined,
   fileMeta: (path) => get().vfs.files[normPath(path)] || null,
   readFile: (path) => (get().vfs.files[normPath(path)] || {}).content ?? null,
-  writeFile: (path, content) => set((s) => {
-    const p = normPath(path)
-    const vfs = clone(s.vfs)
-    const parent = p.slice(0, p.lastIndexOf('\\')) || p.slice(0, 3)
-    const name = p.slice(p.lastIndexOf('\\') + 1)
-    const stamp = new Date().toISOString().slice(0, 19).replace('T', ' ')
-    vfs.files[p] = { content, size: content.length, created: vfs.files[p]?.created || stamp, modified: stamp, accessed: stamp, attrs: vfs.files[p]?.attrs || [] }
-    if (vfs.dirs[parent] && !vfs.dirs[parent].includes(name)) vfs.dirs[parent] = [...vfs.dirs[parent], name]
-    return { vfs }
-  }),
-  createDirectory: (path) => set((s) => {
-    const p = normPath(path)
-    if (s.vfs.dirs[p]) return {}
-    const vfs = clone(s.vfs)
-    const parent = p.slice(0, p.lastIndexOf('\\')) || p.slice(0, 3)
-    const name = p.slice(p.lastIndexOf('\\') + 1)
-    vfs.dirs[p] = []
-    if (vfs.dirs[parent] && !vfs.dirs[parent].includes(name)) vfs.dirs[parent] = [...vfs.dirs[parent], name]
-    return { vfs }
-  }),
-  deleteItem: (path) => set((s) => {
-    const p = normPath(path)
-    const vfs = clone(s.vfs)
-    const parent = p.slice(0, p.lastIndexOf('\\')) || p.slice(0, 3)
-    const name = p.slice(p.lastIndexOf('\\') + 1)
-    delete vfs.files[p]
-    delete vfs.dirs[p]
-    Object.keys(vfs.dirs).forEach((k) => { if (k.startsWith(p + '\\')) delete vfs.dirs[k] })
-    Object.keys(vfs.files).forEach((k) => { if (k.startsWith(p + '\\')) delete vfs.files[k] })
-    if (vfs.dirs[parent]) vfs.dirs[parent] = vfs.dirs[parent].filter((n) => n !== name)
-    return { vfs }
-  }),
-  renameItem: (path, newName) => set((s) => {
-    const p = normPath(path)
-    const vfs = clone(s.vfs)
-    const parent = p.slice(0, p.lastIndexOf('\\')) || p.slice(0, 3)
-    const oldName = p.slice(p.lastIndexOf('\\') + 1)
-    const np = normPath(parent + '\\' + newName)
-    if (vfs.files[p]) { vfs.files[np] = vfs.files[p]; delete vfs.files[p] }
-    if (vfs.dirs[p]) { vfs.dirs[np] = vfs.dirs[p]; delete vfs.dirs[p] }
-    if (vfs.dirs[parent]) vfs.dirs[parent] = vfs.dirs[parent].map((n) => n === oldName ? newName : n)
-    return { vfs }
-  }),
+  writeFile: (path, content) => {
+    set((s) => {
+      const p = normPath(path)
+      const vfs = clone(s.vfs)
+      const parent = p.slice(0, p.lastIndexOf('\\')) || p.slice(0, 3)
+      const name = p.slice(p.lastIndexOf('\\') + 1)
+      const stamp = new Date().toISOString().slice(0, 19).replace('T', ' ')
+      vfs.files[p] = { content, size: content.length, created: vfs.files[p]?.created || stamp, modified: stamp, accessed: stamp, attrs: vfs.files[p]?.attrs || [] }
+      if (vfs.dirs[parent] && !vfs.dirs[parent].includes(name)) vfs.dirs[parent] = [...vfs.dirs[parent], name]
+      return { vfs }
+    })
+    const lab = get().labAction
+    if (lab) lab('write_file', { path: normPath(path), content: String(content ?? '').slice(0, 4096) })
+  },
+  createDirectory: (path) => {
+    set((s) => {
+      const p = normPath(path)
+      if (s.vfs.dirs[p]) return {}
+      const vfs = clone(s.vfs)
+      const parent = p.slice(0, p.lastIndexOf('\\')) || p.slice(0, 3)
+      const name = p.slice(p.lastIndexOf('\\') + 1)
+      vfs.dirs[p] = []
+      if (vfs.dirs[parent] && !vfs.dirs[parent].includes(name)) vfs.dirs[parent] = [...vfs.dirs[parent], name]
+      return { vfs }
+    })
+    const lab = get().labAction
+    if (lab) lab('create_directory', { path: normPath(path) })
+  },
+  deleteItem: (path) => {
+    set((s) => {
+      const p = normPath(path)
+      const vfs = clone(s.vfs)
+      const parent = p.slice(0, p.lastIndexOf('\\')) || p.slice(0, 3)
+      const name = p.slice(p.lastIndexOf('\\') + 1)
+      delete vfs.files[p]
+      delete vfs.dirs[p]
+      Object.keys(vfs.dirs).forEach((k) => { if (k.startsWith(p + '\\')) delete vfs.dirs[k] })
+      Object.keys(vfs.files).forEach((k) => { if (k.startsWith(p + '\\')) delete vfs.files[k] })
+      if (vfs.dirs[parent]) vfs.dirs[parent] = vfs.dirs[parent].filter((n) => n !== name)
+      return { vfs }
+    })
+    const lab = get().labAction
+    if (lab) lab('delete_item', { path: normPath(path) })
+  },
+  renameItem: (path, newName) => {
+    set((s) => {
+      const p = normPath(path)
+      const vfs = clone(s.vfs)
+      const parent = p.slice(0, p.lastIndexOf('\\')) || p.slice(0, 3)
+      const oldName = p.slice(p.lastIndexOf('\\') + 1)
+      const np = normPath(parent + '\\' + newName)
+      if (vfs.files[p]) { vfs.files[np] = vfs.files[p]; delete vfs.files[p] }
+      if (vfs.dirs[p]) { vfs.dirs[np] = vfs.dirs[p]; delete vfs.dirs[p] }
+      if (vfs.dirs[parent]) vfs.dirs[parent] = vfs.dirs[parent].map((n) => n === oldName ? newName : n)
+      return { vfs }
+    })
+    const lab = get().labAction
+    if (lab) lab('rename_item', { path: normPath(path), new_name: newName })
+  },
 
   // ── disks ──
   disks: clone(SEED_DISKS),
