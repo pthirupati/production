@@ -143,9 +143,9 @@ function GPOEditor({ name, os, onClose }) {
           if (os.labAction) {
             os.labAction('update_gpo_setting', {
               gpo: name,
-              setting: edit[0],
-              value: 'Enabled',
-              detail: edit[2],
+              key: edit[0],
+              value: edit[2],
+              enabled: true,
             })
           }
           setEdit(null)
@@ -153,9 +153,9 @@ function GPOEditor({ name, os, onClose }) {
           if (os.labAction) {
             os.labAction('update_gpo_setting', {
               gpo: name,
-              setting: edit[0],
-              value: 'Enabled',
-              detail: edit[2],
+              key: edit[0],
+              value: edit[2],
+              enabled: true,
             })
           }
         }}>Apply</button></>}>
