@@ -16,7 +16,7 @@ import LaunchWizard from './pages/ec2/LaunchWizard'
 import { SecurityGroupList, KeyPairList, VolumeList, ElasticIpList, AmiList } from './pages/ec2/Ec2Lists'
 import { BucketList, BucketDetail } from './pages/s3/S3Pages'
 import { IamDashboard, UserList, GroupList, RoleList, PolicyList } from './pages/iam/IamPages'
-import { VpcDashboard, VpcList, SubnetList, RouteTableList, InternetGatewayList } from './pages/vpc/VpcPages'
+import { VpcDashboard, VpcList, SubnetList, RouteTableList, InternetGatewayList, NetworkAclList, NatGatewayList } from './pages/vpc/VpcPages'
 import { CloudWatchOverview, AlarmList, AlarmDetail, MetricsExplorer, DashboardList } from './pages/cloudwatch/CloudWatchPages'
 import { BillingDashboard, GenericResourceDetail, GenericResourceList, GenericServiceHome } from './pages/generic/GenericServicePages'
 import SettingsPage from './pages/SettingsPage'
@@ -116,6 +116,8 @@ export default function AwsConsole({ embedded = false }) {
             <Route path="vpc/subnets" element={<SubnetList />} />
             <Route path="vpc/route-tables" element={<RouteTableList />} />
             <Route path="vpc/internet-gateways" element={<InternetGatewayList />} />
+            <Route path="vpc/nat-gateways" element={<NatGatewayList />} />
+            <Route path="vpc/network-acls" element={<NetworkAclList />} />
             <Route path="vpc/security-groups" element={<SecurityGroupList />} />
 
             <Route path="cloudwatch/home" element={<CloudWatchOverview />} />

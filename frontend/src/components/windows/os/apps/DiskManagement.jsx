@@ -111,7 +111,11 @@ function InitDialog({ diskId, onClose }) {
   const [style, setStyle] = useState('GPT')
   return (
     <Dialog title="Initialize Disk" onClose={onClose} width={440}
-      footer={<><button className="winos-btn primary" onClick={() => { os.initializeDisk(diskId, style); onClose() }}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button></>}>
+      footer={<><button className="winos-btn primary" onClick={() => {
+        os.initializeDisk(diskId, style)
+        if (os.labAction) os.labAction('initialize_disk', { disk_id: diskId, style })
+        onClose()
+      }}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button></>}>
       <p style={{ fontSize: 12.5 }}>You must initialize a disk before Logical Disk Manager can access it.</p>
       <p style={{ fontSize: 12.5 }}>Select disks:</p>
       <div style={{ border: '1px solid #ddd', padding: 8, marginBottom: 12 }}><label><input type="checkbox" defaultChecked readOnly /> Disk {diskId}</label></div>
@@ -136,8 +140,12 @@ function NewVolumeWizard({ diskId, onClose }) {
   const [quick, setQuick] = useState(true)
 
   const finish = () => {
-    os.createVolume(diskId, { letter, label, fs, sizeGB: Math.round((sizeMB / 1024) * 100) / 100 })
+    const sizeGB = Math.round((sizeMB / 1024) * 100) / 100
+    os.createVolume(diskId, { letter, label, fs, sizeGB })
     os.logEvent('System', { id: 98, level: 'Information', src: 'Virtual Disk Service', msg: `Volume ${letter}: was created and formatted with ${fs}.` })
+    if (os.labAction) {
+      os.labAction('create_volume', { disk_id: diskId, letter, label, fs, size_gb: sizeGB })
+    }
     onClose()
   }
 

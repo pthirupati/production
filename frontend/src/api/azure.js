@@ -149,6 +149,12 @@ export const azureApi = {
   createVpnGateway(sessionId, name, opts = {}) {
     return azureApi.action(sessionId, 'create_vpn_gateway', { name, ...opts })
   },
+  createLoadBalancer(sessionId, payload = {}) {
+    return azureApi.action(sessionId, 'create_load_balancer', payload)
+  },
+  createPublicIp(sessionId, payload = {}) {
+    return azureApi.action(sessionId, 'create_public_ip', payload)
+  },
 }
 
 export default azureApi

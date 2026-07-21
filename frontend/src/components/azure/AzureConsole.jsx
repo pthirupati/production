@@ -229,7 +229,14 @@ export default function AzureConsole({
         <div className="az-tile"><Database size={16} /> <div><div className="az-tile-num">{storageAccounts.length}</div><div className="az-tile-label">Storage</div></div></div>
         <div className="az-tile"><Globe2 size={16} /> <div><div className="az-tile-num">{(st.cosmos_accounts || []).length}</div><div className="az-tile-label">Cosmos</div></div></div>
       </div>
-      <h2 className="text-lg font-semibold pt-2">Public IP addresses</h2>
+      <div className="flex justify-between items-center flex-wrap gap-2 pt-2">
+        <h2 className="text-lg font-semibold">Public IP addresses</h2>
+        <button type="button" className="az-btn-sm flex items-center gap-1" onClick={() => run(() => azureApi.createPublicIp(sessionId, {
+          name: `pip-${Date.now().toString(36).slice(-4)}`,
+        }), 'Public IP created')}>
+          <Plus size={11} /> Create public IP
+        </button>
+      </div>
       <SimDataTable columns={[
         { key: 'name', label: 'Name', sortable: true },
         { key: 'ip', label: 'IP address', sortable: true },
@@ -349,7 +356,14 @@ export default function AzureConsole({
 
   const renderLoadBalancers = () => (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Load balancers</h2>
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <h2 className="text-lg font-semibold">Load balancers</h2>
+        <button type="button" className="az-btn-primary flex items-center gap-1" onClick={() => run(() => azureApi.createLoadBalancer(sessionId, {
+          name: `lb-${Date.now().toString(36).slice(-4)}`,
+        }), 'Load balancer created')}>
+          <Plus size={14} /> Create load balancer
+        </button>
+      </div>
       {loadBalancers.map((lb) => (
         <div key={lb.name} className="az-panel">
           <div className="flex items-center justify-between mb-2 flex-wrap gap-2">

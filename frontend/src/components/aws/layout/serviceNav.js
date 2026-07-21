@@ -119,9 +119,10 @@ export const LEFT_NAV = {
       { label: 'Subnets', path: `${BASE}/vpc/subnets` },
       { label: 'Route tables', path: `${BASE}/vpc/route-tables` },
       { label: 'Internet gateways', path: `${BASE}/vpc/internet-gateways` },
+      { label: 'NAT gateways', path: `${BASE}/vpc/nat-gateways` },
       { group: 'Security' },
       { label: 'Security groups', path: `${BASE}/vpc/security-groups` },
-      { label: 'Network ACLs', path: `${BASE}/vpc/vpcs` },
+      { label: 'Network ACLs', path: `${BASE}/vpc/network-acls` },
     ],
   },
   cloudwatch: {

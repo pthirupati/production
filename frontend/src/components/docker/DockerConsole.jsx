@@ -3,7 +3,7 @@ import { dockerApi } from '../../api/docker'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Container, Image, Network, HardDrive, Layers,
-  Play, Square, Trash2, RotateCw, Plus, Download, Hexagon, KeyRound, Archive,
+  Play, Square, Trash2, RotateCw, Plus, Download, Hexagon, KeyRound, Archive, Terminal, Info, Eraser,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
@@ -151,6 +151,13 @@ export default function DockerConsole({
               </div>
             ))}
           </div>
+          <div className="flex justify-end mb-3">
+            <button type="button" className="docker-btn-ghost inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
+              disabled={busy}
+              onClick={() => run(() => dockerApi.systemPrune(sessionId, { all: false, volumes: false }), 'System pruned')}>
+              <Eraser size={14} /> System prune
+            </button>
+          </div>
           <SimDataTable
             searchKeys={['shortName', 'image', 'status']}
             columns={[
@@ -182,6 +189,14 @@ export default function DockerConsole({
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.restartContainer(sessionId, r.shortName), 'Restarted') }}>
                       <RotateCw size={14} />
                     </button>
+                    <button type="button" title="Exec" className="p-1 rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
+                      onClick={(e) => { e.stopPropagation(); run(() => dockerApi.execContainer(sessionId, r.shortName, 'sh'), 'Exec OK') }}>
+                      <Terminal size={14} />
+                    </button>
+                    <button type="button" title="Inspect" className="p-1 rounded hover:bg-slate-100" disabled={busy}
+                      onClick={(e) => { e.stopPropagation(); run(() => dockerApi.inspectContainer(sessionId, r.shortName), 'Inspected') }}>
+                      <Info size={14} />
+                    </button>
                     <button type="button" title="Remove" className="p-1 rounded hover:bg-slate-100" disabled={busy}
                       onClick={(e) => {
                         e.stopPropagation()
@@ -202,7 +217,12 @@ export default function DockerConsole({
     if (nav === 'images') {
       return (
         <div>
-          <div className="flex justify-end mb-3">
+          <div className="flex justify-end mb-3 gap-2">
+            <button type="button" className="docker-btn-ghost inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
+              disabled={busy}
+              onClick={() => run(() => dockerApi.systemPrune(sessionId, { all: true, volumes: false }), 'Pruned unused')}>
+              <Eraser size={14} /> Prune unused
+            </button>
             <button type="button" className="docker-btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
               onClick={() => setPullOpen(true)} disabled={busy}>
               <Download size={14} /> Pull image

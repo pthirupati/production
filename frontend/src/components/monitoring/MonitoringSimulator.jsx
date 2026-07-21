@@ -1018,12 +1018,20 @@ function normalizePromTarget(t) {
 }
 
 /* ── Prometheus status sub-pages ── */
-function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload }) {
+function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload, state }) {
   const [newTarget, setNewTarget] = useState({ job: 'node', url: 'http://localhost:9100/metrics' })
   const [newRule, setNewRule] = useState({ group: 'lab', name: '', expr: 'up == 0', for: '5m' })
   const [busy, setBusy] = useState(false)
   const [flagFilter, setFlagFilter] = useState('')
+  const [probeTarget, setProbeTarget] = useState('https://example.com')
+  const [probeModule, setProbeModule] = useState('http_2xx')
+  const [pushJob, setPushJob] = useState('batch')
+  const [pushInstance, setPushInstance] = useState('cron-1')
   const targets = (prom.targets || []).map(normalizePromTarget)
+  const exporters = state?.exporters || {}
+  const serviceDiscovery = (state?.service_discovery?.length ? state.service_discovery : null)
+  const promFlags = (state?.prom_flags?.length ? state.prom_flags : null)
+  const promRuntime = state?.prom_runtime || {}
 
   const addTarget = async () => {
     if (!sessionId || !newTarget.url.trim()) return
@@ -1090,25 +1098,26 @@ function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload }) {
     )
   }
   if (statusSub === 'service-discovery') {
+    const sdRows = serviceDiscovery || [
+      ...PROMETHEUS_SERVICE_DISCOVERY,
+      ...Object.values(targets.reduce((acc, t) => {
+        acc[t.job] = acc[t.job] || { job: t.job, discovered: 0, labels: ['job', 'instance'] }
+        acc[t.job].discovered += 1
+        return acc
+      }, {})),
+    ]
     return (
       <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 text-gray-500 text-xs">
-            <th className="px-3 py-2 text-left">Job</th><th className="px-3 py-2 text-left">Discovered targets</th><th className="px-3 py-2 text-left">Labels</th>
+            <th className="px-3 py-2 text-left">Job</th><th className="px-3 py-2 text-left">Discovered targets</th><th className="px-3 py-2 text-left">Type / Labels</th>
           </tr></thead>
           <tbody>
-            {[
-              ...PROMETHEUS_SERVICE_DISCOVERY,
-              ...Object.values(targets.reduce((acc, t) => {
-                acc[t.job] = acc[t.job] || { job: t.job, discovered: 0, labels: ['job', 'instance'] }
-                acc[t.job].discovered += 1
-                return acc
-              }, {})),
-            ].map((sd, i) => (
-              <tr key={`${sd.job}-${i}`} className="border-t border-gray-100">
-                <td className="px-3 py-2 font-mono">{sd.job}</td>
-                <td className="px-3 py-2">{sd.discovered}</td>
-                <td className="px-3 py-2 font-mono text-xs text-gray-600">{(sd.labels || []).join(', ')}</td>
+            {sdRows.map((sd, i) => (
+              <tr key={`${sd.job || sd.type}-${i}`} className="border-t border-gray-100">
+                <td className="px-3 py-2 font-mono">{sd.job || sd.role || '—'}</td>
+                <td className="px-3 py-2">{sd.discovered ?? sd.active ?? '—'}</td>
+                <td className="px-3 py-2 font-mono text-xs text-gray-600">{sd.type || (sd.labels || []).join(', ') || sd.path || '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -1127,10 +1136,10 @@ function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload }) {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
-            ['Start time', prom.started_at || '2026-06-20 08:00:00 UTC'],
-            ['Version', prom.version || '2.51.0'],
+            ['Start time', promRuntime.start_time || prom.started_at || '2026-06-20 08:00:00 UTC'],
+            ['Version', promRuntime.version || prom.version || '2.51.0'],
             ['Head series', (prom.tsdb?.head_series || prom.head_series || 124832).toLocaleString()],
-            ['Retention', prom.tsdb?.retention || prom.retention || '15d'],
+            ['Retention', promRuntime.storage_retention || prom.tsdb?.retention || prom.retention || '15d'],
             ['Storage', prom.storage || 'local TSDB'],
             ['WAL corruptions', prom.tsdb?.wal_corruptions ?? 0],
             ['Scrape interval', prom.scrape_interval || '15s'],
@@ -1198,7 +1207,10 @@ function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload }) {
   }
   if (statusSub === 'flags') {
     const q = flagFilter.trim().toLowerCase()
-    const rows = PROMETHEUS_FLAGS.filter(([k, v]) => !q || k.toLowerCase().includes(q) || String(v).toLowerCase().includes(q))
+    const flagPairs = promFlags
+      ? promFlags.map((f) => [f.flag || f.name, f.value])
+      : PROMETHEUS_FLAGS
+    const rows = flagPairs.filter(([k, v]) => !q || String(k).toLowerCase().includes(q) || String(v).toLowerCase().includes(q))
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1216,6 +1228,101 @@ function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload }) {
               {rows.length === 0 && (
                 <tr><td colSpan={2} className="px-3 py-6 text-center text-xs text-gray-400">No flags match “{flagFilter}”.</td></tr>
               )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+  if (statusSub === 'exporters') {
+    const node = exporters.node_exporter || {}
+    const blackbox = exporters.blackbox || { modules: [], probes: [] }
+    const pushgateway = exporters.pushgateway || { groups: [] }
+    const runProbe = async () => {
+      if (!sessionId || !probeTarget.trim()) return
+      setBusy(true)
+      try {
+        await monitoringApi.blackboxProbe(sessionId, { target: probeTarget.trim(), module: probeModule })
+        onReload?.()
+      } finally {
+        setBusy(false)
+      }
+    }
+    const runPush = async () => {
+      if (!sessionId) return
+      setBusy(true)
+      try {
+        await monitoringApi.pushgatewayPush(sessionId, { job: pushJob.trim() || 'batch', instance: pushInstance.trim() || 'cron-1', metrics: 1 })
+        onReload?.()
+      } finally {
+        setBusy(false)
+      }
+    }
+    return (
+      <div className="space-y-4">
+        <div className="mon-card bg-white !border-gray-200 !p-3">
+          <div className="text-sm font-semibold text-gray-800 mb-1">node_exporter</div>
+          <div className="text-xs font-mono text-gray-600">{node.url || '—'}</div>
+          <div className="text-xs mt-1">Status: <span className={node.up ? 'text-emerald-600' : 'text-red-600'}>{node.up === false ? 'DOWN' : 'UP'}</span></div>
+        </div>
+        <div className="mon-card bg-white !border-gray-200 !p-3 space-y-2">
+          <div className="text-sm font-semibold text-gray-800">Blackbox exporter</div>
+          <div className="text-xs font-mono text-gray-500">{blackbox.url || 'http://127.0.0.1:9115'}</div>
+          <div className="flex flex-wrap gap-2 items-end">
+            <label className="text-xs text-gray-600">Target
+              <input className="mon-input bg-white !text-gray-800 block mt-0.5 !w-64" value={probeTarget} onChange={(e) => setProbeTarget(e.target.value)} />
+            </label>
+            <label className="text-xs text-gray-600">Module
+              <select className="mon-input bg-white !text-gray-800 block mt-0.5" value={probeModule} onChange={(e) => setProbeModule(e.target.value)}>
+                {(blackbox.modules || ['http_2xx']).map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </label>
+            <button type="button" className="px-3 py-1.5 rounded border border-gray-200 text-xs text-gray-700 hover:bg-gray-50" disabled={busy} onClick={runProbe}>Probe</button>
+          </div>
+          <table className="w-full text-sm mt-2">
+            <thead><tr className="bg-gray-50 text-gray-500 text-xs">
+              <th className="px-2 py-1.5 text-left">Target</th><th className="px-2 py-1.5 text-left">Module</th><th className="px-2 py-1.5 text-left">Result</th><th className="px-2 py-1.5 text-left">Duration</th>
+            </tr></thead>
+            <tbody>
+              {(blackbox.probes || []).slice(0, 8).map((p, i) => (
+                <tr key={`${p.target}-${i}`} className="border-t border-gray-100">
+                  <td className="px-2 py-1.5 font-mono text-xs">{p.target}</td>
+                  <td className="px-2 py-1.5 text-xs">{p.module}</td>
+                  <td className={`px-2 py-1.5 text-xs font-semibold ${p.success ? 'text-emerald-600' : 'text-red-600'}`}>{p.success ? 'OK' : 'FAIL'}</td>
+                  <td className="px-2 py-1.5 font-mono text-xs">{p.duration_s != null ? `${p.duration_s}s` : '—'}</td>
+                </tr>
+              ))}
+              {!(blackbox.probes || []).length && (
+                <tr><td colSpan={4} className="px-2 py-4 text-center text-xs text-gray-400">No probes yet — run a probe above.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="mon-card bg-white !border-gray-200 !p-3 space-y-2">
+          <div className="text-sm font-semibold text-gray-800">Pushgateway</div>
+          <div className="text-xs font-mono text-gray-500">{pushgateway.url || 'http://127.0.0.1:9091'}</div>
+          <div className="flex flex-wrap gap-2 items-end">
+            <label className="text-xs text-gray-600">Job
+              <input className="mon-input bg-white !text-gray-800 block mt-0.5" value={pushJob} onChange={(e) => setPushJob(e.target.value)} />
+            </label>
+            <label className="text-xs text-gray-600">Instance
+              <input className="mon-input bg-white !text-gray-800 block mt-0.5" value={pushInstance} onChange={(e) => setPushInstance(e.target.value)} />
+            </label>
+            <button type="button" className="px-3 py-1.5 rounded border border-gray-200 text-xs text-gray-700 hover:bg-gray-50" disabled={busy} onClick={runPush}>Push</button>
+          </div>
+          <table className="w-full text-sm mt-2">
+            <thead><tr className="bg-gray-50 text-gray-500 text-xs">
+              <th className="px-2 py-1.5 text-left">Job</th><th className="px-2 py-1.5 text-left">Instance</th><th className="px-2 py-1.5 text-left">Metrics</th><th className="px-2 py-1.5 text-left">Last push</th>
+            </tr></thead>
+            <tbody>
+              {(pushgateway.groups || []).map((g) => (
+                <tr key={`${g.job}-${g.instance}`} className="border-t border-gray-100">
+                  <td className="px-2 py-1.5 font-mono text-xs">{g.job}</td>
+                  <td className="px-2 py-1.5 font-mono text-xs">{g.instance}</td>
+                  <td className="px-2 py-1.5 text-xs">{g.metrics ?? 0}</td>
+                  <td className="px-2 py-1.5 font-mono text-xs text-gray-500">{g.last_push || '—'}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -1398,7 +1505,7 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr, activeNav, st
 
       {showAlerts && <PrometheusAlertsPanel prom={prom} sessionId={sessionId} onReload={onReload} />}
 
-      {showStatus && <PrometheusStatusPanel prom={prom} statusSub={statusSub} sessionId={sessionId} onReload={onReload} />}
+      {showStatus && <PrometheusStatusPanel prom={prom} statusSub={statusSub} sessionId={sessionId} onReload={onReload} state={state} />}
 
       {(showGraph || (!externalNav && sub === 'query')) && (
         <div className="space-y-3">

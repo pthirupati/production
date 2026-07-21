@@ -97,13 +97,36 @@ def seed_v2() -> dict[str, Any]:
 def ensure_v2(state: dict) -> None:
     seed = seed_v2()
     # Top-level collections
-    for key in ("loadBalancers", "targetGroups", "autoScalingGroups", "cwAlarms", "cwDashboards"):
+    for key in ("loadBalancers", "targetGroups", "autoScalingGroups", "cwAlarms", "cwDashboards",
+                "networkAcls", "natGateways"):
         if key not in state or state.get(key) is None:
             if key in seed:
                 state[key] = seed[key]
             elif key == "cwAlarms":
                 state[key] = []
             elif key == "cwDashboards":
+                state[key] = []
+            elif key == "networkAcls":
+                state[key] = [
+                    {
+                        "id": "acl-0a1b2c3d4e5f67893", "region": "us-east-1",
+                        "vpcId": "vpc-0a1b2c3d4e5f67890", "default": True,
+                        "associations": [
+                            "subnet-0a1b2c3d4e5f10001",
+                            "subnet-0a1b2c3d4e5f10002",
+                            "subnet-0a1b2c3d4e5f10003",
+                        ],
+                        "inbound": [
+                            {"rule": 100, "protocol": "-1", "action": "allow", "cidr": "0.0.0.0/0", "from": 0, "to": 65535},
+                            {"rule": 32767, "protocol": "-1", "action": "deny", "cidr": "0.0.0.0/0", "from": 0, "to": 65535},
+                        ],
+                        "outbound": [
+                            {"rule": 100, "protocol": "-1", "action": "allow", "cidr": "0.0.0.0/0", "from": 0, "to": 65535},
+                            {"rule": 32767, "protocol": "-1", "action": "deny", "cidr": "0.0.0.0/0", "from": 0, "to": 65535},
+                        ],
+                    },
+                ]
+            elif key == "natGateways":
                 state[key] = []
     # Merge genericResources per service
     gr = state.setdefault("genericResources", {})

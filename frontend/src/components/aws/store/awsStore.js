@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { useAuthStore } from '../../../store/authStore'
 import {
   newInstanceId, newVolumeId, newSnapshotId, newSgId, newKeyPairId, newAmiId, newEipAllocId,
-  newEipAssocId, newIgwId, newSubnetId, newVpcId, newSgRuleId, newRtbId,
+  newEipAssocId, newIgwId, newSubnetId, newVpcId, newSgRuleId, newRtbId, newNatId, newAclId,
   newIamUserId, newIamRoleId, newIamGroupId, newAccessKeyId,
   newSecretAccessKey, newPrivateIp, newPublicIp, publicDns, privateDns, hostnameFromIp,
 } from '../lib/ids'
@@ -300,8 +300,23 @@ function seedState() {
       { id: 'igw-0a1b2c3d4e5f67891', region: 'us-east-1', vpcId: 'vpc-0a1b2c3d4e5f67890', state: 'attached', name: '' },
     ],
     routeTables: [
-      { id: 'rtb-0a1b2c3d4e5f67892', region: 'us-east-1', vpcId: 'vpc-0a1b2c3d4e5f67890', main: true, routes: [{ dest: '172.31.0.0/16', target: 'local' }, { dest: '0.0.0.0/0', target: 'igw-0a1b2c3d4e5f67891' }] },
+      { id: 'rtb-0a1b2c3d4e5f67892', region: 'us-east-1', vpcId: 'vpc-0a1b2c3d4e5f67890', main: true, associations: ['subnet-0a1b2c3d4e5f10001', 'subnet-0a1b2c3d4e5f10002', 'subnet-0a1b2c3d4e5f10003'], routes: [{ dest: '172.31.0.0/16', target: 'local' }, { dest: '0.0.0.0/0', target: 'igw-0a1b2c3d4e5f67891' }] },
     ],
+    networkAcls: [
+      {
+        id: 'acl-0a1b2c3d4e5f67893', region: 'us-east-1', vpcId: 'vpc-0a1b2c3d4e5f67890', default: true,
+        associations: ['subnet-0a1b2c3d4e5f10001', 'subnet-0a1b2c3d4e5f10002', 'subnet-0a1b2c3d4e5f10003'],
+        inbound: [
+          { rule: 100, protocol: '-1', action: 'allow', cidr: '0.0.0.0/0', from: 0, to: 65535 },
+          { rule: 32767, protocol: '-1', action: 'deny', cidr: '0.0.0.0/0', from: 0, to: 65535 },
+        ],
+        outbound: [
+          { rule: 100, protocol: '-1', action: 'allow', cidr: '0.0.0.0/0', from: 0, to: 65535 },
+          { rule: 32767, protocol: '-1', action: 'deny', cidr: '0.0.0.0/0', from: 0, to: 65535 },
+        ],
+      },
+    ],
+    natGateways: [],
     securityGroups: [
       { id: 'sg-0a1b2c3web00001', region: 'us-east-1', name: 'web-sg', description: 'Allow web traffic', vpcId: 'vpc-0a1b2c3d4e5f67890', inbound: [
         { id: 'sgr-1', type: 'SSH', protocol: 'TCP', from: 22, to: 22, source: '0.0.0.0/0', description: 'SSH' },
@@ -1114,7 +1129,7 @@ export const useAwsStore = create(
         const vpc = vpcs.find((v) => v.id === vpcId) || vpcs[0]
         if (!vpc) return fail(invalidParameterValue('CreateRouteTable', 'VPC not found'))
         const rtb = {
-          id: newRtbId(), region, vpcId: vpc.id, main: false,
+          id: newRtbId(), region, vpcId: vpc.id, main: false, associations: [],
           routes: [{ dest: vpc.cidr, target: 'local' }],
         }
         set((s) => ({ routeTables: [...(s.routeTables || []), rtb] }))
@@ -1136,6 +1151,22 @@ export const useAwsStore = create(
         get()._syncAction('create_route', { rtb_id: rtbId, dest: route.dest, target: route.target })
         return ok()
       },
+      associateRouteTable: (rtbId, subnetId) => {
+        const { routeTables, subnets } = get()
+        const rtb = routeTables.find((r) => r.id === rtbId)
+        const subnet = subnets.find((s) => s.id === subnetId)
+        if (!rtb) return fail(invalidParameterValue('AssociateRouteTable', `The routeTable ID '${rtbId}' does not exist`))
+        if (!subnet) return fail(invalidParameterValue('AssociateRouteTable', `The subnet ID '${subnetId}' does not exist`))
+        set((s) => ({
+          routeTables: s.routeTables.map((r) => {
+            const assocs = (r.associations || []).filter((a) => a !== subnetId)
+            if (r.id === rtbId && !assocs.includes(subnetId)) assocs.push(subnetId)
+            return { ...r, associations: assocs }
+          }),
+        }))
+        get()._syncAction('associate_route_table', { rtb_id: rtbId, subnet_id: subnetId })
+        return ok()
+      },
       deleteRouteTable: (id) => {
         const { routeTables } = get()
         const rtb = routeTables.find((r) => r.id === id)
@@ -1146,6 +1177,100 @@ export const useAwsStore = create(
         }
         set((s) => ({ routeTables: (s.routeTables || []).filter((r) => r.id !== id) }))
         get()._syncAction('delete_route_table', { rtb_id: id })
+        return ok()
+      },
+
+      createNetworkAcl: ({ vpcId } = {}) => {
+        const { region, vpcs } = get()
+        const vpc = vpcs.find((v) => v.id === vpcId) || vpcs[0]
+        if (!vpc) return fail(invalidParameterValue('CreateNetworkAcl', 'VPC not found'))
+        const acl = {
+          id: newAclId(), region, vpcId: vpc.id, default: false, associations: [],
+          inbound: [{ rule: 32767, protocol: '-1', action: 'deny', cidr: '0.0.0.0/0', from: 0, to: 65535 }],
+          outbound: [{ rule: 32767, protocol: '-1', action: 'deny', cidr: '0.0.0.0/0', from: 0, to: 65535 }],
+        }
+        set((s) => ({ networkAcls: [...(s.networkAcls || []), acl] }))
+        get()._syncAction('create_network_acl', { acl_id: acl.id, vpc_id: vpc.id })
+        return acl
+      },
+      createNaclEntry: (aclId, { rule = 100, protocol = '-1', action = 'allow', cidr = '0.0.0.0/0', from = 0, to = 65535, egress = false } = {}) => {
+        const { networkAcls } = get()
+        const acl = (networkAcls || []).find((a) => a.id === aclId)
+        if (!acl) return fail(invalidParameterValue('CreateNetworkAclEntry', `The networkAcl ID '${aclId}' does not exist`))
+        const dir = egress ? 'outbound' : 'inbound'
+        const row = { rule, protocol, action, cidr, from, to }
+        set((s) => ({
+          networkAcls: s.networkAcls.map((a) => {
+            if (a.id !== aclId) return a
+            const rules = [...(a[dir] || []).filter((r) => r.rule !== rule), row].sort((x, y) => x.rule - y.rule)
+            return { ...a, [dir]: rules }
+          }),
+        }))
+        get()._syncAction('create_nacl_entry', { acl_id: aclId, rule, protocol, action, cidr, from, to, egress })
+        return ok()
+      },
+      replaceNaclAssociation: (aclId, subnetId) => {
+        const { networkAcls, subnets } = get()
+        if (!(networkAcls || []).find((a) => a.id === aclId)) {
+          return fail(invalidParameterValue('ReplaceNetworkAclAssociation', `The networkAcl ID '${aclId}' does not exist`))
+        }
+        if (!subnets.find((s) => s.id === subnetId)) {
+          return fail(invalidParameterValue('ReplaceNetworkAclAssociation', `The subnet ID '${subnetId}' does not exist`))
+        }
+        set((s) => ({
+          networkAcls: s.networkAcls.map((a) => {
+            const assocs = (a.associations || []).filter((x) => x !== subnetId)
+            if (a.id === aclId && !assocs.includes(subnetId)) assocs.push(subnetId)
+            return { ...a, associations: assocs }
+          }),
+        }))
+        get()._syncAction('replace_nacl_association', { acl_id: aclId, subnet_id: subnetId })
+        return ok()
+      },
+      deleteNetworkAcl: (id) => {
+        const { networkAcls } = get()
+        const acl = (networkAcls || []).find((a) => a.id === id)
+        if (acl?.default) {
+          const err = dependencyViolation('DeleteNetworkAcl', `The default network ACL '${id}' cannot be deleted.`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        if (acl?.associations?.length) {
+          const err = dependencyViolation('DeleteNetworkAcl', `Network ACL '${id}' has subnet associations`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        set((s) => ({ networkAcls: (s.networkAcls || []).filter((a) => a.id !== id) }))
+        get()._syncAction('delete_network_acl', { acl_id: id })
+        return ok()
+      },
+
+      createNatGateway: ({ subnetId, allocationId } = {}) => {
+        const { region, subnets, elasticIps } = get()
+        const subnet = subnets.find((s) => s.id === subnetId) || subnets[0]
+        if (!subnet) return fail(invalidParameterValue('CreateNatGateway', 'Subnet not found'))
+        let eip = allocationId ? elasticIps.find((e) => e.allocationId === allocationId) : null
+        if (!eip) {
+          eip = {
+            allocationId: newEipAllocId(), region, publicIp: newPublicIp(),
+            associationId: null, instanceId: null, domain: 'vpc',
+          }
+          set((s) => ({ elasticIps: [...(s.elasticIps || []), eip] }))
+          get()._syncAction('allocate_eip', { allocation_id: eip.allocationId, public_ip: eip.publicIp })
+        }
+        const nat = {
+          id: newNatId(), region, subnetId: subnet.id, vpcId: subnet.vpcId,
+          allocationId: eip.allocationId, publicIp: eip.publicIp, state: 'available',
+        }
+        set((s) => ({ natGateways: [...(s.natGateways || []), nat] }))
+        get()._syncAction('create_nat_gateway', {
+          nat_id: nat.id, subnet_id: subnet.id, allocation_id: eip.allocationId, public_ip: eip.publicIp,
+        })
+        return nat
+      },
+      deleteNatGateway: (id) => {
+        set((s) => ({ natGateways: (s.natGateways || []).filter((n) => n.id !== id) }))
+        get()._syncAction('delete_nat_gateway', { nat_id: id })
         return ok()
       },
 

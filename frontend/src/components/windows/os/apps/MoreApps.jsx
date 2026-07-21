@@ -325,7 +325,21 @@ function AdapterProps({ adapter, onClose }) {
   if (ipv4) {
     return (
       <Dialog title="Internet Protocol Version 4 (TCP/IPv4) Properties" onClose={() => setIpv4(false)} width={440}
-        footer={<><button className="winos-btn primary" onClick={() => { os.setAdapter(adapter.id, { ipv4: form.ipv4, mask: form.mask, gateway: form.gateway, dns: form.dns, dhcp: form.dhcp }); setIpv4(false) }}>OK</button><button className="winos-btn" onClick={() => setIpv4(false)}>Cancel</button></>}>
+        footer={<><button className="winos-btn primary" onClick={() => {
+          const patch = { ipv4: form.ipv4, mask: form.mask, gateway: form.gateway, dns: form.dns, dhcp: form.dhcp }
+          os.setAdapter(adapter.id, patch)
+          if (os.labAction) {
+            os.labAction('set_adapter_ip', {
+              adapter_id: adapter.id,
+              dhcp: !!form.dhcp,
+              ipv4: form.ipv4,
+              mask: form.mask,
+              gw: form.gateway,
+              dns: form.dns,
+            })
+          }
+          setIpv4(false)
+        }}>OK</button><button className="winos-btn" onClick={() => setIpv4(false)}>Cancel</button></>}>
         <div style={{ fontSize: 12.5 }}>
           <label style={{ display: 'block' }}><input type="radio" checked={form.dhcp} onChange={() => setForm((f) => ({ ...f, dhcp: true }))} /> Obtain an IP address automatically</label>
           <label style={{ display: 'block', marginBottom: 6 }}><input type="radio" checked={!form.dhcp} onChange={() => setForm((f) => ({ ...f, dhcp: false }))} /> Use the following IP address:</label>

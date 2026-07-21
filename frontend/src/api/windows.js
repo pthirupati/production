@@ -68,6 +68,9 @@ export const windowsApi = {
   stopService: (sessionId, service) => action(sessionId, 'stop_service', { service }),
   restartService: (sessionId, service) => action(sessionId, 'restart_service', { service }),
   setStartup: (sessionId, service, startup) => action(sessionId, 'set_startup', { service, startup }),
+  initializeDisk: (sessionId, diskId, style = 'GPT') => action(sessionId, 'initialize_disk', { disk_id: diskId, style }),
+  createVolume: (sessionId, payload = {}) => action(sessionId, 'create_volume', payload),
+  setAdapterIp: (sessionId, payload = {}) => action(sessionId, 'set_adapter_ip', payload),
 
   joinDomain: (sessionId, domain) => action(sessionId, 'join_domain', domain ? { domain } : {}),
   leaveDomain: (sessionId) => action(sessionId, 'leave_domain', {}),

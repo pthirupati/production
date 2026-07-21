@@ -3,7 +3,7 @@ export default function PrometheusTopNav({ active, onSelect, statusSub, onStatus
   const items = [
     { key: 'alerts', label: 'Alerts' },
     { key: 'graph', label: 'Graph' },
-    { key: 'status', label: 'Status', dropdown: ['Runtime & Build', 'TSDB Status', 'Configuration', 'Flags', 'Rules', 'Targets', 'Service Discovery'] },
+    { key: 'status', label: 'Status', dropdown: ['Runtime & Build', 'TSDB Status', 'Configuration', 'Flags', 'Rules', 'Targets', 'Service Discovery', 'Exporters'] },
     { key: 'help', label: 'Help' },
   ]
   const statusKeys = {
@@ -14,6 +14,7 @@ export default function PrometheusTopNav({ active, onSelect, statusSub, onStatus
     Rules: 'rules',
     Targets: 'targets',
     'Service Discovery': 'service-discovery',
+    Exporters: 'exporters',
   }
   return (
     <nav className="flex items-center gap-1 px-4 py-2 bg-white border-b border-gray-200 text-sm">

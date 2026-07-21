@@ -83,14 +83,26 @@ export default function Services() {
   )
 }
 
+function toEngineStartup(ui) {
+  const raw = String(ui || '').toLowerCase()
+  if (raw.includes('disabled')) return 'disabled'
+  if (raw.includes('delayed')) return 'automatic-delayed'
+  if (raw.includes('auto')) return 'automatic'
+  return 'manual'
+}
+
 function ServiceProps({ svc, onClose }) {
   const os = useOS()
   const [tab, setTab] = useState('General')
   const live = os.services.find((s) => s.name === svc.name) || svc
   const [startup, setStartup] = useState(live.startup)
+  const applyStartup = () => {
+    os.setService(svc.name, { startup })
+    if (os.labAction) os.labAction('set_startup', { service: svc.name, startup: toEngineStartup(startup) })
+  }
   return (
     <Dialog title={`${live.display} Properties (Local Computer)`} onClose={onClose} width={460}
-      footer={<><button className="winos-btn primary" onClick={() => { os.setService(svc.name, { startup }); onClose() }}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button><button className="winos-btn" onClick={() => os.setService(svc.name, { startup })}>Apply</button></>}>
+      footer={<><button className="winos-btn primary" onClick={() => { applyStartup(); onClose() }}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button><button className="winos-btn" onClick={applyStartup}>Apply</button></>}>
       <Tabs tabs={['General', 'Log On', 'Recovery', 'Dependencies']} active={tab} onChange={setTab} />
       <div style={{ paddingTop: 12, fontSize: 12.5 }}>
         {tab === 'General' && (

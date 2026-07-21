@@ -24,11 +24,15 @@ export function VpcDashboard() {
   const rts = scoped(useAwsStore((s) => s.routeTables), region)
   const igws = scoped(useAwsStore((s) => s.internetGateways), region)
   const sgs = scoped(useAwsStore((s) => s.securityGroups), region)
+  const acls = scoped(useAwsStore((s) => s.networkAcls) || [], region)
+  const nats = scoped(useAwsStore((s) => s.natGateways) || [], region)
   const cards = [
     ['VPCs', vpcs.length, `${BASE}/vpc/vpcs`],
     ['Subnets', subnets.length, `${BASE}/vpc/subnets`],
     ['Route tables', rts.length, `${BASE}/vpc/route-tables`],
     ['Internet gateways', igws.length, `${BASE}/vpc/internet-gateways`],
+    ['NAT gateways', nats.length, `${BASE}/vpc/nat-gateways`],
+    ['Network ACLs', acls.length, `${BASE}/vpc/network-acls`],
     ['Security groups', sgs.length, `${BASE}/vpc/security-groups`],
   ]
   const primaryVpc = vpcs[0]
@@ -174,25 +178,37 @@ export function RouteTableList() {
   const region = useAwsStore((s) => s.region)
   const rts = scoped(useAwsStore((s) => s.routeTables), region)
   const vpcs = scoped(useAwsStore((s) => s.vpcs), region)
+  const subnets = scoped(useAwsStore((s) => s.subnets), region)
   const igws = scoped(useAwsStore((s) => s.internetGateways), region)
   const createRtb = useAwsStore((s) => s.createRouteTable)
   const createRoute = useAwsStore((s) => s.createRoute)
+  const associateRtb = useAwsStore((s) => s.associateRouteTable)
   const deleteRtb = useAwsStore((s) => s.deleteRouteTable)
   const pushFlash = useAwsStore((s) => s.pushFlash)
   const columns = [
     { key: 'id', label: 'Route table ID', render: (r) => <IDCopy value={r.id} /> },
     { key: 'main', label: 'Main', render: (r) => (r.main ? 'Yes' : 'No') },
     { key: 'vpcId', label: 'VPC', render: (r) => <span className="aws-mono">{r.vpcId}</span> },
+    { key: 'associations', label: 'Subnet associations', render: (r) => (r.associations || []).length },
     { key: 'routes', label: 'Routes', render: (r) => r.routes.map((rt) => `${rt.dest} → ${rt.target}`).join(', ') },
     {
       key: 'actions', label: '', sortable: false,
       render: (r) => (
-        <Button variant="link" onClick={() => {
-          const igw = igws.find((g) => g.vpcId === r.vpcId && g.state === 'attached') || igws[0]
-          const res = createRoute(r.id, { dest: '0.0.0.0/0', target: igw?.id || 'igw-local' })
-          if (res?.ok === false) return
-          pushFlash('success', `Added default route on ${r.id}`)
-        }}>Add 0.0.0.0/0</Button>
+        <span className="flex gap-2 flex-wrap">
+          <Button variant="link" onClick={() => {
+            const igw = igws.find((g) => g.vpcId === r.vpcId && g.state === 'attached') || igws[0]
+            const res = createRoute(r.id, { dest: '0.0.0.0/0', target: igw?.id || 'igw-local' })
+            if (res?.ok === false) return
+            pushFlash('success', `Added default route on ${r.id}`)
+          }}>Add 0.0.0.0/0</Button>
+          <Button variant="link" onClick={() => {
+            const subnet = subnets.find((s) => s.vpcId === r.vpcId && !(r.associations || []).includes(s.id)) || subnets.find((s) => s.vpcId === r.vpcId)
+            if (!subnet) { pushFlash('error', 'No subnet available'); return }
+            const res = associateRtb(r.id, subnet.id)
+            if (res?.ok === false) return
+            pushFlash('success', `Associated ${subnet.id} with ${r.id}`)
+          }}>Associate subnet</Button>
+        </span>
       ),
     },
   ]
@@ -282,6 +298,105 @@ export function InternetGatewayList() {
           </select>
         </Modal>
       )}
+    </Page>
+  )
+}
+
+export function NetworkAclList() {
+  const region = useAwsStore((s) => s.region)
+  const acls = scoped(useAwsStore((s) => s.networkAcls) || [], region)
+  const vpcs = scoped(useAwsStore((s) => s.vpcs), region)
+  const subnets = scoped(useAwsStore((s) => s.subnets), region)
+  const createAcl = useAwsStore((s) => s.createNetworkAcl)
+  const createEntry = useAwsStore((s) => s.createNaclEntry)
+  const replaceAssoc = useAwsStore((s) => s.replaceNaclAssociation)
+  const deleteAcl = useAwsStore((s) => s.deleteNetworkAcl)
+  const pushFlash = useAwsStore((s) => s.pushFlash)
+  const columns = [
+    { key: 'id', label: 'Network ACL ID', render: (r) => <IDCopy value={r.id} /> },
+    { key: 'default', label: 'Default', render: (r) => (r.default ? 'Yes' : 'No') },
+    { key: 'vpcId', label: 'VPC', render: (r) => <span className="aws-mono">{r.vpcId}</span> },
+    { key: 'associations', label: 'Subnets', render: (r) => (r.associations || []).length },
+    { key: 'inbound', label: 'Inbound rules', render: (r) => (r.inbound || []).length },
+    {
+      key: 'actions', label: '', sortable: false,
+      render: (r) => (
+        <span className="flex gap-2 flex-wrap">
+          <Button variant="link" onClick={() => {
+            const res = createEntry(r.id, { rule: 110, protocol: '6', action: 'allow', cidr: '0.0.0.0/0', from: 80, to: 80 })
+            if (res?.ok === false) return
+            pushFlash('success', `Added inbound rule 110 on ${r.id}`)
+          }}>Allow HTTP</Button>
+          <Button variant="link" onClick={() => {
+            const subnet = subnets.find((s) => s.vpcId === r.vpcId)
+            if (!subnet) { pushFlash('error', 'No subnet'); return }
+            const res = replaceAssoc(r.id, subnet.id)
+            if (res?.ok === false) return
+            pushFlash('success', `Associated ${subnet.id}`)
+          }}>Associate subnet</Button>
+        </span>
+      ),
+    },
+  ]
+  return (
+    <Page
+      title={`Network ACLs (${acls.length})`}
+      action={<Button variant="primary" onClick={() => {
+        const res = createAcl({ vpcId: vpcs[0]?.id })
+        if (res?.ok === false) return
+        pushFlash('success', `Created ${res.id}`)
+      }}>Create network ACL</Button>}
+    >
+      <DataTable
+        columns={columns}
+        rows={acls}
+        getRowKey={(r) => r.id}
+        selectable
+        selected={[]}
+        onSelect={() => {}}
+        rowActions={(r) => (r.default ? [] : [
+          { label: 'Delete', danger: true, onClick: () => { const res = deleteAcl(r.id); if (res?.ok === false) return; pushFlash('success', `Deleted ${r.id}`) } },
+        ])}
+      />
+    </Page>
+  )
+}
+
+export function NatGatewayList() {
+  const region = useAwsStore((s) => s.region)
+  const nats = scoped(useAwsStore((s) => s.natGateways) || [], region)
+  const subnets = scoped(useAwsStore((s) => s.subnets), region)
+  const createNat = useAwsStore((s) => s.createNatGateway)
+  const deleteNat = useAwsStore((s) => s.deleteNatGateway)
+  const pushFlash = useAwsStore((s) => s.pushFlash)
+  const columns = [
+    { key: 'id', label: 'NAT gateway ID', render: (r) => <IDCopy value={r.id} /> },
+    { key: 'state', label: 'State', render: (r) => <Badge state="available">{r.state}</Badge> },
+    { key: 'subnetId', label: 'Subnet', render: (r) => <span className="aws-mono">{r.subnetId}</span> },
+    { key: 'publicIp', label: 'Primary public IP', render: (r) => r.publicIp || '—' },
+    { key: 'allocationId', label: 'Elastic IP allocation ID', render: (r) => <span className="aws-mono">{r.allocationId}</span> },
+  ]
+  return (
+    <Page
+      title={`NAT gateways (${nats.length})`}
+      action={<Button variant="primary" onClick={() => {
+        const subnet = subnets.find((s) => s.mapPublicIp) || subnets[0]
+        const res = createNat({ subnetId: subnet?.id })
+        if (res?.ok === false) return
+        pushFlash('success', `Created ${res.id}`)
+      }}>Create NAT gateway</Button>}
+    >
+      <DataTable
+        columns={columns}
+        rows={nats}
+        getRowKey={(r) => r.id}
+        selectable
+        selected={[]}
+        onSelect={() => {}}
+        rowActions={(r) => [
+          { label: 'Delete', danger: true, onClick: () => { const res = deleteNat(r.id); if (res?.ok === false) return; pushFlash('success', `Deleted ${r.id}`) } },
+        ]}
+      />
     </Page>
   )
 }

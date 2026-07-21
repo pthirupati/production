@@ -79,6 +79,14 @@ def new_rtb_id() -> str:
     return f"rtb-0{_hex(16)}"
 
 
+def new_acl_id() -> str:
+    return f"acl-0{_hex(16)}"
+
+
+def new_nat_id() -> str:
+    return f"nat-0{_hex(16)}"
+
+
 def new_eip_alloc_id() -> str:
     return f"eipalloc-0{_hex(16)}"
 
@@ -221,8 +229,23 @@ def _base_state() -> dict:
             {"id": "igw-0a1b2c3d4e5f67891", "region": "us-east-1", "vpcId": "vpc-0a1b2c3d4e5f67890", "state": "attached", "name": ""},
         ],
         "routeTables": [
-            {"id": "rtb-0a1b2c3d4e5f67892", "region": "us-east-1", "vpcId": "vpc-0a1b2c3d4e5f67890", "main": True, "routes": [{"dest": "172.31.0.0/16", "target": "local"}, {"dest": "0.0.0.0/0", "target": "igw-0a1b2c3d4e5f67891"}]},
+            {"id": "rtb-0a1b2c3d4e5f67892", "region": "us-east-1", "vpcId": "vpc-0a1b2c3d4e5f67890", "main": True, "associations": ["subnet-0a1b2c3d4e5f10001", "subnet-0a1b2c3d4e5f10002", "subnet-0a1b2c3d4e5f10003"], "routes": [{"dest": "172.31.0.0/16", "target": "local"}, {"dest": "0.0.0.0/0", "target": "igw-0a1b2c3d4e5f67891"}]},
         ],
+        "networkAcls": [
+            {
+                "id": "acl-0a1b2c3d4e5f67893", "region": "us-east-1", "vpcId": "vpc-0a1b2c3d4e5f67890", "default": True,
+                "associations": ["subnet-0a1b2c3d4e5f10001", "subnet-0a1b2c3d4e5f10002", "subnet-0a1b2c3d4e5f10003"],
+                "inbound": [
+                    {"rule": 100, "protocol": "-1", "action": "allow", "cidr": "0.0.0.0/0", "from": 0, "to": 65535},
+                    {"rule": 32767, "protocol": "-1", "action": "deny", "cidr": "0.0.0.0/0", "from": 0, "to": 65535},
+                ],
+                "outbound": [
+                    {"rule": 100, "protocol": "-1", "action": "allow", "cidr": "0.0.0.0/0", "from": 0, "to": 65535},
+                    {"rule": 32767, "protocol": "-1", "action": "deny", "cidr": "0.0.0.0/0", "from": 0, "to": 65535},
+                ],
+            },
+        ],
+        "natGateways": [],
         "securityGroups": [
             {"id": "sg-0a1b2c3web00001", "region": "us-east-1", "name": "web-sg", "description": "Allow web traffic", "vpcId": "vpc-0a1b2c3d4e5f67890", "inbound": [
                 {"id": "sgr-1", "type": "SSH", "protocol": "TCP", "from": 22, "to": 22, "source": "0.0.0.0/0", "description": "SSH"},
@@ -967,6 +990,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             "region": region,
             "vpcId": vpc_id,
             "main": False,
+            "associations": [],
             "routes": [{"dest": (vpc or {}).get("cidr") or "10.0.0.0/16", "target": "local"}],
         }
         state.setdefault("routeTables", []).append(rtb)
@@ -999,6 +1023,155 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"Route table {rtb_id} deleted", "info")
         _save(session_id, entry)
         return {"ok": True, "message": "DeleteRouteTable succeeded"}
+
+    if action == "associate_route_table":
+        rtb_id = payload.get("rtb_id") or ""
+        subnet_id = payload.get("subnet_id") or ""
+        rtb = next((r for r in state.get("routeTables", []) if r.get("id") == rtb_id), None)
+        subnet = next((s for s in state.get("subnets", []) if s.get("id") == subnet_id), None)
+        if not rtb:
+            return {"ok": False, "error": f"The routeTable ID '{rtb_id}' does not exist"}
+        if not subnet:
+            return {"ok": False, "error": f"The subnet ID '{subnet_id}' does not exist"}
+        for other in state.get("routeTables") or []:
+            assocs = list(other.get("associations") or [])
+            if subnet_id in assocs and other.get("id") != rtb_id:
+                other["associations"] = [a for a in assocs if a != subnet_id]
+        assocs = list(rtb.get("associations") or [])
+        if subnet_id not in assocs:
+            assocs.append(subnet_id)
+        rtb["associations"] = assocs
+        _event(state, f"Associated {subnet_id} with {rtb_id}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "AssociateRouteTable succeeded"}
+
+    if action == "disassociate_route_table":
+        rtb_id = payload.get("rtb_id") or ""
+        subnet_id = payload.get("subnet_id") or ""
+        rtb = next((r for r in state.get("routeTables", []) if r.get("id") == rtb_id), None)
+        if not rtb:
+            return {"ok": False, "error": f"The routeTable ID '{rtb_id}' does not exist"}
+        rtb["associations"] = [a for a in (rtb.get("associations") or []) if a != subnet_id]
+        _event(state, f"Disassociated {subnet_id} from {rtb_id}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "DisassociateRouteTable succeeded"}
+
+    if action == "create_network_acl":
+        vpc_id = payload.get("vpc_id") or (state.get("vpcs") or [{}])[0].get("id")
+        acl = {
+            "id": payload.get("acl_id") or new_acl_id(),
+            "region": region,
+            "vpcId": vpc_id,
+            "default": False,
+            "associations": [],
+            "inbound": [
+                {"rule": 32767, "protocol": "-1", "action": "deny", "cidr": "0.0.0.0/0", "from": 0, "to": 65535},
+            ],
+            "outbound": [
+                {"rule": 32767, "protocol": "-1", "action": "deny", "cidr": "0.0.0.0/0", "from": 0, "to": 65535},
+            ],
+        }
+        state.setdefault("networkAcls", []).append(acl)
+        _event(state, f"Network ACL {acl['id']} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CreateNetworkAcl succeeded", "acl_id": acl["id"]}
+
+    if action == "delete_network_acl":
+        acl_id = payload.get("acl_id") or payload.get("id")
+        acl = next((a for a in state.get("networkAcls", []) if a.get("id") == acl_id), None)
+        if not acl:
+            return {"ok": False, "error": f"The networkAcl ID '{acl_id}' does not exist"}
+        if acl.get("default"):
+            return {"ok": False, "error": f"The default network ACL '{acl_id}' cannot be deleted."}
+        if acl.get("associations"):
+            return {"ok": False, "error": f"Network ACL '{acl_id}' has subnet associations"}
+        state["networkAcls"] = [a for a in state["networkAcls"] if a.get("id") != acl_id]
+        _event(state, f"Network ACL {acl_id} deleted", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "DeleteNetworkAcl succeeded"}
+
+    if action == "create_nacl_entry":
+        acl_id = payload.get("acl_id") or ""
+        acl = next((a for a in state.get("networkAcls", []) if a.get("id") == acl_id), None)
+        if not acl:
+            return {"ok": False, "error": f"The networkAcl ID '{acl_id}' does not exist"}
+        direction = "outbound" if payload.get("egress") else "inbound"
+        rule_row = {
+            "rule": int(payload.get("rule") or payload.get("rule_number") or 100),
+            "protocol": str(payload.get("protocol") if payload.get("protocol") is not None else "-1"),
+            "action": (payload.get("action") or "allow").lower(),
+            "cidr": payload.get("cidr") or "0.0.0.0/0",
+            "from": int(payload.get("from") or payload.get("from_port") or 0),
+            "to": int(payload.get("to") or payload.get("to_port") or 65535),
+        }
+        rules = [r for r in (acl.get(direction) or []) if r.get("rule") != rule_row["rule"]]
+        rules.append(rule_row)
+        rules.sort(key=lambda r: r.get("rule", 0))
+        acl[direction] = rules
+        _event(state, f"NACL entry {rule_row['rule']} on {acl_id}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CreateNetworkAclEntry succeeded"}
+
+    if action == "replace_nacl_association":
+        acl_id = payload.get("acl_id") or ""
+        subnet_id = payload.get("subnet_id") or ""
+        acl = next((a for a in state.get("networkAcls", []) if a.get("id") == acl_id), None)
+        if not acl:
+            return {"ok": False, "error": f"The networkAcl ID '{acl_id}' does not exist"}
+        for other in state.get("networkAcls") or []:
+            assocs = list(other.get("associations") or [])
+            if subnet_id in assocs and other.get("id") != acl_id:
+                other["associations"] = [a for a in assocs if a != subnet_id]
+        assocs = list(acl.get("associations") or [])
+        if subnet_id not in assocs:
+            assocs.append(subnet_id)
+        acl["associations"] = assocs
+        _event(state, f"Associated subnet {subnet_id} with NACL {acl_id}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "ReplaceNetworkAclAssociation succeeded"}
+
+    if action == "create_nat_gateway":
+        subnet_id = payload.get("subnet_id") or (state.get("subnets") or [{}])[0].get("id")
+        subnet = next((s for s in state.get("subnets", []) if s.get("id") == subnet_id), None)
+        if not subnet:
+            return {"ok": False, "error": f"The subnet ID '{subnet_id}' does not exist"}
+        alloc = payload.get("allocation_id")
+        eip = None
+        if alloc:
+            eip = next((e for e in state.get("elasticIps", []) if e.get("allocationId") == alloc), None)
+        if not eip:
+            eip = {
+                "allocationId": alloc or new_eip_alloc_id(),
+                "region": region,
+                "publicIp": payload.get("public_ip") or new_public_ip(),
+                "associationId": None,
+                "instanceId": None,
+                "domain": "vpc",
+            }
+            state.setdefault("elasticIps", []).append(eip)
+        nat = {
+            "id": payload.get("nat_id") or new_nat_id(),
+            "region": region,
+            "subnetId": subnet_id,
+            "vpcId": subnet.get("vpcId"),
+            "allocationId": eip["allocationId"],
+            "publicIp": eip["publicIp"],
+            "state": "available",
+        }
+        state.setdefault("natGateways", []).append(nat)
+        _event(state, f"NAT gateway {nat['id']} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CreateNatGateway succeeded", "nat_id": nat["id"]}
+
+    if action == "delete_nat_gateway":
+        nat_id = payload.get("nat_id") or payload.get("id")
+        before = len(state.get("natGateways") or [])
+        state["natGateways"] = [n for n in (state.get("natGateways") or []) if n.get("id") != nat_id]
+        if len(state.get("natGateways") or []) == before:
+            return {"ok": False, "error": f"The natGateway ID '{nat_id}' does not exist"}
+        _event(state, f"NAT gateway {nat_id} deleted", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "DeleteNatGateway succeeded"}
 
     if action == "create_image":
         inst_id = payload.get("instance_id") or ""

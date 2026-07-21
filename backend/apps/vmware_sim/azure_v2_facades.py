@@ -551,4 +551,41 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
             rule["enabled"] = not bool(rule.get("enabled"))
         return {"ok": True, "message": f"Rule {rule['name']} → {'enabled' if rule['enabled'] else 'disabled'}", "rule": rule}
 
+    if action == "create_load_balancer":
+        name = (payload.get("name") or f"lb-{_hex(4)}").strip()
+        if any(x.get("name") == name for x in state.get("load_balancers") or []):
+            return {"ok": False, "error": f"Load balancer '{name}' already exists"}
+        frontend = payload.get("frontend_ip") or f"20.1.2.{10 + len(state.get('load_balancers') or [])}"
+        item = {
+            "id": f"lb-{_hex(8)}",
+            "name": name,
+            "resource_group": rg,
+            "location": payload.get("location") or "eastus",
+            "sku": payload.get("sku") or "Standard",
+            "frontend_ip": frontend,
+            "backend_pool": list(payload.get("backend_pool") or []),
+            "rules": list(payload.get("rules") or []),
+            "probes": list(payload.get("probes") or [
+                {"name": "http-probe", "protocol": "Http", "port": 80, "path": "/"},
+            ]),
+        }
+        state.setdefault("load_balancers", []).append(item)
+        return {"ok": True, "message": f"Created load balancer {name}", "load_balancer": item}
+
+    if action == "create_public_ip":
+        name = (payload.get("name") or f"pip-{_hex(4)}").strip()
+        if any(x.get("name") == name for x in state.get("public_ips") or []):
+            return {"ok": False, "error": f"Public IP '{name}' already exists"}
+        item = {
+            "id": f"pip-{_hex(8)}",
+            "name": name,
+            "resource_group": rg,
+            "ip": payload.get("ip") or f"20.1.3.{10 + len(state.get('public_ips') or [])}",
+            "sku": payload.get("sku") or "Standard",
+            "allocation": payload.get("allocation") or "Static",
+            "attached_to": payload.get("attached_to") or "",
+        }
+        state.setdefault("public_ips", []).append(item)
+        return {"ok": True, "message": f"Created public IP {name}", "public_ip": item}
+
     return None
