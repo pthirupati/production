@@ -127,7 +127,16 @@ export function renderNetAppV2Page({ nav, st, sessionId, busy, run }) {
           ]} rows={st.mav_approvals || []} />
         </div>
         <div>
-          <h2 className="text-lg font-semibold mb-2">FlexCache</h2>
+          <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">FlexCache</h2>
+            <button type="button" className="na-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => netappApi.createFlexcache(sessionId, {
+                name: `cache_${Date.now().toString(36).slice(-4)}`,
+                origin: 'vol_data',
+              }), 'FlexCache created')}>
+              <Plus size={14} /> Create FlexCache
+            </button>
+          </div>
           <SimDataTable columns={[
             { key: 'name', label: 'Cache' },
             { key: 'origin', label: 'Origin' },

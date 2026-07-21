@@ -69,6 +69,9 @@ export const netappApi = {
   mavApprove(sessionId, id) {
     return netappApi.action(sessionId, 'mav_approve', { id })
   },
+  createFlexcache(sessionId, payload = {}) {
+    return netappApi.action(sessionId, 'create_flexcache', payload)
+  },
   arpSetMode(sessionId, mode, volume) {
     return netappApi.action(sessionId, 'arp_set_mode', { mode, volume })
   },

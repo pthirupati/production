@@ -114,6 +114,18 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         item["approvals"] = "2/2"
         return {"ok": True, "message": f"Approved MAV for {item['operation']}", "mav": item}
 
+    if action == "create_flexcache":
+        name = (payload.get("name") or f"cache_{_hex(4)}").strip()
+        item = {
+            "id": f"fc-{_hex()}", "name": name,
+            "origin": payload.get("origin") or "vol_data",
+            "svm": payload.get("svm") or "svm-edge",
+            "size_gb": int(payload.get("size_gb") or 500),
+            "hit_ratio_pct": int(payload.get("hit_ratio_pct") or 0),
+        }
+        state.setdefault("flexcaches", []).append(item)
+        return {"ok": True, "message": f"Created FlexCache {name}", "flexcache": item}
+
     if action == "arp_set_mode":
         mode = payload.get("mode") or "active"
         events = state.setdefault("arp_events", [])

@@ -110,6 +110,25 @@ export function renderK8sV2Page({ nav, cluster, sessionId, busy, run, isOpenShif
           { key: 'version', label: 'Version' },
           { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
           { key: 'revision', label: 'Rev' },
+          {
+            key: 'actions', label: 'Actions',
+            render: (r) => (
+              <div className="flex gap-1 flex-wrap">
+                <button type="button" className="k8s-btn-ghost" disabled={busy}
+                  onClick={(e) => { e.stopPropagation(); run(() => k8sApi.helmUpgrade(sessionId, r.name), 'Helm upgrade complete') }}>
+                  Upgrade
+                </button>
+                <button type="button" className="k8s-btn-ghost" disabled={busy || (r.revision || 1) <= 1}
+                  onClick={(e) => { e.stopPropagation(); run(() => k8sApi.helmRollback(sessionId, r.name), 'Helm rollback complete') }}>
+                  Rollback
+                </button>
+                <button type="button" className="k8s-btn-ghost" disabled={busy}
+                  onClick={(e) => { e.stopPropagation(); run(() => k8sApi.helmUninstall(sessionId, r.name), 'Helm uninstall complete') }}>
+                  Uninstall
+                </button>
+              </div>
+            ),
+          },
         ]} rows={cluster.helm_releases || []} searchKeys={['name', 'chart']} />
       </div>
     )

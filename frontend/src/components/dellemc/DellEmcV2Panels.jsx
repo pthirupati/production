@@ -24,7 +24,15 @@ export function renderDellEmcV2Page({ nav, st, sessionId, busy, run }) {
           ]} rows={st.powerstore_metro || []} />
         </div>
         <div>
-          <h2 className="text-lg font-semibold mb-2">vVols</h2>
+          <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">vVols</h2>
+            <button type="button" className="de-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => dellemcApi.registerVvol(sessionId, {
+                name: `vvol-ds-${Date.now().toString(36).slice(-4)}`,
+              }), 'vVol registered')}>
+              <Plus size={14} /> Register vVol
+            </button>
+          </div>
           <SimDataTable columns={[
             { key: 'name', label: 'Datastore' },
             { key: 'vasa', label: 'VASA' },

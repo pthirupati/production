@@ -414,12 +414,20 @@ export function GenericResourceDetail() {
   const deleteGenericResource = useAwsStore((s) => s.deleteGenericResource)
   const updateGenericResource = useAwsStore((s) => s.updateGenericResource)
   const transitionGenericResource = useAwsStore((s) => s.transitionGenericResource)
+  const publishSnsTopic = useAwsStore((s) => s.publishSnsTopic)
+  const sendSqsMessage = useAwsStore((s) => s.sendSqsMessage)
+  const receiveSqsMessage = useAwsStore((s) => s.receiveSqsMessage)
+  const purgeSqsQueue = useAwsStore((s) => s.purgeSqsQueue)
+  const getSecretValue = useAwsStore((s) => s.getSecretValue)
+  const rotateSecret = useAwsStore((s) => s.rotateSecret)
+  const upsertRoute53Record = useAwsStore((s) => s.upsertRoute53Record)
   const pushFlash = useAwsStore((s) => s.pushFlash)
   const serviceCfg = SERVICE_CONFIGS[service]
   const cfg = getResourceConfig(service, resource)
   const row = rows.find((r) => r.id === id)
   const [tab, setTab] = useState('overview')
   const [rawOpen, setRawOpen] = useState(false)
+  const [secretReveal, setSecretReveal] = useState(null)
 
   if (!serviceCfg || !cfg || !row) {
     return <div className="aws-page"><EmptyState title="Resource not found" action={<Button onClick={() => navigate(`${BASE}/${service}/home`)}>Back to service</Button>} /></div>
@@ -446,6 +454,36 @@ export function GenericResourceDetail() {
       pushFlash('info', `Rebooting ${row.name}`)
       return
     }
+    if (service === 'sns' && resource === 'topics') {
+      const res = publishSnsTopic(row.id)
+      if (res?.ok === false) { pushFlash('error', res.error); return }
+      pushFlash('success', `Published message to ${row.name}`)
+      return
+    }
+    if (service === 'sqs' && resource === 'queues') {
+      const res = sendSqsMessage(row.id)
+      if (res?.ok === false) { pushFlash('error', res.error); return }
+      pushFlash('success', `Sent message to ${row.name}`)
+      return
+    }
+    if (service === 'secretsmanager' && resource === 'secrets') {
+      const res = getSecretValue(row.id)
+      if (res?.ok === false) { pushFlash('error', res.error); return }
+      setSecretReveal(res.value)
+      pushFlash('success', `Retrieved secret ${row.name}`)
+      return
+    }
+    if (service === 'route53' && resource === 'hosted-zones') {
+      const res = upsertRoute53Record(row.id, {
+        name: `app.${row.name || 'example.internal'}`,
+        type: 'A',
+        value: '10.0.0.50',
+        ttl: 300,
+      })
+      if (res?.ok === false) { pushFlash('error', res.error); return }
+      pushFlash('success', `Upserted A record on ${row.name}`)
+      return
+    }
     const patch = {
       lastRun: new Date().toISOString(),
       status: rowStatus,
@@ -456,6 +494,16 @@ export function GenericResourceDetail() {
     if (service === 'glue') patch.runs = (row.runs || 0) + 1
     updateGenericResource(service, resource, row.id, patch)
     pushFlash('success', `Test action completed for ${row.name}`)
+  }
+
+  const primaryActionLabel = () => {
+    if (service === 'lambda') return 'Test'
+    if (service === 'rds') return 'Reboot'
+    if (service === 'sns' && resource === 'topics') return 'Publish'
+    if (service === 'sqs' && resource === 'queues') return 'Send message'
+    if (service === 'secretsmanager' && resource === 'secrets') return 'Retrieve secret value'
+    if (service === 'route53' && resource === 'hosted-zones') return 'Create record'
+    return 'Run action'
   }
 
   const onDelete = () => {
@@ -472,8 +520,29 @@ export function GenericResourceDetail() {
         <PageHeader
           title={row.name}
           action={(
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Button disabled={transient} onClick={simulateRun}>{service === 'lambda' ? 'Test' : service === 'rds' ? 'Reboot' : 'Run action'}</Button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Button disabled={transient} onClick={simulateRun}>{primaryActionLabel()}</Button>
+              {service === 'sqs' && resource === 'queues' && (
+                <>
+                  <Button disabled={transient} onClick={() => {
+                    const res = receiveSqsMessage(row.id)
+                    if (res?.ok === false) pushFlash('error', res.error)
+                    else pushFlash('success', res.count ? `Received message from ${row.name}` : `No messages in ${row.name}`)
+                  }}>Receive</Button>
+                  <Button disabled={transient} onClick={() => {
+                    const res = purgeSqsQueue(row.id)
+                    if (res?.ok === false) pushFlash('error', res.error)
+                    else pushFlash('success', `Purged ${row.name}`)
+                  }}>Purge</Button>
+                </>
+              )}
+              {service === 'secretsmanager' && resource === 'secrets' && (
+                <Button disabled={transient} onClick={() => {
+                  const res = rotateSecret(row.id)
+                  if (res?.ok === false) pushFlash('error', res.error)
+                  else { setSecretReveal(res.value); pushFlash('success', `Rotated ${row.name}`) }
+                }}>Rotate secret</Button>
+              )}
               <Button disabled={transient} onClick={toggleStatus}>{canPause ? 'Disable / stop' : 'Enable / start'}</Button>
               <Button variant="danger" disabled={transient} onClick={onDelete}>Delete</Button>
             </div>
@@ -483,6 +552,28 @@ export function GenericResourceDetail() {
           <div className="aws-flash aws-flash-info" style={{ marginBottom: 12 }}>
             <span className="aws-spinner" style={{ width: 14, height: 14 }} />
             <div style={{ flex: 1 }}>{row.name} is {rowStatus.toLowerCase?.() || rowStatus}. Actions are unavailable until the operation completes.</div>
+          </div>
+        )}
+        {secretReveal != null && (
+          <div className="aws-flash aws-flash-success" style={{ marginBottom: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Secret value</div>
+              <code style={{ fontSize: 12 }}>{secretReveal}</code>
+            </div>
+            <Button onClick={() => setSecretReveal(null)}>Hide</Button>
+          </div>
+        )}
+        {service === 'route53' && resource === 'hosted-zones' && (row.recordSets || []).length > 0 && tab === 'overview' && (
+          <div className="aws-card" style={{ marginBottom: 16 }}>
+            <SectionLabel>Record sets</SectionLabel>
+            <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+              {(row.recordSets || []).map((rec) => (
+                <div className="aws-kv" key={`${rec.name}-${rec.type}`}>
+                  <span className="k">{rec.type} {rec.name}</span>
+                  <span className="v">{rec.value} · TTL {rec.ttl}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         <div className="aws-card" style={{ marginBottom: 16 }}>

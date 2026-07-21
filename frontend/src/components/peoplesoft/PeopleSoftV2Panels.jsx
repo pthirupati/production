@@ -1,6 +1,73 @@
+import { useMemo, useState } from 'react'
 import { peoplesoftApi } from '../../api/peoplesoft'
 
 const PS_BLUE = '#1b3a5c'
+
+function PeopleCodeEditor({ pc, sessionId, busy, run }) {
+  const [body, setBody] = useState(pc.body || '')
+  const dirty = body !== (pc.body || '')
+  return (
+    <div className="bg-white border border-slate-200 rounded overflow-hidden">
+      <div className="px-3 py-2 text-xs font-medium border-b border-slate-100 flex justify-between items-center gap-2 flex-wrap">
+        <span className="font-mono">{pc.object}</span>
+        <div className="flex items-center gap-2">
+          <span className={pc.validated ? 'text-emerald-600' : 'text-amber-600'}>{pc.validated ? 'Validated' : 'Needs review'}</span>
+          <button type="button" disabled={busy || !dirty} className="text-xs px-2 py-1 rounded text-white disabled:opacity-50" style={{ background: PS_BLUE }}
+            onClick={() => run(() => peoplesoftApi.savePeopleCode(sessionId, { object: pc.object, body }), 'PeopleCode saved')}>
+            Save
+          </button>
+        </div>
+      </div>
+      <textarea
+        className="w-full p-3 text-xs font-mono bg-slate-50 min-h-[140px] border-0 outline-none resize-y"
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        spellCheck={false}
+      />
+    </div>
+  )
+}
+
+function DirectorySearch({ v2 }) {
+  const [q, setQ] = useState('')
+  const people = useMemo(() => {
+    const all = v2.directory || []
+    const needle = q.trim().toLowerCase()
+    if (!needle) return all
+    return all.filter((p) => [p.name, p.title, p.dept, p.email, p.emplid, p.phone]
+      .filter(Boolean)
+      .some((v) => String(v).toLowerCase().includes(needle)))
+  }, [v2.directory, q])
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <h2 className="text-sm font-semibold text-slate-700">Company Directory</h2>
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search name, dept, email…"
+          className="text-sm border border-slate-200 rounded px-3 py-1.5 w-64 max-w-full"
+        />
+      </div>
+      <Table head={['EmplID', 'Name', 'Title', 'Dept', 'Email', 'Phone']}>
+        {people.map((p) => (
+          <tr key={p.emplid} className="border-t border-slate-100">
+            <td className="px-3 py-2 font-mono text-xs">{p.emplid}</td>
+            <td className="px-3 py-2">{p.name}</td>
+            <td className="px-3 py-2">{p.title}</td>
+            <td className="px-3 py-2">{p.dept}</td>
+            <td className="px-3 py-2 text-xs">{p.email}</td>
+            <td className="px-3 py-2">{p.phone}</td>
+          </tr>
+        ))}
+      </Table>
+      {people.length === 0 && (
+        <p className="text-xs text-slate-500">No directory matches for “{q}”.</p>
+      )}
+    </div>
+  )
+}
 
 /** Query Manager, PeopleCode, GL, AP/AR, Payroll — V2 PIA blades. */
 export function renderPeopleSoftV2Page({ section, v2 = {}, sessionId, busy, run }) {
@@ -63,17 +130,11 @@ export function renderPeopleSoftV2Page({ section, v2 = {}, sessionId, busy, run 
               object: 'JOB.EFFDT.FieldChange',
               body: "Function EffDtCheck()\n   If None(JOB.EFFDT) Then\n      Error \"Effective date required\";\n   End-If;\nEnd-Function;\n",
             }), 'PeopleCode saved')}>
-            Save sample PeopleCode
+            Add sample event
           </button>
         </div>
         {pcs.map((pc) => (
-          <div key={pc.id} className="bg-white border border-slate-200 rounded overflow-hidden">
-            <div className="px-3 py-2 text-xs font-medium border-b border-slate-100 flex justify-between">
-              <span className="font-mono">{pc.object}</span>
-              <span className={pc.validated ? 'text-emerald-600' : 'text-amber-600'}>{pc.validated ? 'Validated' : 'Needs review'}</span>
-            </div>
-            <pre className="p-3 text-xs font-mono bg-slate-50 overflow-x-auto whitespace-pre-wrap">{pc.body}</pre>
-          </div>
+          <PeopleCodeEditor key={pc.id} pc={pc} sessionId={sessionId} busy={busy} run={run} />
         ))}
       </div>
     )
@@ -242,24 +303,7 @@ export function renderPeopleSoftEssPage({ fluidView, v2 = {}, sessionId, busy, r
     )
   }
   if (fluidView === 'directory') {
-    const people = v2.directory || []
-    return (
-      <div className="space-y-4">
-        <h2 className="text-sm font-semibold text-slate-700">Company Directory</h2>
-        <Table head={['EmplID', 'Name', 'Title', 'Dept', 'Email', 'Phone']}>
-          {people.map((p) => (
-            <tr key={p.emplid} className="border-t border-slate-100">
-              <td className="px-3 py-2 font-mono text-xs">{p.emplid}</td>
-              <td className="px-3 py-2">{p.name}</td>
-              <td className="px-3 py-2">{p.title}</td>
-              <td className="px-3 py-2">{p.dept}</td>
-              <td className="px-3 py-2 text-xs">{p.email}</td>
-              <td className="px-3 py-2">{p.phone}</td>
-            </tr>
-          ))}
-        </Table>
-      </div>
-    )
+    return <DirectorySearch v2={v2} />
   }
   if (fluidView === 'training') {
     const courses = v2.training || []

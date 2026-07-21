@@ -106,10 +106,23 @@ export default function PeopleSoftSimulator({
     if (t.includes('voucher') || t.includes('accounts payable')) { setSection('ap'); setFluidView(null); return }
     if (t.includes('billing') || t.includes('customer invoice') || t.includes('accounts receivable')) { setSection('ar'); setFluidView(null); return }
     if (t.includes('payroll processing') || t.includes('pay period')) { setSection('payroll_admin'); setFluidView(null); return }
-    if (t.includes('benefit') || t.includes('enrollment')) { handleFluidNav('benefits'); return }
-    if (t.includes('pay') || t.includes('payroll')) { handleFluidNav('pay'); return }
-    if (t.includes('job') || t.includes('personal') || t.includes('organizational')) { handleFluidNav('jobdata'); return }
-    if (t.includes('process') || t.includes('time')) { setSection(t.includes('time') ? 'home' : 'process'); setFluidView(null); return }
+    if (t.includes('travel') || t.includes('expense')) { handleFluidNav('expenses'); return }
+    if (t.includes('applicant') || t.includes('job opening') || t.includes('recruiting')) { handleFluidNav('jobs'); return }
+    if (t.includes('directory') || t.includes('colleague')) { handleFluidNav('directory'); return }
+    if (t.includes('training') || t.includes('learning')) { handleFluidNav('training'); return }
+    if (t.includes('benefit') || t.includes('enrollment') || t.includes('ebenefits')) { handleFluidNav('benefits'); return }
+    if (t === 'time' || t.includes('report time') || t.includes('view time') || t.includes('process time')) {
+      if (t.includes('process time')) { setSection('process'); setFluidView(null); return }
+      handleFluidNav('time'); return
+    }
+    if (t.includes('employee pay') || t === 'payroll' || (t.includes('pay') && !t.includes('payroll processing'))) {
+      handleFluidNav('pay'); return
+    }
+    if (t.includes('job information') || t.includes('personal information') || t.includes('personal details')
+      || t.includes('organizational')) {
+      handleFluidNav('jobdata'); return
+    }
+    if (t.includes('process')) { setSection('process'); setFluidView(null); return }
     setSection('home')
     setFluidView(null)
   }

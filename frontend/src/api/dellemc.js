@@ -54,6 +54,9 @@ export const dellemcApi = {
   enablePowerstoreMetro(sessionId, payload = {}) {
     return dellemcApi.action(sessionId, 'enable_powerstore_metro', payload)
   },
+  registerVvol(sessionId, payload = {}) {
+    return dellemcApi.action(sessionId, 'register_vvol', payload)
+  },
   enableRetentionLock(sessionId, payload = {}) {
     return dellemcApi.action(sessionId, 'enable_retention_lock', payload)
   },

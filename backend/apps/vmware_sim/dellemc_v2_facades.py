@@ -72,6 +72,17 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         state.setdefault("powerstore_metro", []).append(item)
         return {"ok": True, "message": f"Enabled Metro Volume {name}", "metro": item}
 
+    if action == "register_vvol":
+        name = (payload.get("name") or f"vvol-ds-{_hex(4)}").strip()
+        item = {
+            "id": f"vvol-{_hex()}", "name": name,
+            "vasa": payload.get("vasa") or "Registered",
+            "vms": int(payload.get("vms") or 0),
+            "policy": payload.get("policy") or "Gold-Replication",
+        }
+        state.setdefault("vvols", []).append(item)
+        return {"ok": True, "message": f"Registered vVol datastore {name}", "vvol": item}
+
     if action == "enable_retention_lock":
         mtree = payload.get("mtree") or f"/data/col1/{_hex(4)}"
         item = {

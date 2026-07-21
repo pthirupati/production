@@ -55,6 +55,9 @@ export const k8sApi = {
       name, namespace, ...(volumeName ? { volume_name: volumeName } : {}),
     })
   },
+  createPvc(sessionId, payload = {}) {
+    return k8sApi.action(sessionId, 'create_pvc', payload)
+  },
   patchResource(sessionId, kind, name, patch = {}, namespace = '') {
     return k8sApi.action(sessionId, 'patch_resource', { kind, name, patch, namespace })
   },
@@ -66,6 +69,15 @@ export const k8sApi = {
   },
   helmInstall(sessionId, payload = {}) {
     return k8sApi.action(sessionId, 'helm_install', payload)
+  },
+  helmUpgrade(sessionId, name, payload = {}) {
+    return k8sApi.action(sessionId, 'helm_upgrade', { name, ...payload })
+  },
+  helmRollback(sessionId, name) {
+    return k8sApi.action(sessionId, 'helm_rollback', { name })
+  },
+  helmUninstall(sessionId, name) {
+    return k8sApi.action(sessionId, 'helm_uninstall', { name })
   },
   createHpa(sessionId, payload = {}) {
     return k8sApi.action(sessionId, 'create_hpa', payload)

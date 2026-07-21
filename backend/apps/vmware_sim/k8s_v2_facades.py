@@ -153,6 +153,67 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         state.setdefault("helm_releases", []).append(row)
         return {"ok": True, "message": f"Helm release {name} deployed", "release": row}
 
+    if action == "helm_upgrade":
+        name = payload.get("name") or ""
+        rel = next((r for r in state.get("helm_releases") or [] if r.get("name") == name), None)
+        if not rel and state.get("helm_releases"):
+            rel = state["helm_releases"][0]
+        if not rel:
+            return {"ok": False, "error": "Helm release not found"}
+        rel["revision"] = int(rel.get("revision") or 1) + 1
+        if payload.get("version"):
+            rel["version"] = payload["version"]
+        if payload.get("chart"):
+            rel["chart"] = payload["chart"]
+        rel["status"] = "deployed"
+        rel["updated"] = _now()
+        return {"ok": True, "message": f"Helm release {rel['name']} upgraded to rev {rel['revision']}", "release": rel}
+
+    if action == "helm_rollback":
+        name = payload.get("name") or ""
+        rel = next((r for r in state.get("helm_releases") or [] if r.get("name") == name), None)
+        if not rel and state.get("helm_releases"):
+            rel = state["helm_releases"][0]
+        if not rel:
+            return {"ok": False, "error": "Helm release not found"}
+        rev = int(rel.get("revision") or 1)
+        if rev <= 1:
+            return {"ok": False, "error": f"Release {rel['name']} has no prior revision to roll back to"}
+        rel["revision"] = rev - 1
+        rel["status"] = "deployed"
+        rel["updated"] = _now()
+        return {"ok": True, "message": f"Helm release {rel['name']} rolled back to rev {rel['revision']}", "release": rel}
+
+    if action == "helm_uninstall":
+        name = payload.get("name") or ""
+        releases = state.setdefault("helm_releases", [])
+        idx = next((i for i, r in enumerate(releases) if r.get("name") == name), None)
+        if idx is None and releases:
+            idx = 0
+            name = releases[0].get("name")
+        if idx is None:
+            return {"ok": False, "error": "Helm release not found"}
+        removed = releases.pop(idx)
+        return {"ok": True, "message": f"Helm release {removed.get('name')} uninstalled", "release": removed}
+
+    if action == "create_pvc":
+        name = (payload.get("name") or f"pvc-{len(state.get('pvcs') or []) + 1}").strip()
+        ns = payload.get("namespace") or "production"
+        if any(p.get("name") == name and p.get("namespace") == ns for p in state.get("pvcs") or []):
+            return {"ok": False, "error": f"PVC '{name}' already exists in {ns}"}
+        row = {
+            "name": name,
+            "namespace": ns,
+            "status": "Pending",
+            "capacity": payload.get("capacity") or "10Gi",
+            "storageClass": payload.get("storageClass") or payload.get("storage_class") or "standard",
+            "accessModes": payload.get("accessModes") or ["ReadWriteOnce"],
+            "volumeName": "",
+            "creationTimestamp": _now(),
+        }
+        state.setdefault("pvcs", []).append(row)
+        return {"ok": True, "message": f"persistentvolumeclaim/{name} created", "pvc": row}
+
     if action == "create_hpa":
         name = (payload.get("name") or payload.get("target") or "app").strip()
         ns = payload.get("namespace") or "production"

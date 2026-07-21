@@ -249,4 +249,120 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         gr.setdefault(service, {}).setdefault(resource, []).append(row)
         return {"ok": True, "message": f"Created {service}/{resource} {name}", "resource": row}
 
+    if action == "publish_sns":
+        topic = payload.get("name") or payload.get("topic") or "lab-topic"
+        topics = gr.setdefault("sns", {}).setdefault("topics", [])
+        row = next((t for t in topics if t.get("name") == topic or t.get("id") == payload.get("id")), None)
+        if not row and topics:
+            row = topics[0]
+        if not row:
+            row = _row(payload.get("id") or f"topic-{_hex()}", topic, {"type": "Standard", "subscriptions": 0, "status": "Active", "published": 0})
+            topics.append(row)
+        row["published"] = int(row.get("published") or 0) + 1
+        row["lastPublish"] = _now()
+        return {"ok": True, "message": f"Published to {row.get('name')}", "topic": row}
+
+    if action == "send_sqs":
+        qname = payload.get("name") or "lab-queue"
+        queues = gr.setdefault("sqs", {}).setdefault("queues", [])
+        row = next((q for q in queues if q.get("name") == payload.get("name") or q.get("id") == payload.get("id")), None)
+        if not row and queues:
+            row = queues[0]
+        if not row:
+            row = _row(payload.get("id") or f"queue-{_hex()}", qname, {"type": "Standard", "messages": 0, "status": "Active"})
+            queues.append(row)
+        row["messages"] = int(row.get("messages") or 0) + int(payload.get("count") or 1)
+        row["lastSend"] = _now()
+        return {"ok": True, "message": f"Sent message to {row.get('name')}", "queue": row}
+
+    if action == "receive_sqs":
+        qname = payload.get("name") or "lab-queue"
+        queues = gr.setdefault("sqs", {}).setdefault("queues", [])
+        row = next((q for q in queues if q.get("name") == payload.get("name") or q.get("id") == payload.get("id")), None)
+        if not row and queues:
+            row = queues[0]
+        if not row:
+            row = _row(payload.get("id") or f"queue-{_hex()}", qname, {"type": "Standard", "messages": 0, "status": "Active"})
+            queues.append(row)
+        available = int(row.get("messages") or 0)
+        took = min(available, int(payload.get("max") or 1))
+        row["messages"] = available - took
+        row["lastReceive"] = _now()
+        return {"ok": True, "message": f"Received {took} message(s)", "queue": row, "count": took}
+
+    if action == "purge_sqs":
+        qname = payload.get("name") or "lab-queue"
+        queues = gr.setdefault("sqs", {}).setdefault("queues", [])
+        row = next((q for q in queues if q.get("name") == payload.get("name") or q.get("id") == payload.get("id")), None)
+        if not row and queues:
+            row = queues[0]
+        if not row:
+            row = _row(payload.get("id") or f"queue-{_hex()}", qname, {"type": "Standard", "messages": 0, "status": "Active"})
+            queues.append(row)
+        row["messages"] = 0
+        row["lastPurge"] = _now()
+        return {"ok": True, "message": f"Purged {row.get('name')}", "queue": row}
+
+    if action == "get_secret_value":
+        sname = payload.get("name") or "lab/secret"
+        secrets = gr.setdefault("secretsmanager", {}).setdefault("secrets", [])
+        row = next((s for s in secrets if s.get("name") == payload.get("name") or s.get("id") == payload.get("id")), None)
+        if not row and secrets:
+            row = secrets[0]
+        if not row:
+            row = _row(payload.get("id") or f"secret-{_hex()}", sname, {
+                "rotation": "Disabled", "lastChanged": "Today", "status": "Active",
+                "secretValue": f"lab-secret-{sname}", "versions": 1,
+            })
+            secrets.append(row)
+        value = row.get("secretValue") or row.get("value") or f"lab-secret-{row.get('name', 'value')}"
+        row["lastAccessed"] = _now()
+        row["versions"] = int(row.get("versions") or 1)
+        return {"ok": True, "message": "Secret retrieved", "secret": row, "value": value}
+
+    if action == "rotate_secret":
+        sname = payload.get("name") or "lab/secret"
+        secrets = gr.setdefault("secretsmanager", {}).setdefault("secrets", [])
+        row = next((s for s in secrets if s.get("name") == payload.get("name") or s.get("id") == payload.get("id")), None)
+        if not row and secrets:
+            row = secrets[0]
+        if not row:
+            row = _row(payload.get("id") or f"secret-{_hex()}", sname, {
+                "rotation": "Disabled", "lastChanged": "Today", "status": "Active", "versions": 1,
+            })
+            secrets.append(row)
+        row["rotation"] = "Enabled"
+        row["versions"] = int(row.get("versions") or 1) + 1
+        row["lastChanged"] = "Today"
+        row["secretValue"] = f"rotated-{_hex(6)}"
+        return {"ok": True, "message": f"Rotated {row.get('name')}", "secret": row}
+
+    if action == "upsert_route53_record":
+        zones = gr.setdefault("route53", {}).setdefault("hosted-zones", [])
+        zone = next((z for z in zones if z.get("id") == payload.get("zone_id") or z.get("name") == payload.get("zone")), None)
+        if not zone and zones:
+            zone = zones[0]
+        if not zone:
+            zone = _row(payload.get("zone_id") or f"Z{_hex(10).upper()}", payload.get("zone") or "example.internal", {
+                "type": "Private", "records": 0, "status": "available", "recordSets": [],
+            })
+            zones.append(zone)
+        records = zone.setdefault("recordSets", [])
+        name = (payload.get("record_name") or payload.get("name") or "app").strip()
+        rtype = payload.get("type") or "A"
+        existing = next((r for r in records if r.get("name") == name and r.get("type") == rtype), None)
+        if existing:
+            existing["value"] = payload.get("value") or existing.get("value")
+            existing["ttl"] = int(payload.get("ttl") or existing.get("ttl") or 300)
+            row = existing
+        else:
+            row = {
+                "name": name, "type": rtype,
+                "value": payload.get("value") or "10.0.0.10",
+                "ttl": int(payload.get("ttl") or 300),
+            }
+            records.append(row)
+            zone["records"] = len(records)
+        return {"ok": True, "message": f"Upserted {rtype} {name}", "record": row, "zone": zone}
+
     return None

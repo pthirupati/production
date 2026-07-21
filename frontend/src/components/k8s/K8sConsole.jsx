@@ -359,7 +359,17 @@ export default function K8sConsole({
       return (
         <div className="space-y-6">
           <div>
-            <h3 className="text-sm font-semibold text-slate-700 mb-2">Persistent Volume Claims</h3>
+            <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+              <h3 className="text-sm font-semibold text-slate-700">Persistent Volume Claims</h3>
+              <button type="button" className="k8s-btn-primary flex items-center gap-1" disabled={busy}
+                onClick={() => run(() => k8sApi.createPvc(sessionId, {
+                  name: `claim-${Date.now().toString(36).slice(-4)}`,
+                  namespace: 'production',
+                  capacity: '10Gi',
+                }), 'PVC created')}>
+                Create PVC
+              </button>
+            </div>
             <SimDataTable
               searchKeys={['name', 'namespace', 'status']}
               columns={[

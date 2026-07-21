@@ -160,18 +160,27 @@ function seedGenericResources() {
       'change-sets': [row('changeset-lab001', r, 'my-lab-stack-change-set', { status: 'CREATE_COMPLETE', changes: 2 })],
     },
     route53: {
-      'hosted-zones': [row('Z1234567890ABC', '', 'example.internal', { type: 'Private', records: 7, status: 'available' })],
+      'hosted-zones': [row('Z1234567890ABC', '', 'example.internal', {
+        type: 'Private', records: 2, status: 'available',
+        recordSets: [
+          { name: 'api.example.internal', type: 'A', value: '10.0.1.20', ttl: 300 },
+          { name: 'www.example.internal', type: 'CNAME', value: 'api.example.internal', ttl: 60 },
+        ],
+      })],
       'health-checks': [row('hc-demo001', '', 'api-health-check', { protocol: 'HTTPS', status: 'Healthy' })],
     },
     sns: {
-      topics: [row('topic-demo001', r, 'my-alerts-topic', { type: 'Standard', subscriptions: 1, status: 'Active' })],
+      topics: [row('topic-demo001', r, 'my-alerts-topic', { type: 'Standard', subscriptions: 1, status: 'Active', published: 0 })],
       subscriptions: [row('sub-demo001', r, 'admin@example.com', { protocol: 'Email', status: 'Confirmed' })],
     },
     sqs: {
       queues: [row('queue-demo001', r, 'orders-queue', { type: 'Standard', messages: 3, status: 'Active' })],
     },
     secretsmanager: {
-      secrets: [row('secret-demo001', r, 'prod/db/password', { rotation: 'Disabled', lastChanged: 'Today', status: 'Active' })],
+      secrets: [row('secret-demo001', r, 'prod/db/password', {
+        rotation: 'Disabled', lastChanged: 'Today', status: 'Active',
+        secretValue: 'lab-db-password-v1', versions: 1,
+      })],
     },
     acm: {
       certificates: [row('cert-demo001', r, '*.example.com', { type: 'Amazon issued', status: 'Issued', expires: '2027-03-01' })],
@@ -1448,6 +1457,101 @@ export const useAwsStore = create(
       },
       setLambdaCode: (id, code) => set((s) => mapGeneric(s, 'lambda', 'functions', id, (fn) => ({ ...fn, code }))),
       setLambdaEnv: (id, env) => set((s) => mapGeneric(s, 'lambda', 'functions', id, (fn) => ({ ...fn, env: env || {} }))),
+
+      // ---------- SNS / SQS / Secrets / Route53 ----------
+      publishSnsTopic: (id, message) => {
+        const topics = get().genericResources?.sns?.topics || []
+        const topic = topics.find((t) => t.id === id) || topics[0]
+        if (!topic) return fail(resourceNotFound('Publish', 'SNS topic not found.'))
+        set((s) => mapGeneric(s, 'sns', 'topics', topic.id, (t) => ({
+          ...t,
+          published: (t.published || 0) + 1,
+          lastPublish: new Date().toISOString(),
+          lastMessage: message || 'lab notification',
+        })))
+        get()._syncAction('publish_sns', { id: topic.id, name: topic.name, message: message || 'lab notification' })
+        return ok({ topic: topic.name })
+      },
+      sendSqsMessage: (id, body) => {
+        const queues = get().genericResources?.sqs?.queues || []
+        const queue = queues.find((q) => q.id === id) || queues[0]
+        if (!queue) return fail(resourceNotFound('SendMessage', 'SQS queue not found.'))
+        set((s) => mapGeneric(s, 'sqs', 'queues', queue.id, (q) => ({
+          ...q,
+          messages: (q.messages || 0) + 1,
+          lastSend: new Date().toISOString(),
+          lastBody: body || 'lab-message',
+        })))
+        get()._syncAction('send_sqs', { id: queue.id, name: queue.name })
+        return ok({ queue: queue.name })
+      },
+      receiveSqsMessage: (id) => {
+        const queues = get().genericResources?.sqs?.queues || []
+        const queue = queues.find((q) => q.id === id) || queues[0]
+        if (!queue) return fail(resourceNotFound('ReceiveMessage', 'SQS queue not found.'))
+        const available = queue.messages || 0
+        const took = available > 0 ? 1 : 0
+        set((s) => mapGeneric(s, 'sqs', 'queues', queue.id, (q) => ({
+          ...q,
+          messages: Math.max(0, (q.messages || 0) - took),
+          lastReceive: new Date().toISOString(),
+        })))
+        get()._syncAction('receive_sqs', { id: queue.id, name: queue.name, max: 1 })
+        return ok({ count: took, body: took ? (queue.lastBody || 'lab-message') : null })
+      },
+      purgeSqsQueue: (id) => {
+        const queues = get().genericResources?.sqs?.queues || []
+        const queue = queues.find((q) => q.id === id) || queues[0]
+        if (!queue) return fail(resourceNotFound('PurgeQueue', 'SQS queue not found.'))
+        set((s) => mapGeneric(s, 'sqs', 'queues', queue.id, (q) => ({ ...q, messages: 0, lastPurge: new Date().toISOString() })))
+        get()._syncAction('purge_sqs', { id: queue.id, name: queue.name })
+        return ok()
+      },
+      getSecretValue: (id) => {
+        const secrets = get().genericResources?.secretsmanager?.secrets || []
+        const secret = secrets.find((s) => s.id === id) || secrets[0]
+        if (!secret) return fail(resourceNotFound('GetSecretValue', 'Secret not found.'))
+        const value = secret.secretValue || `lab-secret-${secret.name}`
+        set((s) => mapGeneric(s, 'secretsmanager', 'secrets', secret.id, (x) => ({
+          ...x, lastAccessed: new Date().toISOString(),
+        })))
+        get()._syncAction('get_secret_value', { id: secret.id, name: secret.name })
+        return ok({ value, name: secret.name })
+      },
+      rotateSecret: (id) => {
+        const secrets = get().genericResources?.secretsmanager?.secrets || []
+        const secret = secrets.find((s) => s.id === id) || secrets[0]
+        if (!secret) return fail(resourceNotFound('RotateSecret', 'Secret not found.'))
+        const next = `rotated-${Math.random().toString(36).slice(2, 8)}`
+        set((s) => mapGeneric(s, 'secretsmanager', 'secrets', secret.id, (x) => ({
+          ...x,
+          rotation: 'Enabled',
+          versions: (x.versions || 1) + 1,
+          lastChanged: 'Today',
+          secretValue: next,
+        })))
+        get()._syncAction('rotate_secret', { id: secret.id, name: secret.name })
+        return ok({ value: next })
+      },
+      upsertRoute53Record: (zoneId, record) => {
+        const zones = get().genericResources?.route53?.['hosted-zones'] || []
+        const zone = zones.find((z) => z.id === zoneId) || zones[0]
+        if (!zone) return fail(resourceNotFound('ChangeResourceRecordSets', 'Hosted zone not found.'))
+        const name = record?.name || 'app.example.internal'
+        const type = record?.type || 'A'
+        set((s) => mapGeneric(s, 'route53', 'hosted-zones', zone.id, (z) => {
+          const records = [...(z.recordSets || [])]
+          const idx = records.findIndex((r) => r.name === name && r.type === type)
+          const row = { name, type, value: record?.value || '10.0.0.10', ttl: record?.ttl || 300 }
+          if (idx >= 0) records[idx] = { ...records[idx], ...row }
+          else records.push(row)
+          return { ...z, recordSets: records, records: records.length }
+        }))
+        get()._syncAction('upsert_route53_record', {
+          zone_id: zone.id, zone: zone.name, record_name: name, type, value: record?.value, ttl: record?.ttl,
+        })
+        return ok()
+      },
 
       // ---------- DynamoDB bespoke ----------
       putDynamoItem: (id, item) => set((s) => mapGeneric(s, 'dynamodb', 'tables', id, (t) => {
