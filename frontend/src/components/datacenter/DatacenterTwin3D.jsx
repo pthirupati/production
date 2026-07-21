@@ -1,11 +1,14 @@
 /**
- * Phase 7 — Lab Environment 3D digital twin (R3F + Rapier).
- * Lazy-loaded from DatacenterSimulator; CSS 2D floor remains the default.
+ * Phase 7+ — Animated Lab Environment 3D digital twin (R3F + Rapier).
+ * Camera intro, rack doors, LED/power pulse, fans, cable packets, airflow.
  */
-import { Suspense, useMemo, useRef, useState } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Html, Environment, ContactShadows, RoundedBox } from '@react-three/drei'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import {
+  OrbitControls, Html, Environment, ContactShadows, RoundedBox, Float,
+} from '@react-three/drei'
 import { Physics, RigidBody, BallCollider } from '@react-three/rapier'
+import { motion } from 'framer-motion'
 import * as THREE from 'three'
 
 const RACK_W = 0.6
@@ -36,74 +39,288 @@ function FpsMeter({ onFps }) {
   return null
 }
 
+/** Dolly + orbit settle when the 3D twin mounts. */
+function CameraIntro({ enabled }) {
+  const { camera } = useThree()
+  const controls = useThree((s) => s.controls)
+  const t0 = useRef(null)
+  const done = useRef(false)
+  const from = useMemo(() => new THREE.Vector3(12, 9, 14), [])
+  const to = useMemo(() => new THREE.Vector3(6, 5, 7), [])
+  const look = useMemo(() => new THREE.Vector3(1, 0.8, -1.5), [])
+
+  useEffect(() => {
+    if (!enabled) return
+    t0.current = performance.now()
+    done.current = false
+    camera.position.copy(from)
+    camera.lookAt(look)
+  }, [enabled, camera, from, look])
+
+  useFrame(() => {
+    if (!enabled || done.current || t0.current == null) return
+    const u = Math.min(1, (performance.now() - t0.current) / 2200)
+    const e = 1 - (1 - u) ** 3
+    camera.position.lerpVectors(from, to, e)
+    camera.lookAt(look)
+    if (controls?.target) controls.target.lerp(look, 0.08)
+    if (u >= 1) done.current = true
+  })
+  return null
+}
+
 function Floor() {
+  const mat = useRef()
+  useFrame(({ clock }) => {
+    if (mat.current) mat.current.emissiveIntensity = 0.04 + Math.sin(clock.elapsedTime * 0.6) * 0.02
+  })
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
       <planeGeometry args={[24, 16]} />
-      <meshStandardMaterial color="#1a1f2e" roughness={0.92} metalness={0.05} />
+      <meshStandardMaterial
+        ref={mat}
+        color="#1a1f2e"
+        roughness={0.92}
+        metalness={0.08}
+        emissive="#1e293b"
+        emissiveIntensity={0.05}
+      />
     </mesh>
   )
 }
 
 function HotAisleGlow({ z }) {
+  const mesh = useRef()
+  useFrame(({ clock }) => {
+    if (mesh.current?.material) {
+      mesh.current.material.opacity = 0.08 + Math.sin(clock.elapsedTime * 1.4 + z) * 0.05
+    }
+  })
   return (
-    <mesh position={[0, 0.02, z]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[18, 0.35]} />
-      <meshBasicMaterial color="#f97316" transparent opacity={0.12} />
+    <mesh ref={mesh} position={[0, 0.02, z]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[18, 0.4]} />
+      <meshBasicMaterial color="#f97316" transparent opacity={0.12} depthWrite={false} />
     </mesh>
   )
 }
 
-/** Shared box geometry for U-slot chassis (LOD: simple boxes). */
-function ServerStack({ servers, onSelect }) {
-  const geo = useMemo(() => new THREE.BoxGeometry(RACK_W * 0.88, U_H * 0.9, RACK_D * 0.82), [])
+/** Rising heat/airflow particles in cold→hot aisle. */
+function AirflowParticles({ count = 180 }) {
+  const ref = useRef()
+  const positions = useMemo(() => {
+    const arr = new Float32Array(count * 3)
+    for (let i = 0; i < count; i++) {
+      arr[i * 3] = (Math.random() - 0.5) * 10
+      arr[i * 3 + 1] = Math.random() * 2.2
+      arr[i * 3 + 2] = -1.2 - Math.random() * 3.5
+    }
+    return arr
+  }, [count])
+  const speeds = useMemo(() => Float32Array.from({ length: count }, () => 0.25 + Math.random() * 0.55), [count])
+
+  useFrame((_, dt) => {
+    const mesh = ref.current
+    if (!mesh) return
+    const pos = mesh.geometry.attributes.position.array
+    for (let i = 0; i < count; i++) {
+      pos[i * 3 + 1] += speeds[i] * dt
+      pos[i * 3] += Math.sin(performance.now() * 0.001 + i) * 0.002
+      if (pos[i * 3 + 1] > 2.4) {
+        pos[i * 3 + 1] = 0.05
+        pos[i * 3] = (Math.random() - 0.5) * 10
+      }
+    }
+    mesh.geometry.attributes.position.needsUpdate = true
+  })
+
+  return (
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.035}
+        color="#38bdf8"
+        transparent
+        opacity={0.55}
+        depthWrite={false}
+        sizeAttenuation
+      />
+    </points>
+  )
+}
+
+function FanSpinner({ position, powered }) {
+  const ref = useRef()
+  useFrame((_, dt) => {
+    if (!ref.current || !powered) return
+    ref.current.rotation.z += dt * 18
+  })
+  return (
+    <mesh ref={ref} position={position}>
+      <cylinderGeometry args={[0.04, 0.04, 0.01, 8]} />
+      <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.25} />
+    </mesh>
+  )
+}
+
+function StatusLed({ position, failed, powered }) {
+  const mat = useRef()
+  useFrame(({ clock }) => {
+    if (!mat.current) return
+    if (failed) {
+      mat.current.emissiveIntensity = 0.6 + Math.sin(clock.elapsedTime * 8) * 0.4
+      mat.current.color.set('#ef4444')
+      mat.current.emissive.set('#ef4444')
+    } else if (powered) {
+      mat.current.emissiveIntensity = 0.45 + Math.sin(clock.elapsedTime * 3) * 0.25
+      mat.current.color.set('#34d399')
+      mat.current.emissive.set('#34d399')
+    } else {
+      mat.current.emissiveIntensity = 0.05
+      mat.current.color.set('#64748b')
+      mat.current.emissive.set('#000000')
+    }
+  })
+  return (
+    <mesh position={position}>
+      <sphereGeometry args={[0.018, 8, 8]} />
+      <meshStandardMaterial ref={mat} color="#34d399" emissive="#34d399" emissiveIntensity={0.5} />
+    </mesh>
+  )
+}
+
+function SelectionAura({ active }) {
+  const ref = useRef()
+  useFrame(({ clock }) => {
+    if (!ref.current) return
+    const t = (Math.sin(clock.elapsedTime * 3) + 1) / 2
+    ref.current.material.opacity = active ? 0.12 + t * 0.18 : 0
+    ref.current.scale.setScalar(active ? 1 + t * 0.03 : 1)
+  })
+  return (
+    <mesh ref={ref} position={[0, 0, RACK_D / 2 + 0.025]}>
+      <planeGeometry args={[RACK_W * 1.08, RACK_H * 1.04]} />
+      <meshBasicMaterial color="#f97316" transparent opacity={0} side={THREE.DoubleSide} depthWrite={false} />
+    </mesh>
+  )
+}
+
+function RackDoor({ open, side = 'left' }) {
+  const ref = useRef()
+  const target = open ? (side === 'left' ? -1.35 : 1.35) : 0
+  useFrame((_, dt) => {
+    if (!ref.current) return
+    ref.current.rotation.y = THREE.MathUtils.damp(ref.current.rotation.y, target, 4, dt)
+  })
+  const x = side === 'left' ? -RACK_W / 2 : RACK_W / 2
+  return (
+    <group position={[x, 0, RACK_D / 2]} ref={ref}>
+      <mesh position={[side === 'left' ? -0.14 : 0.14, 0, 0.01]} castShadow>
+        <boxGeometry args={[0.28, RACK_H * 0.96, 0.02]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.45} roughness={0.4} transparent opacity={0.92} />
+      </mesh>
+    </group>
+  )
+}
+
+/** Shared geometry chassis with LED + fan motion. */
+function ServerStack({ servers, onSelect, animBoost = 1 }) {
+  const geo = useMemo(() => new THREE.BoxGeometry(RACK_W * 0.88, U_H * 0.9, RACK_D * 0.72), [])
   return (
     <group>
-      {servers.map((s) => {
+      {servers.map((s, i) => {
         const failed = Object.values(s.components || {}).some((x) => x !== 'healthy')
+        const powered = s.power_state === 'on'
         const y = ((s.u_slot || 1) - 1) * U_H + U_H * 0.5 + 0.05
         let color = vendorColor(s.vendor)
-        if (s.power_state !== 'on') color = '#475569'
+        if (!powered) color = '#475569'
         if (failed) color = '#ef4444'
         return (
-          <mesh
+          <Float
             key={s.id}
-            geometry={geo}
-            position={[0, y, 0]}
-            castShadow
-            onClick={(e) => { e.stopPropagation(); onSelect?.(s.id) }}
+            speed={powered ? 1.2 * animBoost : 0}
+            rotationIntensity={0}
+            floatIntensity={powered ? 0.04 : 0}
+            floatingRange={[-0.01, 0.01]}
           >
-            <meshStandardMaterial
-              color={color}
-              metalness={0.4}
-              roughness={0.4}
-              emissive={failed ? '#7f1d1d' : '#000000'}
-              emissiveIntensity={failed ? 0.35 : 0}
-            />
-          </mesh>
+            <group position={[0, y, -0.04]}>
+              <mesh
+                geometry={geo}
+                castShadow
+                onClick={(e) => { e.stopPropagation(); onSelect?.(s.id) }}
+                onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }}
+                onPointerOut={() => { document.body.style.cursor = 'default' }}
+              >
+                <meshStandardMaterial
+                  color={color}
+                  metalness={0.45}
+                  roughness={0.35}
+                  emissive={failed ? '#7f1d1d' : powered ? color : '#000000'}
+                  emissiveIntensity={failed ? 0.4 : powered ? 0.12 : 0}
+                />
+              </mesh>
+              <StatusLed position={[RACK_W * 0.38, 0, RACK_D * 0.38]} failed={failed} powered={powered} />
+              <FanSpinner position={[-RACK_W * 0.32, 0, RACK_D * 0.38]} powered={powered && !failed} />
+              {/* stagger idle shimmer by index */}
+              <mesh position={[0, 0, RACK_D * 0.37]} visible={powered}>
+                <planeGeometry args={[RACK_W * 0.5, U_H * 0.35]} />
+                <meshBasicMaterial
+                  color={failed ? '#f87171' : '#38bdf8'}
+                  transparent
+                  opacity={0.08 + (i % 3) * 0.03}
+                  depthWrite={false}
+                />
+              </mesh>
+            </group>
+          </Float>
         )
       })}
     </group>
   )
 }
 
-function CableStrand({ from, to, color = '#94a3b8', loose = false }) {
+function CableStrand({ from, to, color = '#94a3b8', loose = false, traffic = true }) {
+  const groupRef = useRef()
+  const packetRef = useRef()
   const curve = useMemo(() => {
     const mid = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5)
-    mid.y -= loose ? 0.35 : 0.12
-    mid.x += loose ? 0.15 : 0
-    return new THREE.CatmullRomCurve3([from, mid, to])
+    mid.y -= loose ? 0.38 : 0.14
+    mid.x += loose ? 0.18 : 0.04
+    return new THREE.CatmullRomCurve3([from.clone(), mid, to.clone()])
   }, [from, to, loose])
+  const tube = useMemo(() => new THREE.TubeGeometry(curve, 20, 0.012, 6, false), [curve])
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    if (groupRef.current && loose) {
+      groupRef.current.rotation.z = Math.sin(t * 2.2) * 0.04
+      groupRef.current.position.y = Math.sin(t * 1.7) * 0.03
+    }
+    if (packetRef.current && traffic && !loose) {
+      const u = (t * 0.35) % 1
+      packetRef.current.position.copy(curve.getPointAt(u))
+      packetRef.current.visible = true
+    } else if (packetRef.current) {
+      packetRef.current.visible = false
+    }
+  })
+
   return (
-    <mesh>
-      <tubeGeometry args={[curve, 16, 0.012, 6, false]} />
-      <meshStandardMaterial
-        color={color}
-        roughness={0.7}
-        emissive={loose ? '#b45309' : '#000000'}
-        emissiveIntensity={loose ? 0.4 : 0}
-      />
-    </mesh>
+    <group ref={groupRef}>
+      <mesh geometry={tube}>
+        <meshStandardMaterial
+          color={color}
+          roughness={0.65}
+          emissive={loose ? '#b45309' : color}
+          emissiveIntensity={loose ? 0.45 : 0.15}
+        />
+      </mesh>
+      <mesh ref={packetRef}>
+        <sphereGeometry args={[0.028, 10, 10]} />
+        <meshStandardMaterial color="#e0f2fe" emissive="#38bdf8" emissiveIntensity={1.2} />
+      </mesh>
+    </group>
   )
 }
 
@@ -111,11 +328,11 @@ function CablePhysicsBits({ anchors }) {
   return (
     <group>
       {anchors.map((a, i) => (
-        <RigidBody key={i} position={a} colliders={false} restitution={0.1} linearDamping={2} angularDamping={2}>
-          <BallCollider args={[0.04]} />
+        <RigidBody key={i} position={a} colliders={false} restitution={0.15} linearDamping={1.5} angularDamping={1.5}>
+          <BallCollider args={[0.045]} />
           <mesh>
-            <sphereGeometry args={[0.035, 8, 8]} />
-            <meshStandardMaterial color="#64748b" metalness={0.6} />
+            <sphereGeometry args={[0.038, 8, 8]} />
+            <meshStandardMaterial color="#64748b" metalness={0.65} />
           </mesh>
         </RigidBody>
       ))}
@@ -130,17 +347,30 @@ function rackPosition(index) {
   }
 }
 
-function RackInner({ rack, servers, selectedId, onSelectRack, onSelectServer, tip }) {
+function RackInner({
+  rack, servers, selectedId, expanded, onSelectRack, onSelectServer, tip, animBoost,
+}) {
   const anyFail = servers.some((s) => Object.values(s.components || {}).some((c) => c !== 'healthy'))
+  const group = useRef()
+  const open = expanded || servers.some((s) => s.id === selectedId)
+
+  useFrame(({ clock }) => {
+    if (!group.current || !tip) return
+    group.current.rotation.z = Math.sin(clock.elapsedTime * 1.8) * 0.035
+  })
+
   return (
-    <group onClick={(e) => { e.stopPropagation(); onSelectRack?.(rack.id) }}>
+    <group
+      ref={group}
+      onClick={(e) => { e.stopPropagation(); onSelectRack?.(rack.id) }}
+    >
       <RoundedBox args={[RACK_W, RACK_H, RACK_D]} radius={0.02} castShadow receiveShadow>
         <meshStandardMaterial
           color={anyFail ? '#3f1d1d' : '#0f141f'}
           metalness={0.55}
           roughness={0.35}
-          emissive={anyFail ? '#7f1d1d' : '#000000'}
-          emissiveIntensity={anyFail ? 0.25 : 0}
+          emissive={anyFail ? '#7f1d1d' : '#0ea5e9'}
+          emissiveIntensity={anyFail ? 0.28 : open ? 0.08 : 0.02}
         />
       </RoundedBox>
       <mesh position={[-RACK_W / 2 + 0.02, 0, 0]}>
@@ -151,81 +381,94 @@ function RackInner({ rack, servers, selectedId, onSelectRack, onSelectServer, ti
         <boxGeometry args={[0.03, RACK_H * 0.98, RACK_D * 0.95]} />
         <meshStandardMaterial color="#334155" metalness={0.7} />
       </mesh>
-      <ServerStack servers={servers} onSelect={onSelectServer} />
-      <Html position={[0, RACK_H / 2 + 0.12, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
-        <div className="dc-3d-label">
+      <RackDoor open={open} side="left" />
+      <RackDoor open={open} side="right" />
+      <ServerStack servers={servers} onSelect={onSelectServer} animBoost={animBoost} />
+      <SelectionAura active={!!selectedId && servers.some((s) => s.id === selectedId)} />
+      <Html position={[0, RACK_H / 2 + 0.14, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
+        <div className={`dc-3d-label ${open ? 'dc-3d-label-hot' : ''}`}>
           {rack.id}
           {tip ? ' · TIP' : ''}
           {rack.physics?.mass_kg ? ` · ${rack.physics.mass_kg}kg` : ''}
         </div>
       </Html>
-      {selectedId && servers.some((s) => s.id === selectedId) && (
-        <mesh position={[0, 0, RACK_D / 2 + 0.02]}>
-          <planeGeometry args={[RACK_W * 1.05, RACK_H * 1.02]} />
-          <meshBasicMaterial color="#f97316" transparent opacity={0.15} side={THREE.DoubleSide} />
-        </mesh>
-      )}
     </group>
   )
 }
 
-function RackMesh({ rack, servers, index, selectedId, onSelectRack, onSelectServer, physicsEnabled }) {
+function RackMesh({
+  rack, servers, index, selectedId, expandedRack, onSelectRack, onSelectServer, physicsEnabled, animBoost,
+}) {
   const tip = rack.physics?.tip_risk === 'high'
   const { x, z } = rackPosition(index)
+  const wrap = useRef()
+  const start = useRef(performance.now() + index * 110)
+
+  useFrame(() => {
+    if (!wrap.current) return
+    const u = Math.min(1, Math.max(0, (performance.now() - start.current) / 950))
+    const e = 1 - (1 - u) ** 3
+    wrap.current.position.set(x, RACK_H / 2 - (1 - e) * 1.15, z)
+    wrap.current.scale.setScalar(0.88 + e * 0.12)
+  })
+
+  const inner = (
+    <RackInner
+      rack={rack}
+      servers={servers}
+      selectedId={selectedId}
+      expanded={expandedRack === rack.id}
+      onSelectRack={onSelectRack}
+      onSelectServer={onSelectServer}
+      tip={tip}
+      animBoost={animBoost}
+    />
+  )
 
   if (physicsEnabled && tip) {
     return (
-      <RigidBody
-        type="dynamic"
-        position={[x, RACK_H / 2, z]}
-        colliders="cuboid"
-        enabledRotations={[false, false, true]}
-        linearDamping={4}
-        angularDamping={6}
-      >
-        <RackInner
-          rack={rack}
-          servers={servers}
-          selectedId={selectedId}
-          onSelectRack={onSelectRack}
-          onSelectServer={onSelectServer}
-          tip={tip}
-        />
-      </RigidBody>
+      <group ref={wrap}>
+        <RigidBody
+          type="dynamic"
+          colliders="cuboid"
+          enabledRotations={[false, false, true]}
+          linearDamping={4}
+          angularDamping={6}
+        >
+          {inner}
+        </RigidBody>
+      </group>
     )
   }
 
   if (physicsEnabled) {
     return (
-      <RigidBody type="fixed" position={[x, RACK_H / 2, z]} colliders="cuboid">
-        <RackInner
-          rack={rack}
-          servers={servers}
-          selectedId={selectedId}
-          onSelectRack={onSelectRack}
-          onSelectServer={onSelectServer}
-          tip={tip}
-        />
-      </RigidBody>
+      <group ref={wrap}>
+        <RigidBody type="fixed" colliders="cuboid">
+          {inner}
+        </RigidBody>
+      </group>
     )
   }
 
   return (
-    <group position={[x, RACK_H / 2, z]} rotation={[0, 0, tip ? 0.08 : 0]}>
-      <RackInner
-        rack={rack}
-        servers={servers}
-        selectedId={selectedId}
-        onSelectRack={onSelectRack}
-        onSelectServer={onSelectServer}
-        tip={tip}
-      />
+    <group ref={wrap} rotation={[0, 0, tip ? 0.06 : 0]}>
+      {inner}
     </group>
   )
 }
 
+function PulsingLight() {
+  const ref = useRef()
+  useFrame(({ clock }) => {
+    if (ref.current) ref.current.intensity = 0.35 + Math.sin(clock.elapsedTime * 1.2) * 0.15
+  })
+  return <pointLight ref={ref} position={[-4, 3, -2]} color="#38bdf8" />
+}
+
 function SceneContent({
-  racks, serversByRack, network, selectedId, onSelectServer, onSelectRack, physicsEnabled, onFps,
+  racks, serversByRack, network, selectedId, expandedRack,
+  onSelectServer, onSelectRack, physicsEnabled, onFps, animBoost, intro,
 }) {
   const cables = useMemo(() => {
     const links = []
@@ -258,28 +501,28 @@ function SceneContent({
   return (
     <>
       <FpsMeter onFps={onFps} />
+      <CameraIntro enabled={intro} />
       <color attach="background" args={['#0b0e14']} />
-      <ambientLight intensity={0.35} />
-      <directionalLight
-        castShadow
-        position={[6, 10, 4]}
-        intensity={1.15}
-        shadow-mapSize={[1024, 1024]}
-      />
-      <pointLight position={[-4, 3, -2]} intensity={0.4} color="#38bdf8" />
+      <fog attach="fog" args={['#0b0e14', 12, 32]} />
+      <ambientLight intensity={0.32} />
+      <directionalLight castShadow position={[6, 10, 4]} intensity={1.1} shadow-mapSize={[1024, 1024]} />
+      <PulsingLight />
       <Environment preset="warehouse" />
       <Floor />
       <HotAisleGlow z={-1.6} />
       <HotAisleGlow z={-3.8} />
+      {animBoost > 0 && <AirflowParticles count={Math.round(140 * animBoost)} />}
 
-      <group position={[5.5, 0.9, -1.2]}>
-        <RoundedBox args={[0.7, 1.8, 0.9]} radius={0.02} castShadow>
-          <meshStandardMaterial color="#111827" metalness={0.5} roughness={0.4} />
-        </RoundedBox>
-        <Html position={[0, 1.05, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
-          <div className="dc-3d-label">MDF / Agg</div>
-        </Html>
-      </group>
+      <Float speed={1.5} floatIntensity={0.15} rotationIntensity={0.05}>
+        <group position={[5.5, 0.9, -1.2]}>
+          <RoundedBox args={[0.7, 1.8, 0.9]} radius={0.02} castShadow>
+            <meshStandardMaterial color="#111827" metalness={0.5} roughness={0.4} emissive="#0ea5e9" emissiveIntensity={0.06} />
+          </RoundedBox>
+          <Html position={[0, 1.05, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
+            <div className="dc-3d-label dc-3d-label-hot">MDF / Agg</div>
+          </Html>
+        </group>
+      </Float>
 
       {racks.map((rack, i) => (
         <RackMesh
@@ -288,14 +531,23 @@ function SceneContent({
           index={i}
           servers={serversByRack[rack.id] || []}
           selectedId={selectedId}
+          expandedRack={expandedRack}
           onSelectRack={onSelectRack}
           onSelectServer={onSelectServer}
           physicsEnabled={physicsEnabled}
+          animBoost={animBoost}
         />
       ))}
 
       {cables.map((c) => (
-        <CableStrand key={c.id} from={c.from} to={c.to} color={c.color} loose={c.loose} />
+        <CableStrand
+          key={c.id}
+          from={c.from}
+          to={c.to}
+          color={c.color}
+          loose={c.loose}
+          traffic={animBoost > 0}
+        />
       ))}
 
       {physicsEnabled && <CablePhysicsBits anchors={cableAnchors} />}
@@ -303,6 +555,8 @@ function SceneContent({
       <ContactShadows position={[0, 0.01, 0]} opacity={0.45} scale={22} blur={2.2} far={8} />
       <OrbitControls
         makeDefault
+        enableDamping
+        dampingFactor={0.08}
         maxPolarAngle={Math.PI * 0.48}
         minDistance={3}
         maxDistance={18}
@@ -326,32 +580,57 @@ export default function DatacenterTwin3D({
   serversByRack = {},
   network,
   selectedServerId,
+  expandedRack,
   onSelectServer,
   onSelectRack,
 }) {
   const [physicsEnabled, setPhysicsEnabled] = useState(true)
+  const [animBoost, setAnimBoost] = useState(1)
+  const [intro, setIntro] = useState(true)
   const [fps, setFps] = useState(0)
 
+  useEffect(() => {
+    if (!intro) return undefined
+    const id = setTimeout(() => setIntro(false), 2400)
+    return () => clearTimeout(id)
+  }, [intro])
+
   return (
-    <div className="dc-3d-root">
+    <motion.div
+      className="dc-3d-root"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.45 }}
+    >
       <div className="dc-3d-toolbar">
-        <span className="dc-twin-title">3D Lab Twin · Orbit drag · click chassis</span>
+        <span className="dc-twin-title">3D Lab Twin · animated floor</span>
         <label className="dc-3d-toggle">
           <input
             type="checkbox"
             checked={physicsEnabled}
             onChange={(e) => setPhysicsEnabled(e.target.checked)}
           />
-          Rapier physics
+          Rapier
         </label>
-        <span className="dc-muted">~{fps || '—'} FPS · shared U-geo · cable strands</span>
+        <label className="dc-3d-toggle">
+          <input
+            type="checkbox"
+            checked={animBoost > 0}
+            onChange={(e) => setAnimBoost(e.target.checked ? 1 : 0)}
+          />
+          Motions
+        </label>
+        <button type="button" className="dc-btn-outline dc-btn-xs" onClick={() => setIntro(true)}>
+          Replay intro
+        </button>
+        <span className="dc-muted">~{fps || '—'} FPS · doors · LEDs · fans · packets · airflow</span>
       </div>
       <div className="dc-3d-canvas-wrap">
         <Suspense fallback={<LoadingFallback />}>
           <Canvas
             shadows
-            dpr={[1, 1.75]}
-            camera={{ position: [6, 5, 7], fov: 42, near: 0.1, far: 80 }}
+            dpr={[1, Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio : 1.5)]}
+            camera={{ position: [12, 9, 14], fov: 42, near: 0.1, far: 80 }}
             gl={{ antialias: true, powerPreference: 'high-performance' }}
           >
             <Physics gravity={[0, -9.81, 0]} colliders={false} paused={!physicsEnabled}>
@@ -360,15 +639,18 @@ export default function DatacenterTwin3D({
                 serversByRack={serversByRack}
                 network={network}
                 selectedId={selectedServerId}
+                expandedRack={expandedRack}
                 onSelectServer={onSelectServer}
                 onSelectRack={onSelectRack}
                 physicsEnabled={physicsEnabled}
                 onFps={setFps}
+                animBoost={animBoost}
+                intro={intro}
               />
             </Physics>
           </Canvas>
         </Suspense>
       </div>
-    </div>
+    </motion.div>
   )
 }

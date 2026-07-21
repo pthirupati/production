@@ -101,6 +101,7 @@ instancing / streaming.
 - [x] LOD / InstancedMesh / BVH for 60 FPS
   Data hall **2D | 3D** toggle; 3D lazy-loads `DatacenterTwin3D` (R3F + Rapier).
   CSS pseudo-isometric floor remains the default fallback.
+  Motions: camera intro, staggered rack rise, door open, LED/fan pulse, cable packets, airflow particles.
 
 ---
 

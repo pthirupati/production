@@ -317,6 +317,7 @@ export default function DatacenterSimulator({
             serversByRack={serversByRack}
             network={network}
             selectedServerId={selectedServerId}
+            expandedRack={expandedRack}
             onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}
             onSelectRack={(id) => setExpandedRack((cur) => (cur === id ? null : id))}
           />
