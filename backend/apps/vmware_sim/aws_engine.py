@@ -737,7 +737,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     if action == "create_subnet":
         vpc_id = payload.get("vpc_id") or state["vpcs"][0]["id"]
         subnet = {
-            "id": new_subnet_id(), "region": region, "vpcId": vpc_id,
+            "id": payload.get("subnet_id") or new_subnet_id(), "region": region, "vpcId": vpc_id,
             "cidr": payload.get("cidr") or "172.31.48.0/20", "az": payload.get("az") or f"{region}a",
             "availableIps": 4091, "mapPublicIp": bool(payload.get("map_public_ip")), "isDefault": False,
         }
@@ -745,6 +745,122 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"Subnet {subnet['id']} created", "success")
         _save(session_id, entry)
         return {"ok": True, "message": "CreateSubnet succeeded", "subnet_id": subnet["id"]}
+
+    if action == "create_vpc":
+        vpc = {
+            "id": payload.get("vpc_id") or new_vpc_id(),
+            "region": region,
+            "name": payload.get("name") or "",
+            "cidr": payload.get("cidr") or "10.0.0.0/16",
+            "state": "available",
+            "isDefault": False,
+            "dnsHostnames": False,
+            "dnsSupport": True,
+            "tenancy": payload.get("tenancy") or "default",
+        }
+        state.setdefault("vpcs", []).append(vpc)
+        _event(state, f"VPC {vpc['id']} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CreateVpc succeeded", "vpc_id": vpc["id"]}
+
+    if action == "create_volume":
+        vol = {
+            "id": payload.get("volume_id") or new_volume_id(),
+            "region": region,
+            "size": int(payload.get("size_gb") or payload.get("size") or 8),
+            "type": payload.get("volume_type") or payload.get("type") or "gp3",
+            "state": "available",
+            "az": payload.get("az") or f"{region}a",
+            "encrypted": bool(payload.get("encrypted")),
+            "attachedTo": None,
+            "device": None,
+            "created": _now_iso(),
+        }
+        state.setdefault("volumes", []).append(vol)
+        _event(state, f"Volume {vol['id']} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CreateVolume succeeded", "volume_id": vol["id"]}
+
+    if action == "delete_volume":
+        vol_id = payload.get("volume_id") or payload.get("id")
+        vol = next((v for v in state.get("volumes", []) if v.get("id") == vol_id), None)
+        if not vol:
+            return {"ok": False, "error": f"The volume '{vol_id}' does not exist."}
+        if vol.get("state") == "in-use":
+            return {"ok": False, "error": f"Volume '{vol_id}' is currently attached and cannot be deleted."}
+        state["volumes"] = [v for v in state["volumes"] if v.get("id") != vol_id]
+        _event(state, f"Volume {vol_id} deleted", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "DeleteVolume succeeded"}
+
+    if action == "create_snapshot":
+        vol_id = payload.get("volume_id") or ""
+        vol = next((v for v in state.get("volumes", []) if v.get("id") == vol_id), None)
+        snap = {
+            "id": payload.get("snapshot_id") or f"snap-{_hex(17)}",
+            "region": region,
+            "volumeId": vol_id,
+            "size": (vol or {}).get("size") or int(payload.get("size") or 8),
+            "state": "completed",
+            "progress": "100%",
+            "description": payload.get("description") or "",
+            "started": _now_iso(),
+            "encrypted": bool((vol or {}).get("encrypted")),
+        }
+        state.setdefault("snapshots", []).append(snap)
+        _event(state, f"Snapshot {snap['id']} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CreateSnapshot succeeded", "snapshot_id": snap["id"]}
+
+    if action == "delete_snapshot":
+        sid = payload.get("snapshot_id") or payload.get("id")
+        before = len(state.get("snapshots") or [])
+        state["snapshots"] = [s for s in (state.get("snapshots") or []) if s.get("id") != sid]
+        if len(state.get("snapshots") or []) == before:
+            return {"ok": False, "error": f"The snapshot '{sid}' does not exist."}
+        _event(state, f"Snapshot {sid} deleted", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "DeleteSnapshot succeeded"}
+
+    if action == "allocate_eip":
+        eip = {
+            "allocationId": payload.get("allocation_id") or new_eip_alloc_id(),
+            "region": region,
+            "publicIp": payload.get("public_ip") or new_public_ip(),
+            "associationId": None,
+            "instanceId": None,
+            "domain": "vpc",
+        }
+        state.setdefault("elasticIps", []).append(eip)
+        _event(state, f"Elastic IP {eip['publicIp']} allocated", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "AllocateAddress succeeded", "allocation_id": eip["allocationId"]}
+
+    if action == "delete_iam_user":
+        uname = payload.get("name") or ""
+        before = len(state.get("iamUsers") or [])
+        state["iamUsers"] = [u for u in (state.get("iamUsers") or []) if u.get("name") != uname]
+        if len(state.get("iamUsers") or []) == before:
+            return {"ok": False, "error": f"NoSuchEntity: The user with name {uname} cannot be found"}
+        _event(state, f"IAM user {uname} deleted", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "DeleteUser succeeded"}
+
+    if action == "create_access_key":
+        uname = payload.get("name") or ""
+        user = next((u for u in state.get("iamUsers", []) if u.get("name") == uname), None)
+        if not user:
+            return {"ok": False, "error": f"NoSuchEntity: The user with name {uname} cannot be found"}
+        key = {
+            "id": payload.get("access_key_id") or new_access_key_id(),
+            "created": _now_iso(),
+            "status": "Active",
+            "lastUsed": "N/A",
+        }
+        user.setdefault("accessKeys", []).append(key)
+        _event(state, f"Access key created for {uname}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CreateAccessKey succeeded", "access_key_id": key["id"]}
 
     # ── S3 ─────────────────────────────────────────────────────────────────────
     if action == "create_bucket":

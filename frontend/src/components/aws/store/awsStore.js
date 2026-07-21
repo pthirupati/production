@@ -1007,6 +1007,7 @@ export const useAwsStore = create(
         }
         const vpc = { id: newVpcId(), region, name: name || '', cidr, state: 'available', isDefault: false, dnsHostnames: false, dnsSupport: true, tenancy: tenancy || 'default' }
         set((s) => ({ vpcs: [...s.vpcs, vpc] }))
+        get()._syncAction('create_vpc', { vpc_id: vpc.id, name: vpc.name, cidr: vpc.cidr, tenancy: vpc.tenancy })
         return vpc
       },
       deleteVpc: (id) => {
@@ -1021,6 +1022,7 @@ export const useAwsStore = create(
           return fail(err)
         }
         set((s) => ({ vpcs: s.vpcs.filter((v) => v.id !== id), securityGroups: s.securityGroups.filter((sg) => sg.vpcId !== id) }))
+        get()._syncAction('delete_vpc', { vpc_id: id })
         return ok()
       },
 
@@ -1045,6 +1047,7 @@ export const useAwsStore = create(
         }
         const subnet = { id: newSubnetId(), region, vpcId, cidr, az: az || `${region}a`, availableIps: 4091, mapPublicIp: !!mapPublicIp, isDefault: false }
         set((s) => ({ subnets: [...s.subnets, subnet] }))
+        get()._syncAction('create_subnet', { subnet_id: subnet.id, vpc_id: vpcId, cidr, az: subnet.az, map_public_ip: !!mapPublicIp })
         return subnet
       },
       deleteSubnet: (id) => {
@@ -1055,6 +1058,7 @@ export const useAwsStore = create(
           return fail(err)
         }
         set((s) => ({ subnets: s.subnets.filter((sn) => sn.id !== id) }))
+        get()._syncAction('delete_subnet', { subnet_id: id })
         return ok()
       },
 
@@ -1105,6 +1109,9 @@ export const useAwsStore = create(
         }
         const finalDevice = device || '/dev/sdf'
         set((s) => ({ volumes: s.volumes.map((v) => (v.id === volId ? { ...v, state: 'in-use', attachedTo: instanceId, device: finalDevice } : v)) }))
+        get()._syncAction('attach_volume', {
+          volume_id: volId, instance_id: instanceId, device: finalDevice, size_gb: vol.size,
+        })
         if (get().labSessionId) {
           notifyAwsBridge(get().labSessionId, 'bridge_attach_volume', {
             volume_id: volId, instance_id: instanceId, device: finalDevice, size_gb: vol.size,
@@ -1123,6 +1130,7 @@ export const useAwsStore = create(
         const device = vol?.device || null
         const instanceId = vol?.attachedTo || null
         set((s) => ({ volumes: s.volumes.map((v) => (v.id === volId ? { ...v, state: 'available', attachedTo: null, device: null } : v)) }))
+        get()._syncAction('detach_volume', { volume_id: volId, instance_id: instanceId, device })
         if (get().labSessionId) {
           notifyAwsBridge(get().labSessionId, 'bridge_detach_volume', {
             volume_id: volId, instance_id: instanceId, device,
@@ -1136,13 +1144,21 @@ export const useAwsStore = create(
         if (!vol) return fail(invalidParameterValue('CreateSnapshot', `The volume '${volId}' does not exist.`))
         const snap = { id: newSnapshotId(), region, volumeId: volId, size: vol.size, state: 'completed', progress: '100%', description: description || '', started: new Date().toISOString(), encrypted: !!vol.encrypted }
         set((s) => ({ snapshots: [...(s.snapshots || []), snap] }))
+        get()._syncAction('create_snapshot', { volume_id: volId, snapshot_id: snap.id, description: description || '' })
         return snap
       },
-      deleteSnapshot: (id) => { set((s) => ({ snapshots: (s.snapshots || []).filter((x) => x.id !== id) })); return ok() },
+      deleteSnapshot: (id) => {
+        set((s) => ({ snapshots: (s.snapshots || []).filter((x) => x.id !== id) }))
+        get()._syncAction('delete_snapshot', { snapshot_id: id })
+        return ok()
+      },
       createVolume: ({ size, type, az, encrypted } = {}) => {
         const { region } = get()
         const vol = { id: newVolumeId(), region, size: size || 8, type: type || 'gp3', state: 'available', az: az || `${region}a`, encrypted: !!encrypted, attachedTo: null, device: null, created: new Date().toISOString() }
         set((s) => ({ volumes: [...s.volumes, vol] }))
+        get()._syncAction('create_volume', {
+          volume_id: vol.id, size_gb: vol.size, volume_type: vol.type, az: vol.az, encrypted: !!encrypted,
+        })
         return vol
       },
       deleteVolume: (id) => {
@@ -1154,6 +1170,7 @@ export const useAwsStore = create(
           return fail(err)
         }
         set((s) => ({ volumes: s.volumes.filter((v) => v.id !== id) }))
+        get()._syncAction('delete_volume', { volume_id: id })
         return ok()
       },
 
@@ -1162,6 +1179,7 @@ export const useAwsStore = create(
         const { region } = get()
         const eip = { allocationId: newEipAllocId(), region, publicIp: newPublicIp(), associationId: null, instanceId: null, domain: 'vpc' }
         set((s) => ({ elasticIps: [...s.elasticIps, eip] }))
+        get()._syncAction('allocate_eip', { allocation_id: eip.allocationId, public_ip: eip.publicIp })
         return eip
       },
       associateEip: (allocationId, instanceId) => {
@@ -1359,17 +1377,24 @@ export const useAwsStore = create(
       createIamUser: ({ name, consoleAccess, policies }) => {
         const user = { id: newIamUserId(), name, created: new Date().toISOString(), consoleAccess: !!consoleAccess, groups: [], policies: policies || [], accessKeys: [] }
         set((s) => ({ iamUsers: [...s.iamUsers, user] }))
+        get()._syncAction('create_iam_user', { name, console_access: !!consoleAccess, policies: policies || [] })
         return user
       },
-      deleteIamUser: (name) => set((s) => ({ iamUsers: s.iamUsers.filter((u) => u.name !== name) })),
+      deleteIamUser: (name) => {
+        set((s) => ({ iamUsers: s.iamUsers.filter((u) => u.name !== name) }))
+        get()._syncAction('delete_iam_user', { name })
+        return ok()
+      },
       createAccessKey: (userName) => {
         const key = { id: newAccessKeyId(), secret: newSecretAccessKey(), created: new Date().toISOString(), status: 'Active', lastUsed: 'N/A' }
         set((s) => ({ iamUsers: s.iamUsers.map((u) => (u.name === userName ? { ...u, accessKeys: [...u.accessKeys, { id: key.id, created: key.created, status: 'Active', lastUsed: 'N/A' }] } : u)) }))
+        get()._syncAction('create_access_key', { name: userName, access_key_id: key.id })
         return key
       },
       createIamRole: ({ name, trustedEntity, policies }) => {
         const role = { id: newIamRoleId(), name, created: new Date().toISOString(), trustedEntity, policies: policies || [] }
         set((s) => ({ iamRoles: [...s.iamRoles, role] }))
+        get()._syncAction('create_iam_role', { name, trusted_entity: trustedEntity, policies: policies || [] })
         return role
       },
       createIamPolicy: ({ name, description, document }) => {
@@ -1383,6 +1408,7 @@ export const useAwsStore = create(
         const doc = typeof document === 'string' ? JSON.parse(document) : document
         const policy = { name, type: 'Customer managed', attached: 0, created: new Date().toISOString(), description, document: doc }
         set((s) => ({ iamPolicies: [...s.iamPolicies, policy] }))
+        get()._syncAction('create_iam_policy', { name, description, document: doc })
         return policy
       },
       updateIamPolicy: (name, patch) => set((s) => ({

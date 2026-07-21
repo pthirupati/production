@@ -280,12 +280,36 @@ export default function DellEmcSimulator({
       )
     }
     if (nav === 'ports') {
-      return <SimDataTable columns={[
-        { key: 'id', label: 'Port', sortable: true },
-        { key: 'director', label: 'Director', sortable: true },
-        { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'online' ? 'success' : 'error'} label={r.status} /> },
-        { key: 'speed', label: 'Speed', sortable: true },
-      ]} rows={st.ports || []} searchKeys={['id', 'director']} />
+      return (
+        <div className="space-y-5">
+          <div>
+            <h2 className="text-lg font-semibold mb-2">Ports</h2>
+            <SimDataTable columns={[
+              { key: 'id', label: 'Port', sortable: true },
+              { key: 'director', label: 'Director', sortable: true },
+              { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'online' ? 'success' : 'error'} label={r.status} /> },
+              { key: 'speed', label: 'Speed', sortable: true },
+            ]} rows={st.ports || []} searchKeys={['id', 'director']} />
+          </div>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center flex-wrap gap-2">
+              <h2 className="text-lg font-semibold">Port Groups</h2>
+              <button type="button" className="de-btn-primary flex items-center gap-1" disabled={busy}
+                onClick={() => run(() => dellemcApi.createPortGroup(
+                  sessionId,
+                  `PG_${Date.now().toString(36).slice(-4)}`,
+                  [(st.ports || [])[0]?.id || 'FA-1D:4'],
+                ), 'Port group created')}>
+                <Plus size={14} /> Create port group
+              </button>
+            </div>
+            <SimDataTable columns={[
+              { key: 'name', label: 'Port Group', sortable: true },
+              { key: 'ports', label: 'Ports', render: (r) => (r.ports || []).join(', ') },
+            ]} rows={st.port_groups || []} searchKeys={['name']} />
+          </div>
+        </div>
+      )
     }
     if (nav === 'activity') {
       return (

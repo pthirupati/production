@@ -516,10 +516,17 @@ export default function TerraformCloudShell({
 
       <SimModal open={showApply} onClose={() => setShowApply(false)} title="Confirm Apply"
         footer={<><button type="button" className="text-sm px-3 py-1.5" onClick={() => setShowApply(false)}>Cancel</button><button type="button" className="tfc-btn-primary" disabled={busy} onClick={() => {
-          run(() => terraformApi.queueRun(sessionId, selectedWs?.name || 'lab-workspace', true), 'Apply complete')
+          const runId = selectedRun?.id
+          run(() => (runId
+            ? terraformApi.applyRun(sessionId, runId)
+            : terraformApi.queueRun(sessionId, selectedWs?.name || 'lab-workspace', true)), 'Apply complete')
           setShowApply(false)
         }}>Confirm & Apply</button></>}>
-        <p className="text-sm text-slate-300">Apply the latest successful plan to infrastructure?</p>
+        <p className="text-sm text-slate-300">
+          {selectedRun?.id
+            ? `Apply planned run ${selectedRun.id} to infrastructure?`
+            : 'Apply the latest successful plan to infrastructure?'}
+        </p>
       </SimModal>
 
       <SimModal open={showVarModal} onClose={() => { setShowVarModal(false); setVarKey(''); setVarValue(''); setVarSensitive(false); setVarHcl(false) }} title="Add Variable"

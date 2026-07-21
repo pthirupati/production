@@ -307,21 +307,33 @@ export default function K8sConsole({
 
     if (nav === 'services') {
       return (
-        <SimDataTable
-          searchKeys={['name', 'namespace', 'type']}
-          columns={[
-            { key: 'name', label: 'Name', sortable: true },
-            { key: 'namespace', label: 'Namespace', sortable: true },
-            { key: 'type', label: 'Type', sortable: true },
-            { key: 'clusterIP', label: 'Cluster IP' },
-            { key: 'externalIP', label: 'External IP', render: (r) => r.externalIP || '—' },
-            {
-              key: 'ports', label: 'Ports',
-              render: (r) => (r.ports || []).map((p) => `${p.port}${p.nodePort ? `:${p.nodePort}` : ''}/${p.protocol}`).join(', '),
-            },
-          ]}
-          rows={services}
-        />
+        <div>
+          <div className="flex justify-end mb-3">
+            <button type="button" className="k8s-btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
+              onClick={() => run(() => k8sApi.createService(sessionId, {
+                name: `svc-${Date.now().toString(36).slice(-4)}`,
+                namespace: 'production',
+                port: 80,
+              }), 'Service created')} disabled={busy}>
+              <Plus size={14} /> Create Service
+            </button>
+          </div>
+          <SimDataTable
+            searchKeys={['name', 'namespace', 'type']}
+            columns={[
+              { key: 'name', label: 'Name', sortable: true },
+              { key: 'namespace', label: 'Namespace', sortable: true },
+              { key: 'type', label: 'Type', sortable: true },
+              { key: 'clusterIP', label: 'Cluster IP' },
+              { key: 'externalIP', label: 'External IP', render: (r) => r.externalIP || '—' },
+              {
+                key: 'ports', label: 'Ports',
+                render: (r) => (r.ports || []).map((p) => `${p.port}${p.nodePort ? `:${p.nodePort}` : ''}/${p.protocol}`).join(', '),
+              },
+            ]}
+            rows={services}
+          />
+        </div>
       )
     }
 

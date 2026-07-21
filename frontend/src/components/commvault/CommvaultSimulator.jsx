@@ -207,10 +207,20 @@ export default function CommvaultSimulator({
             { key: 'retention_days', label: 'Retention', sortable: true, render: (r) => `${r.retention_days} days` },
             { key: 'library', label: 'Library', sortable: true },
             { key: 'enabled', label: 'State', render: (r) => <SimStatusBadge status={r.enabled ? 'success' : 'disabled'} label={r.enabled ? 'Enabled' : 'Disabled'} /> },
-            { key: 'actions', label: 'Actions', render: (r) => !r.enabled && (
-              <button type="button" className="cv-btn-sm" onClick={(e) => { e.stopPropagation(); run(() => commvaultApi.enablePolicy(sessionId, r.name), 'Storage policy enabled') }}>
-                Enable
-              </button>
+            { key: 'actions', label: 'Actions', render: (r) => (
+              <div className="flex gap-1">
+                {!r.enabled && (
+                  <button type="button" className="cv-btn-sm" onClick={(e) => { e.stopPropagation(); run(() => commvaultApi.enablePolicy(sessionId, r.name), 'Storage policy enabled') }}>
+                    Enable
+                  </button>
+                )}
+                <button type="button" className="cv-btn-sm cv-btn-outline" onClick={(e) => {
+                  e.stopPropagation()
+                  run(() => commvaultApi.setRetention(sessionId, r.name, (r.retention_days || 30) + 30), 'Retention updated')
+                }}>
+                  +30d retention
+                </button>
+              </div>
             ) },
           ]} rows={st.storage_policies || []} searchKeys={['name']} />
         </div>
@@ -240,7 +250,18 @@ export default function CommvaultSimulator({
     if (nav === 'schedules') {
       return (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Schedules</h2>
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Schedules</h2>
+            <button type="button" className="cv-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => commvaultApi.createSchedule(sessionId, {
+                name: `Schedule-${Date.now().toString(36).slice(-4)}`,
+                client: (st.clients || [])[0]?.name || 'web01',
+                type: 'Incremental',
+                cron: '0 2 * * *',
+              }), 'Schedule created')}>
+              <Plus size={14} /> Create schedule
+            </button>
+          </div>
           <SimDataTable columns={[
             { key: 'name', label: 'Schedule', sortable: true },
             { key: 'client', label: 'Client', sortable: true },

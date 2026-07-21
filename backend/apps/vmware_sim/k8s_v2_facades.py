@@ -5,6 +5,7 @@ Learner language: Lab Environment / Lab Server — never Simulation/Sandbox/Mock
 
 from __future__ import annotations
 
+import random
 from datetime import datetime, timezone
 from typing import Any
 
@@ -213,6 +214,33 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         }
         state.setdefault("pvcs", []).append(row)
         return {"ok": True, "message": f"persistentvolumeclaim/{name} created", "pvc": row}
+
+    if action == "create_service":
+        name = (payload.get("name") or f"svc-{len(state.get('services') or []) + 1}").strip()
+        ns = payload.get("namespace") or "production"
+        if any(s.get("name") == name and s.get("namespace") == ns for s in state.get("services") or []):
+            return {"ok": False, "error": f"Service '{name}' already exists in {ns}"}
+        svc_type = payload.get("type") or "ClusterIP"
+        port = int(payload.get("port") or 80)
+        target = int(payload.get("target_port") or payload.get("targetPort") or 8080)
+        row = {
+            "name": name,
+            "namespace": ns,
+            "type": svc_type,
+            "clusterIP": payload.get("clusterIP") or f"10.96.{random.randint(0, 255)}.{random.randint(1, 254)}",
+            "externalIP": payload.get("externalIP") or ("<none>" if svc_type == "ClusterIP" else ""),
+            "ports": [{
+                "port": port,
+                "targetPort": target,
+                "protocol": payload.get("protocol") or "TCP",
+                "nodePort": int(payload["node_port"]) if payload.get("node_port") else None,
+            }],
+            "selector": payload.get("selector") or {"app": name},
+            "sessionAffinity": "None",
+            "creationTimestamp": _now(),
+        }
+        state.setdefault("services", []).append(row)
+        return {"ok": True, "message": f"service/{name} created", "service": row}
 
     if action == "create_hpa":
         name = (payload.get("name") or payload.get("target") or "app").strip()

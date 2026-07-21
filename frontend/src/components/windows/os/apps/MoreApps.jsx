@@ -47,6 +47,14 @@ export function DNSManager() {
     } finally { setBusy(false) }
   }
 
+  const deleteRecord = async (name) => {
+    if (!labAction || busy || !name || name.startsWith('(') || name.startsWith('_')) return
+    setBusy(true)
+    try {
+      await labAction('dns_delete_record', { name, zone: sel })
+    } finally { setBusy(false) }
+  }
+
   return (
     <div className="winos-app">
       <div className="winos-toolbar">
@@ -69,9 +77,18 @@ export function DNSManager() {
         </div>
         <div className="winos-main">
           <table className="winos-table">
-            <thead><tr><th>Name</th><th>Type</th><th>Data</th></tr></thead>
+            <thead><tr><th>Name</th><th>Type</th><th>Data</th><th /></tr></thead>
             <tbody>{rows.map((r, i) => (
-              <tr key={i}><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td></tr>
+              <tr key={i}>
+                <td>{r[0]}</td>
+                <td>{r[1]}</td>
+                <td>{r[2]}</td>
+                <td>
+                  {live.length > 0 && !String(r[0]).startsWith('(') && !String(r[0]).startsWith('_') && (
+                    <button type="button" className="winos-btn" disabled={busy} onClick={() => deleteRecord(r[0])}>Delete</button>
+                  )}
+                </td>
+              </tr>
             ))}</tbody>
           </table>
         </div>

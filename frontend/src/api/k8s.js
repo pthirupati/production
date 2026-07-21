@@ -58,6 +58,9 @@ export const k8sApi = {
   createPvc(sessionId, payload = {}) {
     return k8sApi.action(sessionId, 'create_pvc', payload)
   },
+  createService(sessionId, payload = {}) {
+    return k8sApi.action(sessionId, 'create_service', payload)
+  },
   patchResource(sessionId, kind, name, patch = {}, namespace = '') {
     return k8sApi.action(sessionId, 'patch_resource', { kind, name, patch, namespace })
   },

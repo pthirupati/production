@@ -208,23 +208,38 @@ export default function NetAppSimulator({
             { key: 'size_gb', label: 'Size', render: (r) => `${r.size_gb} GB` },
             { key: 'created', label: 'Created', sortable: true },
           ]} rows={st.snapshots || []} searchKeys={['name', 'volume']} />
-          {(st.qtrees || []).length > 0 && (
-            <>
-              <h2 className="text-lg font-semibold pt-2">Qtrees</h2>
-              <SimDataTable columns={[
-                { key: 'name', label: 'Qtree', sortable: true },
-                { key: 'volume', label: 'Volume', sortable: true },
-                { key: 'security_style', label: 'Security', sortable: true },
-              ]} rows={st.qtrees || []} searchKeys={['name']} />
-            </>
-          )}
+          <div className="flex justify-between items-center flex-wrap gap-2 pt-2">
+            <h2 className="text-lg font-semibold">Qtrees</h2>
+            <button type="button" className="na-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => netappApi.createQtree(
+                sessionId,
+                (st.volumes || [])[0]?.name || 'vol1',
+                `qt_${Date.now().toString(36).slice(-4)}`,
+              ), 'Qtree created')}>
+              <Plus size={14} /> Create qtree
+            </button>
+          </div>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Qtree', sortable: true },
+            { key: 'volume', label: 'Volume', sortable: true },
+            { key: 'security_style', label: 'Security', sortable: true },
+          ]} rows={st.qtrees || []} searchKeys={['name']} />
         </div>
       )
     }
     if (nav === 'luns') {
       return (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold">LUNs</h2>
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">LUNs</h2>
+            <button type="button" className="na-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => {
+                const vol = (st.volumes || [])[0]?.name || 'vol1'
+                run(() => netappApi.createLun(sessionId, vol, 50, `/vol/${vol}/lun_${Date.now().toString(36).slice(-4)}`), 'LUN created')
+              }}>
+              <Plus size={14} /> Create LUN
+            </button>
+          </div>
           <SimDataTable columns={[
             { key: 'path', label: 'Path', sortable: true },
             { key: 'svm', label: 'SVM', sortable: true },
@@ -283,7 +298,17 @@ export default function NetAppSimulator({
             { key: 'home_port', label: 'Port', sortable: true },
             { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'up' ? 'success' : 'error'} label={r.status} /> },
           ]} rows={st.network_interfaces || []} searchKeys={['name', 'address']} />
-          <h2 className="text-lg font-semibold pt-2">NFS / CIFS Exports</h2>
+          <div className="flex justify-between items-center flex-wrap gap-2 pt-2">
+            <h2 className="text-lg font-semibold">NFS / CIFS Exports</h2>
+            <button type="button" className="na-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => netappApi.createExport(
+                sessionId,
+                (st.volumes || [])[0]?.name || 'vol1',
+                ['10.0.0.0/8'],
+              ), 'Export created')}>
+              <Plus size={14} /> Create export
+            </button>
+          </div>
           <SimDataTable columns={[
             { key: 'volume', label: 'Volume', sortable: true },
             { key: 'policy', label: 'Export Policy', sortable: true },
