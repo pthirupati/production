@@ -1063,6 +1063,16 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
         _event(state, f"Disabled account: {user['name']}")
         return {"ok": True, "message": f"Disabled {user['name']}"}
 
+    if act in ("delete_ad_user", "remove_ad_user"):
+        key = payload.get("user") or payload.get("name") or payload.get("sam")
+        user = _find_user(world, key)
+        if not user:
+            return {"ok": False, "error": "User not found"}
+        users = world.setdefault("ad", {}).setdefault("users", [])
+        world["ad"]["users"] = [u for u in users if u is not user and u.get("name") != user.get("name")]
+        _event(state, f"Deleted AD user: {user['name']}")
+        return {"ok": True, "message": f"Deleted user {user['name']}"}
+
     if act in ("unlock_ad_user", "unlock_user", "unlock_account"):
         user = _find_user(world, payload.get("user") or payload.get("name"))
         if not user:

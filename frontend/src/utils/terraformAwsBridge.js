@@ -40,6 +40,18 @@ export function collectHcl(files = {}) {
  * ledger and progressive `terraform apply` output. Idempotent per address via the
  * shared `syncedAddresses` ledger, so re-applying an unchanged config is a no-op.
  */
+/** Resolve `${aws_vpc.main.id}` against ids already mirrored this session. */
+function resolveRef(val) {
+  if (val == null || typeof val !== 'string') return val
+  const m = val.match(/\$\{?(aws_[\w]+)\.([\w]+)\.id\}?/) || val.match(/^(aws_[\w]+)\.([\w]+)\.id$/)
+  if (!m) return val
+  const key = `${m[1]}.${m[2]}`
+  // Prefer explicit id map written during this apply; fall back to address set alone.
+  return resourceIdByAddress.get(key) || val
+}
+
+const resourceIdByAddress = new Map()
+
 function createResourceInStore(store, r, region) {
   const address = `${r.type}.${r.name}`
   if (syncedAddresses.has(address)) return []
@@ -63,11 +75,13 @@ function createResourceInStore(store, r, region) {
       tags: attrs.tags || {},
     }) || []
     created.push(...launched.map((i) => i.id))
+    if (launched[0]?.id) resourceIdByAddress.set(address, launched[0].id)
   } else if (r.type === 'aws_s3_bucket') {
     const bucketName = attrs.bucket || r.name
     if (!store.s3Buckets?.some((b) => b.name === bucketName)) {
       store.createBucket?.({ name: bucketName, region, blockPublic: true })
       created.push(`bucket:${bucketName}`)
+      resourceIdByAddress.set(address, bucketName)
     }
   } else if (r.type === 'aws_security_group') {
     const sgName = attrs.name || r.name
@@ -87,14 +101,89 @@ function createResourceInStore(store, r, region) {
       const sg = store.createSecurityGroup?.({
         name: sgName,
         description: attrs.description || 'Managed by Terraform',
-        vpcId: attrs.vpc_id || store.vpcs?.[0]?.id || '',
+        vpcId: resolveRef(attrs.vpc_id) || store.vpcs?.[0]?.id || '',
         inbound,
       })
-      if (sg?.id) created.push(`sg:${sgName}`)
+      if (sg?.id) {
+        created.push(`sg:${sgName}`)
+        resourceIdByAddress.set(address, sg.id)
+      }
+    }
+  } else if (r.type === 'aws_key_pair') {
+    const name = attrs.key_name || r.name
+    if (!store.keyPairs?.some((k) => k.name === name)) {
+      const kp = store.createKeyPair?.({ name, type: 'rsa' })
+      if (kp?.name) {
+        created.push(`keypair:${kp.name}`)
+        resourceIdByAddress.set(address, kp.name)
+      }
+    }
+  } else if (r.type === 'aws_vpc') {
+    const vpc = store.createVpc?.({
+      name: (attrs.tags && attrs.tags.Name) || r.name,
+      cidr: attrs.cidr_block || '10.0.0.0/16',
+      tenancy: attrs.instance_tenancy || 'default',
+    })
+    if (vpc?.id) {
+      created.push(vpc.id)
+      resourceIdByAddress.set(address, vpc.id)
+    }
+  } else if (r.type === 'aws_subnet') {
+    const vpcId = resolveRef(attrs.vpc_id) || store.vpcs?.[0]?.id || ''
+    const subnet = store.createSubnet?.({
+      vpcId,
+      cidr: attrs.cidr_block || '10.0.1.0/24',
+      az: attrs.availability_zone || undefined,
+      mapPublicIp: !!attrs.map_public_ip_on_launch,
+    })
+    if (subnet?.id) {
+      created.push(subnet.id)
+      resourceIdByAddress.set(address, subnet.id)
+    }
+  } else if (r.type === 'aws_internet_gateway') {
+    const igw = store.createInternetGateway?.({ name: (attrs.tags && attrs.tags.Name) || r.name })
+    const vpcId = resolveRef(attrs.vpc_id)
+    if (igw?.id && vpcId) store.attachInternetGateway?.(igw.id, vpcId)
+    if (igw?.id) {
+      created.push(igw.id)
+      resourceIdByAddress.set(address, igw.id)
+    }
+  } else if (r.type === 'aws_route_table') {
+    const vpcId = resolveRef(attrs.vpc_id) || store.vpcs?.[0]?.id
+    const rtb = store.createRouteTable?.({ vpcId })
+    if (rtb?.id) {
+      created.push(rtb.id)
+      resourceIdByAddress.set(address, rtb.id)
+    }
+  } else if (r.type === 'aws_route') {
+    const rtbId = resolveRef(attrs.route_table_id)
+    const dest = attrs.destination_cidr_block || '0.0.0.0/0'
+    const target = resolveRef(attrs.gateway_id || attrs.nat_gateway_id) || attrs.gateway_id || 'igw-local'
+    if (rtbId) store.createRoute?.(rtbId, { dest, target })
+    created.push(`route:${rtbId}:${dest}`)
+    resourceIdByAddress.set(address, dest)
+  } else if (r.type === 'aws_route_table_association') {
+    const rtbId = resolveRef(attrs.route_table_id)
+    const subnetId = resolveRef(attrs.subnet_id)
+    if (rtbId && subnetId) store.associateRouteTable?.(rtbId, subnetId)
+    created.push(`assoc:${subnetId}`)
+    resourceIdByAddress.set(address, subnetId || r.name)
+  } else if (r.type === 'aws_eip') {
+    const eip = store.allocateEip?.()
+    if (eip?.allocationId) {
+      created.push(eip.allocationId)
+      resourceIdByAddress.set(address, eip.allocationId)
+    }
+  } else if (r.type === 'aws_nat_gateway') {
+    const subnetId = resolveRef(attrs.subnet_id)
+    const allocationId = resolveRef(attrs.allocation_id)
+    const nat = store.createNatGateway?.({ subnetId, allocationId })
+    if (nat?.id) {
+      created.push(nat.id)
+      resourceIdByAddress.set(address, nat.id)
     }
   }
-  // aws_instance / bucket / SG mirrored above; any other type is recorded so a
-  // re-apply stays consistent but creates no store object.
+  // Record address so a re-apply stays consistent (even for unmodeled types).
   syncedAddresses.add(address)
   return created
 }
@@ -363,6 +452,7 @@ export function runAwsCommand(argv = []) {
 /** Tear down lab-created AWS sim resources when the lab session ends. */
 export function resetTerraformAwsLabState() {
   syncedAddresses.clear()
+  resourceIdByAddress.clear()
   const store = useAwsStore.getState()
   if (store.resetLabManaged) {
     store.resetLabManaged()

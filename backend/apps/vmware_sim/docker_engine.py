@@ -698,6 +698,105 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": net["id"]}
 
+    if action in ("connect_network", "network_connect"):
+        container_name = payload.get("container") or payload.get("name") or ""
+        network_name = payload.get("network") or payload.get("network_name") or ""
+        if not container_name or not network_name:
+            return {"ok": False, "error": "container and network are required"}
+        c = _find_container(state, container_name)
+        if not c:
+            return {"ok": False, "error": f"No such container: {container_name}"}
+        net = _find_network(state, network_name)
+        if not net:
+            return {"ok": False, "error": f"No such network: {network_name}"}
+        c["network"] = network_name
+        c["networkMode"] = network_name
+        if c.get("state") == "running" and not c.get("ipAddress"):
+            c["ipAddress"] = f"172.18.0.{random.randint(2, 250)}"
+        containers = net.setdefault("containers", [])
+        if c["shortName"] not in containers and c.get("name") not in containers:
+            containers.append(c["shortName"])
+        events.append(_docker_event("connect", "connect", c["shortName"],
+                                    f"Connected {c['shortName']} to {network_name}"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Connected {c['shortName']} to {network_name}",
+                "container": c["shortName"], "network": network_name}
+
+    if action in ("disconnect_network", "network_disconnect"):
+        container_name = payload.get("container") or payload.get("name") or ""
+        network_name = payload.get("network") or payload.get("network_name") or ""
+        c = _find_container(state, container_name)
+        if not c:
+            return {"ok": False, "error": f"No such container: {container_name}"}
+        if network_name:
+            net = _find_network(state, network_name)
+            if net:
+                net["containers"] = [x for x in (net.get("containers") or [])
+                                     if x not in (c["shortName"], c.get("name"))]
+        c["network"] = "bridge"
+        c["networkMode"] = "bridge"
+        events.append(_docker_event("disconnect", "disconnect", c["shortName"],
+                                    f"Disconnected {c['shortName']} from {network_name or 'network'}"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Disconnected {c['shortName']}"}
+
+    if action in ("create_container", "run_container", "docker_run"):
+        name = (payload.get("name") or payload.get("container") or f"ctr-{_short_id()[:6]}").strip()
+        image = (payload.get("image") or "nginx:latest").strip()
+        if _find_container(state, name):
+            return {"ok": False, "error": f"Conflict. The container name \"/{name}\" is already in use"}
+        network = payload.get("network") or payload.get("network_mode") or "bridge"
+        ports_in = payload.get("ports") or []
+        ports = []
+        for p in ports_in if isinstance(ports_in, list) else []:
+            if isinstance(p, dict):
+                ports.append({
+                    "host": p.get("host") or p.get("host_port") or 0,
+                    "container": p.get("container") or p.get("container_port") or 80,
+                    "protocol": p.get("protocol") or "tcp",
+                })
+            elif isinstance(p, str) and ":" in p:
+                host, cont = p.split(":", 1)
+                ports.append({"host": int(host) if host.isdigit() else 0,
+                              "container": int(cont.split("/")[0]) if cont.split("/")[0].isdigit() else 80,
+                              "protocol": "tcp"})
+        publish = payload.get("publish") or payload.get("p")
+        if publish and not ports:
+            if isinstance(publish, str) and ":" in publish:
+                host, cont = publish.split(":", 1)
+                ports.append({"host": int(host) if str(host).isdigit() else 0,
+                              "container": int(str(cont).split("/")[0]) if str(cont).split("/")[0].isdigit() else 80,
+                              "protocol": "tcp"})
+        start = bool(payload.get("start", payload.get("detach", True)))
+        c = _container(
+            name, image,
+            status="Up Less than a second" if start else "Created",
+            state="running" if start else "created",
+            ports=ports,
+            network=network,
+            env=payload.get("env") or [],
+            age_seconds=1,
+            mem_usage_mb=32.0 if start else 0.0,
+            cpu_pct=1.0 if start else 0.0,
+        )
+        state["containers"].append(c)
+        net = _find_network(state, network)
+        if net:
+            containers = net.setdefault("containers", [])
+            if name not in containers:
+                containers.append(name)
+        # Ensure image exists locally after a run
+        repo, _, tag = image.partition(":")
+        tag = tag or "latest"
+        if not any(i.get("repoTag") == image or (i.get("repository") == repo and i.get("tag") == tag)
+                   for i in state.get("images") or []):
+            state.setdefault("images", []).insert(0, _image(repo or image, tag=tag, size_mb=80, age_seconds=1))
+        events.append(_docker_event("create", "create", name, f"Created container {name}"))
+        if start:
+            events.append(_docker_event("start", "start", name, f"Started container {name}"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": c["id"], "container": c}
+
     if action == "remove_network":
         name = payload.get("name") or payload.get("network")
         if name in ("bridge", "host", "none"):

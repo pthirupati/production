@@ -41,6 +41,15 @@ export const dockerApi = {
   removeNetwork(sessionId, name) {
     return dockerApi.action(sessionId, 'remove_network', { name })
   },
+  connectNetwork(sessionId, container, network) {
+    return dockerApi.action(sessionId, 'connect_network', { container, network })
+  },
+  disconnectNetwork(sessionId, container, network = '') {
+    return dockerApi.action(sessionId, 'disconnect_network', { container, network })
+  },
+  createContainer(sessionId, payload = {}) {
+    return dockerApi.action(sessionId, 'create_container', payload)
+  },
   createVolume(sessionId, name, driver = 'local') {
     return dockerApi.action(sessionId, 'create_volume', { name, driver })
   },

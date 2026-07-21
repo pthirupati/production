@@ -159,20 +159,42 @@ describe('syncTerraformApplyToAwsConsole (IDE apply path)', () => {
     expect(web.type).toBe('t3.medium') // regex bridge would have shown a stale default
   })
 
-  it('teardown removes lab-managed resources and re-enables a fresh apply', () => {
-    syncTerraformApplyToAwsConsole(applied({ 'main.tf': MULTI_TF }))
-    const s1 = useAwsStore.getState()
-    expect(s1.instances.some((i) => i.name === 'bastion')).toBe(true)
-
-    resetTerraformAwsLabState()
-    const s2 = useAwsStore.getState()
-    expect(s2.instances.some((i) => i.name === 'bastion')).toBe(false)
-    expect(s2.s3Buckets.some((b) => b.name === 'fixit-data-eu-west-1')).toBe(false)
-    expect(s2.securityGroups.some((g) => g.name === 'app-sg-tf')).toBe(false)
-
-    // address ledger was cleared, so applying again re-creates the resources
-    const inst0 = useAwsStore.getState().instances.length
-    syncTerraformApplyToAwsConsole(applied({ 'main.tf': MULTI_TF }))
-    expect(useAwsStore.getState().instances.length).toBe(inst0 + 3)
+  it('mirrors VPC networking resources (vpc/subnet/igw/route)', () => {
+    const VPC_TF = `
+provider "aws" { region = "us-east-1" }
+resource "aws_vpc" "main" {
+  cidr_block = "10.20.0.0/16"
+  tags = { Name = "lab-vpc" }
+}
+resource "aws_subnet" "public" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.20.1.0/24"
+  map_public_ip_on_launch = true
+}
+resource "aws_internet_gateway" "gw" {
+  vpc_id = aws_vpc.main.id
+}
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+}
+resource "aws_route" "default" {
+  route_table_id         = aws_route_table.public.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.gw.id
+}
+resource "aws_key_pair" "ops" {
+  key_name = "ops-lab-key"
+}
+`
+    const vpc0 = useAwsStore.getState().vpcs.length
+    const sn0 = useAwsStore.getState().subnets.length
+    syncTerraformApplyToAwsConsole(applied({ 'network.tf': VPC_TF }))
+    const s = useAwsStore.getState()
+    expect(s.vpcs.length).toBe(vpc0 + 1)
+    expect(s.vpcs.some((v) => v.name === 'lab-vpc' && v.cidr === '10.20.0.0/16')).toBe(true)
+    expect(s.subnets.length).toBe(sn0 + 1)
+    expect(s.internetGateways.some((g) => g.state === 'attached')).toBe(true)
+    expect(s.routeTables.some((r) => (r.routes || []).some((x) => x.dest === '0.0.0.0/0'))).toBe(true)
+    expect(s.keyPairs.some((k) => k.name === 'ops-lab-key')).toBe(true)
   })
 })

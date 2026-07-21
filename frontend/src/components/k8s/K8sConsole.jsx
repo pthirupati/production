@@ -237,7 +237,20 @@ export default function K8sConsole({
 
     if (nav === 'workloads') {
       return (
-        <SimDataTable
+        <div>
+          <div className="flex justify-end mb-3">
+            <button type="button" className="k8s-btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
+              disabled={busy}
+              onClick={() => run(() => k8sApi.createDeployment(sessionId, {
+                name: `app-${Date.now().toString(36).slice(-4)}`,
+                namespace: 'production',
+                replicas: 1,
+                image: 'nginx:1.25',
+              }), 'Deployment created')}>
+              <Plus size={14} /> Create Deployment
+            </button>
+          </div>
+          <SimDataTable
           searchKeys={['name', 'namespace']}
           columns={[
             { key: 'name', label: 'Deployment', sortable: true },
@@ -271,6 +284,7 @@ export default function K8sConsole({
           ]}
           rows={deployments}
         />
+        </div>
       )
     }
 

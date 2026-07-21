@@ -8,7 +8,10 @@
 //
 // Supported: terraform version|init|validate|fmt|plan|apply|destroy|
 //            state list|show|output. Resources: aws_instance, aws_s3_bucket,
-//            aws_security_group, aws_key_pair (others are planned but no-op).
+//            aws_security_group, aws_key_pair, aws_vpc, aws_subnet,
+//            aws_internet_gateway, aws_route_table, aws_route,
+//            aws_route_table_association, aws_eip, aws_nat_gateway
+//            (others are planned but no-op).
 
 import { parseHcl, parseBody } from './hclParser'
 import { useAwsStore } from '../store/awsStore'
@@ -19,6 +22,15 @@ const TF_FILES = ['main.tf', 'variables.tf', 'outputs.tf', 'providers.tf', 'terr
 
 function addr(r) {
   return `${r.type}.${r.name}`
+}
+
+/** Resolve `${aws_vpc.main.id}` / `aws_vpc.main.id` against the session apply ledger. */
+function resolveRef(val, applied) {
+  if (val == null || typeof val !== 'string') return val
+  const m = val.match(/\$\{?(aws_[\w]+)\.([\w]+)\.id\}?/) || val.match(/^(aws_[\w]+)\.([\w]+)\.id$/)
+  if (!m) return val
+  const rec = applied.get(`${m[1]}.${m[2]}`)
+  return rec?.ids?.[0] || val
 }
 
 export function createTerraform({ store, readFile, getCwd, region }) {
@@ -93,6 +105,75 @@ export function createTerraform({ store, readFile, getCwd, region }) {
       const kp = store.createKeyPair({ name: r.attrs.key_name || r.name, type: 'rsa' })
       applied.set(a, { kind: 'keypair', ids: [kp.name] })
       return [`${fmtAddr(r)}: Creation complete after 0s [id=${kp.name}]`]
+    }
+    if (r.type === 'aws_vpc') {
+      const vpc = store.createVpc({
+        name: (r.attrs.tags && r.attrs.tags.Name) || r.name,
+        cidr: r.attrs.cidr_block || '10.0.0.0/16',
+        tenancy: r.attrs.instance_tenancy || 'default',
+      })
+      if (!vpc?.id) {
+        applied.set(a, { kind: 'noop', ids: [] })
+        return [`${fmtAddr(r)}: Creation complete after 0s [id=${r.name}]`]
+      }
+      applied.set(a, { kind: 'vpc', ids: [vpc.id] })
+      return [`${fmtAddr(r)}: Creation complete after 1s [id=${vpc.id}]`]
+    }
+    if (r.type === 'aws_subnet') {
+      const vpcId = resolveRef(r.attrs.vpc_id, applied) || store.vpcs?.[0]?.id || ''
+      const subnet = store.createSubnet({
+        vpcId,
+        cidr: r.attrs.cidr_block || '10.0.1.0/24',
+        az: r.attrs.availability_zone || undefined,
+        mapPublicIp: !!r.attrs.map_public_ip_on_launch,
+      })
+      if (!subnet?.id) {
+        applied.set(a, { kind: 'noop', ids: [] })
+        return [`${fmtAddr(r)}: Creation complete after 0s [id=${r.name}]`]
+      }
+      applied.set(a, { kind: 'subnet', ids: [subnet.id] })
+      return [`${fmtAddr(r)}: Creation complete after 1s [id=${subnet.id}]`]
+    }
+    if (r.type === 'aws_internet_gateway') {
+      const igw = store.createInternetGateway({ name: (r.attrs.tags && r.attrs.tags.Name) || r.name })
+      const vpcId = resolveRef(r.attrs.vpc_id, applied)
+      if (igw?.id && vpcId) store.attachInternetGateway(igw.id, vpcId)
+      applied.set(a, { kind: 'igw', ids: [igw?.id || r.name] })
+      return [`${fmtAddr(r)}: Creation complete after 1s [id=${igw?.id || r.name}]`]
+    }
+    if (r.type === 'aws_route_table') {
+      const vpcId = resolveRef(r.attrs.vpc_id, applied) || store.vpcs?.[0]?.id
+      const rtb = store.createRouteTable({ vpcId })
+      applied.set(a, { kind: 'rtb', ids: [rtb?.id || r.name] })
+      return [`${fmtAddr(r)}: Creation complete after 1s [id=${rtb?.id || r.name}]`]
+    }
+    if (r.type === 'aws_route') {
+      const rtbId = resolveRef(r.attrs.route_table_id, applied)
+      const dest = r.attrs.destination_cidr_block || '0.0.0.0/0'
+      const target = resolveRef(r.attrs.gateway_id || r.attrs.nat_gateway_id || r.attrs.egress_only_gateway_id, applied)
+        || r.attrs.gateway_id || r.attrs.nat_gateway_id || 'igw-local'
+      if (rtbId) store.createRoute(rtbId, { dest, target })
+      applied.set(a, { kind: 'route', ids: [`${rtbId || 'rtb'}:${dest}`] })
+      return [`${fmtAddr(r)}: Creation complete after 0s [id=${dest}]`]
+    }
+    if (r.type === 'aws_route_table_association') {
+      const rtbId = resolveRef(r.attrs.route_table_id, applied)
+      const subnetId = resolveRef(r.attrs.subnet_id, applied)
+      if (rtbId && subnetId) store.associateRouteTable(rtbId, subnetId)
+      applied.set(a, { kind: 'rtb_assoc', ids: [`${rtbId}:${subnetId}`] })
+      return [`${fmtAddr(r)}: Creation complete after 0s [id=${subnetId || r.name}]`]
+    }
+    if (r.type === 'aws_eip') {
+      const eip = store.allocateEip()
+      applied.set(a, { kind: 'eip', ids: [eip?.allocationId || r.name] })
+      return [`${fmtAddr(r)}: Creation complete after 1s [id=${eip?.allocationId || r.name}]`]
+    }
+    if (r.type === 'aws_nat_gateway') {
+      const subnetId = resolveRef(r.attrs.subnet_id, applied)
+      const allocationId = resolveRef(r.attrs.allocation_id, applied)
+      const nat = store.createNatGateway({ subnetId, allocationId })
+      applied.set(a, { kind: 'nat', ids: [nat?.id || r.name] })
+      return [`${fmtAddr(r)}: Creation complete after 2s [id=${nat?.id || r.name}]`]
     }
     // Unmodeled resource — record so plan/state stay consistent.
     applied.set(a, { kind: 'noop', ids: [] })

@@ -129,8 +129,25 @@ export function GPMC() {
 function GPOEditor({ name, os, onClose }) {
   const [node, setNode] = useState('Password Policy')
   const [edit, setEdit] = useState(null)
+  const [editValue, setEditValue] = useState('')
   const nodes = ['Password Policy', 'Account Lockout Policy', 'Kerberos Policy', 'Audit Policy', 'User Rights Assignment', 'Security Options', 'Windows Firewall with Advanced Security', 'Administrative Templates', 'File Explorer', 'Start Menu and Taskbar', 'Remote Desktop Services', 'Windows Update']
   const rows = node === 'Account Lockout Policy' ? policySettings.slice(6) : node === 'Password Policy' ? policySettings.slice(0, 6) : policySettings
+  const openEdit = (r) => {
+    setEdit(r)
+    setEditValue(r[2] || '')
+  }
+  const saveSetting = () => {
+    if (!edit) return
+    if (os.labAction) {
+      os.labAction('update_gpo_setting', {
+        gpo: name,
+        key: edit[0],
+        value: editValue,
+        enabled: true,
+      })
+    }
+    setEdit(null)
+  }
   return (
     <Dialog title={`Group Policy Management Editor - ${name}`} onClose={onClose} width={920}
       footer={<button className="winos-btn primary" onClick={onClose}>Close</button>}>
@@ -148,26 +165,16 @@ function GPOEditor({ name, os, onClose }) {
         </div>
         <div className="winos-main">
           <table className="winos-table"><thead><tr><th>Policy</th><th>Setting</th></tr></thead>
-            <tbody>{rows.map((r) => <tr key={r[0]} onDoubleClick={() => setEdit(r)}><td>{r[0]}</td><td>{r[2]}</td></tr>)}</tbody></table>
+            <tbody>{rows.map((r) => <tr key={r[0]} onDoubleClick={() => openEdit(r)}><td>{r[0]}</td><td>{r[2]}</td></tr>)}</tbody></table>
         </div>
       </div>
       {edit && <Dialog title={edit[0]} onClose={() => setEdit(null)} width={460}
-        footer={<><button className="winos-btn primary" onClick={() => {
+        footer={<><button className="winos-btn primary" onClick={saveSetting}>OK</button><button className="winos-btn" onClick={() => setEdit(null)}>Cancel</button><button className="winos-btn" onClick={() => {
           if (os.labAction) {
             os.labAction('update_gpo_setting', {
               gpo: name,
               key: edit[0],
-              value: edit[2],
-              enabled: true,
-            })
-          }
-          setEdit(null)
-        }}>OK</button><button className="winos-btn" onClick={() => setEdit(null)}>Cancel</button><button className="winos-btn" onClick={() => {
-          if (os.labAction) {
-            os.labAction('update_gpo_setting', {
-              gpo: name,
-              key: edit[0],
-              value: edit[2],
+              value: editValue,
               enabled: true,
             })
           }
@@ -177,7 +184,7 @@ function GPOEditor({ name, os, onClose }) {
           <label style={{ display: 'block' }}><input type="radio" name="pol" defaultChecked /> Enabled</label>
           <label style={{ display: 'block' }}><input type="radio" name="pol" /> Disabled</label>
           <div style={{ marginTop: 12 }}><b>Options:</b></div>
-          <input className="winos-input" style={{ width: '100%', marginTop: 6 }} defaultValue={edit[2]} />
+          <input className="winos-input" style={{ width: '100%', marginTop: 6 }} value={editValue} onChange={(e) => setEditValue(e.target.value)} />
           <div style={{ marginTop: 12, color: '#666' }}>Supported on: Windows Server 2008 and above</div>
           <textarea className="winos-input" rows={4} style={{ width: '100%', marginTop: 8 }} defaultValue={`This setting controls ${edit[0].toLowerCase()} for domain computers and users.`} />
         </div>

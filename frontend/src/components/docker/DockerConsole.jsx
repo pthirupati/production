@@ -52,6 +52,10 @@ export default function DockerConsole({
   const [loginError, setLoginError] = useState('')
   const [pullOpen, setPullOpen] = useState(false)
   const [pullImage, setPullImage] = useState('nginx:latest')
+  const [runOpen, setRunOpen] = useState(false)
+  const [runForm, setRunForm] = useState({ name: 'web', image: 'nginx:latest', network: 'bridge', publish: '8080:80' })
+  const [connectOpen, setConnectOpen] = useState(null)
+  const [connectNet, setConnectNet] = useState('')
   const [netOpen, setNetOpen] = useState(false)
   const [newNet, setNewNet] = useState('')
   const [volOpen, setVolOpen] = useState(false)
@@ -151,11 +155,16 @@ export default function DockerConsole({
               </div>
             ))}
           </div>
-          <div className="flex justify-end mb-3">
+          <div className="flex justify-end mb-3 gap-2">
             <button type="button" className="docker-btn-ghost inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
               disabled={busy}
               onClick={() => run(() => dockerApi.systemPrune(sessionId, { all: false, volumes: false }), 'System pruned')}>
               <Eraser size={14} /> System prune
+            </button>
+            <button type="button" className="docker-btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
+              disabled={busy}
+              onClick={() => setRunOpen(true)}>
+              <Plus size={14} /> Run container
             </button>
           </div>
           <SimDataTable
@@ -200,6 +209,14 @@ export default function DockerConsole({
                     <button type="button" title="Stats" className="p-1 rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.statsContainer(sessionId, r.shortName), 'Stats OK') }}>
                       <Activity size={14} />
+                    </button>
+                    <button type="button" title="Connect network" className="p-1 rounded hover:bg-slate-100" disabled={busy}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setConnectOpen(r.shortName)
+                        setConnectNet(networks.find((n) => !['bridge', 'host', 'none'].includes(n.name))?.name || '')
+                      }}>
+                      <Network size={14} />
                     </button>
                     <button type="button" title="Remove" className="p-1 rounded hover:bg-slate-100" disabled={busy}
                       onClick={(e) => {
@@ -404,6 +421,62 @@ export default function DockerConsole({
         <label className="block text-sm text-slate-200">Image
           <input className="mt-1 w-full border rounded px-2 py-1.5 text-sm text-slate-900"
             value={pullImage} onChange={(e) => setPullImage(e.target.value)} placeholder="nginx:latest" />
+        </label>
+      </SimModal>
+
+      <SimModal open={runOpen} onClose={() => setRunOpen(false)} title="Run container"
+        footer={<>
+          <button type="button" className="text-sm px-3 text-slate-300" onClick={() => setRunOpen(false)}>Cancel</button>
+          <button type="button" className="docker-btn-primary px-3 py-1.5 text-sm" disabled={busy || !runForm.image.trim()}
+            onClick={() => {
+              run(() => dockerApi.createContainer(sessionId, {
+                name: runForm.name.trim() || undefined,
+                image: runForm.image.trim(),
+                network: runForm.network || 'bridge',
+                publish: runForm.publish.trim() || undefined,
+              }), 'Container created')
+              setRunOpen(false)
+            }}>Run</button>
+        </>}>
+        <div className="space-y-3 text-sm text-slate-200">
+          <label className="block">Name
+            <input className="mt-1 w-full border rounded px-2 py-1.5 text-slate-900"
+              value={runForm.name} onChange={(e) => setRunForm((f) => ({ ...f, name: e.target.value }))} />
+          </label>
+          <label className="block">Image
+            <input className="mt-1 w-full border rounded px-2 py-1.5 text-slate-900"
+              value={runForm.image} onChange={(e) => setRunForm((f) => ({ ...f, image: e.target.value }))} />
+          </label>
+          <label className="block">Network
+            <select className="mt-1 w-full border rounded px-2 py-1.5 text-slate-900"
+              value={runForm.network} onChange={(e) => setRunForm((f) => ({ ...f, network: e.target.value }))}>
+              {(networks.length ? networks : [{ name: 'bridge' }]).map((n) => (
+                <option key={n.name} value={n.name}>{n.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">Publish ports (host:container)
+            <input className="mt-1 w-full border rounded px-2 py-1.5 text-slate-900"
+              value={runForm.publish} onChange={(e) => setRunForm((f) => ({ ...f, publish: e.target.value }))} placeholder="8080:80" />
+          </label>
+        </div>
+      </SimModal>
+
+      <SimModal open={!!connectOpen} onClose={() => setConnectOpen(null)} title={`Connect ${connectOpen || ''}`}
+        footer={<>
+          <button type="button" className="text-sm px-3 text-slate-300" onClick={() => setConnectOpen(null)}>Cancel</button>
+          <button type="button" className="docker-btn-primary px-3 py-1.5 text-sm" disabled={busy || !connectNet}
+            onClick={() => {
+              run(() => dockerApi.connectNetwork(sessionId, connectOpen, connectNet), 'Connected')
+              setConnectOpen(null)
+            }}>Connect</button>
+        </>}>
+        <label className="block text-sm text-slate-200">Network
+          <select className="mt-1 w-full border rounded px-2 py-1.5 text-sm text-slate-900"
+            value={connectNet} onChange={(e) => setConnectNet(e.target.value)}>
+            <option value="">Select network…</option>
+            {networks.map((n) => <option key={n.name} value={n.name}>{n.name}</option>)}
+          </select>
         </label>
       </SimModal>
 

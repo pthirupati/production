@@ -996,6 +996,27 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"deployment.apps/{name} deleted"}
 
+    if action in ("create_deployment", "apply_deployment"):
+        name = (payload.get("name") or payload.get("deployment") or f"dep-{random.randint(1000, 9999)}").strip()
+        namespace = payload.get("namespace") or "production"
+        if _find_deployment(state, name, namespace):
+            return {"ok": False, "error": f"Deployment '{name}' already exists in namespace '{namespace}'"}
+        replicas = max(0, int(payload.get("replicas") or 1))
+        image = payload.get("image") or f"fixitlab/{name}:latest"
+        dep = _deployment(name, namespace, replicas=replicas, available=replicas, ready=replicas, image=image)
+        state.setdefault("deployments", []).append(dep)
+        for i in range(replicas):
+            state.setdefault("pods", []).append(_pod(
+                f"{name}-{random.randint(10000, 99999)}", namespace, {"app": name},
+                node="node1" if i % 2 == 0 else "node2",
+                container_name=name,
+                container_image=image,
+                age_seconds=2,
+            ))
+        events.append(_event(f"Created deployment/{name}", involved_object=name, namespace=namespace))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"deployment.apps/{name} created", "deployment": dep}
+
     if action == "restart_deployment":
         name = payload.get("deployment") or payload.get("name")
         namespace = payload.get("namespace", "production")

@@ -61,7 +61,7 @@ export default function ADUC() {
         label: 'Delete',
         onClick: () => {
           os.deleteADUser(u.sam)
-          if (lab) lab('disable_ad_user', { user: u.sam })
+          if (lab) lab('delete_ad_user', { user: u.sam })
         },
       },
       { label: 'Rename' }, { sep: true },

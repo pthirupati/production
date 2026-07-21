@@ -32,6 +32,9 @@ export const k8sApi = {
   scaleDeployment(sessionId, name, replicas, namespace = 'production') {
     return k8sApi.action(sessionId, 'scale_deployment', { name, replicas, namespace })
   },
+  createDeployment(sessionId, payload = {}) {
+    return k8sApi.action(sessionId, 'create_deployment', payload)
+  },
   deleteDeployment(sessionId, name, namespace = 'production') {
     return k8sApi.action(sessionId, 'delete_deployment', { name, namespace })
   },
