@@ -1722,6 +1722,20 @@ export const useAwsStore = create(
         else if (service === 'systemsmanager' && resource === 'parameters') syncAction = 'create_parameter'
         else if (service === 'kms' && resource === 'keys') syncAction = 'create_key'
         else if (service === 'sns' && resource === 'subscriptions') syncAction = 'create_sns_subscription'
+        else if (service === 'apigateway' && resource === 'apis') syncAction = 'create_api'
+        else if (service === 'eventbridge' && resource === 'rules') syncAction = 'create_event_rule'
+        else if (service === 'states' && resource === 'state-machines') syncAction = 'create_state_machine'
+        else if (service === 'cloudtrail' && resource === 'trails') syncAction = 'create_trail'
+        else if (service === 'config' && resource === 'rules') syncAction = 'create_config_rule'
+        else if (service === 'waf' && resource === 'web-acls') syncAction = 'create_web_acl'
+        else if (service === 'cognito' && resource === 'user-pools') syncAction = 'create_user_pool'
+        else if (service === 'cloudformation' && resource === 'change-sets') syncAction = 'create_change_set'
+        else if (service === 'codecommit' && resource === 'repositories') syncAction = 'create_codecommit_repo'
+        else if (service === 'codebuild' && resource === 'projects') syncAction = 'create_codebuild_project'
+        else if (service === 'codepipeline' && resource === 'pipelines') syncAction = 'create_codepipeline'
+        else if (service === 'lambda' && resource === 'layers') syncAction = 'create_lambda_layer'
+        else if (service === 'eks' && resource === 'node-groups') syncAction = 'create_eks_node_group'
+        else if (service === 'ecs' && resource === 'clusters') syncAction = 'create_ecs_cluster'
         get()._syncAction(syncAction, syncPayload)
         if (created.pendingTransition) get()._ensureTick()
         return created

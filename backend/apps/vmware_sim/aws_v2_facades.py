@@ -652,6 +652,187 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         subs.append(row)
         return {"ok": True, "message": f"Created SNS subscription {name}", "subscription": row}
 
+    if action == "create_api":
+        name = (payload.get("name") or f"api-{_hex(4)}").strip()
+        apis = gr.setdefault("apigateway", {}).setdefault("apis", [])
+        if any(a.get("name") == name for a in apis):
+            return {"ok": False, "error": f"API '{name}' already exists"}
+        row = _row(payload.get("id") or _hex(10), name, {
+            "type": payload.get("type") or "HTTP",
+            "stage": payload.get("stage") or "prod",
+            "status": payload.get("status") or "Active",
+        })
+        apis.append(row)
+        return {"ok": True, "message": f"Created API {name}", "api": row}
+
+    if action == "create_event_rule":
+        name = (payload.get("name") or f"rule-{_hex(4)}").strip()
+        rules = gr.setdefault("eventbridge", {}).setdefault("rules", [])
+        if any(r.get("name") == name for r in rules):
+            return {"ok": False, "error": f"Rule '{name}' already exists"}
+        row = _row(payload.get("id") or f"rule-{_hex()}", name, {
+            "eventBus": payload.get("eventBus") or "default",
+            "targets": int(payload.get("targets") or 1),
+            "status": payload.get("status") or "Enabled",
+        })
+        rules.append(row)
+        return {"ok": True, "message": f"Created EventBridge rule {name}", "rule": row}
+
+    if action == "create_state_machine":
+        name = (payload.get("name") or f"sm-{_hex(4)}").strip()
+        machines = gr.setdefault("states", {}).setdefault("state-machines", [])
+        if any(m.get("name") == name for m in machines):
+            return {"ok": False, "error": f"State machine '{name}' already exists"}
+        row = _row(payload.get("id") or f"sm-{_hex()}", name, {
+            "type": payload.get("type") or "STANDARD",
+            "executions": int(payload.get("executions") or 0),
+            "status": payload.get("status") or "Active",
+        })
+        machines.append(row)
+        return {"ok": True, "message": f"Created state machine {name}", "state_machine": row}
+
+    if action == "create_trail":
+        name = (payload.get("name") or f"trail-{_hex(4)}").strip()
+        trails = gr.setdefault("cloudtrail", {}).setdefault("trails", [])
+        if any(t.get("name") == name for t in trails):
+            return {"ok": False, "error": f"Trail '{name}' already exists"}
+        row = _row(payload.get("id") or f"trail-{_hex()}", name, {
+            "multiRegion": payload.get("multiRegion") or "Yes",
+            "logging": payload.get("logging") or "On",
+            "status": payload.get("status") or "Active",
+        })
+        trails.append(row)
+        return {"ok": True, "message": f"Created CloudTrail {name}", "trail": row}
+
+    if action == "create_config_rule":
+        name = (payload.get("name") or f"config-rule-{_hex(4)}").strip()
+        rules = gr.setdefault("config", {}).setdefault("rules", [])
+        if any(r.get("name") == name for r in rules):
+            return {"ok": False, "error": f"Config rule '{name}' already exists"}
+        row = _row(payload.get("id") or f"config-rule-{_hex()}", name, {
+            "compliance": payload.get("compliance") or "COMPLIANT",
+            "evaluations": int(payload.get("evaluations") or 0),
+            "status": payload.get("status") or "Active",
+        })
+        rules.append(row)
+        return {"ok": True, "message": f"Created Config rule {name}", "rule": row}
+
+    if action == "create_web_acl":
+        name = (payload.get("name") or f"web-acl-{_hex(4)}").strip()
+        acls = gr.setdefault("waf", {}).setdefault("web-acls", [])
+        if any(a.get("name") == name for a in acls):
+            return {"ok": False, "error": f"Web ACL '{name}' already exists"}
+        row = _row(payload.get("id") or f"waf-{_hex()}", name, {
+            "scope": payload.get("scope") or "Regional",
+            "rules": int(payload.get("rules") or 1),
+            "status": payload.get("status") or "Active",
+        })
+        acls.append(row)
+        return {"ok": True, "message": f"Created Web ACL {name}", "web_acl": row}
+
+    if action == "create_user_pool":
+        name = (payload.get("name") or f"pool-{_hex(4)}").strip()
+        pools = gr.setdefault("cognito", {}).setdefault("user-pools", [])
+        if any(p.get("name") == name for p in pools):
+            return {"ok": False, "error": f"User pool '{name}' already exists"}
+        row = _row(payload.get("id") or f"us-east-1_{_hex(8)}", name, {
+            "users": int(payload.get("users") or 0),
+            "mfa": payload.get("mfa") or "Optional",
+            "status": payload.get("status") or "Enabled",
+        })
+        pools.append(row)
+        return {"ok": True, "message": f"Created Cognito user pool {name}", "user_pool": row}
+
+    if action == "create_change_set":
+        name = (payload.get("name") or f"changeset-{_hex(4)}").strip()
+        sets = gr.setdefault("cloudformation", {}).setdefault("change-sets", [])
+        if any(c.get("name") == name for c in sets):
+            return {"ok": False, "error": f"Change set '{name}' already exists"}
+        row = _row(payload.get("id") or f"changeset-{_hex()}", name, {
+            "status": payload.get("status") or "CREATE_COMPLETE",
+            "changes": int(payload.get("changes") or 1),
+        })
+        sets.append(row)
+        return {"ok": True, "message": f"Created change set {name}", "change_set": row}
+
+    if action == "create_codecommit_repo":
+        name = (payload.get("name") or f"repo-{_hex(4)}").strip()
+        repos = gr.setdefault("codecommit", {}).setdefault("repositories", [])
+        if any(r.get("name") == name for r in repos):
+            return {"ok": False, "error": f"Repository '{name}' already exists"}
+        row = _row(payload.get("id") or f"cc-{_hex()}", name, {
+            "defaultBranch": payload.get("defaultBranch") or "main",
+            "commits": int(payload.get("commits") or 0),
+            "status": payload.get("status") or "Active",
+        })
+        repos.append(row)
+        return {"ok": True, "message": f"Created CodeCommit repository {name}", "repository": row}
+
+    if action == "create_codebuild_project":
+        name = (payload.get("name") or f"project-{_hex(4)}").strip()
+        projects = gr.setdefault("codebuild", {}).setdefault("projects", [])
+        if any(p.get("name") == name for p in projects):
+            return {"ok": False, "error": f"Project '{name}' already exists"}
+        row = _row(payload.get("id") or f"cb-{_hex()}", name, {
+            "environment": payload.get("environment") or "Linux container",
+            "lastBuild": payload.get("lastBuild") or "SUCCEEDED",
+            "status": payload.get("status") or "Active",
+        })
+        projects.append(row)
+        return {"ok": True, "message": f"Created CodeBuild project {name}", "project": row}
+
+    if action == "create_codepipeline":
+        name = (payload.get("name") or f"pipeline-{_hex(4)}").strip()
+        pipes = gr.setdefault("codepipeline", {}).setdefault("pipelines", [])
+        if any(p.get("name") == name for p in pipes):
+            return {"ok": False, "error": f"Pipeline '{name}' already exists"}
+        row = _row(payload.get("id") or f"cp-{_hex()}", name, {
+            "stages": int(payload.get("stages") or 3),
+            "lastExecution": payload.get("lastExecution") or "Succeeded",
+            "status": payload.get("status") or "Active",
+        })
+        pipes.append(row)
+        return {"ok": True, "message": f"Created CodePipeline {name}", "pipeline": row}
+
+    if action == "create_lambda_layer":
+        name = (payload.get("name") or f"layer-{_hex(4)}").strip()
+        layers = gr.setdefault("lambda", {}).setdefault("layers", [])
+        if any(l.get("name") == name for l in layers):
+            return {"ok": False, "error": f"Layer '{name}' already exists"}
+        row = _row(payload.get("id") or f"layer-{_hex()}", name, {
+            "runtime": payload.get("runtime") or "Python 3.12",
+            "version": int(payload.get("version") or 1),
+            "status": payload.get("status") or "Active",
+        })
+        layers.append(row)
+        return {"ok": True, "message": f"Created Lambda layer {name}", "layer": row}
+
+    if action == "create_eks_node_group":
+        name = (payload.get("name") or f"ng-{_hex(4)}").strip()
+        groups = gr.setdefault("eks", {}).setdefault("node-groups", [])
+        if any(g.get("name") == name for g in groups):
+            return {"ok": False, "error": f"Node group '{name}' already exists"}
+        row = _row(payload.get("id") or f"ng-{_hex()}", name, {
+            "instanceType": payload.get("instanceType") or "t3.medium",
+            "desired": int(payload.get("desired") or 2),
+            "status": payload.get("status") or "Active",
+        })
+        groups.append(row)
+        return {"ok": True, "message": f"Created EKS node group {name}", "node_group": row}
+
+    if action == "create_ecs_cluster":
+        name = (payload.get("name") or f"cluster-{_hex(4)}").strip()
+        clusters = gr.setdefault("ecs", {}).setdefault("clusters", [])
+        if any(c.get("name") == name for c in clusters):
+            return {"ok": False, "error": f"Cluster '{name}' already exists"}
+        row = _row(payload.get("id") or f"ecscluster-{_hex()}", name, {
+            "services": int(payload.get("services") or 0),
+            "tasks": int(payload.get("tasks") or 0),
+            "status": payload.get("status") or "Active",
+        })
+        clusters.append(row)
+        return {"ok": True, "message": f"Created ECS cluster {name}", "cluster": row}
+
     if action == "send_sqs":
         qname = payload.get("name") or "lab-queue"
         queues = gr.setdefault("sqs", {}).setdefault("queues", [])
