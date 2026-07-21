@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { openstackApi } from '../../api/openstack'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
-  LogIn, Cloud, Server, Network, HardDrive, Plus, Play, Square, RotateCw,
+  LogIn, Cloud, Server, Network, HardDrive, Plus, Play, Square, RotateCw, KeyRound, Layers, Workflow,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import { renderOpenStackV2Page } from '../sim/V3PlatformPanels'
 import '../../styles/sim-products.css'
 import './openstack.css'
 
@@ -17,10 +18,14 @@ const SIDEBAR = [
   { key: 'overview', label: 'Overview', icon: Cloud },
   { key: 'instances', label: 'Instances', icon: Server },
   { key: 'networks', label: 'Networks', icon: Network },
+  { key: 'routers', label: 'Routers', icon: Network },
+  { key: 'loadbalancers', label: 'Load Balancers', icon: Layers },
   { key: 'volumes', label: 'Volumes', icon: HardDrive },
+  { key: 'orchestration', label: 'Orchestration', icon: Workflow },
   { key: 'security', label: 'Security Groups', icon: Network },
   { key: 'floating', label: 'Floating IPs', icon: Cloud },
   { key: 'images', label: 'Images', icon: HardDrive },
+  { key: 'keypairs', label: 'Key Pairs', icon: KeyRound },
 ]
 
 const FLAVOR_OPTIONS = [
@@ -128,6 +133,8 @@ export default function OpenStackConsole({
   }
 
   const renderContent = () => {
+    const v2 = renderOpenStackV2Page({ nav, st, sessionId, busy, run })
+    if (v2) return v2
     if (nav === 'overview') {
       return (
         <div className="space-y-4">

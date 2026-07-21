@@ -16,6 +16,8 @@ import {
   CICD_SEED_PIPELINES, CICD_SEED_PIPELINE_LIST, CICD_FAULTS_CATALOG,
   faultsForScenario, pipelineForScenario,
 } from '../../mockData/cicd'
+import { cicdApi } from '../../api/cicd'
+import { renderCicdGitOpsPage } from '../sim/V3PlatformPanels'
 import '../../styles/lab-chrome.css'
 import '../../styles/sim-products.css'
 
@@ -30,6 +32,8 @@ const TRIGGERS = [
 
 const TABS = [
   { id: 'pipeline', label: 'Workflow', icon: Workflow },
+  { id: 'argocd', label: 'Argo CD', icon: Rocket },
+  { id: 'flux', label: 'Flux', icon: Zap },
   { id: 'editor', label: 'YAML', icon: FileCode },
   { id: 'secrets', label: 'Secrets', icon: KeyRound },
   { id: 'variables', label: 'Variables', icon: Variable },
@@ -52,6 +56,7 @@ function fmtDur(ms) {
 
 export default function CicdPipelineSim({
   scenario,
+  sessionId,
   onExit,
   onHints,
   onCheck,
@@ -306,8 +311,33 @@ export default function CicdPipelineSim({
     runnerRef.current?.cancel()
   }, [])
 
-  const approve = useCallback((jobId) => { runnerRef.current?.approve(jobId) }, [])
+  const approve = useCallback((jobId) => {
+    runnerRef.current?.approve(jobId)
+    if (sessionId) {
+      cicdApi.approveJob(sessionId, jobId).catch(() => {})
+    }
+  }, [sessionId])
   const reject = useCallback((jobId) => { runnerRef.current?.reject(jobId) }, [])
+
+  const [serverState, setServerState] = useState(null)
+  const [gitopsBusy, setGitopsBusy] = useState(false)
+  const reloadServer = useCallback(async () => {
+    if (!sessionId) return
+    try {
+      const data = await cicdApi.getState(sessionId, slug)
+      setServerState(data)
+    } catch { /* grading sync is best-effort */ }
+  }, [sessionId, slug])
+  useEffect(() => { reloadServer() }, [reloadServer])
+  const runGitops = useCallback(async (fn, _msg) => {
+    setGitopsBusy(true)
+    try {
+      await fn()
+      await reloadServer()
+    } finally {
+      setGitopsBusy(false)
+    }
+  }, [reloadServer])
 
   // Re-load a past run's captured event log into the graph/console (read-only view).
   const loadHistory = useCallback((entry) => {
@@ -473,6 +503,9 @@ export default function CicdPipelineSim({
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto p-4">
+        {(tab === 'argocd' || tab === 'flux') && renderCicdGitOpsPage({
+          nav: tab, st: serverState || {}, sessionId, busy: gitopsBusy, run: runGitops,
+        })}
         {tab === 'pipeline' && (
           <div className="max-w-6xl mx-auto space-y-4">
             {allGreen && !running && (

@@ -37,6 +37,9 @@ from .peoplesoft_engine import get_state as peoplesoft_get_state
 from .awx_engine import apply_action as awx_apply_action
 from .awx_engine import drop_session as awx_drop_session
 from .awx_engine import get_state as awx_get_state
+from .cicd_engine import apply_action as cicd_apply_action
+from .cicd_engine import drop_session as cicd_drop_session
+from .cicd_engine import get_state as cicd_get_state
 from .terraform_engine import apply_action as terraform_apply_action
 from .terraform_engine import drop_session as terraform_drop_session
 from .terraform_engine import get_state as terraform_get_state
@@ -708,6 +711,44 @@ class AwxSimReleaseView(APIView):
         if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
             return Response({"error": "Session not found"}, status=404)
         awx_drop_session(session_id)
+        return Response({"released": True})
+
+
+class CicdSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
+        return Response(cicd_get_state(session_id, slug))
+
+
+class CicdSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        cicd_get_state(session_id, slug)
+        result = cicd_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": cicd_get_state(session_id, slug)})
+
+
+class CicdSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        cicd_drop_session(session_id)
         return Response({"released": True})
 
 

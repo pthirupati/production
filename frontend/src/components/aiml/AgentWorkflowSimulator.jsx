@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { aimlApi } from '../../api/aiml'
 import LabChromeBar from '../lab/LabChromeBar'
+import { renderAimlV2Page } from '../sim/V3PlatformPanels'
 import '../../styles/sim-products.css'
 
 /* ── scoped, self-contained n8n-style automation chrome (no shared CSS) ── */
@@ -298,6 +299,8 @@ export default function AgentWorkflowSimulator({
   const [running, setRunning] = useState(false)
   const [tab, setTab] = useState('trace') // trace | output
   const [busy, setBusy] = useState(false)
+  const [platformView, setPlatformView] = useState('workflow') // workflow | experiments | registry | rag
+  const [ragQuery, setRagQuery] = useState('What is the refund policy for digital products?')
 
   // drag + connect interaction state
   const dragRef = useRef(null)        // {id, offsetX, offsetY, moved}
@@ -484,13 +487,45 @@ export default function AgentWorkflowSimulator({
       <style>{SCOPED_CSS}</style>
 
       <LabChromeBar title="n8n · Agent Workflow" subtitle={scenario?.title || slug} accent="#a78bfa" icon={Bot} {...chromeProps}>
-        <button type="button" className="lab-chrome-btn" disabled={running} onClick={runWorkflow}>
-          {running ? <RefreshCw size={13} className="animate-spin" /> : <Play size={13} />} Run
-        </button>
-        <button type="button" className="lab-chrome-btn" onClick={load}><RefreshCw size={13} /></button>
-        <button type="button" className="lab-chrome-btn" onClick={resetGraph} disabled={busy}>Reset</button>
+        {[
+          ['workflow', 'Workflow'],
+          ['experiments', 'Experiments'],
+          ['registry', 'Registry'],
+          ['rag', 'RAG'],
+        ].map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            className={`lab-chrome-btn ${platformView === k ? 'lab-chrome-btn-active' : ''}`}
+            onClick={() => setPlatformView(k)}
+          >
+            {label}
+          </button>
+        ))}
+        {platformView === 'workflow' && (
+          <>
+            <button type="button" className="lab-chrome-btn" disabled={running} onClick={runWorkflow}>
+              {running ? <RefreshCw size={13} className="animate-spin" /> : <Play size={13} />} Run
+            </button>
+            <button type="button" className="lab-chrome-btn" onClick={load}><RefreshCw size={13} /></button>
+            <button type="button" className="lab-chrome-btn" onClick={resetGraph} disabled={busy}>Reset</button>
+          </>
+        )}
       </LabChromeBar>
 
+      {platformView !== 'workflow' ? (
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {renderAimlV2Page({
+            nav: platformView,
+            st: state || {},
+            sessionId,
+            busy,
+            run: async (fn) => { setBusy(true); try { await fn(); await load() } finally { setBusy(false) } },
+            ragQuery,
+            setRagQuery,
+          })}
+        </div>
+      ) : (
       <div className="flex-1 min-h-0 overflow-y-auto p-4 max-w-[1320px] mx-auto w-full">
         {error && (
           <div className="ag-banner ag-banner-err">
@@ -682,6 +717,7 @@ export default function AgentWorkflowSimulator({
           )}
         </div>
       </div>
+      )}
     </div>
   )
 }

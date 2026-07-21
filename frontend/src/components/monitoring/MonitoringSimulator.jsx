@@ -1434,24 +1434,50 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr, activeNav, st
             </div>
           </div>
           <div className="mon-card">
-            <div className="mon-panel-title mb-2">Silences</div>
+            <div className="mon-panel-title mb-2 flex items-center justify-between gap-2">
+              <span>Silences</span>
+              <button
+                type="button"
+                className="text-xs px-2 py-1 rounded bg-[#E6522C] text-white"
+                onClick={async () => {
+                  await monitoringApi.action(sessionId, 'create_silence', { alertname: 'NodeDown', comment: 'Lab silence' })
+                  onReload?.()
+                }}
+              >
+                Create silence
+              </button>
+            </div>
             {(prom.alertmanager.silences || []).length ? (
               <div className="space-y-2">
                 {prom.alertmanager.silences.map((s) => (
                   <div key={s.id} className="rounded border border-[#262a45] bg-[#0d1024] p-2 text-xs">
                     <div className="flex justify-between gap-2">
                       <span className="font-mono text-[#f5c451]">{s.id}</span>
-                      <span className="text-[#8a93b2]">ends {s.ends_at}</span>
+                      <span className="text-[#8a93b2]">{s.state || 'active'} · ends {s.ends_at}</span>
                     </div>
                     <div className="font-mono mt-1 text-[#d8def0]">
                       {(s.matchers || []).map((m) => `${m.name}="${m.value}"`).join(', ') || 'no matchers'}
                     </div>
-                    <div className="text-[#8a93b2] mt-1">{s.comment} · {s.created_by}</div>
+                    <div className="text-[#8a93b2] mt-1 flex justify-between gap-2">
+                      <span>{s.comment} · {s.created_by}</span>
+                      {s.state !== 'expired' && (
+                        <button
+                          type="button"
+                          className="text-[#ff6b6b] underline"
+                          onClick={async () => {
+                            await monitoringApi.action(sessionId, 'expire_silence', { id: s.id })
+                            onReload?.()
+                          }}
+                        >
+                          Expire
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-[#8a93b2]">No active silences. Use Prometheus → Alerts → Silence to mute a firing alert.</p>
+              <p className="text-xs text-[#8a93b2]">No active silences. Use Create silence or Prometheus → Alerts → Silence.</p>
             )}
           </div>
           {(prom.remote_write || []).length > 0 && (

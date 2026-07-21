@@ -30,6 +30,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .monitoring_v2_facades import apply_v2_action, ensure_v2
+
 SESSION_TTL = 7200  # 2-hour TTL matching VMware/K8s/Docker sessions
 
 # Sessions stored in Django cache. Two personas share one engine + state:
@@ -908,6 +910,12 @@ def _merge_lab_hosts(state: dict, session_id: str) -> None:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
+    keys_before = set(entry["state"].keys())
+    targets_before = len((entry["state"].get("prometheus") or {}).get("targets") or [])
+    ensure_v2(entry["state"])
+    targets_after = len((entry["state"].get("prometheus") or {}).get("targets") or [])
+    if set(entry["state"].keys()) != keys_before or targets_after != targets_before:
+        _save_session(str(session_id), entry)
     state = copy.deepcopy(entry["state"])
     _merge_lab_hosts(state, session_id)
     _merge_bridge_workloads(state, session_id)
@@ -933,6 +941,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "high_cardinality": bool(broken.get("high_cardinality_metric")),
         "fix_applied": state.get("fix_applied", False),
         "fault_summary": broken.get("summary", ""),
+        "silences_active": sum(1 for s in (prom.get("alertmanager") or {}).get("silences") or [] if s.get("state") == "active"),
     }
     return {
         "session_id": str(session_id),
@@ -940,6 +949,10 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "grafana": graf,
         "prometheus": prom,
         "broken": broken,
+        "exporters": state.get("exporters", {}),
+        "prom_runtime": state.get("prom_runtime", {}),
+        "prom_flags": state.get("prom_flags", []),
+        "service_discovery": state.get("service_discovery", []),
         "summary": summary,
     }
 
@@ -1232,6 +1245,13 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             t.pop("last_error", None)
         _save_session(str(session_id), entry)
         return {"ok": True, "message": "Environment refreshed to healthy state"}
+
+    ensure_v2(state)
+    v2 = apply_v2_action(state, action, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            _save_session(str(session_id), entry)
+        return v2
 
     return {"ok": False, "error": f"unknown action: {action}"}
 

@@ -14,6 +14,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .openstack_v2_facades import apply_v2_action, ensure_v2, seed_v2
+
 SESSION_TTL = 7200
 PENDING_SECONDS = 3
 
@@ -144,6 +146,7 @@ def _base_state() -> dict:
             "summary": "Manage Nova instances, Neutron networks, and Cinder volumes from Horizon.",
         },
         "broken": {},
+        **seed_v2(),
     }
 
 
@@ -201,6 +204,10 @@ def _advance_lifecycle(state: dict) -> bool:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure(session_id, scenario_slug)
+    keys_before = set(entry["state"].keys())
+    ensure_v2(entry["state"])
+    if set(entry["state"].keys()) != keys_before:
+        _save(session_id, entry)
     if _advance_lifecycle(entry["state"]):
         _save(session_id, entry)
     state = copy.deepcopy(entry["state"])
@@ -439,5 +446,13 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"Associated {fip['address']} with {inst['name']}", "success")
         _save(session_id, entry)
         return {"ok": True, "message": "Floating IP associated"}
+
+    ensure_v2(state)
+    v2 = apply_v2_action(state, action, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            _event(state, v2.get("message") or action, "success")
+            _save(session_id, entry)
+        return v2
 
     return {"ok": False, "error": f"Unknown action '{action}'"}

@@ -54,6 +54,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .aiml_v2_facades import apply_v2_action, ensure_v2, seed_v2
+
 SESSION_TTL = 7200  # 2-hour TTL matching the other simulator engines
 
 
@@ -894,6 +896,7 @@ def _apply_preset(state: dict, slug: str) -> None:
     state["graph"] = graph
     state["goal"] = goal
     state["last_run"] = None
+    state.update(seed_v2())
 
 
 # ---------------------------------------------------------------------------
@@ -909,11 +912,17 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
         entry = {"session_id": key, "scenario_slug": scenario_slug, "state": state,
                  "created_at": _now_iso()}
         _save_session(key, entry)
+    else:
+        ensure_v2(entry["state"])
     return entry
 
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
+    keys_before = set(entry["state"].keys())
+    ensure_v2(entry["state"])
+    if set(entry["state"].keys()) != keys_before:
+        _save_session(str(session_id), entry)
     state = copy.deepcopy(entry["state"])
     graph = state.get("graph", _empty_graph())
     goal = state.get("goal", {})
@@ -946,6 +955,12 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "last_run": last_run,
         # Mirror the other engines' {events} activity feed: the last run trace.
         "events": (last_run or {}).get("trace", []) if last_run else [],
+        "experiments": state.get("experiments", []),
+        "ml_runs": state.get("ml_runs", []),
+        "model_registry": state.get("model_registry", []),
+        "knowledge_bases": state.get("knowledge_bases", []),
+        "rag_results": state.get("rag_results", []),
+        "llm_playground": state.get("llm_playground", {}),
         "summary": {
             "node_count": len(graph.get("nodes", [])),
             "edge_count": len(graph.get("edges", [])),
@@ -955,6 +970,8 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "objective": goal.get("objective", ""),
             "validation_passed": ok,
             "validation_message": msg,
+            "experiments": len(state.get("experiments") or []),
+            "knowledge_bases": len(state.get("knowledge_bases") or []),
         },
     }
 
@@ -1076,6 +1093,13 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _apply_preset(state, entry.get("scenario_slug", ""))
         _save_session(str(session_id), entry)
         return {"ok": True, "message": "Workflow reset to scenario starting point"}
+
+    ensure_v2(state)
+    v2 = apply_v2_action(state, action, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            _save_session(str(session_id), entry)
+        return v2
 
     return {"ok": False, "error": f"unknown action: {action}"}
 

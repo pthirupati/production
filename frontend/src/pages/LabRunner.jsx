@@ -3336,6 +3336,7 @@ export default function LabRunner() {
         <LazySimPanel
           Sim={LazyCicdPipelineSim}
           label="CI/CD pipeline"
+          sessionId={sessionId}
           scenario={scenario}
           onExit={() => setShowCicdSim(false)}
           vmwareHref={showSimVmwareLink ? vmwareServerHref : null}

@@ -31,6 +31,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .cicd_v2_facades import apply_v2_action, ensure_v2, seed_v2
+
 SESSION_TTL = 7200  # 2-hour TTL matching the sibling simulators
 
 
@@ -166,6 +168,7 @@ def _base_state() -> dict:
         "fault": {"kind": None, "job": None, "summary": ""},
         "last_run": None,
         "events": [],
+        **seed_v2(),
     }
 
 
@@ -340,6 +343,10 @@ def _dag_is_safe(state: dict) -> tuple[bool, str]:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure(session_id, scenario_slug)
+    keys_before = set(entry["state"].keys())
+    ensure_v2(entry["state"])
+    if set(entry["state"].keys()) != keys_before:
+        _save(session_id, entry)
     state = copy.deepcopy(entry["state"])
     outcome = _pipeline_outcome(state)
     summary = {
@@ -349,6 +356,8 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "fault_kind": state.get("fault", {}).get("kind"),
         "fault_summary": state.get("fault", {}).get("summary", ""),
         "structural_ok": outcome["structural_ok"],
+        "argo_apps": len(state.get("argo_apps") or []),
+        "flux_kustomizations": len((state.get("flux") or {}).get("kustomizations") or []),
     }
     return {
         "session_id": str(session_id),
@@ -366,6 +375,9 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "fault": state.get("fault", {}),
         "last_run": state.get("last_run"),
         "events": state.get("events", []),
+        "argo_apps": state.get("argo_apps", []),
+        "flux": state.get("flux", {}),
+        "github": state.get("github", {}),
         "summary": summary,
     }
 
@@ -504,6 +516,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["events"].insert(0, {"time": _now_iso(), "message": f"Updated job {job_id}", "severity": "info"})
         _save(session_id, entry)
         return {"ok": True, "message": f"Job {job_id} updated"}
+
+    ensure_v2(state)
+    v2 = apply_v2_action(state, action, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            state.setdefault("events", []).insert(0, {
+                "time": _now_iso(), "message": v2.get("message") or action, "severity": "success",
+            })
+            _save(session_id, entry)
+        return v2
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 
