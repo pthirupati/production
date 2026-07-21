@@ -72,6 +72,51 @@ export const gcpApi = {
   createSnapshot(sessionId, diskName, name) {
     return gcpApi.action(sessionId, 'create_snapshot', { disk_name: diskName, name })
   },
+  createCloudRunService(sessionId, payload = {}) {
+    return gcpApi.action(sessionId, 'create_cloud_run_service', payload)
+  },
+  updateCloudRunTraffic(sessionId, name, trafficPct) {
+    return gcpApi.action(sessionId, 'update_cloud_run_traffic', { name, traffic_pct: trafficPct })
+  },
+  createPubsubTopic(sessionId, name) {
+    return gcpApi.action(sessionId, 'create_pubsub_topic', { name })
+  },
+  createPubsubSubscription(sessionId, topic, payload = {}) {
+    return gcpApi.action(sessionId, 'create_pubsub_subscription', { topic, ...payload })
+  },
+  publishPubsub(sessionId, topic) {
+    return gcpApi.action(sessionId, 'publish_pubsub', { topic })
+  },
+  createGkeCluster(sessionId, payload = {}) {
+    return gcpApi.action(sessionId, 'create_gke_cluster', payload)
+  },
+  resizeGkeNodePool(sessionId, cluster, pool, nodeCount) {
+    return gcpApi.action(sessionId, 'resize_gke_node_pool', { cluster, pool, node_count: nodeCount })
+  },
+  createCloudFunction(sessionId, payload = {}) {
+    return gcpApi.action(sessionId, 'create_cloud_function', payload)
+  },
+  createSqlInstance(sessionId, payload = {}) {
+    return gcpApi.action(sessionId, 'create_sql_instance', payload)
+  },
+  createSqlDatabase(sessionId, instance, name) {
+    return gcpApi.action(sessionId, 'create_sql_database', { instance, name })
+  },
+  createSecret(sessionId, name) {
+    return gcpApi.action(sessionId, 'create_secret', { name })
+  },
+  addSecretVersion(sessionId, name) {
+    return gcpApi.action(sessionId, 'add_secret_version', { name })
+  },
+  createArmorPolicy(sessionId, name) {
+    return gcpApi.action(sessionId, 'create_armor_policy', { name })
+  },
+  addArmorRule(sessionId, name, rule = {}) {
+    return gcpApi.action(sessionId, 'add_armor_rule', { name, ...rule })
+  },
+  createSpannerInstance(sessionId, payload = {}) {
+    return gcpApi.action(sessionId, 'create_spanner_instance', payload)
+  },
 }
 
 export default gcpApi

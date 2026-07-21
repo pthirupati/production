@@ -4,10 +4,12 @@ import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Cloud, Server, Network, Shield, HardDrive, Plus, AlertTriangle,
   Terminal, Play, Square, RotateCw, Settings2, Link2, Unlink,
+  Container, Radio, Boxes, Zap, Database, KeyRound, ShieldAlert, Globe2,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
 import CloudShellPanel from '../lab/CloudShellPanel'
+import { renderGcpV2Page } from './GcpV2Panels'
 import '../../styles/sim-products.css'
 import './gcp.css'
 
@@ -18,9 +20,17 @@ const ACCENT = '#4285f4'
 const SIDEBAR = [
   { key: 'overview', label: 'Overview', icon: Cloud },
   { key: 'instances', label: 'VM instances', icon: Server },
+  { key: 'gke', label: 'Kubernetes Engine', icon: Boxes },
+  { key: 'run', label: 'Cloud Run', icon: Container },
+  { key: 'functions', label: 'Cloud Functions', icon: Zap },
   { key: 'networking', label: 'VPC network', icon: Network },
+  { key: 'armor', label: 'Cloud Armor', icon: ShieldAlert },
   { key: 'disks', label: 'Disks', icon: HardDrive },
   { key: 'storage', label: 'Cloud Storage', icon: HardDrive },
+  { key: 'sql', label: 'Cloud SQL', icon: Database },
+  { key: 'spanner', label: 'Spanner', icon: Globe2 },
+  { key: 'pubsub', label: 'Pub/Sub', icon: Radio },
+  { key: 'secrets', label: 'Secret Manager', icon: KeyRound },
   { key: 'iam', label: 'IAM & Admin', icon: Shield },
   { key: 'operations', label: 'Operations', icon: Settings2 },
 ]
@@ -71,6 +81,18 @@ export default function GcpConsole({
   const [createBucketOpen, setCreateBucketOpen] = useState(false)
   const [iamOpen, setIamOpen] = useState(false)
   const [cloudShellOpen, setCloudShellOpen] = useState(false)
+  const [createRunOpen, setCreateRunOpen] = useState(false)
+  const [runName, setRunName] = useState('worker-service')
+  const [createTopicOpen, setCreateTopicOpen] = useState(false)
+  const [topicName, setTopicName] = useState('events')
+  const [createGkeOpen, setCreateGkeOpen] = useState(false)
+  const [gkeName, setGkeName] = useState('gke-lab')
+  const [createFnOpen, setCreateFnOpen] = useState(false)
+  const [fnName, setFnName] = useState('hello-http')
+  const [createSqlOpen, setCreateSqlOpen] = useState(false)
+  const [sqlName, setSqlName] = useState('sql-lab')
+  const [createSecOpen, setCreateSecOpen] = useState(false)
+  const [secName, setSecName] = useState('api-key')
 
   const st = state?.state || {}
   const loggedIn = st?.session?.logged_in
@@ -373,6 +395,16 @@ export default function GcpConsole({
   )
 
   const renderContent = () => {
+    const v2 = renderGcpV2Page({
+      nav, st, sessionId, busy, run,
+      createRunOpen, setCreateRunOpen, runName, setRunName,
+      createTopicOpen, setCreateTopicOpen, topicName, setTopicName,
+      createGkeOpen, setCreateGkeOpen, gkeName, setGkeName,
+      createFnOpen, setCreateFnOpen, fnName, setFnName,
+      createSqlOpen, setCreateSqlOpen, sqlName, setSqlName,
+      createSecOpen, setCreateSecOpen, secName, setSecName,
+    })
+    if (v2) return v2
     if (nav === 'instances') return renderInstances()
     if (nav === 'networking') return (
       <div className="space-y-5">

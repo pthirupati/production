@@ -21,6 +21,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .azure_v2_facades import apply_v2_action, ensure_v2, seed_v2
+
 SESSION_TTL = 7200
 SUBSCRIPTION_ID = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
 
@@ -223,6 +225,7 @@ def _base_state() -> dict:
         "goal": {"title": "Azure lab", "objective": "Resolve the flagged Azure issue."},
         "broken": {},
         "events": [],
+        **seed_v2(rg),
     }
 
 
@@ -287,7 +290,10 @@ def _advance_lifecycle(state: dict) -> bool:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure(session_id, scenario_slug)
-    if _advance_lifecycle(entry["state"]):
+    keys_before = set(entry["state"].keys())
+    ensure_v2(entry["state"])
+    changed = _advance_lifecycle(entry["state"]) or set(entry["state"].keys()) != keys_before
+    if changed:
         _save(session_id, entry)
     state = copy.deepcopy(entry["state"])
     try:
@@ -731,6 +737,14 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"Created snapshot {snap['name']} from {disk['name']}", "success")
         _save(session_id, entry)
         return {"ok": True, "message": "Snapshot created", "snapshot": snap}
+
+    ensure_v2(state)
+    v2 = apply_v2_action(state, action, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            _event(state, v2.get("message") or action, "success")
+            _save(session_id, entry)
+        return v2
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

@@ -26,7 +26,7 @@
   display: flex; align-items: center; gap: 0.6rem; background: #fff; border: 1px solid #d8dde3;
   border-radius: 6px; padding: 0.75rem 0.9rem;
 }
-.az-tile-num { font-size: 1.15rem; font-weight: 700; line-height: 1.1; }
+.az-tile-num { font-size: 1.15rem; font-weight: 700; line-height: 1.1; color: #323130; }
 .az-tile-label { font-size: 0.72rem; color: #605e5c; }
 
 .az-btn-primary {
@@ -41,5 +41,14 @@
   padding: 0.25rem 0.5rem; border-radius: 4px; background: #0078d4; color: #fff;
 }
 .az-btn-sm:hover { background: #005ea2; }
+.az-btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
 .az-btn-sm.az-btn-outline { background: transparent; color: #0078d4; border: 1px solid #0078d4; }
 .az-btn-sm.az-btn-outline:hover { background: rgba(0, 120, 212, 0.08); }
+
+.az-detail-panel {
+  background: #faf9f8; border: 1px solid #edebe9; border-radius: 4px; color: #323130;
+}
+.az-link { color: #0078d4; text-decoration: underline; }
+.az-link:hover { color: #005a9e; }
+
+.az-shell .sdt-expand-row td { background: #faf9f8; padding: 0.5rem 0.75rem !important; }

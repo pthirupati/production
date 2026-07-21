@@ -242,3 +242,44 @@ class GcpBridgePowerTests(GcpEngineBase):
         res2 = ge.apply_action(self.sid, "create_instance", {"name": "tf-web"})
         self.assertTrue(res2["ok"])
         self.assertEqual(len([i for i in ge.get_state(self.sid)["state"]["instances"] if i["name"] == "tf-web"]), 1)
+
+
+class GcpV2FacadeTests(GcpEngineBase):
+    def test_seeded_v2_collections(self):
+        self._login()
+        st = ge.get_state(self.sid)["state"]
+        self.assertTrue(st.get("cloud_run_services"))
+        self.assertTrue(st.get("pubsub_topics"))
+        self.assertTrue(st.get("gke_clusters"))
+        self.assertTrue(st.get("cloud_functions"))
+        self.assertTrue(st.get("cloud_sql_instances"))
+        self.assertTrue(st.get("secrets"))
+        self.assertTrue(st.get("armor_policies"))
+        self.assertTrue(st.get("spanner_instances"))
+
+    def test_cloud_run_and_pubsub(self):
+        self._login()
+        self.assertTrue(ge.apply_action(self.sid, "create_cloud_run_service", {"name": "svc-lab"})["ok"])
+        self.assertTrue(ge.apply_action(
+            self.sid, "update_cloud_run_traffic", {"name": "svc-lab", "traffic_pct": 25},
+        )["ok"])
+        self.assertTrue(ge.apply_action(self.sid, "create_pubsub_topic", {"name": "lab-topic"})["ok"])
+        self.assertTrue(ge.apply_action(
+            self.sid, "create_pubsub_subscription", {"topic": "lab-topic", "name": "lab-sub"},
+        )["ok"])
+        self.assertTrue(ge.apply_action(self.sid, "publish_pubsub", {"topic": "lab-topic"})["ok"])
+
+    def test_gke_sql_secrets(self):
+        self._login()
+        self.assertTrue(ge.apply_action(self.sid, "create_gke_cluster", {"name": "gke-lab"})["ok"])
+        self.assertTrue(ge.apply_action(
+            self.sid, "resize_gke_node_pool",
+            {"cluster": "gke-lab", "pool": "default-pool", "node_count": 5},
+        )["ok"])
+        self.assertTrue(ge.apply_action(self.sid, "create_sql_instance", {"name": "sql-lab"})["ok"])
+        self.assertTrue(ge.apply_action(
+            self.sid, "create_sql_database", {"instance": "sql-lab", "name": "orders"},
+        )["ok"])
+        self.assertTrue(ge.apply_action(self.sid, "create_secret", {"name": "lab-secret"})["ok"])
+        self.assertTrue(ge.apply_action(self.sid, "add_secret_version", {"name": "lab-secret"})["ok"])
+

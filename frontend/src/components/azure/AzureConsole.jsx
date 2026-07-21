@@ -4,11 +4,13 @@ import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Cloud, Server, Network, Shield, HardDrive, Plus, AlertTriangle,
   Terminal, Play, Square, RotateCw, Maximize2, Link2, Unlink, KeyRound,
-  Database, Users, Activity, Layers, Box,
+  Database, Users, Activity, Layers, Box, Boxes, AppWindow, Zap, Container,
+  Flame, Globe2, ShieldAlert, IdCard,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
 import CloudShellPanel from '../lab/CloudShellPanel'
+import { renderAzureV2Page } from './AzureV2Panels'
 import '../../styles/sim-products.css'
 import './azure.css'
 
@@ -19,12 +21,20 @@ const ACCENT = '#0078d4'
 const SIDEBAR = [
   { key: 'overview', label: 'Overview', icon: Cloud },
   { key: 'vms', label: 'Virtual machines', icon: Server },
+  { key: 'vmss', label: 'Scale sets', icon: Boxes },
+  { key: 'appservice', label: 'App Services', icon: AppWindow },
+  { key: 'functions', label: 'Function apps', icon: Zap },
+  { key: 'containerapps', label: 'Container apps', icon: Container },
   { key: 'networking', label: 'Networking', icon: Network },
   { key: 'loadbalancers', label: 'Load balancers', icon: Layers },
+  { key: 'firewall', label: 'Firewalls & VPN', icon: Flame },
   { key: 'disks', label: 'Disks', icon: HardDrive },
   { key: 'storage', label: 'Storage accounts', icon: Database },
+  { key: 'cosmos', label: 'Cosmos DB', icon: Globe2 },
   { key: 'keyvault', label: 'Key vaults', icon: KeyRound },
+  { key: 'entra', label: 'Microsoft Entra ID', icon: IdCard },
   { key: 'iam', label: 'Access control (IAM)', icon: Users },
+  { key: 'sentinel', label: 'Microsoft Sentinel', icon: ShieldAlert },
   { key: 'activity', label: 'Activity log', icon: Activity },
 ]
 
@@ -89,6 +99,17 @@ export default function AzureConsole({
   const [containerModal, setContainerModal] = useState(null)
   const [containerName, setContainerName] = useState('logs')
   const [cloudShellOpen, setCloudShellOpen] = useState(false)
+  const [createVmssOpen, setCreateVmssOpen] = useState(false)
+  const [vmssName, setVmssName] = useState('vmss-api')
+  const [vmssCap, setVmssCap] = useState(2)
+  const [createAppOpen, setCreateAppOpen] = useState(false)
+  const [appName, setAppName] = useState('app-workloads')
+  const [createFuncOpen, setCreateFuncOpen] = useState(false)
+  const [funcName, setFuncName] = useState('func-events')
+  const [createCaOpen, setCreateCaOpen] = useState(false)
+  const [caName, setCaName] = useState('ca-worker')
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteUpn, setInviteUpn] = useState('partner@fabrikam.com')
 
   const st = state?.state || {}
   const loggedIn = st?.session?.logged_in
@@ -197,12 +218,13 @@ export default function AzureConsole({
         { key: 'resources', label: 'Resources', render: () => vms.length + vnets.length + nsgs.length + disks.length + storageAccounts.length },
       ]} rows={resourceGroups} searchKeys={['name']} />
       <h2 className="text-lg font-semibold pt-2">Subscription glance</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
         <div className="az-tile"><Server size={16} /> <div><div className="az-tile-num">{vms.length}</div><div className="az-tile-label">VMs</div></div></div>
+        <div className="az-tile"><Boxes size={16} /> <div><div className="az-tile-num">{(st.vmss || []).length}</div><div className="az-tile-label">Scale sets</div></div></div>
+        <div className="az-tile"><AppWindow size={16} /> <div><div className="az-tile-num">{(st.web_apps || []).length}</div><div className="az-tile-label">Web apps</div></div></div>
         <div className="az-tile"><Network size={16} /> <div><div className="az-tile-num">{vnets.length}</div><div className="az-tile-label">VNets</div></div></div>
         <div className="az-tile"><Database size={16} /> <div><div className="az-tile-num">{storageAccounts.length}</div><div className="az-tile-label">Storage</div></div></div>
-        <div className="az-tile"><KeyRound size={16} /> <div><div className="az-tile-num">{keyVaults.length}</div><div className="az-tile-label">Key vaults</div></div></div>
-        <div className="az-tile"><Layers size={16} /> <div><div className="az-tile-num">{loadBalancers.length}</div><div className="az-tile-label">Load balancers</div></div></div>
+        <div className="az-tile"><Globe2 size={16} /> <div><div className="az-tile-num">{(st.cosmos_accounts || []).length}</div><div className="az-tile-label">Cosmos</div></div></div>
       </div>
       <h2 className="text-lg font-semibold pt-2">Public IP addresses</h2>
       <SimDataTable columns={[
@@ -493,6 +515,15 @@ export default function AzureConsole({
   )
 
   const renderContent = () => {
+    const v2 = renderAzureV2Page({
+      nav, st, sessionId, busy, run,
+      createVmssOpen, setCreateVmssOpen, vmssName, setVmssName, vmssCap, setVmssCap,
+      createAppOpen, setCreateAppOpen, appName, setAppName,
+      createFuncOpen, setCreateFuncOpen, funcName, setFuncName,
+      createCaOpen, setCreateCaOpen, caName, setCaName,
+      inviteOpen, setInviteOpen, inviteUpn, setInviteUpn,
+    })
+    if (v2) return v2
     if (nav === 'vms') return renderVms()
     if (nav === 'networking') return renderNetworking()
     if (nav === 'loadbalancers') return renderLoadBalancers()

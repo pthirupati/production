@@ -25,7 +25,7 @@
   display: flex; align-items: center; gap: 0.6rem; background: #fff; border: 1px solid #dadce0;
   border-radius: 8px; padding: 0.75rem 0.9rem;
 }
-.gcp-tile-num { font-size: 1.15rem; font-weight: 700; line-height: 1.1; }
+.gcp-tile-num { font-size: 1.15rem; font-weight: 700; line-height: 1.1; color: #202124; }
 .gcp-tile-label { font-size: 0.72rem; color: #5f6368; }
 
 .gcp-btn-primary {
@@ -43,3 +43,9 @@
 .gcp-btn-sm:disabled { opacity: 0.45; cursor: not-allowed; }
 .gcp-btn-sm.gcp-btn-outline { background: transparent; color: #1a73e8; border: 1px solid #1a73e8; }
 .gcp-btn-sm.gcp-btn-outline:hover { background: rgba(26, 115, 232, 0.08); }
+
+.gcp-detail-panel {
+  background: #f8f9fa; border: 1px solid #e8eaed; border-radius: 8px; color: #202124;
+}
+.gcp-link { color: #1a73e8; }
+.gcp-shell .sdt-expand-row td { background: #f8f9fa; padding: 0.5rem 0.75rem !important; }

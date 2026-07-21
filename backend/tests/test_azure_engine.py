@@ -218,3 +218,55 @@ class AzureBridgePowerTests(AzureEngineBase):
         res2 = ae.apply_action(self.sid, "create_vm", {"name": "tf-web"})
         self.assertTrue(res2["ok"])
         self.assertEqual(len([v for v in ae.get_state(self.sid)["state"]["vms"] if v["name"] == "tf-web"]), 1)
+
+
+class AzureV2FacadeTests(AzureEngineBase):
+    def test_seeded_v2_collections(self):
+        self._login()
+        st = ae.get_state(self.sid)["state"]
+        self.assertTrue(st.get("vmss"))
+        self.assertTrue(st.get("web_apps"))
+        self.assertTrue(st.get("function_apps"))
+        self.assertTrue(st.get("container_apps"))
+        self.assertTrue(st.get("firewalls"))
+        self.assertTrue(st.get("cosmos_accounts"))
+        self.assertTrue(st.get("sentinel"))
+        self.assertTrue(st.get("entra"))
+
+    def test_create_and_scale_vmss(self):
+        self._login()
+        r = ae.apply_action(self.sid, "create_vmss", {"name": "vmss-lab", "capacity": 3})
+        self.assertTrue(r["ok"], r)
+        st = ae.get_state(self.sid)["state"]
+        ss = next(v for v in st["vmss"] if v["name"] == "vmss-lab")
+        self.assertEqual(ss["capacity"], 3)
+        self.assertEqual(len(ss["instances"]), 3)
+        r2 = ae.apply_action(self.sid, "scale_vmss", {"name": "vmss-lab", "capacity": 1})
+        self.assertTrue(r2["ok"], r2)
+        ss = next(v for v in ae.get_state(self.sid)["state"]["vmss"] if v["name"] == "vmss-lab")
+        self.assertEqual(ss["capacity"], 1)
+        self.assertEqual(len(ss["instances"]), 1)
+
+    def test_web_app_and_function_and_container(self):
+        self._login()
+        self.assertTrue(ae.apply_action(self.sid, "create_web_app", {"name": "app-lab"})["ok"])
+        self.assertTrue(ae.apply_action(self.sid, "swap_web_slots", {"name": "app-lab"})["ok"])
+        self.assertTrue(ae.apply_action(self.sid, "create_function_app", {"name": "func-lab"})["ok"])
+        self.assertTrue(ae.apply_action(
+            self.sid, "create_function", {"app": "func-lab", "function_name": "Http1"},
+        )["ok"])
+        self.assertTrue(ae.apply_action(self.sid, "create_container_app", {"name": "ca-lab"})["ok"])
+
+    def test_sentinel_and_entra(self):
+        self._login()
+        st = ae.get_state(self.sid)["state"]
+        iid = st["sentinel"]["incidents"][0]["id"]
+        self.assertTrue(ae.apply_action(
+            self.sid, "sentinel_update_incident", {"incident_id": iid, "status": "Closed"},
+        )["ok"])
+        self.assertTrue(ae.apply_action(
+            self.sid, "entra_invite_user", {"upn": "guest2@fabrikam.com"},
+        )["ok"])
+        ups = [u["upn"] for u in ae.get_state(self.sid)["state"]["entra"]["users"]]
+        self.assertIn("guest2@fabrikam.com", ups)
+

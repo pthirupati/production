@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, Fragment } from 'react'
 import { ChevronDown, ChevronUp, ChevronsUpDown, Search } from 'lucide-react'
 
 /**
@@ -9,11 +9,12 @@ import { ChevronDown, ChevronUp, ChevronsUpDown, Search } from 'lucide-react'
 export default function SimDataTable({
   columns = [], rows = [], searchKeys = [], pageSize = 10,
   onRowClick, emptyMessage = 'No records found', className = '',
-  variant = 'auto',
+  variant = 'auto', expandRow, rowKey = 'id',
 }) {
   const [sort, setSort] = useState({ key: null, dir: 'asc' })
   const [q, setQ] = useState('')
   const [page, setPage] = useState(0)
+  const [expanded, setExpanded] = useState(null)
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -77,17 +78,32 @@ export default function SimDataTable({
           <tbody>
             {slice.length === 0 ? (
               <tr><td colSpan={columns.length} className="sdt-empty">{emptyMessage}</td></tr>
-            ) : slice.map((row, i) => (
-              <tr key={row.id ?? i}
-                onClick={() => onRowClick?.(row)}
-                className={onRowClick ? 'sdt-row-click' : ''}>
-                {columns.map((col) => (
-                  <td key={col.key}>
-                    {col.render ? col.render(row) : row[col.key]}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            ) : slice.map((row, i) => {
+              const key = row[rowKey] ?? i
+              const isOpen = expandRow && expanded === key
+              const handleClick = () => {
+                if (expandRow) setExpanded(isOpen ? null : key)
+                onRowClick?.(row)
+              }
+              return (
+                <Fragment key={key}>
+                  <tr
+                    onClick={handleClick}
+                    className={(onRowClick || expandRow) ? 'sdt-row-click' : ''}>
+                    {columns.map((col) => (
+                      <td key={col.key}>
+                        {col.render ? col.render(row) : row[col.key]}
+                      </td>
+                    ))}
+                  </tr>
+                  {isOpen && (
+                    <tr className="sdt-expand-row">
+                      <td colSpan={columns.length}>{expandRow(row)}</td>
+                    </tr>
+                  )}
+                </Fragment>
+              )
+            })}
           </tbody>
         </table>
       </div>

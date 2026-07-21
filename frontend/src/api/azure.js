@@ -83,6 +83,39 @@ export const azureApi = {
   snapshotDisk(sessionId, diskName, name) {
     return azureApi.action(sessionId, 'snapshot_disk', { disk_name: diskName, name })
   },
+  createVmss(sessionId, payload = {}) {
+    return azureApi.action(sessionId, 'create_vmss', payload)
+  },
+  scaleVmss(sessionId, name, capacity) {
+    return azureApi.action(sessionId, 'scale_vmss', { name, capacity })
+  },
+  createWebApp(sessionId, payload = {}) {
+    return azureApi.action(sessionId, 'create_web_app', payload)
+  },
+  swapWebSlots(sessionId, name) {
+    return azureApi.action(sessionId, 'swap_web_slots', { name })
+  },
+  createFunctionApp(sessionId, payload = {}) {
+    return azureApi.action(sessionId, 'create_function_app', payload)
+  },
+  createFunction(sessionId, app, payload = {}) {
+    return azureApi.action(sessionId, 'create_function', { app, ...payload })
+  },
+  createContainerApp(sessionId, payload = {}) {
+    return azureApi.action(sessionId, 'create_container_app', payload)
+  },
+  createFirewallRule(sessionId, firewall, rule = {}) {
+    return azureApi.action(sessionId, 'create_firewall_rule', { firewall, ...rule })
+  },
+  createCosmosItem(sessionId, account, database, container) {
+    return azureApi.action(sessionId, 'create_cosmos_item', { account, database, container })
+  },
+  sentinelUpdateIncident(sessionId, incidentId, status) {
+    return azureApi.action(sessionId, 'sentinel_update_incident', { incident_id: incidentId, status })
+  },
+  entraInviteUser(sessionId, upn, opts = {}) {
+    return azureApi.action(sessionId, 'entra_invite_user', { upn, ...opts })
+  },
 }
 
 export default azureApi
