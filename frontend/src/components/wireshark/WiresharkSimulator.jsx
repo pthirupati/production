@@ -428,7 +428,6 @@ export default function WiresharkSimulator({
     } catch { setError('Could not refresh analysis') }
     finally { setBusy(false) }
   }, [sessionId, load])
-  }, [sessionId, load])
 
   const selectPacket = useCallback(async (no) => {
     try { await wiresharkApi.selectPacket(sessionId, no); await load() } catch { /* ignore */ }
