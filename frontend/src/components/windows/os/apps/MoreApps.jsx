@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ChevronRight, Globe, Box, Network, Settings as Cog } from 'lucide-react'
 import { useOS } from '../store'
-import { Dialog, Tabs } from '../ui'
+import { Dialog, Tabs, useCtxMenu } from '../ui'
 
 // ── DNS Manager ─────────────────────────────────────────────────────────────
 const DNS_RECORDS = [
@@ -299,13 +299,37 @@ export function ComputerManagement() {
 // ── Network Connections (ncpa.cpl) ───────────────────────────────────────────
 export function NetworkConnections() {
   const os = useOS()
+  const ctx = useCtxMenu()
   const [props, setProps] = useState(null)
+
+  const toggleAdapter = (a) => {
+    const enable = a.status === 'Disabled' || a.status === 'Disconnected'
+    os.setAdapter(a.id, { status: enable ? 'Connected' : 'Disabled' })
+    if (os.labAction) {
+      os.labAction(enable ? 'enable_adapter' : 'disable_adapter', { adapter_id: a.id, name: a.name })
+    }
+  }
+
+  const adapterCtx = (a) => (e) => {
+    e.preventDefault()
+    ctx.open(e.clientX, e.clientY, [
+      { label: 'Status' },
+      { sep: true },
+      {
+        label: (a.status === 'Disabled' || a.status === 'Disconnected') ? 'Enable' : 'Disable',
+        onClick: () => toggleAdapter(a),
+      },
+      { label: 'Properties', onClick: () => setProps(a) },
+    ])
+  }
+
   return (
     <div className="winos-app">
       <div className="winos-toolbar"><Network size={14} /> <span style={{ fontSize: 12 }}>Network Connections</span></div>
       <div className="winos-main" style={{ padding: 16, display: 'flex', gap: 18, flexWrap: 'wrap' }}>
         {os.adapters.map((a) => (
-          <div key={a.id} style={{ width: 160, textAlign: 'center', cursor: 'default' }} onDoubleClick={() => setProps(a)}>
+          <div key={a.id} style={{ width: 160, textAlign: 'center', cursor: 'default' }}
+            onDoubleClick={() => setProps(a)} onContextMenu={adapterCtx(a)}>
             <div style={{ fontSize: 40 }}>{a.status === 'Connected' ? '🖧' : '🚫'}</div>
             <div style={{ fontSize: 12, fontWeight: 600 }}>{a.name}</div>
             <div style={{ fontSize: 11, color: '#666' }}>{a.status}<br />{a.desc}</div>
@@ -384,6 +408,7 @@ export function TaskScheduler() {
   const os = useOS()
   const [sel, setSel] = useState(null)
   const [wizard, setWizard] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({ name: 'New Task', description: '', trigger: 'Daily', action: 'Start a program', program: 'powershell.exe' })
   const cur = os.scheduledTasks.find((t) => t.name === sel)
   const finish = () => {
@@ -408,11 +433,41 @@ export function TaskScheduler() {
     setWizard(false)
     setSel(name)
   }
+  const runTask = async () => {
+    if (!cur || busy) return
+    setBusy(true)
+    try {
+      os.setScheduledTask(cur.name, { lastRun: 'Just now', result: '0x0', status: 'Ready' })
+      if (os.labAction) await os.labAction('run_scheduled_task', { name: cur.name })
+    } finally { setBusy(false) }
+  }
+  const toggleDisable = async () => {
+    if (!cur || busy) return
+    const disabled = cur.status !== 'Disabled'
+    const status = disabled ? 'Disabled' : 'Ready'
+    setBusy(true)
+    try {
+      os.setScheduledTask(cur.name, { status })
+      if (os.labAction) await os.labAction('set_scheduled_task_status', { name: cur.name, status })
+    } finally { setBusy(false) }
+  }
+  const deleteTask = async () => {
+    if (!cur || busy) return
+    setBusy(true)
+    try {
+      os.removeScheduledTask(cur.name)
+      if (os.labAction) await os.labAction('delete_scheduled_task', { name: cur.name })
+      setSel(null)
+    } finally { setBusy(false) }
+  }
   return (
     <div className="winos-app">
       <div className="winos-toolbar">
         <span style={{ fontSize: 12 }}>File &nbsp; Action &nbsp; View &nbsp; Help</span>
         <span style={{ flex: 1 }} />
+        <button className="winos-btn" disabled={!cur || busy} onClick={runTask}>Run</button>
+        <button className="winos-btn" disabled={!cur || busy} onClick={toggleDisable}>{cur?.status === 'Disabled' ? 'Enable' : 'Disable'}</button>
+        <button className="winos-btn" disabled={!cur || busy} onClick={deleteTask}>Delete</button>
         <button className="winos-btn" onClick={() => { setForm({ name: 'New Task', description: '', trigger: 'Daily', action: 'Start a program', program: 'powershell.exe' }); setWizard(true) }}>Create Basic Task…</button>
       </div>
       <div className="winos-split">
@@ -458,12 +513,47 @@ export function SettingsApp() {
   const os = useOS()
   const [page, setPage] = useState('System')
   const [deviceName, setDeviceName] = useState(os.computer.name)
+  const [domainInput, setDomainInput] = useState(os.computer.domain || 'lab.local')
+  const [updChecking, setUpdChecking] = useState(false)
+  const [updBusy, setUpdBusy] = useState('')
   const pages = ['System', 'Network & Internet', 'Personalization', 'Apps', 'Accounts', 'Update & Security']
+  const pendingUpdates = os.updates.filter((u) => {
+    const st = String(u.status || '')
+    return st.includes('Pending') || st.includes('Failed') || st.includes('Downloading')
+  })
   const applyRename = () => {
     const name = (deviceName || '').trim()
     if (!name || name === os.computer.name) return
     os.setComputerName(name)
     if (os.labAction) os.labAction('rename_computer', { name })
+  }
+  const joinDomain = async () => {
+    const domain = (domainInput || '').trim()
+    if (!domain || !os.labAction) return
+    await os.labAction('join_domain', { domain })
+  }
+  const leaveDomain = async () => {
+    if (!os.labAction) return
+    await os.labAction('leave_domain', {})
+  }
+  const checkUpdates = async () => {
+    setUpdChecking(true)
+    try {
+      if (os.labAction) await os.labAction('check_updates', {})
+    } finally {
+      setTimeout(() => setUpdChecking(false), 900)
+    }
+  }
+  const installUpdate = async (u) => {
+    if (!os.labAction || updBusy) return
+    const failed = String(u.status || '').includes('Failed')
+    setUpdBusy(u.kb)
+    try {
+      await os.labAction(failed ? 'retry_update' : 'install_update', { kb: u.kb })
+      os.setUpdateStatus(u.kb, 'Successfully installed')
+    } finally {
+      setUpdBusy('')
+    }
   }
   return (
     <div className="winos-app">
@@ -480,13 +570,51 @@ export function SettingsApp() {
               <input className="winos-input" value={deviceName} onChange={(e) => setDeviceName(e.target.value)} style={{ width: 180 }} />
               <button type="button" className="winos-btn" onClick={applyRename} disabled={!deviceName.trim() || deviceName.trim() === os.computer.name}>Rename</button>
             </div>
+            <span>Domain / Workgroup</span>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <input className="winos-input" value={domainInput} onChange={(e) => setDomainInput(e.target.value)} style={{ width: 180 }} />
+              <button type="button" className="winos-btn primary" disabled={!os.labAction || !domainInput.trim()} onClick={joinDomain}>Join domain</button>
+              <button type="button" className="winos-btn" disabled={!os.labAction} onClick={leaveDomain}>Leave domain</button>
+            </div>
             <span>Edition</span><span>{os.computer.edition}</span>
             <span>Version</span><span>21H2 (Build {os.computer.build})</span>
             <span>Processor</span><span>{os.computer.cpu}</span>
             <span>Installed RAM</span><span>{os.computer.ramGB}.0 GB</span>
           </div>}
-          {page === 'Update & Security' && <div style={{ marginTop: 12 }}><div style={{ color: '#107c10', fontWeight: 600 }}>You're up to date</div><div style={{ color: '#666', fontSize: 12 }}>Last checked: Today, 6:00 AM</div><button className="winos-btn primary" style={{ marginTop: 10 }}>Check for updates</button></div>}
-          {page === 'Network & Internet' && <div style={{ marginTop: 12 }}>{os.adapters.map((a) => <div key={a.id} style={{ marginBottom: 8 }}><b>{a.name}</b> — {a.ipv4}</div>)}</div>}
+          {page === 'Update & Security' && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ color: pendingUpdates.length ? '#9d5d00' : '#107c10', fontWeight: 600 }}>
+                {updChecking ? 'Checking for updates…' : (pendingUpdates.length ? `${pendingUpdates.length} update(s) available` : "You're up to date")}
+              </div>
+              <div style={{ color: '#666', fontSize: 12 }}>Last checked: Today</div>
+              <button type="button" className="winos-btn primary" style={{ marginTop: 10 }} disabled={updChecking} onClick={checkUpdates}>Check for updates</button>
+              <table className="winos-table" style={{ marginTop: 12 }}>
+                <thead><tr><th>KB</th><th>Title</th><th>Status</th><th /></tr></thead>
+                <tbody>
+                  {os.updates.map((u) => {
+                    const failed = String(u.status || '').includes('Failed')
+                    const pending = String(u.status || '').includes('Pending') || String(u.status || '').includes('Downloading')
+                    return (
+                      <tr key={u.kb}>
+                        <td>{u.kb}</td>
+                        <td>{u.title}</td>
+                        <td>{u.status}</td>
+                        <td>
+                          {(failed || pending) && (
+                            <button type="button" className="winos-btn" disabled={!!updBusy || !os.labAction}
+                              onClick={() => installUpdate(u)}>
+                              {updBusy === u.kb ? '…' : (failed ? 'Retry' : 'Install')}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {page === 'Network & Internet' && <div style={{ marginTop: 12 }}>{os.adapters.map((a) => <div key={a.id} style={{ marginBottom: 8 }}><b>{a.name}</b> — {a.status} — {a.ipv4 || 'No IPv4'}</div>)}</div>}
           {['Personalization', 'Apps', 'Accounts'].includes(page) && <div style={{ marginTop: 12, color: '#555' }}>{page === 'Apps' ? `${os.programs.length} apps installed.` : `${page} options for this server.`}</div>}
         </div>
       </div>

@@ -229,6 +229,23 @@ export const useOS = create((set, get) => ({
   addScheduledTask: (task) => set((s) => ({
     scheduledTasks: [...s.scheduledTasks, task],
   })),
+  setScheduledTask: (name, patch) => set((s) => ({
+    scheduledTasks: s.scheduledTasks.map((t) => t.name === name ? { ...t, ...patch } : t),
+  })),
+  removeScheduledTask: (name) => set((s) => ({
+    scheduledTasks: s.scheduledTasks.filter((t) => t.name !== name),
+  })),
+  setUpdateStatus: (kb, status) => set((s) => ({
+    updates: s.updates.map((u) => u.kb === kb ? { ...u, status } : u),
+  })),
+  perfCounters: [],
+  addPerfCounter: (row) => set((s) => {
+    const counter = row?.counter
+    if (!counter) return {}
+    const exists = s.perfCounters.some((c) => c.counter === counter && c.instance === (row.instance || '_Total'))
+    if (exists) return {}
+    return { perfCounters: [...s.perfCounters, row] }
+  }),
   setComputerName: (name) => set((s) => ({
     computer: { ...s.computer, name, fqdn: s.computer.domain ? `${name}.${s.computer.domain}` : name },
   })),
@@ -260,6 +277,10 @@ export const useOS = create((set, get) => ({
       dns_records: snapshot.dns_records,
       firewall_rules: snapshot.firewall_rules,
       group_policy: snapshot.group_policy,
+      scheduled_tasks: snapshot.scheduled_tasks,
+      perf_counters: snapshot.perf_counters,
+      network: snapshot.network,
+      devices: snapshot.devices,
     })
     // Short-circuit WITHOUT calling set() — calling set (even returning {})
     // produces a fresh state object every time, which would re-fire any effect
@@ -420,6 +441,58 @@ export const useOS = create((set, get) => ({
       groupPolicyGpos: Array.isArray(snapshot.group_policy?.gpos)
         ? snapshot.group_policy.gpos.map((g) => g.name).filter(Boolean)
         : s.groupPolicyGpos,
+      scheduledTasks: Array.isArray(snapshot.scheduled_tasks) && snapshot.scheduled_tasks.length
+        ? snapshot.scheduled_tasks.map((t) => ({
+          name: t.name,
+          status: t.status || 'Ready',
+          triggers: t.triggers || t.trigger || '',
+          nextRun: t.nextRun || t.next_run || 'Soon',
+          lastRun: t.lastRun || t.last_run || 'Never',
+          result: t.result || '0x0',
+          author: t.author || 'lab\\Administrator',
+          program: t.program || 'powershell.exe',
+        }))
+        : s.scheduledTasks,
+      perfCounters: Array.isArray(snapshot.perf_counters) && snapshot.perf_counters.length
+        ? snapshot.perf_counters
+        : s.perfCounters,
+      adapters: Array.isArray(snapshot.network?.adapters) && snapshot.network.adapters.length
+        ? snapshot.network.adapters.map((a) => ({
+          id: a.id,
+          name: a.name,
+          desc: a.desc || a.description || '',
+          mac: a.mac || '',
+          status: a.status || 'Connected',
+          speed: a.speed || '10.0 Gbps',
+          dhcp: !!a.dhcp,
+          ipv4: a.ipv4 || '',
+          mask: a.mask || '',
+          gateway: a.gw || a.gateway || '',
+          dns: Array.isArray(a.dns) ? a.dns : [],
+          ipv6: a.ipv6 || '',
+          sent: a.sent || 0,
+          received: a.received || 0,
+        }))
+        : s.adapters,
+      devices: Array.isArray(snapshot.devices) && snapshot.devices.length
+        ? s.devices.map((cat) => ({
+          ...cat,
+          items: cat.items.map((item) => {
+            const match = snapshot.devices.find((d) => (
+              d.name === item.name || (d.class === cat.cls && d.name === item.name)
+            ))
+            if (!match) return item
+            const disabled = match.disabled === true
+              || String(match.status || '').toLowerCase() === 'disabled'
+            return {
+              ...item,
+              disabled,
+              status: match.status || item.status,
+              driver: match.driver || item.driver,
+            }
+          }),
+        }))
+        : s.devices,
       labSessionId: snapshot.session_id || s.labSessionId,
     }
     })

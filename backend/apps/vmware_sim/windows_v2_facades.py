@@ -355,6 +355,36 @@ def apply_v2_action(world: dict, action: str, payload: dict | None = None) -> di
         world["v2"]["scheduled_tasks"] = world["scheduled_tasks"]
         return {"ok": True, "message": f"Created scheduled task {name}", "task": row}
 
+    if action == "run_scheduled_task":
+        name = (payload.get("name") or "").strip()
+        task = next((t for t in (world.get("scheduled_tasks") or []) if t.get("name") == name), None)
+        if not task:
+            return {"ok": False, "error": f"Task '{name}' not found"}
+        task["status"] = "Ready"
+        task["lastRun"] = "Just now"
+        task["result"] = "0x0"
+        world["v2"]["scheduled_tasks"] = world["scheduled_tasks"]
+        return {"ok": True, "message": f"Ran scheduled task {name}", "task": task}
+
+    if action == "set_scheduled_task_status":
+        name = (payload.get("name") or "").strip()
+        status = (payload.get("status") or "Ready").strip()
+        task = next((t for t in (world.get("scheduled_tasks") or []) if t.get("name") == name), None)
+        if not task:
+            return {"ok": False, "error": f"Task '{name}' not found"}
+        task["status"] = status
+        world["v2"]["scheduled_tasks"] = world["scheduled_tasks"]
+        return {"ok": True, "message": f"Set task {name} to {status}", "task": task}
+
+    if action == "delete_scheduled_task":
+        name = (payload.get("name") or "").strip()
+        before = len(world.get("scheduled_tasks") or [])
+        world["scheduled_tasks"] = [t for t in (world.get("scheduled_tasks") or []) if t.get("name") != name]
+        world["v2"]["scheduled_tasks"] = world["scheduled_tasks"]
+        if len(world["scheduled_tasks"]) == before:
+            return {"ok": False, "error": f"Task '{name}' not found"}
+        return {"ok": True, "message": f"Deleted scheduled task {name}"}
+
     if action == "add_perf_counter":
         counter = (payload.get("counter") or "% Processor Time").strip()
         row = {

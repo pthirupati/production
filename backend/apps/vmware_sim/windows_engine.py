@@ -1447,9 +1447,61 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
         _event(state, f"Updated network settings for {adapter.get('name')}")
         return {"ok": True, "message": "Network adapter updated", "adapter": adapter}
 
+    if act in ("set_adapter_status", "enable_adapter", "disable_adapter"):
+        adapter_id = payload.get("adapter_id") or payload.get("id") or payload.get("name")
+        adapters = world.setdefault("network", {}).setdefault("adapters", [])
+        adapter = next(
+            (a for a in adapters if a.get("id") == adapter_id or a.get("name") == adapter_id),
+            None,
+        )
+        if not adapter:
+            return {"ok": False, "error": "Network adapter not found"}
+        if act == "enable_adapter":
+            enabled = True
+        elif act == "disable_adapter":
+            enabled = False
+        else:
+            enabled = payload.get("enabled")
+            if enabled is None:
+                status = str(payload.get("status") or "").lower()
+                enabled = status not in ("disabled", "disconnected", "down")
+        adapter["status"] = "Connected" if enabled else "Disabled"
+        _event(state, f"{'Enabled' if enabled else 'Disabled'} adapter {adapter.get('name')}")
+        return {"ok": True, "message": f"Adapter {adapter.get('name')} {'enabled' if enabled else 'disabled'}", "adapter": adapter}
+
     if act in ("scan_devices", "refresh_devices"):
         _event(state, "Refreshed Device Manager")
         return {"ok": True, "message": "Device scan complete", "devices": world.get("devices", [])}
+
+    if act in ("set_device", "enable_device", "disable_device"):
+        name = (payload.get("name") or payload.get("device") or "").strip()
+        cls = (payload.get("class") or payload.get("cls") or "").strip()
+        if not name:
+            return {"ok": False, "error": "Device name required"}
+        devices = world.setdefault("devices", [])
+        device = next(
+            (d for d in devices if d.get("name") == name and (not cls or d.get("class") == cls)),
+            None,
+        )
+        if device is None:
+            device = {
+                "id": f"dev-{name[:12]}",
+                "name": name,
+                "class": cls or "Other devices",
+                "status": "OK",
+                "driver": payload.get("driver") or "",
+            }
+            devices.append(device)
+        if act == "enable_device":
+            disabled = False
+        elif act == "disable_device":
+            disabled = True
+        else:
+            disabled = bool(payload.get("disabled"))
+        device["disabled"] = disabled
+        device["status"] = "Disabled" if disabled else (payload.get("status") or "OK")
+        _event(state, f"{'Disabled' if disabled else 'Enabled'} device {name}")
+        return {"ok": True, "message": f"Device {name} {'disabled' if disabled else 'enabled'}", "device": device}
 
     if act in ("reset",):
         # Re-break the world from the preset (a fresh start for the learner).

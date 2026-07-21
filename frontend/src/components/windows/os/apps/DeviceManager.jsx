@@ -11,13 +11,27 @@ export default function DeviceManager() {
   const [props, setProps] = useState(null)
   const [scanning, setScanning] = useState(false)
 
+  const toggleDevice = (cls, item) => {
+    const disabled = !item.disabled
+    os.setDevice(cls, item.name, { disabled })
+    if (os.labAction) {
+      os.labAction(disabled ? 'disable_device' : 'enable_device', { name: item.name, class: cls, cls })
+    }
+  }
+
+  const scanDevices = () => {
+    setScanning(true)
+    if (os.labAction) os.labAction('scan_devices', {})
+    setTimeout(() => setScanning(false), 1200)
+  }
+
   const devCtx = (cls, item) => (e) => {
     e.preventDefault(); setSel(`${cls}/${item.name}`)
     ctx.open(e.clientX, e.clientY, [
       { label: 'Update driver', onClick: () => setProps({ cls, item, tab: 'Driver', updating: true }) },
-      { label: item.disabled ? 'Enable device' : 'Disable device', onClick: () => os.setDevice(cls, item.name, { disabled: !item.disabled }) },
+      { label: item.disabled ? 'Enable device' : 'Disable device', onClick: () => toggleDevice(cls, item) },
       { label: 'Uninstall device' }, { sep: true },
-      { label: 'Scan for hardware changes', onClick: () => { setScanning(true); setTimeout(() => setScanning(false), 1200) } },
+      { label: 'Scan for hardware changes', onClick: scanDevices },
       { sep: true }, { label: 'Properties', onClick: () => setProps({ cls, item, tab: 'General' }) },
     ])
   }
@@ -27,7 +41,7 @@ export default function DeviceManager() {
       <div className="winos-toolbar">
         <span style={{ fontSize: 12 }}>File &nbsp; Action &nbsp; View &nbsp; Help</span>
         <span style={{ flex: 1 }} />
-        <button className="winos-btn" onClick={() => { setScanning(true); setTimeout(() => setScanning(false), 1000) }}>Scan for hardware changes</button>
+        <button className="winos-btn" onClick={scanDevices}>Scan for hardware changes</button>
       </div>
       <div className="winos-main" style={{ padding: '6px 0' }}>
         <div className="winos-tree-row" style={{ fontWeight: 600 }}><Monitor size={14} /> SERVER01</div>
@@ -100,7 +114,13 @@ function DeviceProps({ cls, item, tab: initTab, updating, onClose }) {
               <button className="winos-btn">Driver Details</button>
               <button className="winos-btn" onClick={() => setSearchState('searching')}>Update Driver</button>
               <button className="winos-btn" disabled>Roll Back Driver</button>
-              <button className="winos-btn" onClick={() => os.setDevice(cls, live.name, { disabled: !live.disabled })}>{live.disabled ? 'Enable Device' : 'Disable Device'}</button>
+              <button className="winos-btn" onClick={() => {
+                const disabled = !live.disabled
+                os.setDevice(cls, live.name, { disabled })
+                if (os.labAction) {
+                  os.labAction(disabled ? 'disable_device' : 'enable_device', { name: live.name, class: cls, cls })
+                }
+              }}>{live.disabled ? 'Enable Device' : 'Disable Device'}</button>
               <button className="winos-btn">Uninstall Device</button>
             </div>
           </div>

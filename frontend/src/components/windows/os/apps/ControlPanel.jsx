@@ -8,6 +8,34 @@ export default function ControlPanel() {
   const [view, setView] = useState('home')
   const [confirm, setConfirm] = useState(null)
   const [updChecking, setUpdChecking] = useState(false)
+  const [updBusy, setUpdBusy] = useState('')
+
+  const pendingUpdates = os.updates.filter((u) => {
+    const st = String(u.status || '')
+    return st.includes('Pending') || st.includes('Failed') || st.includes('Downloading')
+  })
+  const upToDate = pendingUpdates.length === 0
+
+  const checkUpdates = async () => {
+    setUpdChecking(true)
+    try {
+      if (os.labAction) await os.labAction('check_updates', {})
+    } finally {
+      setTimeout(() => setUpdChecking(false), 900)
+    }
+  }
+
+  const installUpdate = async (u) => {
+    if (!os.labAction || updBusy) return
+    const failed = String(u.status || '').includes('Failed')
+    setUpdBusy(u.kb)
+    try {
+      await os.labAction(failed ? 'retry_update' : 'install_update', { kb: u.kb })
+      os.setUpdateStatus(u.kb, 'Successfully installed')
+    } finally {
+      setUpdBusy('')
+    }
+  }
 
   const cats = [
     { id: 'sys', label: 'System and Security', icon: <Shield size={26} color="#107c10" />, sub: 'Review your computer\'s status · Windows Update · Firewall' },
@@ -40,18 +68,42 @@ export default function ControlPanel() {
           <div>
             <Section title="Windows Update">
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <RefreshCw size={20} className={updChecking ? 'spin' : ''} color="#107c10" />
+                <RefreshCw size={20} className={updChecking ? 'spin' : ''} color={upToDate ? '#107c10' : '#9d5d00'} />
                 <div>
-                  <div style={{ fontWeight: 600 }}>{updChecking ? 'Checking for updates…' : 'You\'re up to date'}</div>
-                  <div style={{ color: '#666', fontSize: 11.5 }}>Last checked: Today, 6:00 AM</div>
+                  <div style={{ fontWeight: 600 }}>
+                    {updChecking ? 'Checking for updates…' : (upToDate ? "You're up to date" : `${pendingUpdates.length} update(s) available`)}
+                  </div>
+                  <div style={{ color: '#666', fontSize: 11.5 }}>Last checked: Today</div>
                 </div>
                 <span style={{ flex: 1 }} />
-                <button className="winos-btn primary" onClick={() => { setUpdChecking(true); setTimeout(() => setUpdChecking(false), 1800) }}>Check for updates</button>
+                <button type="button" className="winos-btn primary" disabled={updChecking} onClick={checkUpdates}>Check for updates</button>
               </div>
               <div style={{ marginTop: 12, fontWeight: 600, fontSize: 12 }}>Update history</div>
               <table className="winos-table" style={{ marginTop: 4 }}>
-                <thead><tr><th>Date</th><th>KB</th><th>Title</th><th>Status</th></tr></thead>
-                <tbody>{os.updates.map((u) => <tr key={u.kb}><td>{u.date}</td><td>{u.kb}</td><td style={{ maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.title}</td><td><span className="winos-badge ok">Successful</span></td></tr>)}</tbody>
+                <thead><tr><th>Date</th><th>KB</th><th>Title</th><th>Status</th><th /></tr></thead>
+                <tbody>{os.updates.map((u) => {
+                  const failed = String(u.status || '').includes('Failed')
+                  const pending = String(u.status || '').includes('Pending') || String(u.status || '').includes('Downloading')
+                  const ok = String(u.status || '').includes('Success') || String(u.status || '').toLowerCase().includes('installed')
+                  return (
+                    <tr key={u.kb}>
+                      <td>{u.date}</td>
+                      <td>{u.kb}</td>
+                      <td style={{ maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.title}</td>
+                      <td>
+                        <span className={`winos-badge ${ok ? 'ok' : failed ? 'err' : 'warn'}`}>{u.status}</span>
+                      </td>
+                      <td>
+                        {(failed || pending) && (
+                          <button type="button" className="winos-btn" disabled={!!updBusy || !os.labAction}
+                            onClick={() => installUpdate(u)}>
+                            {updBusy === u.kb ? '…' : (failed ? 'Retry' : 'Install')}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}</tbody>
               </table>
             </Section>
             <Section title="System">
@@ -59,7 +111,17 @@ export default function ControlPanel() {
                 <span style={{ color: '#666' }}>Edition</span><span>{os.computer.edition}</span>
                 <span style={{ color: '#666' }}>Computer name</span><span>{os.computer.name}</span>
                 <span style={{ color: '#666' }}>Full computer name</span><span>{os.computer.fqdn}</span>
-                <span style={{ color: '#666' }}>Domain</span><span>{os.computer.domain}</span>
+                <span style={{ color: '#666' }}>Domain</span>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span>{os.computer.domain}</span>
+                  {os.labAction && (
+                    <button type="button" className="winos-btn" onClick={async () => {
+                      const domain = window.prompt('Domain to join', os.computer.domain || 'lab.local')
+                      if (!domain?.trim()) return
+                      await os.labAction('join_domain', { domain: domain.trim() })
+                    }}>Change…</button>
+                  )}
+                </div>
                 <span style={{ color: '#666' }}>Processor</span><span>{os.computer.cpu}</span>
                 <span style={{ color: '#666' }}>Installed RAM</span><span>{os.computer.ramGB}.0 GB</span>
                 <span style={{ color: '#666' }}>System type</span><span>64-bit operating system, x64-based processor</span>

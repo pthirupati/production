@@ -490,12 +490,26 @@ export function FirewallAdvanced() {
 }
 
 function FirewallRuleDialog({ rule, onClose }) {
+  const labAction = useOS((s) => s.labAction)
   const [tab, setTab] = useState('General')
+  const [enabled, setEnabled] = useState(rule[3] === 'Yes')
+  const [busy, setBusy] = useState(false)
+  const apply = async () => {
+    if (!labAction || busy) return
+    setBusy(true)
+    try {
+      await labAction('firewall_toggle_rule', { name: rule[0], enabled })
+    } finally { setBusy(false) }
+  }
+  const ok = async () => {
+    await apply()
+    onClose()
+  }
   return (
     <Dialog title={`${rule[0]} Properties`} onClose={onClose} width={520}
-      footer={<><button className="winos-btn primary" onClick={onClose}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button><button className="winos-btn">Apply</button></>}>
+      footer={<><button type="button" className="winos-btn primary" disabled={busy} onClick={ok}>OK</button><button type="button" className="winos-btn" onClick={onClose}>Cancel</button><button type="button" className="winos-btn" disabled={busy || !labAction} onClick={apply}>Apply</button></>}>
       <Tabs tabs={['General', 'Programs and Services', 'Protocols and Ports', 'Scope', 'Advanced']} active={tab} onChange={setTab} />
-      <div className="winos-grid2" style={{ marginTop: 12 }}><span>Name</span><input className="winos-input" defaultValue={rule[0]} /><span>Enabled</span><label><input type="checkbox" defaultChecked={rule[3] === 'Yes'} /> Enabled</label><span>Action</span><select className="winos-input" defaultValue={rule[4]}><option>Allow</option><option>Block</option></select><span>Protocol</span><span>{rule[5]}</span><span>Local port</span><span>{rule[6]}</span></div>
+      <div className="winos-grid2" style={{ marginTop: 12 }}><span>Name</span><input className="winos-input" defaultValue={rule[0]} /><span>Enabled</span><label><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled</label><span>Action</span><select className="winos-input" defaultValue={rule[4]}><option>Allow</option><option>Block</option></select><span>Protocol</span><span>{rule[5]}</span><span>Local port</span><span>{rule[6]}</span></div>
     </Dialog>
   )
 }
@@ -504,17 +518,24 @@ export function PerformanceMonitor() {
   const os = useOS()
   const [counter, setCounter] = useState('% Processor Time')
   const [add, setAdd] = useState(false)
-  const points = useMemo(() => Array.from({ length: 60 }, (_, i) => 20 + Math.sin(i / 4) * 12 + (i % 7)), [counter])
+  const rows = (os.perfCounters?.length
+    ? os.perfCounters
+    : [{ counter: '% Processor Time', color: 'Green', scale: 1.0, instance: '_Total', object: 'Processor', computer: '\\\\SERVER01' }])
+  const active = rows.find((r) => r.counter === counter) || rows[0]
+  const displayCounter = active?.counter || counter
+  const points = useMemo(() => Array.from({ length: 60 }, (_, i) => 20 + Math.sin(i / 4) * 12 + (i % 7)), [displayCounter])
   const path = points.map((p, i) => `${i * 10},${150 - p}`).join(' ')
   const addCounter = () => {
+    const row = { counter, instance: '_Total', object: 'Processor', computer: '\\\\SERVER01', color: 'Green', scale: 1.0 }
+    if (os.addPerfCounter) os.addPerfCounter(row)
     if (os.labAction) {
-      os.labAction('add_perf_counter', { counter, instance: '_Total', object: 'Processor', computer: '\\\\SERVER01' })
+      os.labAction('add_perf_counter', row)
     }
     setAdd(false)
   }
   return (
     <div className="winos-app">
-      <div className="winos-toolbar"><Gauge size={14} /><button className="winos-btn" onClick={() => setAdd(true)}><Plus size={13} /> Add Counters</button><button className="winos-btn">Freeze Display</button><span>{counter}</span></div>
+      <div className="winos-toolbar"><Gauge size={14} /><button className="winos-btn" onClick={() => setAdd(true)}><Plus size={13} /> Add Counters</button><button className="winos-btn">Freeze Display</button><span>{displayCounter}</span></div>
       <div className="winos-split">
         <div className="winos-tree" style={{ width: 250 }}><TreeLine d={0} label="Performance" open /><TreeLine d={1} label="Monitoring Tools" open /><div className="winos-tree-row sel" style={{ paddingLeft: 34 }}>Performance Monitor</div><TreeLine d={1} label="Data Collector Sets" /><TreeLine d={1} label="Reports" /></div>
         <div className="winos-main" style={{ padding: 16 }}>
@@ -523,7 +544,13 @@ export function PerformanceMonitor() {
             {Array.from({ length: 6 }, (_, i) => <line key={i} x1="0" y1={i * 34} x2="600" y2={i * 34} stroke="#164316" />)}
             <polyline points={path} fill="none" stroke="#84ff84" strokeWidth="2" />
           </svg>
-          <table className="winos-table" style={{ marginTop: 12 }}><thead><tr><th>Counter</th><th>Color</th><th>Scale</th><th>Instance</th><th>Parent</th><th>Object</th><th>Computer</th></tr></thead><tbody><tr><td>{counter}</td><td>Green</td><td>1.0</td><td>_Total</td><td></td><td>Processor</td><td>\\SERVER01</td></tr></tbody></table>
+          <table className="winos-table" style={{ marginTop: 12 }}><thead><tr><th>Counter</th><th>Color</th><th>Scale</th><th>Instance</th><th>Parent</th><th>Object</th><th>Computer</th></tr></thead><tbody>
+            {rows.map((r) => (
+              <tr key={`${r.counter}-${r.instance || '_Total'}`} className={r.counter === displayCounter ? 'sel' : ''} onClick={() => setCounter(r.counter)}>
+                <td>{r.counter}</td><td>{r.color || 'Green'}</td><td>{r.scale ?? 1.0}</td><td>{r.instance || '_Total'}</td><td></td><td>{r.object || 'Processor'}</td><td>{(r.computer || '\\\\SERVER01').replace(/\\\\/g, '\\')}</td>
+              </tr>
+            ))}
+          </tbody></table>
         </div>
       </div>
       {add && <Dialog title="Add Counters" onClose={() => setAdd(false)} width={560}
