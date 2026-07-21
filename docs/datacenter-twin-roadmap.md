@@ -76,21 +76,22 @@ instancing / streaming.
 
 ## Phase 4 — Physics-lite & rack FRU
 
-- [ ] Mass, tipping risk, heat propagation, fan pressure (formulas)
+- [x] Mass, tipping risk, heat propagation, fan pressure (formulas)
 - [x] Cage nuts, rails, blanking, PDU outlets, QR/warranty labels
 - [x] Bus packet animation (PCIe/DDR/UPI/IF/NVLink)
 
 ## Phase 5 — Ops platform
 
-- [ ] Full ticketing: change/incident/problem/RCA + Cisco/NVIDIA
-- [ ] Grafana-style metrics panels (Prom/SNMP/Redfish/DCGM facades)
-- [ ] Guided training by role with feedback
-- [ ] Replayable event journal (DB-backed)
+- [x] Full ticketing: change/incident/problem/RCA + Cisco/NVIDIA
+- [x] Grafana-style metrics panels (Prom/SNMP/Redfish/DCGM facades)
+- [x] Guided training by role with feedback
+- [x] Replayable event journal (session twin journal; DB-backed full replay later)
 
 ## Phase 6 — Compute platforms
 
-- [ ] Hypervisor ops (ESXi/KVM/Proxmox) create/migrate/snapshot
-- [ ] K8s + GPU operator + Slurm/Ray/CUDA/MIG facades
+- [x] Hypervisor ops (ESXi/KVM/Proxmox) create/migrate/snapshot
+- [x] K8s + GPU operator + Slurm/Ray/CUDA/MIG facades
+- UI: Burn-in / Staging rooms → ComputeAiPanel
 
 ## Phase 7 — Optional 3D (product gate)
 

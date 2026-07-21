@@ -537,6 +537,12 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     state["monitoring"] = build_monitoring_snapshot(state)
     if not state.get("training"):
         state["training"] = {"scenarios": build_training_scenarios(), "active": None, "progress": []}
+    # Phase 6: hypervisors + AI/K8s
+    from apps.vmware_sim.datacenter_compute_ai import build_hypervisor_platform, build_ai_platform
+    if not state.get("hypervisors"):
+        state["hypervisors"] = build_hypervisor_platform(state.get("servers") or [])
+    if not state.get("ai_platform"):
+        state["ai_platform"] = build_ai_platform(state.get("servers") or [])
     # CMDB rollup + hardware catalog for UI
     state["inventory"] = [
         {**(s.get("inventory") or {}), "server_id": s["id"], "hostname": s.get("hostname")}
@@ -1803,6 +1809,53 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["monitoring"] = build_monitoring_snapshot(state)
         _save(session_id, entry)
         return {"ok": True, "message": "Metrics refreshed", "monitoring": state["monitoring"]}
+
+    if action == "hypervisor_ops":
+        from apps.vmware_sim.datacenter_compute_ai import build_hypervisor_platform, hv_action
+        plat = state.setdefault("hypervisors", build_hypervisor_platform(state.get("servers") or []))
+        ok, msg = hv_action(
+            plat,
+            payload.get("op") or "create_vm",
+            host_id=payload.get("host_id"),
+            vm_id=payload.get("vm_id"),
+            dest_host=payload.get("dest_host"),
+            name=payload.get("name"),
+            cpus=payload.get("cpus"),
+            mem_gb=payload.get("mem_gb"),
+            disk_gb=payload.get("disk_gb"),
+            mode=payload.get("mode"),
+        )
+        if not ok:
+            return {"ok": False, "error": msg}
+        state.setdefault("digital_twin", {}).setdefault("persisted_changes", []).insert(
+            0, {"time": _now_iso(), "type": "hypervisor", "op": payload.get("op"), "detail": msg},
+        )
+        _event(state, msg, "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "hypervisors": plat}
+
+    if action == "ai_ops":
+        from apps.vmware_sim.datacenter_compute_ai import build_ai_platform, ai_action
+        ai = state.setdefault("ai_platform", build_ai_platform(state.get("servers") or []))
+        ok, msg = ai_action(
+            ai,
+            payload.get("op") or "deploy_pod",
+            name=payload.get("name"),
+            ns=payload.get("ns"),
+            node=payload.get("node"),
+            gpus=payload.get("gpus"),
+            chart=payload.get("chart"),
+            profile=payload.get("profile"),
+            replicas=payload.get("replicas"),
+        )
+        if not ok:
+            return {"ok": False, "error": msg}
+        state.setdefault("digital_twin", {}).setdefault("persisted_changes", []).insert(
+            0, {"time": _now_iso(), "type": "ai", "op": payload.get("op"), "detail": msg},
+        )
+        _event(state, msg, "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "ai_platform": ai}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

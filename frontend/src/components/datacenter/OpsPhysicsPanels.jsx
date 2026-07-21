@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Activity, AlertTriangle, ClipboardList, Gauge, Ticket } from 'lucide-react'
+import { Activity, AlertTriangle, Boxes, ClipboardList, Cpu, Gauge, Ticket } from 'lucide-react'
 
 /** Animated motherboard bus packets */
 export function BusAnimPanel({ buses }) {
@@ -188,6 +188,119 @@ export function TrainingPanel({ training, busy, onStart, onStep }) {
           </ol>
         </>
       )}
+    </div>
+  )
+}
+
+/** Phase 6 — hypervisor + K8s / GPU-AI lab surfaces */
+export function ComputeAiPanel({ hypervisors, aiPlatform, busy, onHv, onAi }) {
+  const hosts = hypervisors?.hosts || []
+  const snaps = hypervisors?.snapshots || []
+  const migs = hypervisors?.migrations || []
+  const k8s = aiPlatform?.kubernetes || {}
+  const slurm = aiPlatform?.slurm || {}
+  const mig = aiPlatform?.mig || {}
+  const inference = aiPlatform?.inference || []
+
+  return (
+    <div className="dc-ops-room">
+      <div className="dc-ops-panel">
+        <div className="dc-twin-title"><Boxes size={13} /> Hypervisor fleet</div>
+        <div className="dc-muted mb-1">
+          Platforms: {(hypervisors?.platforms || []).slice(0, 5).join(', ')}
+          {(hypervisors?.platforms || []).length > 5 ? '…' : ''}
+        </div>
+        <div className="dc-action-row" style={{ flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+          <button type="button" disabled={busy || !hosts.length} className="dc-btn-outline dc-btn-xs"
+            onClick={() => onHv?.('create_vm', { name: `lab-vm-${Date.now() % 10000}`, cpus: 2, mem_gb: 4 })}>
+            Create VM
+          </button>
+        </div>
+        {hosts.map((h) => (
+          <div key={h.id} className="dc-cmdb-card" style={{ marginBottom: '0.5rem' }}>
+            <div className="dc-twin-subtitle">{h.hostname} · {h.hypervisor} {h.version}</div>
+            <div className="dc-muted">{h.cpu_cores}c / {h.mem_gb} GB · {(h.vms || []).length} VMs</div>
+            <ul className="dc-bios-boot">
+              {(h.vms || []).map((vm) => (
+                <li key={vm.id}>
+                  <span>{vm.name} ({vm.cpus}c/{vm.mem_gb}G) — {vm.power}</span>
+                  <span className="dc-action-row" style={{ display: 'inline-flex', gap: 4, marginLeft: 8 }}>
+                    <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                      onClick={() => onHv?.('power_vm', { vm_id: vm.id, mode: vm.power === 'on' ? 'off' : 'on' })}>
+                      Power {vm.power === 'on' ? 'off' : 'on'}
+                    </button>
+                    <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                      onClick={() => onHv?.('snapshot_vm', { vm_id: vm.id })}>
+                      Snapshot
+                    </button>
+                    {hosts.length > 1 && (
+                      <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                        onClick={() => {
+                          const dest = hosts.find((x) => x.id !== h.id)
+                          if (dest) onHv?.('migrate_vm', { vm_id: vm.id, dest_host: dest.id })
+                        }}>
+                        Migrate
+                      </button>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        {snaps.length > 0 && (
+          <div className="dc-muted mt-1">Snapshots: {snaps.slice(0, 3).map((s) => s.name).join(', ')}</div>
+        )}
+        {migs.length > 0 && (
+          <div className="dc-muted">Migrations: {migs.slice(0, 2).map((m) => `${m.vm_id} ${m.type}`).join('; ')}</div>
+        )}
+      </div>
+
+      <div className="dc-ops-panel" style={{ marginTop: '0.75rem' }}>
+        <div className="dc-twin-title"><Cpu size={13} /> Kubernetes · GPU · AI</div>
+        <div className="dc-muted">
+          K8s {k8s.version} · GPU operator {k8s.gpu_operator?.version} ({k8s.gpu_operator?.status})
+          · CUDA {aiPlatform?.cuda?.version} · NCCL {aiPlatform?.nccl?.version}
+        </div>
+        <div className="dc-action-row" style={{ flexWrap: 'wrap', margin: '0.5rem 0' }}>
+          <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+            onClick={() => onAi?.('deploy_pod', { name: `job-${Date.now() % 10000}`, gpus: 1 })}>
+            Deploy GPU pod
+          </button>
+          <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+            onClick={() => onAi?.('helm_install', { chart: 'nvidia-device-plugin' })}>
+            Helm install
+          </button>
+          <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+            onClick={() => onAi?.('enable_mig', { profile: '1g.10gb' })}>
+            Enable MIG {mig.enabled ? `(${mig.active_profile || 'on'})` : ''}
+          </button>
+          <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+            onClick={() => onAi?.('slurm_submit', { name: 'train-batch', gpus: 2 })}>
+            Slurm submit
+          </button>
+          <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+            onClick={() => onAi?.('scale_inference', { replicas: 2 })}>
+            Scale inference
+          </button>
+        </div>
+        <div className="dc-twin-subtitle">Pods</div>
+        <ul className="dc-bios-boot">
+          {(k8s.pods || []).slice(0, 6).map((p) => (
+            <li key={`${p.ns}-${p.name}`}>{p.ns}/{p.name} — {p.status}{p.gpus ? ` · ${p.gpus} GPU` : ''}</li>
+          ))}
+        </ul>
+        <div className="dc-twin-subtitle mt-1">Helm · Slurm · Inference</div>
+        <div className="dc-muted">
+          Releases: {(k8s.helm_releases || []).join(', ') || '—'}
+        </div>
+        <div className="dc-muted">
+          Slurm [{slurm.partition}]: {(slurm.jobs || []).map((j) => `#${j.id} ${j.name} ${j.state}`).join('; ') || 'idle'}
+        </div>
+        <div className="dc-muted">
+          Ray {aiPlatform?.ray?.status} · Inference: {inference.map((i) => `${i.name}×${i.replicas}`).join(', ') || '—'}
+        </div>
+      </div>
     </div>
   )
 }

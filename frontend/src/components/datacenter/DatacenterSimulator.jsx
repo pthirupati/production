@@ -17,7 +17,7 @@ import {
   NetworkRoomPhase3, CableOpsPanel, StorageStackPanel,
 } from './NetworkStoragePanels'
 import {
-  RackPhysicsFruPanel, MonitoringPanel, OpsTicketsPanel, TrainingPanel,
+  RackPhysicsFruPanel, MonitoringPanel, OpsTicketsPanel, TrainingPanel, ComputeAiPanel,
 } from './OpsPhysicsPanels'
 import '../../styles/sim-products.css'
 import './DatacenterSimulator.css'
@@ -111,6 +111,8 @@ export default function DatacenterSimulator({
   const hardwareCatalog = st.hardware_catalog || {}
   const monitoring = st.monitoring || {}
   const training = st.training || {}
+  const hypervisors = st.hypervisors || {}
+  const aiPlatform = st.ai_platform || {}
   const currentRoomId = st.current_room || 'data-hall-a'
   const currentRoom = rooms.find((r) => r.id === currentRoomId) || rooms[0] || { type: 'data_hall', racks: [] }
 
@@ -414,11 +416,25 @@ export default function DatacenterSimulator({
         </div>
       )}
 
+      {(currentRoom.id === 'burn-in' || currentRoom.id === 'staging') && (
+        <div className="dc-room-body">
+          <ComputeAiPanel
+            hypervisors={hypervisors}
+            aiPlatform={aiPlatform}
+            busy={busy}
+            onHv={(op, extra) => doAction(() => datacenterApi.hypervisorOps(sessionId, op, extra), `HV ${op}`)}
+            onAi={(op, extra) => doAction(() => datacenterApi.aiOps(sessionId, op, extra), `AI ${op}`)}
+          />
+        </div>
+      )}
+
       {currentRoom.type !== 'data_hall'
         && !(currentRoom.type === 'network' && currentRoom.id === 'mdf')
         && !(currentRoom.type === 'mechanical' && currentRoom.id === 'mechanical')
         && !(currentRoom.type === 'electrical' && currentRoom.id === 'electrical')
-        && !(currentRoom.type === 'ops' && (currentRoom.id === 'noc' || currentRoom.id === 'soc')) && (
+        && !(currentRoom.type === 'ops' && (currentRoom.id === 'noc' || currentRoom.id === 'soc'))
+        && currentRoom.id !== 'burn-in'
+        && currentRoom.id !== 'staging' && (
         <div className="dc-room-body">
           <CampusRoomView room={currentRoom} campus={campus} />
         </div>

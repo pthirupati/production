@@ -197,6 +197,12 @@ export const datacenterApi = {
   refreshMonitoring(sessionId) {
     return datacenterApi.action(sessionId, 'refresh_monitoring', {})
   },
+  hypervisorOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'hypervisor_ops', { op, ...extra })
+  },
+  aiOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'ai_ops', { op, ...extra })
+  },
 }
 
 export default datacenterApi
