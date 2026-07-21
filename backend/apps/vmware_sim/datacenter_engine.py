@@ -684,6 +684,19 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         state["liquid_cooling"] = build_liquid_cooling(state.get("servers") or [])
     if not state.get("pxe_maas"):
         state["pxe_maas"] = build_pxe_maas(state.get("servers") or [])
+    # Phase 10: fire/env/optical/capacity/PdM
+    from apps.vmware_sim.datacenter_facility_ops import (
+        build_fire_safety, build_environmental, build_optical,
+        build_capacity_snapshot, build_predictive_maintenance,
+    )
+    if not state.get("fire_safety"):
+        state["fire_safety"] = build_fire_safety()
+    if not state.get("environmental"):
+        state["environmental"] = build_environmental(state.get("servers") or [])
+    if not state.get("optical"):
+        state["optical"] = build_optical()
+    state["capacity"] = build_capacity_snapshot(state)
+    state["predictive"] = build_predictive_maintenance(state)
     # CMDB rollup + hardware catalog for UI
     state["inventory"] = [
         {**(s.get("inventory") or {}), "server_id": s["id"], "hostname": s.get("hostname")}
@@ -1443,6 +1456,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 if cables:
                     cables[0]["status"] = "damaged" if preset.get("detail") == "fiber" else "loose"
                     state["broken"] = {"server": srv["id"], "component": "cable", "cable_id": cables[0]["id"]}
+                if preset.get("detail") == "fiber":
+                    from apps.vmware_sim.datacenter_facility_ops import build_optical, optical_op
+                    opt = state.get("optical") or build_optical()
+                    _, _, opt = optical_op(opt, "cut_fiber", trunk_id="TRK-MPO-02")
+                    state["optical"] = opt
                 _event(state, f"Injected cable/fiber fault on {srv['id']}", "danger")
             elif comp == "pxe":
                 bios = srv.setdefault("bios", {})
@@ -1524,6 +1542,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                     state["liquid_cooling"] = loop
                     state["broken"]["detail"] = "water_leak"
                     state["broken"]["target"] = "liquid-leak"
+                    from apps.vmware_sim.datacenter_facility_ops import build_environmental, environmental_op
+                    env = state.get("environmental") or build_environmental(state.get("servers") or [])
+                    _, _, env = environmental_op(env, "trip_leak")
+                    state["environmental"] = env
+                if preset["component"] == "fire":
+                    from apps.vmware_sim.datacenter_facility_ops import build_fire_safety, fire_safety_op
+                    fs = state.get("fire_safety") or build_fire_safety()
+                    _, _, fs = fire_safety_op(fs, "smoke_alarm", zone_id="FZ-A")
+                    state["fire_safety"] = fs
+                    state["broken"]["target"] = "FZ-A"
             state["goal"] = {"title": preset["label"], "objective": f"Respond to {preset['label']}."}
             _event(state, f"Injected facility fault: {preset['label']}", "danger")
             _twin_journal(state, "inject_failure", {"preset": preset_id})
@@ -2200,6 +2228,69 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"Rack FRU {rack_id}: {msg}", "info")
         _save(session_id, entry)
         return {"ok": True, "message": msg, "fru": fru}
+
+    if action == "fire_safety_ops":
+        from apps.vmware_sim.datacenter_facility_ops import build_fire_safety, fire_safety_op
+        fs = state.get("fire_safety") or build_fire_safety()
+        op = payload.get("op") or ""
+        ok, msg, fs = fire_safety_op(fs, op, **{k: v for k, v in payload.items() if k != "op"})
+        state["fire_safety"] = fs
+        if not ok:
+            return {"ok": False, "error": msg}
+        if op == "smoke_alarm":
+            state["broken"] = {"server": None, "component": "fire", "target": payload.get("zone_id") or "FZ-A"}
+            state.setdefault("facility", {})["alarm"] = "fire"
+        if op in ("silence", "rearm") and broken.get("component") == "fire":
+            broken.clear()
+            state.setdefault("facility", {}).pop("alarm", None)
+        _twin_journal(state, "fire_safety_ops", {"op": op})
+        _event(state, f"Fire: {msg}", "danger" if "alarm" in op or op == "discharge" else "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "fire_safety": fs}
+
+    if action == "environmental_ops":
+        from apps.vmware_sim.datacenter_facility_ops import build_environmental, environmental_op
+        env = state.get("environmental") or build_environmental(state.get("servers") or [])
+        op = payload.get("op") or ""
+        ok, msg, env = environmental_op(env, op, **{k: v for k, v in payload.items() if k != "op"})
+        state["environmental"] = env
+        if not ok:
+            return {"ok": False, "error": msg}
+        if op == "trip_leak":
+            state["broken"] = {"server": None, "component": "leak", "target": "facility", "detail": "water_leak"}
+        if op in ("clear_leak", "normalize") and broken.get("component") in ("leak",):
+            broken.clear()
+        _twin_journal(state, "environmental_ops", {"op": op})
+        _event(state, f"Env: {msg}", "warning" if op in ("trip_leak", "hotspot", "open_door") else "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "environmental": env}
+
+    if action == "optical_ops":
+        from apps.vmware_sim.datacenter_facility_ops import build_optical, optical_op
+        opt = state.get("optical") or build_optical()
+        op = payload.get("op") or ""
+        ok, msg, opt = optical_op(opt, op, **{k: v for k, v in payload.items() if k != "op"})
+        state["optical"] = opt
+        if not ok:
+            return {"ok": False, "error": msg}
+        if op == "cut_fiber":
+            state["broken"] = {"server": None, "component": "cable", "target": payload.get("trunk_id") or "TRK-MPO-01", "detail": "fiber"}
+        if op == "repair_fiber" and broken.get("detail") == "fiber":
+            broken.clear()
+        if op == "carrier_up" and broken.get("component") in ("cable",):
+            pass
+        _twin_journal(state, "optical_ops", {"op": op})
+        _event(state, f"Optical: {msg}", "danger" if "cut" in op or "down" in op else "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "optical": opt}
+
+    if action == "refresh_capacity":
+        from apps.vmware_sim.datacenter_facility_ops import build_capacity_snapshot, build_predictive_maintenance
+        state["capacity"] = build_capacity_snapshot(state)
+        state["predictive"] = build_predictive_maintenance(state)
+        _event(state, "Capacity / PdM refreshed", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Capacity refreshed", "capacity": state["capacity"], "predictive": state["predictive"]}
 
     if action == "ops_ticket":
         from apps.vmware_sim.datacenter_physics_ops import build_ops_ticket, advance_ticket, SUPPORT_VENDORS

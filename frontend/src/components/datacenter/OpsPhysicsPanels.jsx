@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Activity, AlertTriangle, Boxes, ClipboardList, Cpu, Gauge, Ticket } from 'lucide-react'
+import { Activity, AlertTriangle, Boxes, ClipboardList, Cpu, Gauge, Network, Ticket } from 'lucide-react'
 
 /** Animated motherboard bus packets */
 export function BusAnimPanel({ buses }) {
@@ -470,6 +470,189 @@ export function ComputeAiPanel({ hypervisors, aiPlatform, busy, onHv, onAi }) {
           Ray {aiPlatform?.ray?.status} · Inference: {inference.map((i) => `${i.name}×${i.replicas}`).join(', ') || '—'}
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Fire suppression / VESDA */
+export function FireSafetyPanel({ fire, busy, onOp }) {
+  const fs = fire || {}
+  if (!fs.system) return <p className="dc-muted">No fire system.</p>
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><AlertTriangle size={13} /> {fs.system}</span>
+        <span className={fs.status === 'armed' ? 'dc-text-ok' : 'dc-text-bad'}>{fs.status}</span>
+      </div>
+      <div className="dc-crac-grid">
+        {(fs.zones || []).map((z) => (
+          <div key={z.id} className={`dc-crac-card ${z.status !== 'normal' ? 'dc-crac-alert' : ''}`}>
+            <div className="dc-crac-id">{z.id} · {z.name}</div>
+            <div className="dc-crac-zone">{z.status} · smoke {z.smoke_pct}%</div>
+            <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs mt-1"
+              onClick={() => onOp?.('smoke_alarm', { zone_id: z.id })}>Smoke alarm</button>
+          </div>
+        ))}
+      </div>
+      <div className="dc-drawer-label mt-2">Cylinders</div>
+      {(fs.cylinders || []).map((c) => (
+        <div key={c.id} className="dc-muted">{c.id} {c.agent} · {c.pressure_bar} bar · {c.weight_kg} kg · {c.status}</div>
+      ))}
+      <div className="dc-action-row mt-2">
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('manual_release')}>Manual release</button>
+        <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs" onClick={() => onOp?.('discharge', { force: true })}>Discharge</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('silence')}>Silence / reset</button>
+        <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onOp?.('rearm')}>Rearm</button>
+      </div>
+      {(fs.events || []).slice(0, 3).map((e, i) => (
+        <div key={i} className="dc-muted">{e.time} · {e.message}</div>
+      ))}
+    </div>
+  )
+}
+
+/** Environmental sensors */
+export function EnvironmentalPanel({ environmental, busy, onOp }) {
+  const env = environmental || {}
+  if (!(env.sensors || []).length) return <p className="dc-muted">No environmental sensors.</p>
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><Activity size={13} /> Environmental · ASHRAE {env.ashrae_class}</span>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('normalize')}>Normalize</button>
+      </div>
+      <table className="dc-port-table">
+        <thead><tr><th>ID</th><th>Type</th><th>Location</th><th>Reading</th><th>Status</th><th /></tr></thead>
+        <tbody>
+          {(env.sensors || []).map((s) => (
+            <tr key={s.id}>
+              <td>{s.id}</td>
+              <td>{s.type}</td>
+              <td>{s.location}</td>
+              <td>
+                {s.type === 'temp_humidity' && `${s.temp_c}°C / ${s.humidity_pct}%`}
+                {s.type === 'water_leak' && (s.wet ? 'WET' : 'dry')}
+                {s.type === 'door' && (s.open ? 'OPEN' : 'closed')}
+                {s.type === 'differential_pressure' && `${s.pa} Pa`}
+              </td>
+              <td><span className={`dc-port-badge ${s.status === 'ok' ? 'dc-port-up' : 'dc-port-down'}`}>{s.status}</span></td>
+              <td>
+                {s.type === 'water_leak' && (
+                  <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs" onClick={() => onOp?.('trip_leak', { sensor_id: s.id })}>Trip</button>
+                )}
+                {s.type === 'door' && (
+                  <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                    onClick={() => onOp?.(s.open ? 'close_door' : 'open_door', { sensor_id: s.id })}>
+                    {s.open ? 'Close' : 'Open'}
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="dc-action-row mt-1">
+        <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs" onClick={() => onOp?.('hotspot')}>Inject hotspot</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('clear_leak')}>Clear leaks</button>
+      </div>
+      {(env.alerts || []).slice(0, 4).map((a, i) => (
+        <div key={i} className="dc-alert-row">[{a.severity}] {a.message}</div>
+      ))}
+    </div>
+  )
+}
+
+/** FEF / MMR / MPO optical plant */
+export function OpticalPanel({ optical, busy, onOp }) {
+  const opt = optical || {}
+  if (!opt.fef) return <p className="dc-muted">No optical plant.</p>
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-title"><Network size={13} /> Optical · FEF / MMR / MPO</div>
+      <div className="dc-drawer-label">Fiber entrance (FEF)</div>
+      {(opt.fef?.carriers || []).map((c) => (
+        <div key={c.id} className="dc-action-row">
+          <span className="dc-topology-chip">{c.id} · {c.circuit} · {c.status}</span>
+          {c.status === 'up' ? (
+            <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs" onClick={() => onOp?.('carrier_down', { carrier_id: c.id })}>Down</button>
+          ) : (
+            <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onOp?.('carrier_up', { carrier_id: c.id })}>Restore</button>
+          )}
+        </div>
+      ))}
+      <div className="dc-drawer-label mt-2">Meet-Me cross-connects</div>
+      {(opt.mmr?.cross_connects || []).map((x) => (
+        <div key={x.id} className="dc-action-row">
+          <span className="dc-muted">{x.id}: {x.a} → {x.z} ({x.media}) · {x.status}</span>
+          {x.status === 'active' ? (
+            <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('deactivate_xc', { xc_id: x.id })}>Dark</button>
+          ) : (
+            <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onOp?.('activate_xc', { xc_id: x.id })}>Activate</button>
+          )}
+        </div>
+      ))}
+      <div className="dc-drawer-label mt-2">MPO trunks</div>
+      {(opt.trunks || []).map((t) => (
+        <div key={t.id} className={`dc-vd-card ${t.status === 'cut' ? 'dc-crac-alert' : ''}`}>
+          <div className="dc-vd-head">
+            <strong>{t.id}</strong>
+            <span>{t.type} · {t.from}→{t.to} · {t.length_m}m · {t.loss_db} dB · {t.status}</span>
+          </div>
+          <div className="dc-action-row">
+            {t.status === 'cut' ? (
+              <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onOp?.('repair_fiber', { trunk_id: t.id })}>Repair / splice</button>
+            ) : (
+              <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs" onClick={() => onOp?.('cut_fiber', { trunk_id: t.id })}>Cut fiber</button>
+            )}
+          </div>
+        </div>
+      ))}
+      <div className="dc-drawer-label mt-2">Patch panels</div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        {(opt.patch_panels || []).map((p) => (
+          <span key={p.id} className="dc-topology-chip">{p.id}: {p.populated}/{p.ports} {p.media}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Capacity planning + predictive maintenance */
+export function CapacityPdmPanel({ capacity, predictive, busy, onRefresh }) {
+  const cap = capacity || {}
+  const pdm = predictive || {}
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><ClipboardList size={13} /> Capacity & predictive</span>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={onRefresh}>Refresh</button>
+      </div>
+      <div className="dc-facility-metrics">
+        <div className="dc-facility-metric"><span>Space</span><strong>{cap.space?.pct ?? '—'}%</strong><div className="dc-muted">{cap.space?.used_u}/{cap.space?.total_u} U</div></div>
+        <div className="dc-facility-metric"><span>Power</span><strong>{cap.power?.pct ?? '—'}%</strong><div className="dc-muted">{cap.power?.it_kw}/{cap.power?.capacity_kw} kW</div></div>
+        <div className="dc-facility-metric"><span>Cooling</span><strong>{cap.cooling?.pct ?? '—'}%</strong><div className="dc-muted">{cap.cooling?.load_kw}/{cap.cooling?.capacity_kw} kW</div></div>
+        <div className="dc-facility-metric dc-facility-pue"><span>PUE</span><strong>{cap.pue ?? '—'}</strong></div>
+      </div>
+      {(cap.bottlenecks || []).length > 0 && (
+        <>
+          <div className="dc-drawer-label mt-2">Bottlenecks</div>
+          {(cap.bottlenecks || []).map((b, i) => (
+            <div key={i} className="dc-alert-row">{b.resource} {b.pct}% — {b.note}</div>
+          ))}
+        </>
+      )}
+      <div className="dc-drawer-label mt-2">6-month forecast</div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        {(cap.forecast_6m || []).map((f) => (
+          <span key={f.month} className="dc-topology-chip">M{f.month}: S{f.space_pct}% P{f.power_pct}% C{f.cooling_pct}%</span>
+        ))}
+      </div>
+      <div className="dc-drawer-label mt-2">Predictive · high {pdm.high_risk_count || 0} · med {pdm.medium_risk_count || 0}</div>
+      {(pdm.items || []).slice(0, 8).map((it, i) => (
+        <div key={i} className={`dc-muted ${it.risk === 'high' ? 'dc-text-bad' : ''}`}>
+          [{it.risk}] {it.asset} · {it.part} · {it.metric}={it.value} — {it.recommendation}
+        </div>
+      ))}
     </div>
   )
 }

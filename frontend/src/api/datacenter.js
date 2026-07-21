@@ -230,6 +230,18 @@ export const datacenterApi = {
   rackFruOps(sessionId, rackId, op, extra = {}) {
     return datacenterApi.action(sessionId, 'rack_fru_ops', { rack_id: rackId, op, ...extra })
   },
+  fireSafetyOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'fire_safety_ops', { op, ...extra })
+  },
+  environmentalOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'environmental_ops', { op, ...extra })
+  },
+  opticalOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'optical_ops', { op, ...extra })
+  },
+  refreshCapacity(sessionId) {
+    return datacenterApi.action(sessionId, 'refresh_capacity', {})
+  },
 }
 
 export default datacenterApi

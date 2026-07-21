@@ -19,7 +19,7 @@ import {
 } from './NetworkStoragePanels'
 import {
   RackPhysicsFruPanel, MonitoringPanel, OpsTicketsPanel, TrainingPanel, ComputeAiPanel,
-  LiquidCoolingPanel, PxeMaasPanel,
+  LiquidCoolingPanel, PxeMaasPanel, FireSafetyPanel, EnvironmentalPanel, OpticalPanel, CapacityPdmPanel,
 } from './OpsPhysicsPanels'
 import '../../styles/sim-products.css'
 import './DatacenterSimulator.css'
@@ -112,6 +112,11 @@ export default function DatacenterSimulator({
   const cooling = st.cooling || []
   const liquidCooling = st.liquid_cooling || null
   const pxeMaas = st.pxe_maas || null
+  const fireSafety = st.fire_safety || null
+  const environmental = st.environmental || null
+  const optical = st.optical || null
+  const capacity = st.capacity || null
+  const predictive = st.predictive || null
   const rooms = st.rooms || []
   const network = st.network || { switches: [], topology: [] }
   const powerChain = st.power_chain || {}
@@ -476,6 +481,41 @@ export default function DatacenterSimulator({
             onStart={(id) => doAction(() => datacenterApi.trainingStart(sessionId, id), `Training ${id}`)}
             onStep={(step) => doAction(() => datacenterApi.trainingStep(sessionId, step), `Step: ${step}`)}
           />
+          <div style={{ marginTop: '1rem' }}>
+            <CapacityPdmPanel
+              capacity={capacity}
+              predictive={predictive}
+              busy={busy}
+              onRefresh={() => doAction(() => datacenterApi.refreshCapacity(sessionId), 'Capacity refreshed')}
+            />
+          </div>
+          <div style={{ marginTop: '1rem' }}>
+            <EnvironmentalPanel
+              environmental={environmental}
+              busy={busy}
+              onOp={(op, extra) => doAction(() => datacenterApi.environmentalOps(sessionId, op, extra), `Env ${op}`)}
+            />
+          </div>
+        </div>
+      )}
+
+      {currentRoom.id === 'fire-suppression' && (
+        <div className="dc-room-body">
+          <FireSafetyPanel
+            fire={fireSafety}
+            busy={busy}
+            onOp={(op, extra) => doAction(() => datacenterApi.fireSafetyOps(sessionId, op, extra), `Fire ${op}`)}
+          />
+        </div>
+      )}
+
+      {(currentRoom.id === 'fef' || currentRoom.id === 'mmr' || currentRoom.id === 'cable-room') && (
+        <div className="dc-room-body">
+          <OpticalPanel
+            optical={optical}
+            busy={busy}
+            onOp={(op, extra) => doAction(() => datacenterApi.opticalOps(sessionId, op, extra), `Optical ${op}`)}
+          />
         </div>
       )}
 
@@ -509,7 +549,11 @@ export default function DatacenterSimulator({
         && !(currentRoom.type === 'electrical' && currentRoom.id === 'electrical')
         && !(currentRoom.type === 'ops' && (currentRoom.id === 'noc' || currentRoom.id === 'soc'))
         && currentRoom.id !== 'burn-in'
-        && currentRoom.id !== 'staging' && (
+        && currentRoom.id !== 'staging'
+        && currentRoom.id !== 'fire-suppression'
+        && currentRoom.id !== 'fef'
+        && currentRoom.id !== 'mmr'
+        && currentRoom.id !== 'cable-room' && (
         <div className="dc-room-body">
           <CampusRoomView room={currentRoom} campus={campus} />
         </div>

@@ -125,6 +125,13 @@ Still intentionally shallow vs Omniverse: screw-level photoreal meshes, real Vir
 - [x] Server chassis label plates on CMDB
 - [x] MAAS region + enlist/commission/deploy/PXE (Staging/Burn-in + server drawer)
 
+## Phase 10 — Fire / env / optical / capacity / PdM
+
+- [x] Fire suppression (VESDA/Novec) room ops + smoke inject
+- [x] Environmental sensors (temp/humidity/leak/door) in NOC
+- [x] Optical FEF/MMR/MPO trunks (fiber cut/repair, carriers, XC)
+- [x] Capacity planning + predictive maintenance on NOC
+
 ---
 
 ## Spec document index (expand later)
