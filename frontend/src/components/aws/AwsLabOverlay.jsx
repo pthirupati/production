@@ -48,6 +48,12 @@ export default function AwsLabOverlay({
     if (/vpc-routing|vpc_routing/.test(slug)) {
       try { useAwsStore.getState().hydrateVpcRoutingBroken() } catch { /* ignore */ }
     }
+    if (/encrypt|s3-encrypt/.test(slug)) {
+      try { useAwsStore.getState().hydrateS3EncryptBroken() } catch { /* ignore */ }
+    }
+    if (/private-subnet|private_subnet/.test(slug)) {
+      try { useAwsStore.getState().hydratePrivateSubnetBroken() } catch { /* ignore */ }
+    }
     try { useAwsStore.getState().armLabSync(sessionId) } catch { /* ignore */ }
     try { useAwsStore.getState().setLabSessionId(sessionId) } catch { /* ignore */ }
     return () => {

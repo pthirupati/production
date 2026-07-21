@@ -376,12 +376,21 @@ def _apply_preset(state: dict, slug: str) -> None:
     elif "encrypt" in slug or "s3-encrypt" in slug:
         state["goal"] = {"title": "Enable S3 encryption", "objective": "Enable default encryption (SSE-S3 or SSE-KMS) on my-logs-demo-123456."}
         state["broken"] = {"require_bucket_encrypted": "my-logs-demo-123456"}
+        for b in state.get("s3Buckets") or []:
+            if b.get("name") == "my-logs-demo-123456":
+                b["encryption"] = "None"
+                break
     elif "bucket" in slug and ("public" in slug or "block" in slug):
         state["goal"] = {"title": "Block public access", "objective": "Turn off public access on my-web-assets-demo-123456."}
         state["broken"] = {"require_bucket_private": "my-web-assets-demo-123456"}
     elif "private-subnet" in slug or "private_subnet" in slug:
         state["goal"] = {"title": "Move workload to private subnet", "objective": "Launch an instance in the private subnet (subnet-0a1b2c3d4e5f10003)."}
         state["broken"] = {"require_instance_in_subnet": "subnet-0a1b2c3d4e5f10003"}
+        for sn in state.get("subnets") or []:
+            if sn.get("id") == "subnet-0a1b2c3d4e5f10003":
+                sn["mapPublicIp"] = False
+                sn["isDefault"] = False
+                break
     elif "tag" in slug:
         state["goal"] = {"title": "Tag the instance", "objective": "Add the tag Environment=production to db-server-01."}
         state["broken"] = {"require_tag": {"name": "db-server-01", "key": "Environment", "value": "production"}}

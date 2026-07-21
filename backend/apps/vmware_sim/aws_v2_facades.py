@@ -215,6 +215,25 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         db["last_reboot"] = _now()
         return {"ok": True, "message": f"Rebooted {db['name']}", "database": db}
 
+    if action == "modify_rds":
+        name = payload.get("name") or payload.get("id") or ""
+        dbs = gr.setdefault("rds", {}).setdefault("databases", [])
+        db = next((d for d in dbs if d.get("name") == name or d.get("id") == name), None)
+        if not db and dbs:
+            db = dbs[0]
+        if not db:
+            return {"ok": False, "error": "DB instance not found"}
+        patch = payload.get("patch") if isinstance(payload.get("patch"), dict) else {
+            k: v for k, v in payload.items() if k not in ("name", "id", "patch")
+        }
+        for key, val in (patch or {}).items():
+            if key in ("id", "name"):
+                continue
+            db[key] = val
+        db["status"] = db.get("status") or "available"
+        db["last_modified"] = _now()
+        return {"ok": True, "message": f"Modified {db.get('name')}", "database": db}
+
     if action == "create_dynamodb_table":
         name = (payload.get("name") or f"table-{_hex(4)}").strip()
         table = _row(f"table-{_hex()}", name, {
@@ -264,6 +283,69 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
                             if not (r.get(pk) == key.get(pk) and (not sk or r.get(sk) == key.get(sk)))]
         table["items"] = len(table["records"])
         return {"ok": True, "message": f"Deleted item from {table.get('name')}", "table": table}
+
+    if action in ("query_dynamodb", "scan_dynamodb", "get_dynamodb_item"):
+        tables = gr.setdefault("dynamodb", {}).setdefault("tables", [])
+        table = next((t for t in tables if t.get("id") == payload.get("id") or t.get("name") == payload.get("name")), None)
+        if not table and tables:
+            table = tables[0]
+        if not table:
+            return {"ok": False, "error": "Table not found"}
+        records = list(table.get("records") or [])
+        pk = (table.get("partitionKey") or "pk").split()[0]
+        sk = (table.get("sortKey") or "").split()[0] if table.get("sortKey") else ""
+        key = payload.get("key") or {}
+        if action == "scan_dynamodb":
+            items = records
+        elif action == "get_dynamodb_item":
+            items = [r for r in records
+                     if r.get(pk) == key.get(pk) and (not sk or r.get(sk) == key.get(sk))]
+            items = items[:1]
+        else:
+            items = [r for r in records if r.get(pk) == key.get(pk)]
+        ops = table.setdefault("ops", [])
+        ops.append({"op": action, "at": _now(), "count": len(items)})
+        table["last_query"] = {"op": action, "count": len(items), "at": _now()}
+        return {
+            "ok": True,
+            "message": f"{action} on {table.get('name')} returned {len(items)} item(s)",
+            "items": items,
+            "count": len(items),
+            "table": table.get("name"),
+        }
+
+    if action == "assume_role":
+        role = (payload.get("role") or payload.get("role_name") or payload.get("name") or "").strip()
+        if not role:
+            return {"ok": False, "error": "Role name required"}
+        session = payload.get("session_name") or "fixitlab-session"
+        state.setdefault("sts", {})["assumed_role"] = {
+            "role": role,
+            "session_name": session,
+            "arn": payload.get("arn") or f"arn:aws:sts::123456789012:assumed-role/{role}/{session}",
+            "assumed_at": _now(),
+        }
+        return {"ok": True, "message": f"Assumed role {role}", "sts": state["sts"]["assumed_role"]}
+
+    if action == "transition_generic_resource":
+        service = payload.get("service") or ""
+        resource = payload.get("resource") or ""
+        rid = payload.get("id") or payload.get("name") or ""
+        op = payload.get("action") or payload.get("op") or "update"
+        patch = payload.get("patch") if isinstance(payload.get("patch"), dict) else {}
+        bucket = gr.setdefault(service, {}).setdefault(resource, [])
+        row = next((r for r in bucket if r.get("id") == rid or r.get("name") == rid), None)
+        if not row and bucket:
+            row = bucket[0]
+        if not row:
+            row = _row(rid or f"{service}-{_hex()}", rid or f"{service}-resource", {"status": "available"})
+            bucket.append(row)
+        for key, val in patch.items():
+            if key not in ("id",):
+                row[key] = val
+        row["last_action"] = op
+        row["last_action_at"] = _now()
+        return {"ok": True, "message": f"{op} on {service}/{resource}", "resource": row}
 
     if action == "create_eks_cluster":
         name = (payload.get("name") or f"eks-{_hex(4)}").strip()

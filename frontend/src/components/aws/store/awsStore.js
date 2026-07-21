@@ -687,6 +687,51 @@ export const useAwsStore = create(
         })
       },
 
+      /** S3 encrypt lab: my-logs-demo starts without default encryption (matches lab server). */
+      hydrateS3EncryptBroken: () => {
+        set((s) => ({
+          s3Buckets: (s.s3Buckets || []).map((b) => (
+            b.name === 'my-logs-demo-123456' ? { ...b, encryption: 'None' } : b
+          )),
+        }))
+      },
+
+      /** Private-subnet lab: subnet-…10003 is private (no auto-assign public IP). */
+      hydratePrivateSubnetBroken: () => {
+        const target = 'subnet-0a1b2c3d4e5f10003'
+        set((s) => ({
+          subnets: (s.subnets || []).map((sn) => (
+            sn.id === target
+              ? { ...sn, mapPublicIp: false, isDefault: false, name: sn.name || 'private-1c' }
+              : sn
+          )),
+          routeTables: (s.routeTables || []).map((rt) => {
+            if (!rt.main) return rt
+            return {
+              ...rt,
+              associations: (rt.associations || []).filter((id) => id !== target),
+            }
+          }),
+        }))
+        // Ensure a dedicated private RT association so the subnet reads as private in the console.
+        const s = get()
+        const vpc = (s.vpcs || [])[0]
+        const region = s.region
+        const rtbId = 'rtb-private10003'
+        if (vpc && !(s.routeTables || []).some((r) => r.id === rtbId)) {
+          set({
+            routeTables: [
+              ...(get().routeTables || []),
+              {
+                id: rtbId, region, vpcId: vpc.id, main: false,
+                associations: [target],
+                routes: [{ dest: vpc.cidr, target: 'local' }],
+              },
+            ],
+          })
+        }
+      },
+
       // ---------- Lab action sync ----------
       // Arm/disarm mirroring of GUI mutations to the server-side action log for
       // grading. Called by AwsLabOverlay with the LabSession id (armed on mount,
@@ -1841,6 +1886,9 @@ export const useAwsStore = create(
           pendingTransition: { op: 'action', final: spec.final, patch: extraPatch || {} },
         })))
         get()._ensureTick()
+        get()._syncAction('transition_generic_resource', {
+          service, resource, id, action, patch: extraPatch || {},
+        })
         return ok()
       },
 
@@ -1852,7 +1900,13 @@ export const useAwsStore = create(
         if (db) get()._syncAction('reboot_rds', { id: db.id, name: db.name })
         return res
       },
-      modifyDb: (id, patch) => get().transitionGenericResource('rds', 'databases', id, 'modify', patch),
+      modifyDb: (id, patch) => {
+        const dbs = get().genericResources?.rds?.databases || []
+        const db = dbs.find((d) => d.id === id) || dbs[0]
+        const res = get().transitionGenericResource('rds', 'databases', id, 'modify', patch)
+        if (db) get()._syncAction('modify_rds', { id: db.id, name: db.name, patch: patch || {} })
+        return res
+      },
 
       // ---------- Lambda bespoke ----------
       invokeLambdaFn: (id, payload) => {
@@ -2010,11 +2064,15 @@ export const useAwsStore = create(
         const t = (get().genericResources?.dynamodb?.tables || []).find((x) => x.id === id)
         if (!t) return []
         const pkField = (t.partitionKey || 'pk').split(' ')[0]
-        return ((t.records) || []).filter((r) => r[pkField] === key[pkField])
+        const rows = ((t.records) || []).filter((r) => r[pkField] === key[pkField])
+        get()._syncAction('query_dynamodb', { id: t.id, name: t.name, key, count: rows.length })
+        return rows
       },
       scanDynamo: (id) => {
         const t = (get().genericResources?.dynamodb?.tables || []).find((x) => x.id === id)
-        return t ? ((t.records) || []) : []
+        const rows = t ? ((t.records) || []) : []
+        if (t) get()._syncAction('scan_dynamodb', { id: t.id, name: t.name, count: rows.length })
+        return rows
       },
 
       scaleEksResource: (id, patch = {}) => {
@@ -2120,17 +2178,19 @@ export const useAwsStore = create(
           return fail(err)
         }
         const sessionName = 'fixitlab-session'
+        const arn = `arn:aws:sts::${ACCOUNT_ID}:assumed-role/${roleName}/${sessionName}`
         set({
           currentPrincipal: {
             type: 'assumed-role',
             name: `${roleName}/${sessionName}`,
-            arn: `arn:aws:sts::${ACCOUNT_ID}:assumed-role/${roleName}/${sessionName}`,
+            arn,
             userId: `AROA${roleName.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16).padEnd(16, '0')}:${sessionName}`,
             policyNames: role.policies || [],
             policies: policiesFromNames(role.policies || []),
           },
         })
-        return ok({ arn: `arn:aws:sts::${ACCOUNT_ID}:assumed-role/${roleName}/${sessionName}` })
+        get()._syncAction('assume_role', { role: roleName, session_name: sessionName, arn })
+        return ok({ arn })
       },
       resetPrincipal: () => set({
         currentPrincipal: {
