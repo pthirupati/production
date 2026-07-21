@@ -4,9 +4,11 @@ import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Play, RotateCcw, HardDrive, Users, Briefcase, Server, AlertTriangle,
   Database, Shield, Plus, Terminal, CheckCircle2, XCircle, Clock, Loader2,
+  Boxes, Cloud, FileText, Lock,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import { renderCommvaultV2Page } from './CommvaultV2Panels'
 import '../../styles/sim-products.css'
 import './commvault.css'
 
@@ -15,12 +17,17 @@ const CV_LAB_PASS = 'lab_commvault@123'
 
 const SIDEBAR = [
   { key: 'clients', label: 'Client Computers', icon: Server },
+  { key: 'plans', label: 'Plans', icon: FileText },
+  { key: 'k8s', label: 'Kubernetes', icon: Boxes },
+  { key: 'saas', label: 'SaaS apps', icon: Cloud },
   { key: 'storage-policies', label: 'Storage Policies', icon: Shield },
   { key: 'schedules', label: 'Schedules', icon: Clock },
   { key: 'job-controller', label: 'Job Controller', icon: Briefcase },
   { key: 'aux-copies', label: 'Aux Copies', icon: Database },
   { key: 'media-agents', label: 'Media Agents', icon: Database },
   { key: 'libraries', label: 'Libraries', icon: HardDrive },
+  { key: 'ransomware', label: 'Ransomware', icon: Lock },
+  { key: 'reports', label: 'Reports', icon: FileText },
   { key: 'activity', label: 'Activity Log', icon: Users },
 ]
 
@@ -153,6 +160,8 @@ export default function CommvaultSimulator({
   }
 
   const renderContent = () => {
+    const v2 = renderCommvaultV2Page({ nav, st, sessionId, busy, run })
+    if (v2) return v2
     if (nav === 'clients') {
       return (
         <div className="space-y-3">

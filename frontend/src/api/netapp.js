@@ -54,6 +54,25 @@ export const netappApi = {
   resyncMirror(sessionId, id) {
     return netappApi.action(sessionId, 'resync_mirror', { id })
   },
+  createFlexgroup(sessionId, payload = {}) {
+    return netappApi.action(sessionId, 'create_flexgroup', payload)
+  },
+  enableSnaplock(sessionId, payload = {}) {
+    return netappApi.action(sessionId, 'enable_snaplock', payload)
+  },
+  svmDrFailover(sessionId, id) {
+    return netappApi.action(sessionId, 'svm_dr_failover', { id })
+  },
+  createS3Bucket(sessionId, payload = {}) {
+    return netappApi.action(sessionId, 'create_s3_bucket', payload)
+  },
+  mavApprove(sessionId, id) {
+    return netappApi.action(sessionId, 'mav_approve', { id })
+  },
+  arpSetMode(sessionId, mode, volume) {
+    return netappApi.action(sessionId, 'arp_set_mode', { mode, volume })
+  },
+
 }
 
 export default netappApi

@@ -3,10 +3,11 @@ import { dellemcApi } from '../../api/dellemc'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Plus, HardDrive, Layers, Network, Users, Server, AlertTriangle,
-  Terminal, Eye, Link2,
+  Terminal, Eye, Link2, Boxes, Archive, Cpu, CircuitBoard,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import { renderDellEmcV2Page } from './DellEmcV2Panels'
 import '../../styles/sim-products.css'
 import './dellemc.css'
 
@@ -16,12 +17,16 @@ const ACCENT = '#0072c6'
 
 const SIDEBAR = [
   { key: 'arrays', label: 'Arrays', icon: Server },
+  { key: 'powerstore', label: 'PowerStore', icon: Boxes },
   { key: 'storage-groups', label: 'Storage Groups', icon: Layers },
   { key: 'volumes', label: 'Volumes', icon: HardDrive },
   { key: 'snapshots', label: 'Snapshots', icon: HardDrive },
   { key: 'hosts', label: 'Hosts', icon: Users },
   { key: 'masking-views', label: 'Masking Views', icon: Eye },
   { key: 'srdf', label: 'SRDF', icon: Network },
+  { key: 'datadomain', label: 'Data Domain', icon: Archive },
+  { key: 'vxrail', label: 'VxRail', icon: Cpu },
+  { key: 'idrac', label: 'iDRAC', icon: CircuitBoard },
   { key: 'ports', label: 'Ports', icon: Network },
   { key: 'activity', label: 'Activity', icon: Server },
 ]
@@ -125,6 +130,8 @@ export default function DellEmcSimulator({
   }
 
   const renderContent = () => {
+    const v2 = renderDellEmcV2Page({ nav, st, sessionId, busy, run })
+    if (v2) return v2
     if (nav === 'arrays') {
       return <SimDataTable columns={[
         { key: 'id', label: 'Array ID', sortable: true },

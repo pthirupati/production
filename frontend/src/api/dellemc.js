@@ -51,6 +51,22 @@ export const dellemcApi = {
   deleteMaskingView(sessionId, name) {
     return dellemcApi.action(sessionId, 'delete_masking_view', { name })
   },
+  enablePowerstoreMetro(sessionId, payload = {}) {
+    return dellemcApi.action(sessionId, 'enable_powerstore_metro', payload)
+  },
+  enableRetentionLock(sessionId, payload = {}) {
+    return dellemcApi.action(sessionId, 'enable_retention_lock', payload)
+  },
+  runVxrailLcm(sessionId, name) {
+    return dellemcApi.action(sessionId, 'run_vxrail_lcm', { name })
+  },
+  idracPowerCycle(sessionId, serviceTag) {
+    return dellemcApi.action(sessionId, 'idrac_power_cycle', { service_tag: serviceTag })
+  },
+  createDdboostUnit(sessionId, payload = {}) {
+    return dellemcApi.action(sessionId, 'create_ddboost_unit', payload)
+  },
+
 }
 
 export default dellemcApi

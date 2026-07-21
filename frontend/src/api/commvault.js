@@ -54,6 +54,22 @@ export const commvaultApi = {
   createLibrary(sessionId, name, type = 'Disk', capacityGb = 1000) {
     return commvaultApi.action(sessionId, 'create_library', { name, type, capacity_gb: capacityGb })
   },
+  enableRansomwareProtection(sessionId, client) {
+    return commvaultApi.action(sessionId, 'enable_ransomware_protection', { client })
+  },
+  createK8sBackup(sessionId, payload = {}) {
+    return commvaultApi.action(sessionId, 'create_k8s_backup', payload)
+  },
+  createPlan(sessionId, payload = {}) {
+    return commvaultApi.action(sessionId, 'create_plan', payload)
+  },
+  runCustomReport(sessionId, payload = {}) {
+    return commvaultApi.action(sessionId, 'run_custom_report', payload)
+  },
+  registerSaasApp(sessionId, payload = {}) {
+    return commvaultApi.action(sessionId, 'register_saas_app', payload)
+  },
+
 }
 
 export default commvaultApi

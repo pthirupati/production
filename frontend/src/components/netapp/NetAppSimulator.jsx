@@ -3,10 +3,11 @@ import { netappApi } from '../../api/netapp'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Plus, HardDrive, Layers, Network, Shield, Server, AlertTriangle,
-  Terminal, Link2, Maximize2,
+  Terminal, Link2, Maximize2, Boxes, Lock, RefreshCw, Database, ShieldAlert,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import { renderNetAppV2Page } from './NetAppV2Panels'
 import '../../styles/sim-products.css'
 import './netapp.css'
 
@@ -19,9 +20,14 @@ const SIDEBAR = [
   { key: 'svms', label: 'SVMs', icon: Layers },
   { key: 'aggregates', label: 'Aggregates', icon: Layers },
   { key: 'volumes', label: 'Volumes', icon: HardDrive },
+  { key: 'flexgroups', label: 'FlexGroups', icon: Boxes },
+  { key: 'snaplock', label: 'SnapLock', icon: Lock },
   { key: 'snapshots', label: 'Snapshots', icon: Shield },
   { key: 'luns', label: 'LUNs', icon: HardDrive },
   { key: 'protection', label: 'Protection', icon: Shield },
+  { key: 'svmdr', label: 'SVM-DR', icon: RefreshCw },
+  { key: 's3', label: 'ONTAP S3', icon: Database },
+  { key: 'security', label: 'Security', icon: ShieldAlert },
   { key: 'network', label: 'Network', icon: Network },
   { key: 'activity', label: 'Activity', icon: Server },
 ]
@@ -123,6 +129,8 @@ export default function NetAppSimulator({
   }
 
   const renderContent = () => {
+    const v2 = renderNetAppV2Page({ nav, st, sessionId, busy, run })
+    if (v2) return v2
     if (nav === 'clusters') {
       return <SimDataTable columns={[
         { key: 'name', label: 'Cluster', sortable: true },

@@ -21,3 +21,7 @@
 .cv-btn-sm:hover { background: #0a3568; }
 .cv-btn-sm.cv-btn-outline { background: transparent; color: #0b3d78; border: 1px solid #0b3d78; }
 .cv-btn-sm.cv-btn-outline:hover { background: rgba(11, 61, 120, 0.08); }
+
+.cv-tile { background:#fff; border:1px solid #d0d7de; border-radius:6px; padding:0.75rem; }
+.cv-tile-num { font-weight:700; color:#0b3d78; }
+.cv-tile-label { font-size:0.72rem; color:#5b6b7c; }
