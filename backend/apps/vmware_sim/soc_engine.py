@@ -370,6 +370,22 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": "Case created", "case_id": case_id}
 
+    if action == "create_detection_rule":
+        name = (payload.get("name") or f"Custom Rule {len(state.get('detection_rules') or []) + 1}").strip()
+        rule_id = payload.get("id") or f"rule-{name.lower().replace(' ', '-')[:24]}"
+        if any(r.get("id") == rule_id or r.get("name") == name for r in state.get("detection_rules") or []):
+            return {"ok": False, "error": f"Rule '{name}' already exists"}
+        rule = {
+            "id": rule_id,
+            "name": name,
+            "enabled": bool(payload.get("enabled", True)),
+            "severity": payload.get("severity") or "medium",
+        }
+        state.setdefault("detection_rules", []).append(rule)
+        _event(state, f"Detection rule {name} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Rule created", "rule": rule}
+
     if action == "unblock_ip":
         ip = payload.get("ip") or ""
         if ip in state.get("blocked_ips", []):

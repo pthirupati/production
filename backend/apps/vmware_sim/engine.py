@@ -3212,21 +3212,22 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return {"ok": True, "message": f"Certificate renewed on {host['name']}"}
 
     if action == "extract_host_profile":
-        host = _find_host(state, payload.get("host_id"), payload.get("host_name"))
-        if not host:
-            return {"ok": False, "error": "Host not found"}
-        profile_name = payload.get("profile_name") or f"{host['name'].split('.')[0]}-profile"
-        host["host_profile"] = profile_name
-        state.setdefault("host_profiles", [])
-        if not any(p.get("name") == profile_name for p in state["host_profiles"]):
-            state["host_profiles"].append({
-                "id": f"hp-{int(time.time()) % 100000}", "name": profile_name,
-                "reference_host": host["name"], "compliant_hosts": [host["id"]],
-            })
-        events.append(_event(f"Extracted host profile {profile_name} from {host['name']}", "info", host["name"]))
-        tasks.insert(0, _task("Extract Host Profile", host["name"]))
-        _save_session(str(session_id), entry)
-        return {"ok": True, "message": f"Host profile '{profile_name}' extracted"}
+        host = _find_host(state, payload.get("host_id"), payload.get("host_name") or payload.get("host"))
+        if host:
+            profile_name = payload.get("profile_name") or f"{host['name'].split('.')[0]}-profile"
+            host["host_profile"] = profile_name
+            state.setdefault("host_profiles", [])
+            if not any(p.get("name") == profile_name for p in state["host_profiles"]):
+                state["host_profiles"].append({
+                    "id": f"hp-{int(time.time()) % 100000}", "name": profile_name,
+                    "reference_host": host["name"], "compliant_hosts": [host["id"]],
+                    "compliance": "Unknown", "hosts": [host["name"]],
+                })
+            events.append(_event(f"Extracted host profile {profile_name} from {host['name']}", "info", host["name"]))
+            tasks.insert(0, _task("Extract Host Profile", host["name"]))
+            _save_session(str(session_id), entry)
+            return {"ok": True, "message": f"Host profile '{profile_name}' extracted"}
+        # Fall through to v2 facade when called from admin Host Profiles panel without a live host id
 
     if action == "export_system_logs":
         host = _find_host(state, payload.get("host_id"), payload.get("host_name"))

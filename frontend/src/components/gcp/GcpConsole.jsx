@@ -254,7 +254,14 @@ export default function GcpConsole({
   const renderNetworking = () => (
     <div className="space-y-5">
       <div>
-        <h2 className="text-lg font-semibold mb-2">VPC networks</h2>
+        <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+          <h2 className="text-lg font-semibold">VPC networks</h2>
+          <button type="button" className="gcp-btn-sm" onClick={() => run(() => gcpApi.createVpc(sessionId, {
+            name: `vpc-${Date.now().toString(36).slice(-4)}`,
+          }), 'VPC created')}>
+            <Plus size={11} /> Create VPC
+          </button>
+        </div>
         <SimDataTable columns={[
           { key: 'name', label: 'Name', sortable: true },
           { key: 'mode', label: 'Subnet mode', sortable: true },

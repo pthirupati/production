@@ -205,15 +205,25 @@ export default function OpenStackConsole({
     }
     if (nav === 'networks') {
       return (
-        <SimDataTable
-          searchKeys={['name']}
-          columns={[
-            { key: 'name', label: 'Network Name', sortable: true },
-            { key: 'status', label: 'Status' },
-            { key: 'subnets', label: 'Subnets', render: (r) => (r.subnets || []).map((s) => s.cidr).join(', ') },
-          ]}
-          rows={networks}
-        />
+        <div>
+          <div className="flex justify-end mb-3">
+            <button type="button" className="os-btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
+              onClick={() => run(() => openstackApi.action(sessionId, 'create_network', {
+                name: `net-${Date.now().toString(36).slice(-4)}`,
+              }), 'Network created')} disabled={busy}>
+              <Plus size={14} /> Create Network
+            </button>
+          </div>
+          <SimDataTable
+            searchKeys={['name']}
+            columns={[
+              { key: 'name', label: 'Network Name', sortable: true },
+              { key: 'status', label: 'Status' },
+              { key: 'subnets', label: 'Subnets', render: (r) => (r.subnets || []).map((s) => s.cidr).join(', ') },
+            ]}
+            rows={networks}
+          />
+        </div>
       )
     }
     if (nav === 'security') {
@@ -294,23 +304,34 @@ export default function OpenStackConsole({
       )
     }
     return (
-      <SimDataTable
-        searchKeys={['name']}
-        columns={[
-          { key: 'name', label: 'Volume Name', sortable: true },
-          { key: 'size_gb', label: 'Size (GiB)', sortable: true },
-          { key: 'status', label: 'Status' },
-          { key: 'device', label: 'Device', render: (r) => r.device || '—' },
-          {
-            key: 'actions', label: 'Actions',
-            render: (r) => r.status === 'available' ? (
-              <button type="button" className="text-xs text-red-700 underline"
-                onClick={(e) => { e.stopPropagation(); setAttachTarget(r) }} disabled={busy}>Attach</button>
-            ) : null,
-          },
-        ]}
-        rows={volumes}
-      />
+      <div>
+        <div className="flex justify-end mb-3">
+          <button type="button" className="os-btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
+            onClick={() => run(() => openstackApi.action(sessionId, 'create_volume', {
+              name: `vol-${Date.now().toString(36).slice(-4)}`,
+              size_gb: 40,
+            }), 'Volume created')} disabled={busy}>
+            <Plus size={14} /> Create Volume
+          </button>
+        </div>
+        <SimDataTable
+          searchKeys={['name']}
+          columns={[
+            { key: 'name', label: 'Volume Name', sortable: true },
+            { key: 'size_gb', label: 'Size (GiB)', sortable: true },
+            { key: 'status', label: 'Status' },
+            { key: 'device', label: 'Device', render: (r) => r.device || '—' },
+            {
+              key: 'actions', label: 'Actions',
+              render: (r) => r.status === 'available' ? (
+                <button type="button" className="text-xs text-red-700 underline"
+                  onClick={(e) => { e.stopPropagation(); setAttachTarget(r) }} disabled={busy}>Attach</button>
+              ) : null,
+            },
+          ]}
+          rows={volumes}
+        />
+      </div>
     )
   }
 

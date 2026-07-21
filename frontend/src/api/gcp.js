@@ -132,6 +132,15 @@ export const gcpApi = {
   createHttpLoadBalancer(sessionId, payload = {}) {
     return gcpApi.action(sessionId, 'create_http_load_balancer', payload)
   },
+  createVpc(sessionId, payload = {}) {
+    return gcpApi.action(sessionId, 'create_vpc', payload)
+  },
+  createInstanceGroup(sessionId, payload = {}) {
+    return gcpApi.action(sessionId, 'create_instance_group', payload)
+  },
+  resizeInstanceGroup(sessionId, name, size) {
+    return gcpApi.action(sessionId, 'resize_instance_group', { name, size })
+  },
   uploadGcsObject(sessionId, bucket, payload = {}) {
     return gcpApi.action(sessionId, 'upload_gcs_object', { bucket, ...payload })
   },

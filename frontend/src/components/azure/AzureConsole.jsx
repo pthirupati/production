@@ -294,9 +294,17 @@ export default function AzureConsole({
       <div>
         <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
           <h2 className="text-lg font-semibold">Virtual networks</h2>
-          <button type="button" className="az-btn-sm" onClick={() => run(() => azureApi.createNsg(sessionId, `nsg-${Date.now().toString(36).slice(-4)}`), 'NSG created')}>
-            <Plus size={11} /> Create NSG
-          </button>
+          <div className="flex gap-2 flex-wrap">
+            <button type="button" className="az-btn-sm" onClick={() => run(() => azureApi.createVnet(sessionId, {
+              name: `vnet-${Date.now().toString(36).slice(-4)}`,
+              address_space: '10.20.0.0/16',
+            }), 'VNet created')}>
+              <Plus size={11} /> Create VNet
+            </button>
+            <button type="button" className="az-btn-sm" onClick={() => run(() => azureApi.createNsg(sessionId, `nsg-${Date.now().toString(36).slice(-4)}`), 'NSG created')}>
+              <Plus size={11} /> Create NSG
+            </button>
+          </div>
         </div>
         <SimDataTable columns={[
           { key: 'name', label: 'Name', sortable: true },

@@ -485,15 +485,42 @@ export default function AwxSimulator({
       )
     }
     if (nav === 'instance-groups') {
-      return <SimDataTable columns={[
-        { key: 'name', label: 'Instance Group', sortable: true },
-        { key: 'instances', label: 'Instances', sortable: true },
-        { key: 'capacity', label: 'Capacity', sortable: true },
-        { key: 'jobsRunning', label: 'Running Jobs', sortable: true },
-      ]} rows={(inv.instance_groups || AWX_INSTANCE_GROUPS).map((g) => ({
-        ...g,
-        jobsRunning: g.jobsRunning ?? g.jobs_running,
-      }))} searchKeys={['name']} />
+      return (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Instance Groups</h2>
+            <button type="button" className="awx-btn-launch flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => awxApi.createInstanceGroup(sessionId, {
+                name: `ig-${Date.now().toString(36).slice(-4)}`,
+                instances: 1,
+                capacity: 100,
+              }), 'Instance group created')}>
+              <Plus size={14} /> Add
+            </button>
+          </div>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Instance Group', sortable: true },
+            { key: 'instances', label: 'Instances', sortable: true },
+            { key: 'capacity', label: 'Capacity', sortable: true },
+            { key: 'jobsRunning', label: 'Running Jobs', sortable: true },
+            {
+              key: 'actions', label: '',
+              render: (r) => (
+                <button type="button" className="awx-btn-ghost text-xs" disabled={busy}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    run(() => awxApi.scaleInstanceGroup(sessionId, r.name, { instances: (r.instances || 1) + 1 }), 'Scaled')
+                  }}>
+                  + Instance
+                </button>
+              ),
+            },
+          ]} rows={(inv.instance_groups || AWX_INSTANCE_GROUPS).map((g) => ({
+            ...g,
+            jobsRunning: g.jobsRunning ?? g.jobs_running,
+          }))} searchKeys={['name']} />
+        </div>
+      )
     }
     if (nav === 'execution-envs') {
       return (

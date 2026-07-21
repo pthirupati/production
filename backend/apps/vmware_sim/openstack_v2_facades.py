@@ -143,6 +143,33 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         state.setdefault("volume_snapshots", []).append(row)
         return {"ok": True, "message": f"Created snapshot {snap_name}", "snapshot": row}
 
+    if action == "create_network":
+        name = (payload.get("name") or f"net-{_hex(4)}").strip()
+        if any(n.get("name") == name for n in state.get("networks") or []):
+            return {"ok": False, "error": f"Network '{name}' already exists"}
+        cidr = payload.get("cidr") or payload.get("subnet_cidr") or "10.20.0.0/24"
+        row = {
+            "id": _uuid(), "name": name, "status": "ACTIVE",
+            "shared": False, "external": bool(payload.get("external")),
+            "subnets": [{"id": _uuid(), "name": f"{name}-subnet", "cidr": cidr}],
+        }
+        state.setdefault("networks", []).append(row)
+        return {"ok": True, "message": f"Created network {name}", "network": row}
+
+    if action == "create_volume":
+        name = (payload.get("name") or f"vol-{_hex(4)}").strip()
+        if any(v.get("name") == name for v in state.get("volumes") or []):
+            return {"ok": False, "error": f"Volume '{name}' already exists"}
+        row = {
+            "id": _uuid(), "name": name,
+            "size_gb": int(payload.get("size_gb") or 40),
+            "status": "available", "device": "",
+            "bootable": bool(payload.get("bootable")),
+            "type": payload.get("type") or "__DEFAULT__",
+        }
+        state.setdefault("volumes", []).append(row)
+        return {"ok": True, "message": f"Created volume {name}", "volume": row}
+
     if action == "create_heat_stack":
         name = (payload.get("name") or f"stack-{_hex(4)}").strip()
         if any(s.get("name") == name for s in state.get("heat_stacks") or []):

@@ -201,6 +201,34 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         state.setdefault("execution_environments", []).append(row)
         return {"ok": True, "message": f"Execution environment {name} created", "execution_environment": row}
 
+    if action == "create_instance_group":
+        name = (payload.get("name") or f"ig-{len(state.get('instance_groups') or []) + 1}").strip()
+        if any(g.get("name") == name for g in state.get("instance_groups") or []):
+            return {"ok": False, "error": f"Instance group '{name}' already exists"}
+        row = {
+            "id": f"ig-{len(state.get('instance_groups') or []) + 1}",
+            "name": name,
+            "instances": int(payload.get("instances") or 1),
+            "capacity": int(payload.get("capacity") or 100),
+            "jobsRunning": 0,
+            "jobs_running": 0,
+        }
+        state.setdefault("instance_groups", []).append(row)
+        return {"ok": True, "message": f"Instance group {name} created", "instance_group": row}
+
+    if action == "scale_instance_group":
+        name = payload.get("name") or payload.get("id") or ""
+        group = next((g for g in state.get("instance_groups") or [] if g.get("name") == name or g.get("id") == name), None)
+        if not group and state.get("instance_groups"):
+            group = state["instance_groups"][0]
+        if not group:
+            return {"ok": False, "error": "Instance group not found"}
+        if "instances" in payload:
+            group["instances"] = max(0, int(payload["instances"]))
+        if "capacity" in payload:
+            group["capacity"] = max(0, int(payload["capacity"]))
+        return {"ok": True, "message": f"Scaled {group['name']}", "instance_group": group}
+
     if action == "create_application":
         name = (payload.get("name") or f"App {len(state.get('applications') or []) + 1}").strip()
         row = {

@@ -19,14 +19,27 @@ function HostProfiles({ rows = [], onAction, acting }) {
     <Panel
       title="Host Profiles"
       action={
-        <button
-          type="button"
-          disabled={acting}
-          className="vm-btn vm-btn-blue text-[10px] py-0.5 px-2"
-          onClick={() => onAction('attach_host_profile', { name: `Profile-${(rows.length || 0) + 1}`, host: 'esxi-new.lab.local' })}
-        >
-          Attach profile…
-        </button>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            disabled={acting}
+            className="vm-btn vm-btn-blue text-[10px] py-0.5 px-2"
+            onClick={() => onAction('extract_host_profile', {
+              host: 'esxi-01.lab.local',
+              profile_name: `Profile-${(rows.length || 0) + 1}`,
+            })}
+          >
+            Extract…
+          </button>
+          <button
+            type="button"
+            disabled={acting}
+            className="vm-btn vm-btn-blue text-[10px] py-0.5 px-2"
+            onClick={() => onAction('attach_host_profile', { name: `Profile-${(rows.length || 0) + 1}`, host: 'esxi-new.lab.local' })}
+          >
+            Attach profile…
+          </button>
+        </div>
       }
     >
       <table className="vm-table">

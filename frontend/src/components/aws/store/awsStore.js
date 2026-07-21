@@ -1709,15 +1709,25 @@ export const useAwsStore = create(
       createCwAlarm: ({ name, metric, namespace, threshold, region }) => {
         const alarm = { name, region: region || get().region, metric: metric || 'CPUUtilization', namespace: namespace || 'AWS/EC2', state: 'OK', threshold: threshold || '> 80%' }
         set((s) => ({ cwAlarms: [...(s.cwAlarms || []), alarm] }))
+        get()._syncAction('create_cw_alarm', alarm)
         return alarm
       },
-      deleteCwAlarm: (name) => { set((s) => ({ cwAlarms: (s.cwAlarms || []).filter((a) => a.name !== name) })); return ok() },
+      deleteCwAlarm: (name) => {
+        set((s) => ({ cwAlarms: (s.cwAlarms || []).filter((a) => a.name !== name) }))
+        get()._syncAction('delete_cw_alarm', { name })
+        return ok()
+      },
       createCwDashboard: ({ name, widgets, region }) => {
         const dash = { name, region: region || get().region, widgets: widgets || 0, created: new Date().toISOString() }
         set((s) => ({ cwDashboards: [...(s.cwDashboards || []), dash] }))
+        get()._syncAction('create_cw_dashboard', dash)
         return dash
       },
-      deleteCwDashboard: (name) => { set((s) => ({ cwDashboards: (s.cwDashboards || []).filter((d) => d.name !== name) })); return ok() },
+      deleteCwDashboard: (name) => {
+        set((s) => ({ cwDashboards: (s.cwDashboards || []).filter((d) => d.name !== name) }))
+        get()._syncAction('delete_cw_dashboard', { name })
+        return ok()
+      },
 
       // ---------- IAM engine ----------
       // Gate a mutating action through the current principal's policies.

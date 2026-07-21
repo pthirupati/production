@@ -334,7 +334,16 @@ export default function SocSimulator({
     if (nav === 'rules') {
       return (
         <div className="space-y-3">
-          <h2 className="soc-h">Detection Rules</h2>
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="soc-h">Detection Rules</h2>
+            <button type="button" className="soc-btn-outline" disabled={busy}
+              onClick={() => run(() => socApi.createDetectionRule(sessionId, {
+                name: `Custom Rule ${Date.now().toString(36).slice(-4)}`,
+                severity: 'medium',
+              }), 'Rule created')}>
+              Create rule
+            </button>
+          </div>
           <SimDataTable columns={[
             { key: 'name', label: 'Rule', sortable: true },
             { key: 'severity', label: 'Severity', render: (r) => <SeverityBadge severity={r.severity} /> },

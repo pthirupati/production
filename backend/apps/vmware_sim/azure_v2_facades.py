@@ -494,4 +494,23 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         state.setdefault("vpn_gateways", []).append(item)
         return {"ok": True, "message": f"Created VPN gateway {name}", "vpn_gateway": item}
 
+    if action == "create_vnet":
+        name = (payload.get("name") or f"vnet-{_hex(4)}").strip()
+        if any(v.get("name") == name for v in state.get("vnets") or []):
+            return {"ok": False, "error": f"Virtual network '{name}' already exists"}
+        address_space = payload.get("address_space") or "10.20.0.0/16"
+        subnet_name = payload.get("subnet_name") or "default"
+        subnet_prefix = payload.get("subnet_prefix") or payload.get("address_prefix") or "10.20.1.0/24"
+        item = {
+            "name": name,
+            "resource_group": rg,
+            "location": payload.get("location") or "eastus",
+            "address_space": address_space,
+            "subnets": [
+                {"name": subnet_name, "address_prefix": subnet_prefix, "nsg": ""},
+            ],
+        }
+        state.setdefault("vnets", []).append(item)
+        return {"ok": True, "message": f"Created virtual network {name}", "vnet": item}
+
     return None

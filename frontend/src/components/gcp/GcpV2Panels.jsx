@@ -458,39 +458,77 @@ export function renderGcpV2Page({
 
   if (nav === 'lb') {
     const lbs = st.http_load_balancers || []
+    const igs = st.instance_groups || []
     return (
-      <div className="space-y-3">
-        <div className="flex justify-between items-center flex-wrap gap-2">
-          <h2 className="text-lg font-semibold">Load balancing</h2>
-          <button type="button" className="gcp-btn-primary flex items-center gap-1" disabled={busy}
-            onClick={() => run(() => gcpApi.createHttpLoadBalancer(sessionId, {
-              name: `https-lb-${Date.now().toString(36).slice(-4)}`,
-            }), 'Load balancer created')}>
-            <Plus size={14} /> Create HTTP(S) LB
-          </button>
+      <div className="space-y-5">
+        <div className="space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Load balancing</h2>
+            <button type="button" className="gcp-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => gcpApi.createHttpLoadBalancer(sessionId, {
+                name: `https-lb-${Date.now().toString(36).slice(-4)}`,
+              }), 'Load balancer created')}>
+              <Plus size={14} /> Create HTTP(S) LB
+            </button>
+          </div>
+          <SimDataTable
+            columns={[
+              { key: 'name', label: 'Name', sortable: true },
+              { key: 'protocol', label: 'Protocol' },
+              { key: 'ip', label: 'Frontend IP' },
+              { key: 'port', label: 'Port' },
+              { key: 'backend_service', label: 'Backend service' },
+              { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
+            ]}
+            rows={lbs}
+            searchKeys={['name']}
+            expandRow={(r) => (
+              <div className="gcp-detail-panel text-sm p-3 space-y-1">
+                <div>Health check: <code>{r.health_check}</code> · SSL: <code>{r.ssl_cert}</code></div>
+                <SimDataTable columns={[
+                  { key: 'instance_group', label: 'Backend' },
+                  { key: 'zone', label: 'Zone' },
+                  { key: 'capacity', label: 'Capacity %' },
+                ]} rows={r.backends || []} />
+              </div>
+            )}
+          />
         </div>
-        <SimDataTable
-          columns={[
-            { key: 'name', label: 'Name', sortable: true },
-            { key: 'protocol', label: 'Protocol' },
-            { key: 'ip', label: 'Frontend IP' },
-            { key: 'port', label: 'Port' },
-            { key: 'backend_service', label: 'Backend service' },
-            { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
-          ]}
-          rows={lbs}
-          searchKeys={['name']}
-          expandRow={(r) => (
-            <div className="gcp-detail-panel text-sm p-3 space-y-1">
-              <div>Health check: <code>{r.health_check}</code> · SSL: <code>{r.ssl_cert}</code></div>
-              <SimDataTable columns={[
-                { key: 'instance_group', label: 'Backend' },
-                { key: 'zone', label: 'Zone' },
-                { key: 'capacity', label: 'Capacity %' },
-              ]} rows={r.backends || []} />
-            </div>
-          )}
-        />
+        <div className="space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Instance groups</h2>
+            <button type="button" className="gcp-btn-sm flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => gcpApi.createInstanceGroup(sessionId, {
+                name: `ig-${Date.now().toString(36).slice(-4)}`,
+                size: 1,
+              }), 'Instance group created')}>
+              <Plus size={11} /> Create MIG
+            </button>
+          </div>
+          <SimDataTable
+            columns={[
+              { key: 'name', label: 'Name', sortable: true },
+              { key: 'zone', label: 'Zone' },
+              { key: 'network', label: 'Network' },
+              { key: 'size', label: 'Size', sortable: true },
+              { key: 'template', label: 'Template' },
+              {
+                key: 'actions', label: '',
+                render: (r) => (
+                  <button type="button" className="gcp-btn-sm" disabled={busy}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      run(() => gcpApi.resizeInstanceGroup(sessionId, r.name, (r.size || 1) + 1), 'Resized')
+                    }}>
+                    + Size
+                  </button>
+                ),
+              },
+            ]}
+            rows={igs}
+            searchKeys={['name']}
+          />
+        </div>
       </div>
     )
   }

@@ -80,6 +80,9 @@ export const azureApi = {
   createNsg(sessionId, name) {
     return azureApi.action(sessionId, 'create_nsg', { name })
   },
+  createVnet(sessionId, payload = {}) {
+    return azureApi.action(sessionId, 'create_vnet', payload)
+  },
   snapshotDisk(sessionId, diskName, name) {
     return azureApi.action(sessionId, 'snapshot_disk', { disk_name: diskName, name })
   },

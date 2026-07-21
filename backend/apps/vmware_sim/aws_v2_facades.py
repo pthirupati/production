@@ -97,9 +97,14 @@ def seed_v2() -> dict[str, Any]:
 def ensure_v2(state: dict) -> None:
     seed = seed_v2()
     # Top-level collections
-    for key in ("loadBalancers", "targetGroups", "autoScalingGroups"):
+    for key in ("loadBalancers", "targetGroups", "autoScalingGroups", "cwAlarms", "cwDashboards"):
         if key not in state or state.get(key) is None:
-            state[key] = seed[key]
+            if key in seed:
+                state[key] = seed[key]
+            elif key == "cwAlarms":
+                state[key] = []
+            elif key == "cwDashboards":
+                state[key] = []
     # Merge genericResources per service
     gr = state.setdefault("genericResources", {})
     for svc, resources in (seed.get("genericResources") or {}).items():
@@ -457,5 +462,51 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
             records.append(row)
             zone["records"] = len(records)
         return {"ok": True, "message": f"Upserted {rtype} {name}", "record": row, "zone": zone}
+
+    if action == "create_cw_alarm":
+        name = (payload.get("name") or f"alarm-{_hex(4)}").strip()
+        alarms = state.setdefault("cwAlarms", [])
+        if any(a.get("name") == name for a in alarms):
+            return {"ok": False, "error": f"Alarm '{name}' already exists"}
+        alarm = {
+            "name": name,
+            "region": payload.get("region") or "us-east-1",
+            "metric": payload.get("metric") or "CPUUtilization",
+            "namespace": payload.get("namespace") or "AWS/EC2",
+            "state": payload.get("state") or "OK",
+            "threshold": payload.get("threshold") or "> 80%",
+        }
+        alarms.append(alarm)
+        return {"ok": True, "message": f"Created alarm {name}", "alarm": alarm}
+
+    if action == "delete_cw_alarm":
+        name = payload.get("name") or ""
+        before = len(state.get("cwAlarms") or [])
+        state["cwAlarms"] = [a for a in (state.get("cwAlarms") or []) if a.get("name") != name]
+        if len(state["cwAlarms"]) == before:
+            return {"ok": False, "error": "Alarm not found"}
+        return {"ok": True, "message": f"Deleted alarm {name}"}
+
+    if action == "create_cw_dashboard":
+        name = (payload.get("name") or f"dash-{_hex(4)}").strip()
+        dashes = state.setdefault("cwDashboards", [])
+        if any(d.get("name") == name for d in dashes):
+            return {"ok": False, "error": f"Dashboard '{name}' already exists"}
+        dash = {
+            "name": name,
+            "region": payload.get("region") or "us-east-1",
+            "widgets": int(payload.get("widgets") or 0),
+            "created": _now(),
+        }
+        dashes.append(dash)
+        return {"ok": True, "message": f"Created dashboard {name}", "dashboard": dash}
+
+    if action == "delete_cw_dashboard":
+        name = payload.get("name") or ""
+        before = len(state.get("cwDashboards") or [])
+        state["cwDashboards"] = [d for d in (state.get("cwDashboards") or []) if d.get("name") != name]
+        if len(state["cwDashboards"]) == before:
+            return {"ok": False, "error": "Dashboard not found"}
+        return {"ok": True, "message": f"Deleted dashboard {name}"}
 
     return None

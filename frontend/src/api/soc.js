@@ -48,6 +48,9 @@ export const socApi = {
   disableRule(sessionId, ruleId) {
     return socApi.action(sessionId, 'disable_rule', { rule_id: ruleId })
   },
+  createDetectionRule(sessionId, payload = {}) {
+    return socApi.action(sessionId, 'create_detection_rule', payload)
+  },
   enrichAlert(sessionId, alertId) {
     return socApi.action(sessionId, 'enrich_alert', { alert_id: alertId })
   },

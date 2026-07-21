@@ -70,6 +70,12 @@ export const awxApi = {
   createExecutionEnvironment(sessionId, payload = {}) {
     return awxApi.action(sessionId, 'create_execution_environment', payload)
   },
+  createInstanceGroup(sessionId, payload = {}) {
+    return awxApi.action(sessionId, 'create_instance_group', payload)
+  },
+  scaleInstanceGroup(sessionId, name, payload = {}) {
+    return awxApi.action(sessionId, 'scale_instance_group', { name, ...payload })
+  },
   createApplication(sessionId, payload = {}) {
     return awxApi.action(sessionId, 'create_application', payload)
   },

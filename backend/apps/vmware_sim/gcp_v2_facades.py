@@ -122,6 +122,13 @@ def seed_v2(project: str = "fixitlab-prod-247319") -> dict[str, Any]:
                 "status": "ACTIVE",
             },
         ],
+        "instance_groups": [
+            {
+                "id": f"ig-{_hex()}", "name": "web-ig", "zone": "us-central1-a",
+                "network": "vpc-prod", "size": 2, "template": "web-template",
+                "named_ports": [{"name": "http", "port": 80}],
+            },
+        ],
     }
 
 
@@ -434,5 +441,54 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         obj = {"name": obj_name, "size_kb": int(payload.get("size_kb") or 64)}
         bucket.setdefault("objects", []).append(obj)
         return {"ok": True, "message": f"Uploaded gs://{bucket_name}/{obj_name}", "bucket": bucket, "object": obj}
+
+    if action == "create_vpc":
+        name = (payload.get("name") or f"vpc-{_hex(4)}").strip()
+        if any(n.get("name") == name for n in state.get("networks") or []):
+            return {"ok": False, "error": f"VPC '{name}' already exists"}
+        subnet_name = payload.get("subnet_name") or f"{name}-subnet"
+        item = {
+            "name": name,
+            "mode": payload.get("mode") or "custom",
+            "subnets": [
+                {
+                    "name": subnet_name,
+                    "region": payload.get("region") or "us-central1",
+                    "range": payload.get("range") or "10.200.0.0/20",
+                },
+            ],
+        }
+        state.setdefault("networks", []).append(item)
+        return {"ok": True, "message": f"Created VPC {name}", "network": item}
+
+    if action == "create_instance_group":
+        name = (payload.get("name") or f"ig-{_hex(4)}").strip()
+        if any(g.get("name") == name for g in state.get("instance_groups") or []):
+            return {"ok": False, "error": f"Instance group '{name}' already exists"}
+        item = {
+            "id": f"ig-{_hex()}",
+            "name": name,
+            "zone": payload.get("zone") or "us-central1-a",
+            "network": payload.get("network") or ((state.get("networks") or [{}])[0].get("name") or "vpc-prod"),
+            "size": int(payload.get("size") or 1),
+            "template": payload.get("template") or f"{name}-template",
+            "named_ports": payload.get("named_ports") or [{"name": "http", "port": 80}],
+        }
+        state.setdefault("instance_groups", []).append(item)
+        return {"ok": True, "message": f"Created instance group {name}", "instance_group": item}
+
+    if action == "resize_instance_group":
+        name = payload.get("name") or payload.get("id") or ""
+        group = next(
+            (g for g in state.get("instance_groups") or []
+             if g.get("name") == name or g.get("id") == name),
+            None,
+        )
+        if not group and state.get("instance_groups"):
+            group = state["instance_groups"][0]
+        if not group:
+            return {"ok": False, "error": "Instance group not found"}
+        group["size"] = max(0, int(payload.get("size") if "size" in payload else (group.get("size") or 0) + 1))
+        return {"ok": True, "message": f"Resized {group['name']} to {group['size']}", "instance_group": group}
 
     return None

@@ -104,6 +104,22 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         profiles.append(row)
         return {"ok": True, "message": f"Host profile {name} attached to {host}", "profile": row}
 
+    if action == "extract_host_profile":
+        profiles = state.setdefault("host_profiles", [])
+        host = (payload.get("host") or payload.get("host_name") or "esxi-01.lab.local").strip()
+        profile_name = (payload.get("profile_name") or payload.get("name") or f"{host.split('.')[0]}-profile").strip()
+        if any(p.get("name") == profile_name for p in profiles):
+            return {"ok": False, "error": f"Host profile '{profile_name}' already exists"}
+        row = {
+            "id": f"hp-{len(profiles) + 1}",
+            "name": profile_name,
+            "compliance": "Unknown",
+            "hosts": [host],
+            "reference_host": host,
+        }
+        profiles.append(row)
+        return {"ok": True, "message": f"Extracted host profile {profile_name} from {host}", "profile": row}
+
     if action == "check_host_profile_compliance":
         for p in state.get("host_profiles") or []:
             if p.get("id") == payload.get("profile_id") or p.get("name") == payload.get("name"):
