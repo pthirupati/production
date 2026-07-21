@@ -36,16 +36,32 @@ _COMPONENT_KEYS = (
 )
 
 
-def _hardware_inventory(hostname: str) -> dict:
-    """Detailed server bill-of-materials for the Hardware drawer."""
+def _hardware_inventory(hostname: str, *, vendor: str = "Dell", role: str | None = None, model: str | None = None) -> dict:
+    """Detailed server bill-of-materials for the Hardware drawer (vendor-aware)."""
+    from apps.vmware_sim.datacenter_digital_twin import build_motherboard, build_raid
+
+    v = (vendor or "Dell").upper()
+    mb = build_motherboard(vendor or "Dell")
+    raid = build_raid(vendor or "Dell")
+    bmc_label = {
+        "HPE": "iLO 5 / Redfish", "HP": "iLO 5 / Redfish",
+        "LENOVO": "XClarity Controller / Redfish",
+        "SUPERMICRO": "IPMI AST2600 / Redfish",
+        "CISCO": "Cisco IMC / Redfish",
+        "GIGABYTE": "AMI BMC / Redfish",
+    }.get(v, "iDRAC9 / Redfish")
+    board = mb.get("model") or "ServerBoard"
+    raid_model = (raid.get("controller") or "PERC H755").split("/")[0].strip()
+    cpu_die = ((mb.get("cpu_sockets") or [{}])[0].get("die")) or "Intel Xeon Gold 6338"
+    gpu = "NVIDIA H100 80GB" if role == "gpu_node" else "NVIDIA A40"
     return {
         "motherboard": {
-            "model": "ServerBoard X11DPi-N", "bios": "3.4", "uefi": True, "tpm": "2.0",
-            "bmc": "iDRAC9 / Redfish", "secure_boot": True,
+            "model": board, "bios": "3.4", "uefi": True, "tpm": "2.0",
+            "bmc": bmc_label, "secure_boot": True, "chassis_model": model or board,
         },
         "cpus": [
-            {"socket": 0, "model": "Intel Xeon Gold 6338", "cores": 32, "threads": 64, "numa_node": 0},
-            {"socket": 1, "model": "Intel Xeon Gold 6338", "cores": 32, "threads": 64, "numa_node": 1},
+            {"socket": 0, "model": cpu_die, "cores": 32, "threads": 64, "numa_node": 0},
+            {"socket": 1, "model": cpu_die, "cores": 32, "threads": 64, "numa_node": 1},
         ],
         "dimms": [
             {"slot": f"A{i}", "size_gb": 32, "type": "DDR4-3200 ECC", "status": "healthy"}
@@ -53,9 +69,9 @@ def _hardware_inventory(hostname: str) -> dict:
         ],
         "pcie": [
             {"slot": "PCIe-1", "device": "NIC", "model": "Mellanox ConnectX-6 25GbE", "lanes": "x8"},
-            {"slot": "PCIe-2", "device": "RAID", "model": "PERC H755", "lanes": "x8"},
+            {"slot": "PCIe-2", "device": "RAID", "model": raid_model, "lanes": "x8"},
             {"slot": "PCIe-3", "device": "HBA", "model": "Emulex LPe32002 FC32", "lanes": "x8"},
-            {"slot": "PCIe-4", "device": "GPU", "model": "NVIDIA A40", "lanes": "x16"},
+            {"slot": "PCIe-4", "device": "GPU", "model": gpu, "lanes": "x16"},
         ],
         "storage": [
             {"bay": 0, "model": "Samsung PM9A3", "size_gb": 1920, "bus": "NVMe", "status": "healthy"},
@@ -63,8 +79,8 @@ def _hardware_inventory(hostname: str) -> dict:
             {"bay": 2, "model": "Seagate Exos", "size_gb": 4000, "bus": "SAS", "status": "healthy"},
         ],
         "psus": [
-            {"id": "PSU1", "watts": 1400, "redundant": True, "status": "healthy"},
-            {"id": "PSU2", "watts": 1400, "redundant": True, "status": "healthy"},
+            {"id": "PSU1", "watts": 1400 if role != "gpu_node" else 2200, "redundant": True, "status": "healthy"},
+            {"id": "PSU2", "watts": 1400 if role != "gpu_node" else 2200, "redundant": True, "status": "healthy"},
         ],
         "fans": [
             {"id": f"FAN{i}", "rpm": 7200 + i * 50, "status": "healthy"} for i in range(1, 7)
@@ -75,7 +91,51 @@ def _hardware_inventory(hostname: str) -> dict:
             {"id": "FC0", "type": "fiber", "port": "fc0", "status": "seated"},
         ],
         "hostname": hostname,
+        "vendor": vendor or "Dell",
     }
+
+
+def _normalize_support_vendor(vendor: str) -> str:
+    from apps.vmware_sim.datacenter_physics_ops import SUPPORT_VENDORS
+    raw = (vendor or "Dell").strip()
+    low = raw.lower()
+    aliases = {
+        "hp": "HPE", "hewlett": "HPE", "hewlett-packard": "HPE",
+        "dell emc": "Dell", "dellemc": "Dell",
+        "super micro": "Supermicro", "smci": "Supermicro",
+        "ocp": "Open Compute", "opencompute": "Open Compute",
+    }
+    if low in aliases:
+        return aliases[low]
+    for v in SUPPORT_VENDORS:
+        if v.lower() == low:
+            return v
+    # Title-case unknown OEMs rather than forcing Dell
+    return raw[:1].upper() + raw[1:] if raw else "Dell"
+
+
+def _apply_thermal_to_zone(state: dict, *, inlet_c: float, exhaust_c: float, fans_rpm: int) -> None:
+    """Push facility thermal stress into BMC sensors for all powered servers."""
+    for srv in state.get("servers") or []:
+        bmc = srv.setdefault("bmc", {})
+        sensors = bmc.setdefault("sensors", {})
+        if srv.get("power_state") != "on":
+            continue
+        sensors["inlet_c"] = round(inlet_c, 1)
+        sensors["exhaust_c"] = round(exhaust_c, 1)
+        sensors["fans_rpm"] = fans_rpm
+        sensors["cpu1_c"] = round(inlet_c + 26, 1)
+        sensors["cpu2_c"] = round(inlet_c + 28, 1)
+
+
+def _sync_rack_pdus(state: dict) -> None:
+    """Keep top-level pdus list aligned with power_chain.rack_pdus."""
+    rack_pdus = (state.get("power_chain") or {}).get("rack_pdus") or []
+    state["pdus"] = rack_pdus
+    from apps.vmware_sim.datacenter_physics_ops import enrich_rack
+    cooling = state.get("cooling") or []
+    for rack in state.get("racks") or []:
+        enrich_rack(rack, state.get("servers") or [], cooling, rack_pdus)
 
 
 def _session_key(session_id: str) -> str:
@@ -220,7 +280,7 @@ def _server(asset_id: str, rack: str, u_slot: int, hostname: str, **overrides) -
         "vendor": vendor,
         "service_tag": service_tag,
         "model": model,
-        "hardware": _hardware_inventory(hostname),
+        "hardware": _hardware_inventory(hostname, vendor=vendor, role=role, model=model),
         "firmware_version": overrides.pop("firmware_version", "2.12.0"),
         **({"role": role} if role else {}),
         **{k: v for k, v in overrides.items() if k != "power_state"},
@@ -761,7 +821,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if broken.get("server") == srv["id"] and broken.get("component") == component:
             broken.clear()
         # Keep detailed hardware inventory in sync with component health.
-        hw = srv.setdefault("hardware", _hardware_inventory(srv.get("hostname") or srv["id"]))
+        hw = srv.setdefault("hardware", _hardware_inventory(
+            srv.get("hostname") or srv["id"],
+            vendor=srv.get("vendor") or "Dell",
+            role=srv.get("role"),
+            model=srv.get("model"),
+        ))
         if component == "disk":
             for d in hw.get("storage") or []:
                 d["status"] = "healthy"
@@ -793,7 +858,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         srv = _find_server(state, asset_id)
         if not srv:
             return {"ok": False, "error": f"Asset {asset_id} not found"}
-        hw = srv.setdefault("hardware", _hardware_inventory(srv.get("hostname") or srv["id"]))
+        hw = srv.setdefault("hardware", _hardware_inventory(
+            srv.get("hostname") or srv["id"],
+            vendor=srv.get("vendor") or "Dell",
+            role=srv.get("role"),
+            model=srv.get("model"),
+        ))
         cables = hw.setdefault("cables", [])
         target = None
         if cable_id:
@@ -835,11 +905,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         srv = _find_server(state, asset_id)
         if not srv:
             return {"ok": False, "error": f"Asset {asset_id} not found"}
-        vendor = (payload.get("vendor") or srv.get("vendor") or "Dell").strip()
-        if vendor.lower() in ("hpe", "hp", "hewlett"):
-            vendor = "HPE"
-        elif vendor.lower() in ("dell", "dell emc", "dellemc"):
-            vendor = "Dell"
+        vendor = _normalize_support_vendor(payload.get("vendor") or srv.get("vendor") or "Dell")
         ticket_id = f"{vendor.upper()[:4]}-{int(time.time()) % 100000:05d}"
         tickets = state.setdefault("tickets", [])
         ticket = {
@@ -903,6 +969,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 srv["bmc"]["power"] = "off"
                 affected.append(srv["id"])
         _recompute_facility(state)
+        _sync_rack_pdus(state)
         _event(state, f"Breaker tripped on {pdu['id']} — rack {pdu['rack']} lost power", "danger")
         try:
             from apps.labs.provisioner.simulation.chaos_engine import inject as chaos_inject
@@ -924,6 +991,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if broken.get("component") == "pdu" and broken.get("target") == pdu["id"]:
             broken.clear()
         _recompute_facility(state)
+        _sync_rack_pdus(state)
         _event(state, f"Breaker restored on {pdu['id']}", "success")
         try:
             from apps.labs.provisioner.simulation.chaos_engine import clear_faults
@@ -943,6 +1011,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         crac["ashrae_ok"] = True
         if broken.get("component") == "cooling" and broken.get("target") == crac["id"]:
             broken.clear()
+        _apply_thermal_to_zone(state, inlet_c=22.1, exhaust_c=34.0, fans_rpm=4200)
         _recompute_facility(state)
         _event(state, f"{crac['id']} restored to normal operation", "success")
         _save(session_id, entry)
@@ -1261,7 +1330,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 srv["firmware_version"] = "CORRUPT"
                 _event(state, f"Injected firmware corruption on {srv['id']}", "danger")
             elif comp == "cable":
-                hw = srv.setdefault("hardware", _hardware_inventory(srv.get("hostname") or srv["id"]))
+                hw = srv.setdefault("hardware", _hardware_inventory(
+            srv.get("hostname") or srv["id"],
+            vendor=srv.get("vendor") or "Dell",
+            role=srv.get("role"),
+            model=srv.get("model"),
+        ))
                 cables = hw.setdefault("cables", [])
                 if cables:
                     cables[0]["status"] = "damaged" if preset.get("detail") == "fiber" else "loose"
@@ -1289,7 +1363,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                     for vd in raid.get("virtual_disks") or []:
                         vd["status"] = "degraded"
                 if comp == "fan":
-                    hw = srv.setdefault("hardware", _hardware_inventory(srv.get("hostname") or srv["id"]))
+                    hw = srv.setdefault("hardware", _hardware_inventory(
+            srv.get("hostname") or srv["id"],
+            vendor=srv.get("vendor") or "Dell",
+            role=srv.get("role"),
+            model=srv.get("model"),
+        ))
                     fans = hw.get("fans") or []
                     if fans:
                         fans[0]["status"] = "failed"
@@ -1313,9 +1392,14 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 if cooling:
                     cooling[0]["status"] = "failed"
                     cooling[0]["ashrae_ok"] = False
+                    inlet = 36.0 if preset.get("detail") == "thermal" else 31.0
                     if preset.get("detail") == "thermal":
                         cooling[0]["temp_c"] = 42.0
+                    else:
+                        cooling[0]["temp_c"] = max(float(cooling[0].get("temp_c") or 22), 28.0)
                     state["broken"] = {"server": None, "component": "cooling", "target": cooling[0]["id"]}
+                    _apply_thermal_to_zone(state, inlet_c=inlet, exhaust_c=inlet + 14, fans_rpm=9800)
+                    _recompute_facility(state)
             elif preset["component"] == "ups":
                 ups = (state.get("power_chain") or {}).get("ups") or {}
                 if isinstance(ups, dict):
@@ -1328,6 +1412,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 state["broken"] = {"server": None, "component": preset["component"], "target": "facility"}
             state["goal"] = {"title": preset["label"], "objective": f"Respond to {preset['label']}."}
             _event(state, f"Injected facility fault: {preset['label']}", "danger")
+            _twin_journal(state, "inject_failure", {"preset": preset_id})
         elif target_type == "network":
             net = state.setdefault("network", {})
             net.setdefault("faults", []).insert(0, {"time": _now_iso(), "type": preset["component"], "label": preset["label"]})
@@ -1424,7 +1509,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             hist.insert(0, {"time": _now_iso(), "part": "TPM", "action": "replace"})
         elif op == "hotswap_psu":
             slot = payload.get("psu_id") or "PSU1"
-            hw = srv.setdefault("hardware", _hardware_inventory(srv.get("hostname") or srv["id"]))
+            hw = srv.setdefault("hardware", _hardware_inventory(
+            srv.get("hostname") or srv["id"],
+            vendor=srv.get("vendor") or "Dell",
+            role=srv.get("role"),
+            model=srv.get("model"),
+        ))
             for p in hw.get("psus") or []:
                 if p.get("id") == slot:
                     p["status"] = "healthy"
@@ -1720,7 +1810,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         srv = _find_server(state, asset_id)
         if not srv:
             return {"ok": False, "error": f"Asset {asset_id} not found"}
-        hw = srv.setdefault("hardware", _hardware_inventory(srv.get("hostname") or srv["id"]))
+        hw = srv.setdefault("hardware", _hardware_inventory(
+            srv.get("hostname") or srv["id"],
+            vendor=srv.get("vendor") or "Dell",
+            role=srv.get("role"),
+            model=srv.get("model"),
+        ))
         hw["cables"] = enrich_cables(hw.get("cables") or [])
         ok, msg, cable = cable_action(
             hw["cables"],

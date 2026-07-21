@@ -25,26 +25,28 @@ instancing / streaming.
 |---|-------------|-------|--------|
 | 1 | Real physics (Rapier/Cannon) | P4 lite → P7 Rapier | [x] |
 | 2 | Entire campus building | P1 | [x] campus rooms + plant assets |
-| 3 | Complete rack FRU | P4 | [~] racks/PDUs; not every screw |
-| 4 | Every server OEM | P2 | [~] Dell/HPE live; catalog expanded |
-| 5 | Every CPU generation | P2 | [~] catalog |
-| 6 | GPU systems (DGX/HGX/…) | P2 catalog → P6 AI | [~] |
+| 3 | Complete rack FRU | P4 | [~] racks/PDUs/blanking; not every screw |
+| 4 | Every server OEM | P2 | [x] multi-OEM live fleet + vendor BOM |
+| 5 | Every CPU generation | P2 | [~] catalog + live die from motherboard map |
+| 6 | GPU systems (DGX/HGX/…) | P2 catalog → P6 AI | [~] catalog + gpu_node / H100 BOM |
 | 7 | Complete motherboard + bus anim | P1 panels → P4 anim | [~] |
 | 8 | Every cable type + ops | P1 plug → P3 catalog | [~] |
-| 9 | Real switches + CLI | P3 | [ ] |
+| 9 | Real switches + CLI | P3 | [x] multi-vendor CLI + MPLS/EVPN |
 | 10 | Console / BIOS / BMC / PXE | P1–P2 | [~] |
-| 11 | Real storage stack | P3 | [ ] |
-| 12 | Networking simulation | P3 | [ ] |
-| 13 | Hypervisors | P6 | [~] ESXi role bridge |
-| 14 | Kubernetes | P6 | [ ] |
-| 15 | AI infrastructure | P6 | [ ] |
-| 16 | Monitoring dashboards | P5 | [~] DCIM PUE |
-| 17 | Ticketing / RMA | P1 Dell/HPE → P5 full | [~] |
-| 18 | Inventory / CMDB | P2 | [~] |
-| 19 | Troubleshooting / failure inject | P2 | [~] |
-| 20 | Hardware replacement / service mode | P2 | [~] |
-| 21 | Interactive training roles | P5 | [ ] |
-| 22 | Digital twin persistence / replay | P5 | [~] session cache |
+| 11 | Real storage stack | P3 | [x] facade stack (NVMe/Ceph/ZFS/SAN/NAS) |
+| 12 | Networking simulation | P3 | [x] counters + tools + protocol writers |
+| 13 | Hypervisors | P6 | [x] ESXi/KVM create/migrate/snapshot |
+| 14 | Kubernetes | P6 | [x] GPU operator / Helm / MIG facades |
+| 15 | AI infrastructure | P6 | [x] Slurm / Ray / CUDA / inference scale |
+| 16 | Monitoring dashboards | P5 | [x] Prom-style + NOC panels |
+| 17 | Ticketing / RMA | P1–P5 | [x] multi-OEM + ops tickets |
+| 18 | Inventory / CMDB | P2 | [x] asset/warranty/EOS records |
+| 19 | Troubleshooting / failure inject | P2 | [x] presets + cooling→BMC thermal |
+| 20 | Hardware replacement / service mode | P2 | [x] |
+| 21 | Interactive training roles | P5 | [x] guided scenarios + feedback |
+| 22 | Digital twin persistence / replay | P5 | [x] journal + DB snapshot mirror |
+
+Still intentionally shallow vs Omniverse: screw-level FRU, real VirtualBMC/MAAS, liquid cooling loops.
 
 ---
 
@@ -102,6 +104,7 @@ instancing / streaming.
   Data hall **2D | 3D** toggle; 3D lazy-loads `DatacenterTwin3D` (R3F + Rapier).
   CSS pseudo-isometric floor remains the default fallback.
   Motions: camera intro, staggered rack rise, door open, LED/fan pulse, cable packets, airflow particles.
+  Plant-linked: CRAC + PDU strips, thermal stress → airflow color, InstancedMesh U-slots + BVH picking.
 
 ---
 

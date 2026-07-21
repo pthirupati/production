@@ -72,8 +72,8 @@ function ComponentPill({ name, status }) {
 }
 
 function RoleBadge({ role }) {
-  const meta = ROLE_META[role]
-  if (!meta) return null
+  if (!role) return null
+  const meta = ROLE_META[role] || { label: String(role).replace(/_/g, ' '), icon: Server }
   const Icon = meta.icon
   return (
     <span className="dc-role-badge">
@@ -316,6 +316,8 @@ export default function DatacenterSimulator({
             racks={roomRacks}
             serversByRack={serversByRack}
             network={network}
+            cooling={cooling}
+            pdus={pdus.length ? pdus : (powerChain.rack_pdus || [])}
             selectedServerId={selectedServerId}
             expandedRack={expandedRack}
             onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}
@@ -705,7 +707,7 @@ export default function DatacenterSimulator({
                 <strong>{selectedServer.vendor || 'Dell'}</strong> for this chassis (service tag{' '}
                 {selectedServer.service_tag || '—'}).
               </p>
-              <div className="dc-action-row">
+              <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
                 <button type="button" disabled={busy} className="dc-btn-outline"
                   onClick={() => {
                     const failed = Object.entries(selectedServer.components).find(([, s]) => s !== 'healthy')
@@ -718,26 +720,19 @@ export default function DatacenterSimulator({
                   }}>
                   <Ticket size={13} /> Open {selectedServer.vendor || 'OEM'} ticket
                 </button>
-                {selectedServer.vendor !== 'HPE' && (
-                  <button type="button" disabled={busy} className="dc-btn-outline"
-                    onClick={() => doAction(
-                      () => datacenterApi.openVendorTicket(sessionId, selectedServer.id, broken.component || 'hardware', 'HPE'),
-                      'HPE ticket opened',
-                      selectedServer.id,
-                    )}>
-                    Ticket → HPE
-                  </button>
-                )}
-                {selectedServer.vendor !== 'Dell' && (
-                  <button type="button" disabled={busy} className="dc-btn-outline"
-                    onClick={() => doAction(
-                      () => datacenterApi.openVendorTicket(sessionId, selectedServer.id, broken.component || 'hardware', 'Dell'),
-                      'Dell ticket opened',
-                      selectedServer.id,
-                    )}>
-                    Ticket → Dell
-                  </button>
-                )}
+                {['Dell', 'HPE', 'Lenovo', 'Supermicro', 'Cisco', 'NVIDIA']
+                  .filter((v) => v !== selectedServer.vendor)
+                  .slice(0, 3)
+                  .map((v) => (
+                    <button key={v} type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                      onClick={() => doAction(
+                        () => datacenterApi.openVendorTicket(sessionId, selectedServer.id, broken.component || 'hardware', v),
+                        `${v} ticket opened`,
+                        selectedServer.id,
+                      )}>
+                      Ticket → {v}
+                    </button>
+                  ))}
               </div>
               {(st.tickets || []).filter((t) => t.asset_id === selectedServer.id).slice(0, 4).map((t) => (
                 <div key={t.id} className="dc-ticket-card">

@@ -284,7 +284,14 @@ export function BmcPanel({ bmc, vendor, busy, onPower, onMountIso, onDiag, onUpd
             onClick={() => onFlash?.(t, 'next')}>{t}</button>
         ))}
       </div>
-      <div className="dc-drawer-label mt-2">{vendor === 'HPE' ? 'Insight Diagnostics' : 'ePSA Diagnostics'}</div>
+      <div className="dc-drawer-label mt-2">{(() => {
+        const v = (vendor || '').toUpperCase()
+        if (v === 'HPE' || v === 'HP') return 'Insight Diagnostics'
+        if (v === 'LENOVO') return 'XClarity Diagnostics'
+        if (v === 'SUPERMICRO') return 'IPMI Diagnostics'
+        if (v === 'CISCO') return 'IMC Diagnostics'
+        return 'ePSA Diagnostics'
+      })()}</div>
       <div className="dc-action-row">
         {(bmc.diagnostics?.suites || ['Memory', 'CPU', 'Storage']).map((suite) => (
           <button key={suite} type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
