@@ -23,7 +23,7 @@ instancing / streaming.
 
 | # | Requirement | Phase | Status |
 |---|-------------|-------|--------|
-| 1 | Real physics (Rapier/Cannon) | P4 lite → P7 Rapier | [ ] |
+| 1 | Real physics (Rapier/Cannon) | P4 lite → P7 Rapier | [x] |
 | 2 | Entire campus building | P1 | [x] campus rooms + plant assets |
 | 3 | Complete rack FRU | P4 | [~] racks/PDUs; not every screw |
 | 4 | Every server OEM | P2 | [~] Dell/HPE live; catalog expanded |
@@ -96,9 +96,11 @@ instancing / streaming.
 
 ## Phase 7 — Optional 3D (product gate)
 
-- [ ] Three.js + R3F scene only if explicitly approved
-- [ ] Rapier constraints for cables/racks
-- [ ] LOD / InstancedMesh / BVH for 60 FPS
+- [x] Three.js + R3F scene only if explicitly approved
+- [x] Rapier constraints for cables/racks
+- [x] LOD / InstancedMesh / BVH for 60 FPS
+  Data hall **2D | 3D** toggle; 3D lazy-loads `DatacenterTwin3D` (R3F + Rapier).
+  CSS pseudo-isometric floor remains the default fallback.
 
 ---
 

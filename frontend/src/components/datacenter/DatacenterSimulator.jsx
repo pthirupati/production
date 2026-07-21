@@ -1,14 +1,15 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState, Suspense } from 'react'
 import { datacenterApi } from '../../api/datacenter'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Server, AlertTriangle, Terminal, X, Power, Network, HardDrive,
   CircuitBoard, Cpu, Zap, Wrench, RotateCcw, Snowflake, Gauge, Move,
   Building2, Router, Thermometer, Fuel, BatteryCharging, Plug, ShieldCheck,
-  RefreshCw, MonitorCog, Database, Boxes, Ticket, Monitor,
+  RefreshCw, MonitorCog, Database, Boxes, Ticket, Monitor, Box,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { useSimSession } from '../sim/shared'
+import { lazyWithRetry } from '../../utils/lazyWithRetry'
 import {
   MotherboardPanel, RaidPanel, BiosPanel, BmcPanel, CampusRoomView,
   ServiceModePanel, InventoryPanel, FailureInjectBar,
@@ -21,6 +22,8 @@ import {
 } from './OpsPhysicsPanels'
 import '../../styles/sim-products.css'
 import './DatacenterSimulator.css'
+
+const LazyDatacenterTwin3D = lazyWithRetry(() => import('./DatacenterTwin3D'))
 
 const DC_LAB_USER = 'lab_datacenter'
 const DC_LAB_PASS = 'lab_datacenter@123'
@@ -94,6 +97,7 @@ export default function DatacenterSimulator({
   const [flashId, setFlashId] = useState(null)
   const [drawerTab, setDrawerTab] = useState('overview')
   const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [floorView, setFloorView] = useState('2d') // '2d' | '3d'
   const dragRef = useRef(null)
   const movedRef = useRef(false)
 
@@ -281,10 +285,45 @@ export default function DatacenterSimulator({
             </span>
           ))}
         </div>
-        <div className="dc-status-hint"><Move size={12} /> Drag floor to pan</div>
+        <div className="dc-status-hint">
+          {currentRoom.type === 'data_hall' && (
+            <span className="dc-view-toggle">
+              <button
+                type="button"
+                className={`dc-btn-outline dc-btn-xs ${floorView === '2d' ? 'dc-view-active' : ''}`}
+                onClick={() => setFloorView('2d')}
+              >
+                <Move size={11} /> 2D
+              </button>
+              <button
+                type="button"
+                className={`dc-btn-outline dc-btn-xs ${floorView === '3d' ? 'dc-view-active' : ''}`}
+                onClick={() => setFloorView('3d')}
+              >
+                <Box size={11} /> 3D
+              </button>
+            </span>
+          )}
+          {currentRoom.type === 'data_hall' && floorView === '3d'
+            ? <><Box size={12} /> Orbit · click chassis</>
+            : <><Move size={12} /> Drag floor to pan</>}
+        </div>
       </div>
 
-      {currentRoom.type === 'data_hall' && (
+      {currentRoom.type === 'data_hall' && floorView === '3d' && (
+        <Suspense fallback={<div className="dc-3d-loading">Loading 3D twin…</div>}>
+          <LazyDatacenterTwin3D
+            racks={roomRacks}
+            serversByRack={serversByRack}
+            network={network}
+            selectedServerId={selectedServerId}
+            onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}
+            onSelectRack={(id) => setExpandedRack((cur) => (cur === id ? null : id))}
+          />
+        </Suspense>
+      )}
+
+      {currentRoom.type === 'data_hall' && floorView === '2d' && (
         <div
           className="dc-floor-viewport"
           onMouseDown={onFloorMouseDown}
