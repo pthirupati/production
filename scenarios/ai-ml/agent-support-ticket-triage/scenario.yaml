@@ -18,10 +18,10 @@ description: 'CONTEXT: A team operating AI/ML workflows has raised a ticket for 
   the agent.
 
 
-  OBJECTIVE: Open the Agent Workflow console from the lab toolbar; Add an LLM node in classify mode
-  and feed it the ticket text from the trigger; Add a condition node that detects a high-priority ticket
-  and route the true branch to a send_notification tool, then connect the notification to the output.
-  Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
+  OBJECTIVE: Open the Agent Workflow console from the lab toolbar; Add an LLM node in classify mode and
+  feed it the ticket text from the trigger; Add a condition node that detects a high-priority ticket and
+  route the true branch to a send_notification tool, then connect the notification to the output. Acceptance
+  criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent

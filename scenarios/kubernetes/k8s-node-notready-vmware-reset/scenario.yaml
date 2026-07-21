@@ -23,8 +23,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Work
 
 
   OBJECTIVE: Confirm worker-1 is NotReady (kubectl get nodes) and a pod is Pending (kubectl get pods);
-  Recognise the node VM is hung — kubectl cannot revive a dead kubelet; Open the VMware console and
-  Reset the node VM k8s-worker-1 (Power -> Reset). Acceptance criteria: the change is minimal and reversible,
+  Recognise the node VM is hung — kubectl cannot revive a dead kubelet; Open the VMware console and Reset
+  the node VM k8s-worker-1 (Power -> Reset). Acceptance criteria: the change is minimal and reversible,
   and success means `kubectl get pods` shows every pod Running.
 
 

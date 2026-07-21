@@ -12,9 +12,9 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `K
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: AWS environment with a Kinesis Data Stream configured with 1 shard
-  and a Lambda consumer. Producer throughput exceeds the single shard capacity of 1 MB/s, causing records
-  to pile up and MillisBehindLatest to increase continuously.
+  SYMPTOM / STARTING STATE: AWS environment with a Kinesis Data Stream configured with 1 shard and a Lambda
+  consumer. Producer throughput exceeds the single shard capacity of 1 MB/s, causing records to pile up
+  and MillisBehindLatest to increase continuously.
 
 
   OBJECTIVE: Identify the consumer lag using CloudWatch MillisBehindLatest and GetRecords.IteratorAgeMilliseconds

@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. lsblk shows an unused /dev/sdc (4G). swapon --show
-  returns
+  SYMPTOM / STARTING STATE: RHEL 9 server. lsblk shows an unused /dev/sdc (4G). swapon --show returns
 
   no output and free -h shows 0B of swap. The database process was recently OOM-killed.
 

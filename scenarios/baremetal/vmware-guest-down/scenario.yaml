@@ -9,8 +9,8 @@ description: 'CONTEXT: A team operating bare metal operations has raised a ticke
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL host running libvirt/KVM. A defined guest domain is in the
-  "shut off" state and needs to be started; the application it hosts is currently down.
+  SYMPTOM / STARTING STATE: RHEL host running libvirt/KVM. A defined guest domain is in the "shut off"
+  state and needs to be started; the application it hosts is currently down.
 
 
   OBJECTIVE: List libvirt domains and confirm the guest is shut off; Start the guest domain with virsh;

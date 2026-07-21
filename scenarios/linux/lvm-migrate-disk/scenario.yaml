@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. Volume group vg_data contains one PV: /dev/sda. The
-  LV lv_data
+  SYMPTOM / STARTING STATE: RHEL 9 server. Volume group vg_data contains one PV: /dev/sda. The LV lv_data
 
   is mounted at /data and actively used. smartctl -H /dev/sda shows "FAILED!" for the
 

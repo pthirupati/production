@@ -13,8 +13,8 @@ description: 'CONTEXT: A team operating Ansible automation has raised a ticket f
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: control node. Playbook deploys nginx.conf but after the run the
-  old configuration is still active. No "RUNNING HANDLER" line appears in the output.
+  SYMPTOM / STARTING STATE: control node. Playbook deploys nginx.conf but after the run the old configuration
+  is still active. No "RUNNING HANDLER" line appears in the output.
 
 
   OBJECTIVE: Inspect the playbook to find why the handler is not being notified; Fix the notify name,

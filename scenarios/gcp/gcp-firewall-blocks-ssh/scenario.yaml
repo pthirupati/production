@@ -81,28 +81,28 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+    Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm sshd is active and listening on port 22.
+    1. Find which mount is 100% — often `/` or `/var`.
 
-    2. Check `firewall-cmd` or iptables for blocked port 22.
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
 
-    3. Read `/var/log/secure` for auth or config errors.'
+    3. Look for core dumps, temp files, or oversized application data.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Fix sshd_config, firewall, or socket unit as needed.
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
 
-    2. `systemctl restart sshd`.
+    2. `df -h` should show free space on the affected mount.
 
-    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+    3. Retry the command that failed with ''No space left on device''.
 
 
-    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
+    WHY: many services fail cryptically when disk is full.'
 summary: Add the missing ingress firewall rule for SSH/22 before the default-deny catch-all blocks it,
   restoring SSH access to web01.
 estimated_minutes: 12

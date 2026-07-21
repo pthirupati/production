@@ -33,7 +33,8 @@ description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant git repos, pipelines, artifacts, and runbooks), changing one thing at a time. Check
-  your work continuously against the objective — success means `systemctl is-active rsyslog`` returns active.
+  your work continuously against the objective — success means `systemctl is-active rsyslog`` returns
+  active.
 
 
   VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active rsyslog` returns active.
@@ -74,25 +75,29 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `systemctl status rsyslog` and `journalctl -u rsyslog -n 50`.'
+    Start with `systemctl status rsyslog` and `journalctl -u rsyslog -n 50 --no-pager` before changing
+    anything.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm `rsyslog` is failed/inactive.
+    1. Run `systemctl status rsyslog` — note Active/Failed and the last log lines.
 
-    2. Read the unit journal for the root cause.
+    2. Read `journalctl -u rsyslog -n 50` for the root error.
 
-    3. Apply the smallest fix that restores the unit.'
+    3. Form a hypothesis about the smallest config or permission fix.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Repair the underlying config/cause for `rsyslog`.
+    1. Apply the minimal fix (config, unit override, or missing directory).
 
-    2. `systemctl enable --now rsyslog`.
+    2. Run `systemctl daemon-reload` if you edited a unit file.
 
-    3. Verify with `systemctl is-active rsyslog` (expect active).'
+    3. Run `systemctl restart rsyslog` and confirm `systemctl is-active rsyslog` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
 summary: Complete the runbooks — backup lab devops lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

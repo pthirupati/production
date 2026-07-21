@@ -16,10 +16,10 @@ description: 'CONTEXT: A team operating packet analysis has raised a ticket for 
   yet, so the reassembled request/response view is empty.
 
 
-  OBJECTIVE: Open the Wireshark console from the lab toolbar (toolbar -> Open Wireshark); Locate the
-  HTTP request packets to example.com (the GET /index.html on TCP port 80); Use Follow TCP Stream on that
-  conversation to reassemble client and server payloads. Acceptance criteria: the change is minimal and
-  reversible, and success means `check.sh` exits successfully.
+  OBJECTIVE: Open the Wireshark console from the lab toolbar (toolbar -> Open Wireshark); Locate the HTTP
+  request packets to example.com (the GET /index.html on TCP port 80); Use Follow TCP Stream on that conversation
+  to reassemble client and server payloads. Acceptance criteria: the change is minimal and reversible,
+  and success means `check.sh` exits successfully.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent

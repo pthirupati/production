@@ -14,8 +14,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. top shows the analytics process at nice 0 consuming
-  most CPU.
+  SYMPTOM / STARTING STATE: RHEL 9 server. top shows the analytics process at nice 0 consuming most CPU.
 
   There is no policy file pinning it to a lower priority, so every restart reverts to nice
 

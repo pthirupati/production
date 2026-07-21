@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. eth0 is up with 10.0.0.10/24 but the routing table
-  has no
+  SYMPTOM / STARTING STATE: RHEL 9 server. eth0 is up with 10.0.0.10/24 but the routing table has no
 
   default route. The persistent network config in /etc/sysconfig/network has no GATEWAY
 

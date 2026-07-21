@@ -13,9 +13,9 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `T
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Terraform project where a module block uses source without a version
-  constraint, or uses a floating ref like ?ref=main. Different team members get different infrastructure
-  depending on when they run terraform init.
+  SYMPTOM / STARTING STATE: Terraform project where a module block uses source without a version constraint,
+  or uses a floating ref like ?ref=main. Different team members get different infrastructure depending
+  on when they run terraform init.
 
 
   OBJECTIVE: Identify the unpinned module source reference in the Terraform configuration; Add a version

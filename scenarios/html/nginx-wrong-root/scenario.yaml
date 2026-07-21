@@ -9,9 +9,8 @@ description: 'CONTEXT: A team operating HTML and web delivery has raised a ticke
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL host running nginx. The active server block''s `root` points
-  to a directory that doesn''t contain the intended site files, so the wrong page (or an error) is returned
-  on port 80.
+  SYMPTOM / STARTING STATE: RHEL host running nginx. The active server block''s `root` points to a directory
+  that doesn''t contain the intended site files, so the wrong page (or an error) is returned on port 80.
 
 
   OBJECTIVE: Confirm nginx is serving the wrong content and find the active server block; Correct the

@@ -9,8 +9,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Fix 
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster. A Service is defined with a selector that matches
-  no pods. `kubectl get endpoints <svc>` returns <none> and requests to the Service hang.
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A Service is defined with a selector that matches no pods.
+  `kubectl get endpoints <svc>` returns <none> and requests to the Service hang.
 
 
   OBJECTIVE: Confirm the Service has no endpoints; Compare the Service selector against the backend pod

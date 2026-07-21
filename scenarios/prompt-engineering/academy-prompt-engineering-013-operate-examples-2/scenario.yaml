@@ -77,25 +77,30 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `systemctl status model-server` and `journalctl -u model-server -n 50`.'
+    Open `the solution file`, read the instructions, and run the visible tests to see which assertion
+    fails first.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm `model-server` is failed/inactive.
+    1. From the evidence above, decide which single part of few-shot examples is at fault.
 
-    2. Read the unit journal for the root cause.
+    2. Re-run the most relevant of the example block focused on just that part to confirm it.
 
-    3. Apply the smallest fix that restores the unit.'
+    3. State a one-line hypothesis: the smallest change that would move the state from ''examples bias
+    or confuse output'' toward ''examples improve output quality''.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Repair the underlying config/cause for `model-server`.
+    1. Edit `the solution file` with the smallest correct change.
 
-    2. `systemctl enable --now model-server`.
+    2. Re-run visible tests, then Check Solution (includes hidden tests).
 
-    3. Verify with `systemctl is-active model-server` (expect active).'
+    3. Confirm every test passes.
+
+
+    WHY: coding labs grade against hidden test cases, not marker files.'
 summary: Complete the few-shot examples — operate lab prompt engineering lab and verify success with the
   checker
 estimated_minutes: 20

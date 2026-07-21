@@ -12,9 +12,8 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `C
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: AWS environment with a CloudFront distribution configured. The origin
-  domain is set to an invalid ALB or S3 endpoint, resulting in 502 errors for all requests through the
-  CDN.
+  SYMPTOM / STARTING STATE: AWS environment with a CloudFront distribution configured. The origin domain
+  is set to an invalid ALB or S3 endpoint, resulting in 502 errors for all requests through the CDN.
 
 
   OBJECTIVE: Inspect the CloudFront distribution origin configuration and identify the incorrect domain;

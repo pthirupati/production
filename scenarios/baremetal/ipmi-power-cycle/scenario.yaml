@@ -9,8 +9,8 @@ description: 'CONTEXT: A team operating bare metal operations has raised a ticke
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: bare-metal host reachable only via its BMC/IPMI interface. The operating
-  system is hung and unreachable in-band; power must be managed through ipmitool.
+  SYMPTOM / STARTING STATE: bare-metal host reachable only via its BMC/IPMI interface. The operating system
+  is hung and unreachable in-band; power must be managed through ipmitool.
 
 
   OBJECTIVE: Query the current chassis power state via IPMI; Perform a power cycle (or off/on) on the

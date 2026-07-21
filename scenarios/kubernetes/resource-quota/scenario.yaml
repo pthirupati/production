@@ -12,8 +12,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Pod 
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster. A namespace ResourceQuota caps total CPU/memory
-  requests and pod count. New replicas are rejected with "exceeded quota" and stay Pending.
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A namespace ResourceQuota caps total CPU/memory requests
+  and pod count. New replicas are rejected with "exceeded quota" and stay Pending.
 
 
   OBJECTIVE: Identify that scheduling is blocked by the namespace ResourceQuota; Compare current usage

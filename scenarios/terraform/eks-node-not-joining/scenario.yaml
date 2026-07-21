@@ -13,8 +13,8 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `E
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: AWS environment with an EKS cluster and a managed node group. The
-  node group IAM role lacks the AmazonEKSWorkerNodePolicy, AmazonEKS_CNI_Policy, or AmazonEC2ContainerRegistryReadOnly
+  SYMPTOM / STARTING STATE: AWS environment with an EKS cluster and a managed node group. The node group
+  IAM role lacks the AmazonEKSWorkerNodePolicy, AmazonEKS_CNI_Policy, or AmazonEC2ContainerRegistryReadOnly
   policies, or the role ARN is absent from the aws-auth ConfigMap.
 
 

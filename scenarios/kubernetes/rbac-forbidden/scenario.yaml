@@ -12,8 +12,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Serv
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster. A pod uses a ServiceAccount that lacks RBAC
-  permissions; API calls fail with "User \"system:serviceaccount:...\" cannot list resource pods".
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A pod uses a ServiceAccount that lacks RBAC permissions;
+  API calls fail with "User \"system:serviceaccount:...\" cannot list resource pods".
 
 
   OBJECTIVE: Identify the ServiceAccount and the exact forbidden verb/resource; Create a Role granting

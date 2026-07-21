@@ -9,8 +9,8 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. GRUB fails early with a stage1.5 / error-15 message;
-  the MBR bootloader is corrupt and the OS does not load.
+  SYMPTOM / STARTING STATE: RHEL 9 server. GRUB fails early with a stage1.5 / error-15 message; the MBR
+  bootloader is corrupt and the OS does not load.
 
 
   OBJECTIVE: Recognize the corrupt MBR/bootloader from the GRUB error; Boot a rescue environment and access

@@ -85,28 +85,39 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+    1. Inspect the current state with VMs, datastores, vCenter, and ESXi tasks.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm sshd is active and listening on port 22.
+    1. From the evidence above, decide which single part of vCenter certificate expired - authentication
+    and API is at fault.
 
-    2. Check `firewall-cmd` or iptables for blocked port 22.
+    2. Re-run the most relevant of VMs, datastores, vCenter, and ESXi tasks focused on just that part
+    to confirm it.
 
-    3. Read `/var/log/secure` for auth or config errors.'
+    3. State a one-line hypothesis: the smallest change that would move the state from ''vCenter certificate
+    expired - authentication and API is not behaving as the scenario objectives require'' toward ''`check.sh`
+    exits successfully''.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Fix sshd_config, firewall, or socket unit as needed.
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
 
-    2. `systemctl restart sshd`.
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
 
-    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Complete the vcenter certificate expired - authentication and api vmware lab and verify success
   with the checker
 estimated_minutes: 30

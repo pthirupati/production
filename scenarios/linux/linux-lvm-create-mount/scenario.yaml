@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. lsblk shows an unused 20G /dev/sdc with no partitions
-  or LVM
+  SYMPTOM / STARTING STATE: RHEL 9 server. lsblk shows an unused 20G /dev/sdc with no partitions or LVM
 
   metadata. There is no volume group named vgdata and no /data mount. The application
 

@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. The directory /srv/share exists and contains project
-  files.
+  SYMPTOM / STARTING STATE: RHEL 9 server. The directory /srv/share exists and contains project files.
 
   The samba package is not installed. Windows clients attempting to browse the network
 

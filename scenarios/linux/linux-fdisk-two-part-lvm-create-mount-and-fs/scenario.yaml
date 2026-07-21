@@ -14,8 +14,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. lsblk shows /dev/sdc (30G) with no partitions. There
-  is no
+  SYMPTOM / STARTING STATE: RHEL 9 server. lsblk shows /dev/sdc (30G) with no partitions. There is no
 
   vgdata volume group, no lvdata LV, /data is empty, and /mnt/data2 is empty. /etc/fstab
 

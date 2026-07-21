@@ -82,54 +82,51 @@ hints:
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: the SCCM/MECM client is not behaving as the
-    scenario objectives require. This lab is about the Configuration Manager Software Center — how a required
-    deployment behaves when it fails on a managed Windows Server. Read the objectives and the current
-    state, and note precisely what looks wrong versus healthy before you form any theory.'
+    Do not touch anything yet. First observe the symptom: windows GUI is not behaving as the scenario
+    objectives require. This lab is about windows GUI — how windows GUI behaves in a Windows Server environment.
+    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
+    you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For Configuration Manager patch problems the reliable method is:
-    (1) reproduce/observe the failure in Software Center, (2) narrow from the whole compliance report
-    down to the one deployment that owns the symptom, (3) change exactly one thing, (4) re-check. Fix
-    the underlying deployment failure you identified (not just the noisy compliance line), changing one
-    thing at a time.'
+    Work from evidence, not guesses. For windows GUI problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
+    the noisy log line), changing one thing at a time.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Open Software Center and inspect the Updates / Application list for this device.
+    1. Inspect the current state with PowerShell, Server Manager, and AD tools.
 
-    2. Note the deployment''s status (Required/Failed), its deadline, and its error code — each tells
-    you something specific about why the client-side install did not complete.
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
 
     3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm the Configuration Manager client is installed and its status is active before retrying
-    anything.
+    1. Note the service state and dependency chain in services.msc.
 
-    2. Check the deployment''s target collection and matching KB in Windows Update — a failed ConfigMgr
-    deployment and a failed Windows Update entry for the same KB usually share one root cause.
+    2. Read the most recent error in Event Viewer for the failing component.
 
-    3. Note the error code (0x87D00664) associated with the failed deployment.'
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. In Software Center, select the Required deployment showing Failed and choose Install (or Retry).
-    This should also reconcile the matching Windows Update entry to Installed.
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
 
     2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
 
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: the grader validates real system state, not marker files — a fix only counts when the deployment
-    is actually Installed.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: 'Complete the windows gui: recover a failed sccm/mecm patch deployment windows lab and verify
   success with the checker'
 estimated_minutes: 15

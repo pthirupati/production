@@ -83,28 +83,39 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `cat /etc/resolv.conf` and test with `dig example.com` or `getent hosts example.com`.'
+    1. Inspect the current state with SSH, firewall, TLS, audit logs, and IAM settings.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Note the configured nameserver IP in resolv.conf.
+    1. From the evidence above, decide which single part of OSSEC false positive — tune rules to reduce
+    alert noise is at fault.
 
-    2. `ping` or `nc -zv` the nameserver — is it reachable?
+    2. Re-run the most relevant of SSH, firewall, TLS, audit logs, and IAM settings focused on just that
+    part to confirm it.
 
-    3. Check if NetworkManager or systemd-resolved overwrites the file.'
+    3. State a one-line hypothesis: the smallest change that would move the state from ''OSSEC false positive
+    — tune rules to reduce alert noise is not behaving as the scenario objectives require'' toward ''`check.sh`
+    exits successfully''.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Set a working `nameserver` line (e.g. 8.8.8.8 or the lab''s resolver).
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
 
-    2. Re-run `dig` or `getent hosts` — lookups should succeed.
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
 
-    3. Confirm `check.sh` passes.
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: applications use resolv.conf for every hostname lookup.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Complete the ossec false positive — tune rules to reduce alert noise security lab and verify
   success with the checker
 estimated_minutes: 15

@@ -14,8 +14,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. fdisk -l /dev/sdc shows the disk but NO partitions
-  — the table
+  SYMPTOM / STARTING STATE: RHEL 9 server. fdisk -l /dev/sdc shows the disk but NO partitions — the table
 
   is gone. /data is not mounted. /etc/fstab references the old partition. The application
 

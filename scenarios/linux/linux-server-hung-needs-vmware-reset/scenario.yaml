@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server (web-prod-01), also present in the vCenter console.
-  The
+  SYMPTOM / STARTING STATE: RHEL 9 server (web-prod-01), also present in the vCenter console. The
 
   guest is hung (no VMware Tools heartbeat) and nginx is failed. Commands you run in
 

@@ -17,10 +17,10 @@ description: 'CONTEXT: A team operating AI/ML workflows has raised a ticket for 
   on the false branch while a db_query sits on the true branch. The escalation never fires.
 
 
-  OBJECTIVE: Open the Agent Workflow console and run the broken flow to see what it currently does;
-  Reconfigure the LLM node from summarize mode to classify mode so it produces a category and priority;
-  Fix the Condition node to detect a high-priority ticket (field priority, equals high). Acceptance criteria:
-  the change is minimal and reversible, and success means `check.sh` exits successfully.
+  OBJECTIVE: Open the Agent Workflow console and run the broken flow to see what it currently does; Reconfigure
+  the LLM node from summarize mode to classify mode so it produces a category and priority; Fix the Condition
+  node to detect a high-priority ticket (field priority, equals high). Acceptance criteria: the change
+  is minimal and reversible, and success means `check.sh` exits successfully.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent

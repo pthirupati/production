@@ -9,8 +9,8 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server that drops to the `grub rescue>` prompt at boot. GRUB
-  cannot load its normal configuration, so the OS does not start.
+  SYMPTOM / STARTING STATE: RHEL 9 server that drops to the `grub rescue>` prompt at boot. GRUB cannot
+  load its normal configuration, so the OS does not start.
 
 
   OBJECTIVE: Identify the boot/root partition from the grub rescue prompt; Boot into the OS (or a rescue

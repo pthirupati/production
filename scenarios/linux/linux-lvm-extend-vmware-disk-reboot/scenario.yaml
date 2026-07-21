@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server (web-prod-01), also present in the vCenter console.
-  /data
+  SYMPTOM / STARTING STATE: RHEL 9 server (web-prod-01), also present in the vCenter console. /data
 
   is full (XFS on /dev/mapper/vgdata-lvdata, VG vgdata has 0 free extents). After you
 

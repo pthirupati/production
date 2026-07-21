@@ -12,9 +12,9 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `S
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: AWS environment with an S3 bucket containing sensitive data. The
-  bucket has BlockPublicAcls and BlockPublicPolicy set to false, and a permissive bucket policy grants
-  s3:GetObject to Principal: "*".
+  SYMPTOM / STARTING STATE: AWS environment with an S3 bucket containing sensitive data. The bucket has
+  BlockPublicAcls and BlockPublicPolicy set to false, and a permissive bucket policy grants s3:GetObject
+  to Principal: "*".
 
 
   OBJECTIVE: Identify the public S3 bucket using the CLI and review its public access settings and bucket

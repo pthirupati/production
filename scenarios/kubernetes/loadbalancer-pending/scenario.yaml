@@ -12,8 +12,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Load
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster without a cloud LoadBalancer controller. A Service
-  of type LoadBalancer shows EXTERNAL-IP <pending> indefinitely and the app is unreachable externally.
+  SYMPTOM / STARTING STATE: Kubernetes cluster without a cloud LoadBalancer controller. A Service of type
+  LoadBalancer shows EXTERNAL-IP <pending> indefinitely and the app is unreachable externally.
 
 
   OBJECTIVE: Confirm the LoadBalancer Service is stuck at <pending>; Determine why no external IP is provisioned

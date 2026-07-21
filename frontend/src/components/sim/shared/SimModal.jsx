@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
-import '../../styles/sim-products.css'  // modal theme (portal to body)
+import '../../../styles/sim-products.css'  // modal theme (portal to body)
 
 export default function SimModal({
   open, onClose, title, children, footer, width = 'max-w-lg', danger = false,

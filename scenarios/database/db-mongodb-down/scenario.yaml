@@ -25,7 +25,8 @@ description: 'CONTEXT: A team operating database administration has raised a tic
 
 
   OBJECTIVE: Confirm mongod is failed; Fix the config and start the service; Verify mongod is active.
-  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active mongod``` returns active.
+  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active mongod```
+  returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent

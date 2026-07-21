@@ -12,8 +12,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `HPA 
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster with an HPA targeting a Deployment. The HPA''s
-  TARGETS column shows <unknown>/50% and replica count stays at the minimum despite sustained CPU load.
+  SYMPTOM / STARTING STATE: Kubernetes cluster with an HPA targeting a Deployment. The HPA''s TARGETS
+  column shows <unknown>/50% and replica count stays at the minimum despite sustained CPU load.
 
 
   OBJECTIVE: Inspect the HPA and see why current utilization is <unknown>; Verify metrics-server availability

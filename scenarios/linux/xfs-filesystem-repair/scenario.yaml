@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. /var/data is not mounted. dmesg shows XFS mount errors
-  for
+  SYMPTOM / STARTING STATE: RHEL 9 server. /var/data is not mounted. dmesg shows XFS mount errors for
 
   /dev/sdb1 including "Metadata CRC error" and "xfs_mountfs: corrupted superblock".
 

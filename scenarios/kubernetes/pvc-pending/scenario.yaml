@@ -12,8 +12,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Pers
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster. A PVC sits in Pending because no PV matches
-  and no default StorageClass is configured to provision one. The dependent pod is stuck ContainerCreating.
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A PVC sits in Pending because no PV matches and no default
+  StorageClass is configured to provision one. The dependent pod is stuck ContainerCreating.
 
 
   OBJECTIVE: Inspect the PVC and see why it cannot bind; Check StorageClasses and any available PersistentVolumes;

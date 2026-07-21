@@ -21,8 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter. legacy-app-01 on datastore2. 32 snapshots, total
-  180 GB.
+  SYMPTOM / STARTING STATE: VMware vCenter. legacy-app-01 on datastore2. 32 snapshots, total 180 GB.
 
   VM''s disk read: 2 MB/s (normal: 800 MB/s). Consolidation estimated: 45-60 minutes.
 

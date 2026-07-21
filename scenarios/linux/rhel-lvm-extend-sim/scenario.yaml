@@ -10,9 +10,9 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. The ''rhel'' volume group is out of free extents
-  and / is full. A new disk is NOT attached until the @storage team confirms in Jira; after ~30s, /dev/sdb
-  appears and you can extend LVM.
+  SYMPTOM / STARTING STATE: RHEL 9 server. The ''rhel'' volume group is out of free extents and / is full.
+  A new disk is NOT attached until the @storage team confirms in Jira; after ~30s, /dev/sdb appears and
+  you can extend LVM.
 
 
   OBJECTIVE: Request a new disk from the @storage team in Jira; Verify the new disk (lsblk/fdisk) and

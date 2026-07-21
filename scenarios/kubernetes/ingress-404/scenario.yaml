@@ -12,9 +12,9 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Ingr
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster with an ingress controller. An Ingress resource
-  routes the app hostname, but the backend Service name or port is wrong, producing 404s for every request
-  to that host.
+  SYMPTOM / STARTING STATE: Kubernetes cluster with an ingress controller. An Ingress resource routes
+  the app hostname, but the backend Service name or port is wrong, producing 404s for every request to
+  that host.
 
 
   OBJECTIVE: Reproduce the 404 and inspect the Ingress rules; Verify the referenced Service name and port

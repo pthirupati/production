@@ -14,8 +14,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. lsblk shows /dev/sdc (20G) with no child partitions
-  and no
+  SYMPTOM / STARTING STATE: RHEL 9 server. lsblk shows /dev/sdc (20G) with no child partitions and no
 
   filesystem. blkid does not list /dev/sdc. There is no /data mount and nothing about
 

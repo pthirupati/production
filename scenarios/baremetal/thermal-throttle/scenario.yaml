@@ -12,8 +12,8 @@ description: 'CONTEXT: A team operating bare metal operations has raised a ticke
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: bare-metal RHEL host. CPU frequency is being throttled because IPMI
-  temperature sensors are high; fan readings and/or thermal thresholds indicate a cooling problem.
+  SYMPTOM / STARTING STATE: bare-metal RHEL host. CPU frequency is being throttled because IPMI temperature
+  sensors are high; fan readings and/or thermal thresholds indicate a cooling problem.
 
 
   OBJECTIVE: Read IPMI temperature and fan sensor values; Identify the cause of overheating (fans, airflow,

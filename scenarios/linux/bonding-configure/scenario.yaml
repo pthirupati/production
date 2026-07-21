@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server with two NICs: eth0 (192.168.1.100/24, active) and
-  eth1 (up,
+  SYMPTOM / STARTING STATE: RHEL 9 server with two NICs: eth0 (192.168.1.100/24, active) and eth1 (up,
 
   no IP assigned). There is currently no bonding configured. Running cat /proc/net/bonding/
 

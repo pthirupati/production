@@ -13,9 +13,9 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `S
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Terraform project with a variable "db_password" or "api_key" that
-  is passed to a resource argument. The variable declaration is missing sensitive = true, so terraform
-  plan prints the secret value in plaintext to stdout.
+  SYMPTOM / STARTING STATE: Terraform project with a variable "db_password" or "api_key" that is passed
+  to a resource argument. The variable declaration is missing sensitive = true, so terraform plan prints
+  the secret value in plaintext to stdout.
 
 
   OBJECTIVE: Identify the variable(s) containing secret values in the Terraform configuration; Add sensitive

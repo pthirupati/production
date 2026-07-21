@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server with SELinux in Enforcing mode. nginx is configured
-  to listen
+  SYMPTOM / STARTING STATE: RHEL 9 server with SELinux in Enforcing mode. nginx is configured to listen
 
   on port 8080 in /etc/nginx/nginx.conf. Running systemctl start nginx fails with:
 

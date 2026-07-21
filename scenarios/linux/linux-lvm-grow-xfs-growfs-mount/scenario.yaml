@@ -14,8 +14,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. df -h shows /data at 100% on /dev/mapper/vgdata-lvdata.
-  vgs
+  SYMPTOM / STARTING STATE: RHEL 9 server. df -h shows /data at 100% on /dev/mapper/vgdata-lvdata. vgs
 
   shows vgdata has free space. The XFS filesystem on /data has not yet been grown to use
 

@@ -14,6 +14,37 @@
 .soc-shell.sim-product { font-family: 'Inter', system-ui, sans-serif; color: #e6edf3; }
 .dc-shell.sim-product { font-family: 'IBM Plex Sans', 'Inter', system-ui, sans-serif; color: #e6e9f0; }
 
+/* Status badges — deep text on light portals; pastel on dark shells */
+.sim-badge { border-width: 1px; border-style: solid; }
+.sim-badge-success { background: #e6f4ea; color: #0d652d; border-color: #a8dab5; }
+.sim-badge-running { background: #e8f0fe; color: #174ea6; border-color: #aecbfa; }
+.sim-badge-pending { background: #fef7e0; color: #8a6100; border-color: #fdd663; }
+.sim-badge-error { background: #fce8e6; color: #c5221f; border-color: #f5c2c0; }
+.sim-badge-info { background: #e8f0fe; color: #1967d2; border-color: #aecbfa; }
+.sim-badge-inactive { background: #f1f3f4; color: #3c4043; border-color: #dadce0; }
+.sim-badge-queued { background: #f3e8fd; color: #7627bb; border-color: #d7aefb; }
+.soc-shell .sim-badge-success,
+.dc-shell .sim-badge-success,
+.sim-data-table-dark .sim-badge-success { background: rgba(16,185,129,0.15); color: #34d399; border-color: rgba(16,185,129,0.35); }
+.soc-shell .sim-badge-running,
+.dc-shell .sim-badge-running,
+.sim-data-table-dark .sim-badge-running { background: rgba(14,165,233,0.15); color: #7dd3fc; border-color: rgba(14,165,233,0.35); }
+.soc-shell .sim-badge-pending,
+.dc-shell .sim-badge-pending,
+.sim-data-table-dark .sim-badge-pending { background: rgba(245,158,11,0.15); color: #fcd34d; border-color: rgba(245,158,11,0.35); }
+.soc-shell .sim-badge-error,
+.dc-shell .sim-badge-error,
+.sim-data-table-dark .sim-badge-error { background: rgba(239,68,68,0.15); color: #f87171; border-color: rgba(239,68,68,0.35); }
+.soc-shell .sim-badge-info,
+.dc-shell .sim-badge-info,
+.sim-data-table-dark .sim-badge-info { background: rgba(59,130,246,0.15); color: #93c5fd; border-color: rgba(59,130,246,0.35); }
+.soc-shell .sim-badge-inactive,
+.dc-shell .sim-badge-inactive,
+.sim-data-table-dark .sim-badge-inactive { background: rgba(100,116,139,0.15); color: #94a3b8; border-color: rgba(100,116,139,0.35); }
+.soc-shell .sim-badge-queued,
+.dc-shell .sim-badge-queued,
+.sim-data-table-dark .sim-badge-queued { background: rgba(139,92,246,0.15); color: #c4b5fd; border-color: rgba(139,92,246,0.35); }
+
 /* Goal / objective banners — always readable on light or dark shells */
 .sim-goal-banner {
   display: flex; align-items: center; gap: 0.5rem;

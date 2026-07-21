@@ -21,8 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter. VCSA at vcenter.lab.local. DB at 92% (18.4 GB /
-  20 GB).
+  SYMPTOM / STARTING STATE: VMware vCenter. VCSA at vcenter.lab.local. DB at 92% (18.4 GB / 20 GB).
 
   Event retention: 365 days (misconfigured). Task retention: 365 days.
 

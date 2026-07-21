@@ -12,9 +12,9 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: A guided AI practice console opens in your browser. It is a rule-based tool responder
-  (no real model, no API cost) that scores your prompt and replies with a representative answer so you
-  can feel the difference specificity makes.
+  SYMPTOM / STARTING STATE: A guided AI practice console opens in your browser. It is a rule-based tool
+  responder (no real model, no API cost) that scores your prompt and replies with a representative answer
+  so you can feel the difference specificity makes.
 
 
   OBJECTIVE: Understand the five ingredients of a strong prompt (role, context, task, constraints, format);

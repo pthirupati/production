@@ -14,8 +14,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. swapon --show prints nothing and free -h shows 0B
-  swap.
+  SYMPTOM / STARTING STATE: RHEL 9 server. swapon --show prints nothing and free -h shows 0B swap.
 
   /dev/sdc (4G) is present with no partitions. /etc/fstab has no swap entry for it.
 

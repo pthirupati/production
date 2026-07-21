@@ -12,8 +12,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Depl
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster. A deployment''s container image points to a
-  tag that does not exist in the registry. Pods cycle through ErrImagePull and ImagePullBackOff.
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A deployment''s container image points to a tag that does
+  not exist in the registry. Pods cycle through ErrImagePull and ImagePullBackOff.
 
 
   OBJECTIVE: Describe a failing pod and read the exact image-pull error; Identify the incorrect image

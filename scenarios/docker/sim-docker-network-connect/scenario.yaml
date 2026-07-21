@@ -26,7 +26,8 @@ description: 'CONTEXT: A team operating Docker containers has raised a ticket fo
 
   OBJECTIVE: Confirm the containers cannot reach each other across networks; Identify which networks each
   container is attached to; Attach both to a shared user-defined network and verify name-based connectivity.
-  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active docker``` returns active.
+  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active docker```
+  returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent

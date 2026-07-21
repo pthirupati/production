@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. The autofs package is not installed. The NFS server
-  at
+  SYMPTOM / STARTING STATE: RHEL 9 server. The autofs package is not installed. The NFS server at
 
   192.168.1.10 is exporting /srv/data (verified with showmount -e 192.168.1.10).
 

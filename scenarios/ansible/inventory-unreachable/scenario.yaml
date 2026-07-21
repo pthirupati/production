@@ -13,8 +13,8 @@ description: 'CONTEXT: A team operating Ansible automation has raised a ticket f
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: control node with inventory file pointing at three managed hosts.
-  Running ansible all -m ping returns UNREACHABLE for all hosts.
+  SYMPTOM / STARTING STATE: control node with inventory file pointing at three managed hosts. Running
+  ansible all -m ping returns UNREACHABLE for all hosts.
 
 
   OBJECTIVE: Run ansible all -m ping -vvv to inspect the exact SSH connection attempt details; Correct

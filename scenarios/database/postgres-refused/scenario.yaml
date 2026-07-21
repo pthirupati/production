@@ -9,8 +9,8 @@ description: 'CONTEXT: A team operating database administration has raised a tic
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL host. PostgreSQL is not accepting connections — the service
-  is stopped or failed. Connection attempts return "could not connect ... Connection refused".
+  SYMPTOM / STARTING STATE: RHEL host. PostgreSQL is not accepting connections — the service is stopped
+  or failed. Connection attempts return "could not connect ... Connection refused".
 
 
   OBJECTIVE: Confirm PostgreSQL is down / not listening and why; Start the service, resolving any startup

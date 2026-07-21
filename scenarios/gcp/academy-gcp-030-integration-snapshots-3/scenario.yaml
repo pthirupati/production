@@ -11,9 +11,47 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Service operations lab. The `rsyslog` systemd unit is **failed/inactive** on this host —
-  a realistic fault for Integration Lab workflows that depend on it. Diagnose with `systemctl status rsyslog`
-  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active rsyslog`.
+description: 'CONTEXT: A team operating Google Cloud operations has raised a ticket for `Google Cloud
+  Platform: Snapshots — Integration Lab`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GCP practice project. The architecture is a single
+  lab-primary node exposing Console, gcloud, Compute Engine, disks, VPC, and IAM; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The `rsyslog` service is not running (`systemctl is-active rsyslog` → inactive/failed).
+  Dependent Integration Lab tasks cannot succeed until the unit is healthy again. Service operations lab.
+  The `rsyslog` systemd unit is **failed/inactive** on this host — a realistic fault for Integration Lab
+  workflows that depend on it. Diagnose with `systemctl status rsyslog` and journal logs, apply the smallest
+  reliable fix, then verify with `systemctl is-active rsyslog`.
+
+
+  OBJECTIVE: The `rsyslog` service is active (running); `systemctl is-active rsyslog`` returns active;
+  The fix survives a status re-check (no marker files). Acceptance criteria: the change is minimal and
+  reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant Console, gcloud, Compute Engine, disks, VPC, and IAM), changing one thing at a time.
+  Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - The `rsyslog` service is active (running)
 - '`systemctl is-active rsyslog`` returns active'
@@ -40,25 +78,35 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Inspect the planted gcp Lab Server fault: `/opt/gcp/config` and `gcloud config list`. Do not chase
-    unrelated nginx/rsyslog units.'
+    1. Inspect the current state with snapshot manager and VM disk usage.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm the gcp config under /opt/gcp/ is broken.
+    1. From the evidence above, decide which single part of snapshots is at fault.
 
-    2. Repair credentials/project/region (or OpenStack clouds.yaml).
+    2. Re-run the most relevant of snapshot manager and VM disk usage focused on just that part to confirm
+    it.
 
-    3. Re-check with the cloud CLI until the profile is healthy.'
+    3. State a one-line hypothesis: the smallest change that would move the state from ''old snapshots
+    bloat storage or block operations'' toward ''snapshots are consolidated and storage is reclaimed''.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Fix the broken gcp configuration on this Lab Server.
+    1. Apply the smallest reversible change your hypothesis points to. Configure credentials and networking,
+    then drive one happy-path transaction end to end across both systems.
 
-    2. Apply the documented remediation (config + FIXED-OK where required).
+    2. Re-run `bash check.sh` and confirm snapshots are consolidated and storage is reclaimed.
 
-    3. Click Check Solution once cloud Lab Server health check passes (`systemctl is-failed` finds no
-    failed units / config repaired).'
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 cross_technology: true

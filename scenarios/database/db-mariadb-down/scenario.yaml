@@ -24,7 +24,8 @@ description: 'CONTEXT: A team operating database administration has raised a tic
 
 
   OBJECTIVE: Confirm mariadb is failed; Resolve the cause and start the service; Verify mariadb is active.
-  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active mariadb``` returns active.
+  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active mariadb```
+  returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent

@@ -13,9 +13,9 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `T
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: environment with a Terraform S3 backend and DynamoDB locking table.
-  A stale lock entry exists in DynamoDB from a previous interrupted plan. All terraform plan/apply commands
-  fail immediately with a state lock error.
+  SYMPTOM / STARTING STATE: environment with a Terraform S3 backend and DynamoDB locking table. A stale
+  lock entry exists in DynamoDB from a previous interrupted plan. All terraform plan/apply commands fail
+  immediately with a state lock error.
 
 
   OBJECTIVE: Identify the stale DynamoDB lock entry and retrieve the LockID from the error message; Verify

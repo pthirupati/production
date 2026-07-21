@@ -9,8 +9,8 @@ description: 'CONTEXT: A team operating Ansible automation has raised a ticket f
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Ansible control node with an inventory including web1 and web2.
-  Running ansible-playbook site.yml fails on web2 (a task errors there); web1 completes successfully.
+  SYMPTOM / STARTING STATE: Ansible control node with an inventory including web1 and web2. Running ansible-playbook
+  site.yml fails on web2 (a task errors there); web1 completes successfully.
 
 
   OBJECTIVE: Run the playbook and identify the exact failed task and host (web2); Fix the underlying cause

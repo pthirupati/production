@@ -19,8 +19,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Depl
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster. The api deployment uses image api:missing-tag,
-  which the registry does not have. Pods report ErrImagePull then ImagePullBackOff.
+  SYMPTOM / STARTING STATE: Kubernetes cluster. The api deployment uses image api:missing-tag, which the
+  registry does not have. Pods report ErrImagePull then ImagePullBackOff.
 
 
   OBJECTIVE: Describe a failing api pod and confirm the bad image tag; Set the api deployment to a valid

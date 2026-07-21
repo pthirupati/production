@@ -86,28 +86,39 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+    1. Inspect the current state with VMs, datastores, vCenter, and ESXi tasks.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Find which mount is 100% — often `/` or `/var`.
+    1. From the evidence above, decide which single part of datastore at 95% capacity — risk of VM suspension
+    is at fault.
 
-    2. `journalctl --disk-usage` and old logs under `/var/log`.
+    2. Re-run the most relevant of VMs, datastores, vCenter, and ESXi tasks focused on just that part
+    to confirm it.
 
-    3. Look for core dumps, temp files, or oversized application data.'
+    3. State a one-line hypothesis: the smallest change that would move the state from ''datastore at
+    95% capacity — risk of VM suspension is not behaving as the scenario objectives require'' toward ''`check.sh`
+    exits successfully''.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Remove or rotate the largest safe files (logs, caches, old packages).
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
 
-    2. `df -h` should show free space on the affected mount.
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
 
-    3. Retry the command that failed with ''No space left on device''.
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: many services fail cryptically when disk is full.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Complete the datastore at 95% capacity — risk of vm suspension vmware lab and verify success
   with the checker
 estimated_minutes: 20

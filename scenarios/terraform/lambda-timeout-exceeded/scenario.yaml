@@ -12,9 +12,9 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `L
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: AWS environment with a Lambda function configured with a 3-second
-  timeout and 128 MB memory. Processing a large S3 object or complex computation consistently exceeds
-  the timeout, resulting in Task timed out errors in CloudWatch Logs.
+  SYMPTOM / STARTING STATE: AWS environment with a Lambda function configured with a 3-second timeout
+  and 128 MB memory. Processing a large S3 object or complex computation consistently exceeds the timeout,
+  resulting in Task timed out errors in CloudWatch Logs.
 
 
   OBJECTIVE: Review the Lambda configuration and CloudWatch Logs to confirm timeout errors; Increase the

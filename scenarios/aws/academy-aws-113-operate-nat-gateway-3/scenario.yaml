@@ -11,10 +11,48 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Cloud Lab Server operations for Operate Lab. A planted cloud CLI/API configuration fault
-  keeps the environment unhealthy. Repair the cloud profile under `/opt`, then verify with the documented
-  checker (cloud Lab Server health check passes (`systemctl is-failed` finds no failed units / config
-  repaired)).
+description: 'CONTEXT: A team operating AWS cloud operations has raised a ticket for `Nat Gateway — Operate
+  Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline AWS practice account. The architecture is a single
+  lab-primary node exposing AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform;
+  treat it as the production host for this incident. All tools run locally — no paid APIs or external
+  cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Cloud CLI/API configuration on this Lab Server is broken; console and CLI
+  workflows fail until repaired. Cloud Lab Server operations for Operate Lab. A planted cloud CLI/API
+  configuration fault keeps the environment unhealthy. Repair the cloud profile under `/opt`, then verify
+  with the documented checker (cloud Lab Server health check passes (`systemctl is-failed` finds no failed
+  units / config repaired)).
+
+
+  OBJECTIVE: Identify the planted cloud configuration fault; Repair the cloud profile with the minimal
+  change; cloud Lab Server health check passes (`systemctl is-failed` finds no failed units / config repaired).
+  Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform),
+  changing one thing at a time. Check your work continuously against the objective — success means `check.sh`
+  exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the planted cloud configuration fault
 - Repair the cloud profile with the minimal change
@@ -42,27 +80,39 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Inspect the planted aws Lab Server fault: `/opt/aws/lab-state.json` and the AWS CLI profile. Do not
-    chase unrelated nginx/rsyslog units.'
+    1. Inspect the current state with the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups,
+    and CloudFormation/Terraform for nat gateway.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm the aws config under /opt/aws/ is broken.
+    1. From the evidence above, decide which single part of Nat Gateway is at fault.
 
-    2. Repair credentials/project/region (or OpenStack clouds.yaml).
+    2. Re-run the most relevant of the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups, and
+    CloudFormation/Terraform for nat gateway focused on just that part to confirm it.
 
-    3. Re-check with the cloud CLI until the profile is healthy.'
+    3. State a one-line hypothesis: the smallest change that would move the state from ''Nat Gateway is
+    misconfigured and dependent workflows are failing'' toward ''Nat Gateway behaves correctly under normal
+    and failure checks''.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Fix the broken aws configuration on this Lab Server.
+    1. Apply the smallest reversible change your hypothesis points to. Execute the maintenance in small,
+    reversible steps, taking a snapshot or backup first if the change is risky.
 
-    2. Apply the documented remediation (config + FIXED-OK where required).
+    2. Re-run `bash check.sh` and confirm Nat Gateway behaves correctly under normal and failure checks.
 
-    3. Click Check Solution once cloud Lab Server health check passes (`systemctl is-failed` finds no
-    failed units / config repaired).'
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Complete the nat gateway — operate lab aws lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

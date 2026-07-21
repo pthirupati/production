@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. getenforce returns Enforcing. nginx.conf listens
-  on 8080.
+  SYMPTOM / STARTING STATE: RHEL 9 server. getenforce returns Enforcing. nginx.conf listens on 8080.
 
   systemctl start nginx fails and the audit log shows:
 

@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating database administration has raised a tic
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 database server. mysqld has failed. The error log shows the
-  orders
+  SYMPTOM / STARTING STATE: RHEL 9 database server. mysqld has failed. The error log shows the orders
 
   MyISAM table is marked as crashed following a power loss. A repair flag file exists at
 

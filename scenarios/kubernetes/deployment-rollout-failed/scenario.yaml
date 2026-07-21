@@ -12,8 +12,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Depl
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster. A deployment was updated, but the new ReplicaSet''s
-  pods never become Ready, so the rollout is wedged and `kubectl rollout status` hangs.
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A deployment was updated, but the new ReplicaSet''s pods
+  never become Ready, so the rollout is wedged and `kubectl rollout status` hangs.
 
 
   OBJECTIVE: Inspect rollout status and the new vs old ReplicaSet; Determine why the new pods fail to

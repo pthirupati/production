@@ -25,7 +25,8 @@ description: 'CONTEXT: A team operating Docker containers has raised a ticket fo
 
   OBJECTIVE: Inspect the compose project''s current service status; Bring the stack up and identify any
   service that fails to stay healthy; Fix the failing service/config and confirm all services are Up.
-  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active docker``` returns active.
+  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active docker```
+  returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent

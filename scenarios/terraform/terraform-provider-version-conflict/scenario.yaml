@@ -13,9 +13,9 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `T
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Terraform project with a root module and a child module that declare
-  incompatible AWS provider version constraints. Running terraform init fails because no single provider
-  version satisfies all constraints simultaneously.
+  SYMPTOM / STARTING STATE: Terraform project with a root module and a child module that declare incompatible
+  AWS provider version constraints. Running terraform init fails because no single provider version satisfies
+  all constraints simultaneously.
 
 
   OBJECTIVE: Run terraform init and read the provider version conflict error to identify the incompatible

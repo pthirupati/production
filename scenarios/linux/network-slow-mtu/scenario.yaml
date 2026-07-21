@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server connected through a VPN. SSH sessions are responsive
-  but scp
+  SYMPTOM / STARTING STATE: RHEL 9 server connected through a VPN. SSH sessions are responsive but scp
 
   and rsync transfers stall after a few kilobytes. ping -c 3 8.8.8.8 succeeds but
 

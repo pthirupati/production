@@ -11,10 +11,48 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Service operations lab. The `gitlab-runner` systemd unit is **failed/inactive** on this host
-  — a realistic fault for Daily Operations workflows that depend on it. Diagnose with `systemctl status
-  gitlab-runner` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active
-  gitlab-runner`.
+description: 'CONTEXT: A team operating SOC and cybersecurity operations has raised a ticket for `SOC
+  / SIEM Analyst: Incident Response — Daily Operations`. A customer-facing workflow is degraded and the
+  on-call engineer (you) must diagnose and resolve it. Business impact: reduced service reliability and
+  blocked users until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline security operations lab. The architecture is a single
+  lab-primary node exposing SIEM, EDR, tickets, and investigation timelines; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The `gitlab-runner` service is not running (`systemctl is-active gitlab-runner`
+  → inactive/failed). Dependent Daily Operations tasks cannot succeed until the unit is healthy again.
+  Service operations lab. The `gitlab-runner` systemd unit is **failed/inactive** on this host — a realistic
+  fault for Daily Operations workflows that depend on it. Diagnose with `systemctl status gitlab-runner`
+  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active gitlab-runner`.
+
+
+  OBJECTIVE: The `gitlab-runner` service is active (running); `systemctl is-active gitlab-runner`` returns
+  active; The fix survives a status re-check (no marker files). Acceptance criteria: the change is minimal
+  and reversible, and success means `systemctl is-active gitlab-runner` returns active.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant SIEM, EDR, tickets, and investigation timelines), changing one thing at a time. Check
+  your work continuously against the objective — success means `systemctl is-active gitlab-runner` returns
+  active.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active gitlab-runner` returns
+  active. Capture the before/after output as evidence. Success criteria: the objective''s healthy state
+  holds on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - The `gitlab-runner` service is active (running)
 - '`systemctl is-active gitlab-runner`` returns active'
@@ -41,23 +79,26 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Check the runner: `systemctl status gitlab-runner`. Inspect CI config under `/opt/ci/.gitlab-ci.yml`
-    and `/opt/ci/Jenkinsfile` for failing stages.'
+    Start with `systemctl status gitlab-runner` and `journalctl -u gitlab-runner -n 50 --no-pager` before
+    changing anything.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm `gitlab-runner` is failed/inactive.
+    1. Run `systemctl status gitlab-runner` — note Active/Failed and the last log lines.
 
-    2. Read `/opt/ci/.gitlab-ci.yml` for BROKEN_PIPELINE / exit 1 steps.
+    2. Read `journalctl -u gitlab-runner -n 50` for the root error.
 
-    3. Check `/root/app/.git/config` for a usable remote/branch setup.'
+    3. Form a hypothesis about the smallest config or permission fix.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Repair the CI pipeline YAML so the build stage succeeds.
+    1. Apply the minimal fix (config, unit override, or missing directory).
 
-    2. `systemctl enable --now gitlab-runner`.
+    2. Run `systemctl daemon-reload` if you edited a unit file.
 
-    3. Verify with `systemctl is-active gitlab-runner` (expect active).'
+    3. Run `systemctl restart gitlab-runner` and confirm `systemctl is-active gitlab-runner` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'

@@ -13,9 +13,9 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `A
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: AWS environment with an ALB and a target group. The health check
-  is configured to ping /healthcheck but the app only serves /health, and the EC2 security group blocks
-  port 8080 from the ALB security group.
+  SYMPTOM / STARTING STATE: AWS environment with an ALB and a target group. The health check is configured
+  to ping /healthcheck but the app only serves /health, and the EC2 security group blocks port 8080 from
+  the ALB security group.
 
 
   OBJECTIVE: Inspect the target group health check configuration and identify the incorrect path; Fix

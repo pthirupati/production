@@ -11,9 +11,46 @@ max_score: 100
 is_free: true
 infrastructure_type: docker
 jira_priority: Low
-description: Service operations lab. The `rsyslog` systemd unit is **failed/inactive** on this host —
-  a realistic fault for Build From Scratch workflows that depend on it. Diagnose with `systemctl status
-  rsyslog` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active rsyslog`.
+description: 'CONTEXT: A team operating Dell EMC storage has raised a ticket for `Docker Volumes — Build`.
+  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PowerStore/Unity practice array. The architecture
+  is a single lab-primary node exposing pools, volumes, snapshots, and host mapping; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The `rsyslog` service is not running (`systemctl is-active rsyslog` → inactive/failed).
+  Dependent Build From Scratch tasks cannot succeed until the unit is healthy again. Service operations
+  lab. The `rsyslog` systemd unit is **failed/inactive** on this host — a realistic fault for Build From
+  Scratch workflows that depend on it. Diagnose with `systemctl status rsyslog` and journal logs, apply
+  the smallest reliable fix, then verify with `systemctl is-active rsyslog`.
+
+
+  OBJECTIVE: The `rsyslog` service is active (running); `systemctl is-active rsyslog`` returns active;
+  The fix survives a status re-check (no marker files). Acceptance criteria: the change is minimal and
+  reversible, and success means `systemctl is-active rsyslog` returns active.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant pools, volumes, snapshots, and host mapping), changing one thing at a time. Check
+  your work continuously against the objective — success means `systemctl is-active rsyslog` returns active.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active rsyslog` returns active.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - The `rsyslog` service is active (running)
 - '`systemctl is-active rsyslog`` returns active'
@@ -41,22 +78,26 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `systemctl status rsyslog` and `journalctl -u rsyslog -n 50`.'
+    Start with `systemctl status rsyslog` and `journalctl -u rsyslog -n 50 --no-pager` before changing
+    anything.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm `rsyslog` is failed/inactive.
+    1. Run `systemctl status rsyslog` — note Active/Failed and the last log lines.
 
-    2. Read the unit journal for the root cause.
+    2. Read `journalctl -u rsyslog -n 50` for the root error.
 
-    3. Apply the smallest fix that restores the unit.'
+    3. Form a hypothesis about the smallest config or permission fix.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Repair the underlying config/cause for `rsyslog`.
+    1. Apply the minimal fix (config, unit override, or missing directory).
 
-    2. `systemctl enable --now rsyslog`.
+    2. Run `systemctl daemon-reload` if you edited a unit file.
 
-    3. Verify with `systemctl is-active rsyslog` (expect active).'
+    3. Run `systemctl restart rsyslog` and confirm `systemctl is-active rsyslog` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'

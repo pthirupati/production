@@ -78,27 +78,37 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Inspect GitOps state: `cat /opt/gitops/application.yaml` and `cat /opt/gitops/flux-kustomization.yaml`.
-    Look for OutOfSync / Ready=False.'
+    1. Inspect the current state with `terraform plan -refresh-only` and state.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm sync/health status in the Application manifest.
+    1. From the evidence above, decide which single part of configuration drift is at fault.
 
-    2. Check `syncPolicy` and source path/repoURL.
+    2. Re-run the most relevant of `terraform plan -refresh-only` and state focused on just that part
+    to confirm it.
 
-    3. Compare with the Flux Kustomization Ready condition.'
+    3. State a one-line hypothesis: the smallest change that would move the state from ''real infra differs
+    from code'' toward ''plan is clean after reconciling drift''.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Repair `/opt/gitops/application.yaml` so sync is healthy (Synced/Healthy).
+    1. Apply the smallest reversible change your hypothesis points to. Add or fix the exporter / dashboard
+    / alert with clear names, labels, and a sensible threshold.
 
-    2. Fix Flux reconciliation errors in `/opt/gitops/flux-kustomization.yaml`.
+    2. Re-run `bash check.sh` and confirm plan is clean after reconciling drift.
 
-    3. Click Check Solution once the documented remediation is applied (grader: `grep -q FIXED-OK /opt/fixitlab/academy/academy-ai-ml-018-observability-drift-2.conf`
-    succeeds after the documented fix).'
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Complete the configuration drift — observability lab ai ml lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

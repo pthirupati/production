@@ -27,8 +27,8 @@ description: 'CONTEXT: A team operating PostgreSQL has raised a ticket for `Writ
 
   OBJECTIVE: Unsafe defaults related to write-ahead log are removed or constrained; Access follows least
   privilege and is auditable; Security checks pass without breaking required functionality. Acceptance
-  criteria: the change is minimal and reversible, and success means `systemctl is-active postgresql`` returns
-  active.
+  criteria: the change is minimal and reversible, and success means `systemctl is-active postgresql``
+  returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
@@ -75,25 +75,29 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `systemctl status postgresql` and `journalctl -u postgresql -n 50`.'
+    Start with `systemctl status postgresql` and `journalctl -u postgresql -n 50 --no-pager` before changing
+    anything.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm `postgresql` is failed/inactive.
+    1. Run `systemctl status postgresql` — note Active/Failed and the last log lines.
 
-    2. Read the unit journal for the root cause.
+    2. Read `journalctl -u postgresql -n 50` for the root error.
 
-    3. Apply the smallest fix that restores the unit.'
+    3. Form a hypothesis about the smallest config or permission fix.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Repair the underlying config/cause for `postgresql`.
+    1. Apply the minimal fix (config, unit override, or missing directory).
 
-    2. `systemctl enable --now postgresql`.
+    2. Run `systemctl daemon-reload` if you edited a unit file.
 
-    3. Verify with `systemctl is-active postgresql` (expect active).'
+    3. Run `systemctl restart postgresql` and confirm `systemctl is-active postgresql` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
 summary: Complete the write-ahead log — security lab postgresql lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

@@ -27,7 +27,8 @@ description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for 
 
   OBJECTIVE: Understand how Git workflow work in this lab environment; Identify the main status and configuration
   signals for Git workflow; Confirm you can read the current state confidently before changing anything.
-  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active gitlab-runner`` returns active.
+  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active gitlab-runner``
+  returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
@@ -75,26 +76,29 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Check the runner: `systemctl status gitlab-runner`. Inspect CI config under `/opt/ci/.gitlab-ci.yml`
-    and `/opt/ci/Jenkinsfile` for failing stages.'
+    Start with `systemctl status gitlab-runner` and `journalctl -u gitlab-runner -n 50 --no-pager` before
+    changing anything.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm `gitlab-runner` is failed/inactive.
+    1. Run `systemctl status gitlab-runner` — note Active/Failed and the last log lines.
 
-    2. Read `/opt/ci/.gitlab-ci.yml` for BROKEN_PIPELINE / exit 1 steps.
+    2. Read `journalctl -u gitlab-runner -n 50` for the root error.
 
-    3. Check `/root/app/.git/config` for a usable remote/branch setup.'
+    3. Form a hypothesis about the smallest config or permission fix.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Repair the CI pipeline YAML so the build stage succeeds.
+    1. Apply the minimal fix (config, unit override, or missing directory).
 
-    2. `systemctl enable --now gitlab-runner`.
+    2. Run `systemctl daemon-reload` if you edited a unit file.
 
-    3. Verify with `systemctl is-active gitlab-runner` (expect active).'
+    3. Run `systemctl restart gitlab-runner` and confirm `systemctl is-active gitlab-runner` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
 summary: Complete the git workflow — learn lab devops lab and verify success with the checker
 estimated_minutes: 15
 xp_reward: 100

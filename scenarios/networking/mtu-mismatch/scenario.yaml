@@ -13,8 +13,8 @@ description: 'CONTEXT: A team operating network operations has raised a ticket f
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server with a VPN tunnel. ping with small packets succeeds
-  but ping -s 1400 -M do to the remote end times out. Large file transfers hang indefinitely.
+  SYMPTOM / STARTING STATE: RHEL 9 server with a VPN tunnel. ping with small packets succeeds but ping
+  -s 1400 -M do to the remote end times out. Large file transfers hang indefinitely.
 
 
   OBJECTIVE: Use ping with the DF bit set to discover the effective path MTU; Set the correct MTU on the

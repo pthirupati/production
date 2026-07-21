@@ -12,9 +12,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Serv
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster. Pods are Running, but connecting to the Service''s
-  ClusterIP from another pod times out or is refused. Endpoints may be empty or the ports may not line
-  up.
+  SYMPTOM / STARTING STATE: Kubernetes cluster. Pods are Running, but connecting to the Service''s ClusterIP
+  from another pod times out or is refused. Endpoints may be empty or the ports may not line up.
 
 
   OBJECTIVE: Reproduce the failed connection to the Service ClusterIP; Check the Service''s endpoints,

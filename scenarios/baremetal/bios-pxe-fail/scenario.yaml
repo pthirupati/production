@@ -12,9 +12,9 @@ description: 'CONTEXT: A team operating bare metal operations has raised a ticke
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: bare-metal host managed via IPMI plus a provisioning server (DHCP
-  + TFTP). The server fails PXE with "No bootable device"; the boot order, DHCP next-server, or pxelinux
-  config is misconfigured.
+  SYMPTOM / STARTING STATE: bare-metal host managed via IPMI plus a provisioning server (DHCP + TFTP).
+  The server fails PXE with "No bootable device"; the boot order, DHCP next-server, or pxelinux config
+  is misconfigured.
 
 
   OBJECTIVE: Confirm the server attempts (and fails) a network boot; Verify each link in the PXE chain:

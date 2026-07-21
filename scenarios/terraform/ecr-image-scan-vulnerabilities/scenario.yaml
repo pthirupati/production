@@ -13,9 +13,9 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `E
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: AWS environment with an ECR repository containing an image built
-  on an outdated base image (e.g., ubuntu:18.04). Image scanning is enabled and reports multiple HIGH
-  severity vulnerabilities, causing downstream deployment checks to fail.
+  SYMPTOM / STARTING STATE: AWS environment with an ECR repository containing an image built on an outdated
+  base image (e.g., ubuntu:18.04). Image scanning is enabled and reports multiple HIGH severity vulnerabilities,
+  causing downstream deployment checks to fail.
 
 
   OBJECTIVE: Run an ECR image scan and review the HIGH severity CVE findings; Update the Dockerfile base

@@ -9,8 +9,8 @@ description: 'CONTEXT: A team operating Red Hat Enterprise Linux has raised a ti
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL host. nginx is active and answers on localhost, but firewalld
-  does not permit inbound HTTP, so external access to port 80 is blocked.
+  SYMPTOM / STARTING STATE: RHEL host. nginx is active and answers on localhost, but firewalld does not
+  permit inbound HTTP, so external access to port 80 is blocked.
 
 
   OBJECTIVE: Confirm nginx serves locally but port 80 is blocked by firewalld; Open the HTTP port/service

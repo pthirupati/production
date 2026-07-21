@@ -12,8 +12,8 @@ description: 'CONTEXT: A team operating Ansible automation has raised a ticket f
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: control node. Running ansible-playbook site.yml returns a YAML syntax
-  error and the play does not start. Managed hosts are reachable.
+  SYMPTOM / STARTING STATE: control node. Running ansible-playbook site.yml returns a YAML syntax error
+  and the play does not start. Managed hosts are reachable.
 
 
   OBJECTIVE: Run ansible-playbook --syntax-check to get the exact error location; Fix all YAML syntax

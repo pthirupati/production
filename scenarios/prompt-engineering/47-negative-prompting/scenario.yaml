@@ -18,9 +18,9 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
 
 
   OBJECTIVE: Use targeted prohibitions to remove unwanted output (preambles, fences, filler); Pair a "do
-  not" with a positive "instead, do this" so the model has a target; Pass both graded exercises (the tool responder
-  re-checks your prompt server-side). Acceptance criteria: the change is minimal and reversible, and success
-  means all hidden tests pass.
+  not" with a positive "instead, do this" so the model has a target; Pass both graded exercises (the tool
+  responder re-checks your prompt server-side). Acceptance criteria: the change is minimal and reversible,
+  and success means all hidden tests pass.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent

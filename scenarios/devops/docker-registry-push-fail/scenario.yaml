@@ -34,7 +34,8 @@ description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant git repos, pipelines, artifacts, and runbooks), changing one thing at a time. Check
-  your work continuously against the objective — success means `systemctl is-active docker``` returns active.
+  your work continuously against the objective — success means `systemctl is-active docker``` returns
+  active.
 
 
   VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active docker`` returns active.

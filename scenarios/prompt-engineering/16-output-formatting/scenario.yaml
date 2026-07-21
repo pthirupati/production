@@ -12,8 +12,8 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
 
 
   SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice asking for a precise output
-  format — a table, exactly three bullets, or a one-line answer — and watch the reply snap to
-  the shape you named. Rule-based and free.
+  format — a table, exactly three bullets, or a one-line answer — and watch the reply snap to the shape
+  you named. Rule-based and free.
 
 
   OBJECTIVE: List the levers that control output shape (format type, count, template, "only"); Write a

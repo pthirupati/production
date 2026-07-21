@@ -11,10 +11,10 @@ dual_terminal: true
 infrastructure_type: docker
 jira_priority: Low
 is_free: false
-description: 'CONTEXT: A team operating Linux administration has raised a ticket for `RHEL Lab:
-  Firewall Blocks HTTP (Dual Terminal)`. A customer-facing workflow is degraded and the on-call engineer
-  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating Linux administration has raised a ticket for `RHEL Lab: Firewall
+  Blocks HTTP (Dual Terminal)`. A customer-facing workflow is degraded and the on-call engineer (you)
+  must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
+  underlying state is repaired.
 
 
   ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
@@ -60,15 +60,15 @@ hints:
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: RHEL is not behaving as the scenario
-    objectives require. This lab is about RHEL — how RHEL behaves in a Linux administration
-    environment. Read the objectives and the current state, and note precisely what looks wrong versus
-    healthy before you form any theory.'
+    Do not touch anything yet. First observe the symptom: RHEL lab is not behaving as the scenario objectives
+    require. This lab is about RHEL lab — how RHEL lab behaves in a Linux administration environment.
+    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
+    you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For RHEL problems the reliable method is: (1) reproduce/observe
+    Work from evidence, not guesses. For RHEL lab problems the reliable method is: (1) reproduce/observe
     the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
     change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
     the noisy log line), changing one thing at a time.'

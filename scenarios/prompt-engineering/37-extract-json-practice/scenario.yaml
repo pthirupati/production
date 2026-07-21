@@ -13,12 +13,13 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
 
 
   SYMPTOM / STARTING STATE: The guided AI practice console opens with two graded JSON-extraction exercises.
-  Write prompts that make the rule-based tool responder emit clean JSON and nothing else. No API key, no cost
-  — a strong prompt passes, a vague one fails.
+  Write prompts that make the rule-based tool responder emit clean JSON and nothing else. No API key,
+  no cost — a strong prompt passes, a vague one fails.
 
 
   OBJECTIVE: Write a prompt that returns ONLY valid JSON for a given record — no prose, no fences; Pin
-  the exact field names AND their types so the output is predictable; Pass both graded exercises (the tool responder re-checks your prompt server-side). Acceptance criteria: the change is minimal and reversible,
+  the exact field names AND their types so the output is predictable; Pass both graded exercises (the
+  tool responder re-checks your prompt server-side). Acceptance criteria: the change is minimal and reversible,
   and success means all hidden tests pass.
 
 

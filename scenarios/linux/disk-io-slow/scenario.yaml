@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. An rsync job has been running for 3 hours copying
-  50GB of data.
+  SYMPTOM / STARTING STATE: RHEL 9 server. An rsync job has been running for 3 hours copying 50GB of data.
 
   The server feels sluggish. Running df -h shows /dev/sda is the target disk. dmesg output
 

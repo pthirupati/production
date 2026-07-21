@@ -13,8 +13,8 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `S
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: AWS environment with a Secrets Manager secret configured for automatic
-  rotation via a Lambda function. The Lambda execution role is missing the required Secrets Manager permissions,
+  SYMPTOM / STARTING STATE: AWS environment with a Secrets Manager secret configured for automatic rotation
+  via a Lambda function. The Lambda execution role is missing the required Secrets Manager permissions,
   causing rotation to fail with AccessDenied errors in CloudWatch Logs.
 
 

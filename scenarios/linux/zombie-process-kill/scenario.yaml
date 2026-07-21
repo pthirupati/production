@@ -13,8 +13,8 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. Running ps aux | grep Z shows many processes in Z
-  (zombie) state:
+  SYMPTOM / STARTING STATE: RHEL 9 server. Running ps aux | grep Z shows many processes in Z (zombie)
+  state:
 
   appworker 1234 0.0 0.0 0 0 ? Z 10:00 0:00 [child] <defunct>
 

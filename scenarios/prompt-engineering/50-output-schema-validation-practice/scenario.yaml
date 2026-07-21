@@ -18,9 +18,9 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
 
 
   OBJECTIVE: Write a prompt that declares a JSON schema with required fields and explicit types; Constrain
-  a field to a fixed set of values with an enum, shown by example; Pass both graded exercises (the tool responder
-  re-checks your prompt server-side). Acceptance criteria: the change is minimal and reversible, and success
-  means all hidden tests pass.
+  a field to a fixed set of values with an enum, shown by example; Pass both graded exercises (the tool
+  responder re-checks your prompt server-side). Acceptance criteria: the change is minimal and reversible,
+  and success means all hidden tests pass.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent

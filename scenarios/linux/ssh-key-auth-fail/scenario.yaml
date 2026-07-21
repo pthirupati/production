@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. User ''developer'' has ~/.ssh/authorized_keys in
-  place with
+  SYMPTOM / STARTING STATE: RHEL 9 server. User ''developer'' has ~/.ssh/authorized_keys in place with
 
   the correct public key. Running ssh developer@localhost still prompts for a password.
 

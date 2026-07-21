@@ -24,15 +24,15 @@ description: 'CONTEXT: A team operating database administration has raised a tic
 
 
   OBJECTIVE: Confirm pgbouncer is down; Fix and start the pooler; Verify pgbouncer is active. Acceptance
-  criteria: the change is minimal and reversible, and success means `systemctl is-active pgbouncer``` returns
-  active.
+  criteria: the change is minimal and reversible, and success means `systemctl is-active pgbouncer```
+  returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant SQL client, schemas, backups, and performance views), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active pgbouncer``` returns
-  active.
+  Check your work continuously against the objective — success means `systemctl is-active pgbouncer```
+  returns active.
 
 
   VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active pgbouncer`` returns active.

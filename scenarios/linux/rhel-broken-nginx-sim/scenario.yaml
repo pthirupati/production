@@ -9,8 +9,8 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. nginx is installed but the active site config contains
-  a typo, so `systemctl start nginx` fails and `nginx -t` reports a syntax error. The website is unreachable.
+  SYMPTOM / STARTING STATE: RHEL 9 server. nginx is installed but the active site config contains a typo,
+  so `systemctl start nginx` fails and `nginx -t` reports a syntax error. The website is unreachable.
 
 
   OBJECTIVE: Run nginx -t to locate the configuration syntax error; Fix the misspelled/invalid directive

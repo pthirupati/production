@@ -13,8 +13,8 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. The GRUB bootloader has no password set. Pressing
-  ''e'' at the
+  SYMPTOM / STARTING STATE: RHEL 9 server. The GRUB bootloader has no password set. Pressing ''e'' at
+  the
 
   GRUB menu allows editing of boot entries without any authentication. A security audit
 

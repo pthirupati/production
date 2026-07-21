@@ -12,9 +12,9 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Gate
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster with Gateway API installed. A Gateway and HTTPRoute
-  exist, but requests return 404 because the HTTPRoute does not correctly bind to the Gateway or target
-  the backend Service.
+  SYMPTOM / STARTING STATE: Kubernetes cluster with Gateway API installed. A Gateway and HTTPRoute exist,
+  but requests return 404 because the HTTPRoute does not correctly bind to the Gateway or target the backend
+  Service.
 
 
   OBJECTIVE: Inspect the Gateway and HTTPRoute status and the route rules; Identify the broken parentRef,

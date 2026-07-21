@@ -9,8 +9,8 @@ description: 'CONTEXT: A team operating Ansible automation has raised a ticket f
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Ansible control node. web2 is unreachable over SSH (publickey auth
-  fails) while the other webservers respond. The control node''s key has not been copied to web2.
+  SYMPTOM / STARTING STATE: Ansible control node. web2 is unreachable over SSH (publickey auth fails)
+  while the other webservers respond. The control node''s key has not been copied to web2.
 
 
   OBJECTIVE: Identify that web2 fails Ansible''s ping on publickey authentication; Copy the control node''s

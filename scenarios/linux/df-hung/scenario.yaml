@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. Running df -Th hangs and never returns. The NFS server
-  at
+  SYMPTOM / STARTING STATE: RHEL 9 server. Running df -Th hangs and never returns. The NFS server at
 
   192.168.1.50 is no longer reachable. /proc/mounts shows /mnt/oldshare as an NFS mount.
 

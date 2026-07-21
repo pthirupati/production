@@ -9,8 +9,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Kube
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster. A Service has zero ready endpoints because its
-  pods fail their readiness probe (wrong path/port or the app isn''t actually serving).
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A Service has zero ready endpoints because its pods fail
+  their readiness probe (wrong path/port or the app isn''t actually serving).
 
 
   OBJECTIVE: Confirm the Service has no ready endpoints; Determine why the backing pods are not Ready

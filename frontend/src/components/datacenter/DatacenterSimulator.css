@@ -351,7 +351,7 @@
 .dc-twin-panel { display: flex; flex-direction: column; gap: 0.65rem; }
 .dc-twin-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
 .dc-twin-title { font-size: 0.78rem; font-weight: 700; color: #f1f5f9; display: inline-flex; align-items: center; gap: 0.35rem; }
-.dc-muted { font-size: 0.68rem; color: #8891a5; }
+.dc-muted { font-size: 0.68rem; color: #a8b0c2; }
 .dc-text-ok { font-size: 0.68rem; color: #34d399; }
 .dc-mb-canvas {
   display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem;

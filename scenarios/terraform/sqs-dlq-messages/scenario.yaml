@@ -12,9 +12,9 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `S
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: AWS environment with an SQS standard queue, a DLQ, and a Lambda
-  consumer. The Lambda function fails processing due to a missing environment variable or malformed message,
-  causing messages to be retried and eventually moved to the DLQ.
+  SYMPTOM / STARTING STATE: AWS environment with an SQS standard queue, a DLQ, and a Lambda consumer.
+  The Lambda function fails processing due to a missing environment variable or malformed message, causing
+  messages to be retried and eventually moved to the DLQ.
 
 
   OBJECTIVE: Inspect the DLQ message bodies to understand why processing is failing; Fix the Lambda function

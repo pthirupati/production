@@ -10,9 +10,9 @@ description: 'CONTEXT: A team operating Red Hat Enterprise Linux has raised a ti
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. eth0 has only 10.0.0.10; a secondary IP (10.0.0.20/24)
-  is required for the application VIP. Request the @network team in Jira, wait for confirmation (~30s),
-  then verify in the terminal.
+  SYMPTOM / STARTING STATE: RHEL 9 server. eth0 has only 10.0.0.10; a secondary IP (10.0.0.20/24) is required
+  for the application VIP. Request the @network team in Jira, wait for confirmation (~30s), then verify
+  in the terminal.
 
 
   OBJECTIVE: Request the @network team in Jira to add the secondary IP; Verify the new address with ip

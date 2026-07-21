@@ -9,8 +9,8 @@ description: 'CONTEXT: A team operating Red Hat Enterprise Linux has raised a ti
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. Boot ends in a kernel panic: "VFS: Unable to mount
-  root fs on unknown-block". The root device can''t be found/mounted as currently configured.
+  SYMPTOM / STARTING STATE: RHEL 9 server. Boot ends in a kernel panic: "VFS: Unable to mount root fs
+  on unknown-block". The root device can''t be found/mounted as currently configured.
 
 
   OBJECTIVE: Read the panic and identify that root cannot be mounted; Find the wrong root UUID/device

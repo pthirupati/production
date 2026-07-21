@@ -21,8 +21,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Fix 
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster. A Service routes to healthy pods, but its targetPort
-  (e.g. 8080) doesn''t match the container''s listening port (e.g. 80), so requests are refused.
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A Service routes to healthy pods, but its targetPort (e.g.
+  8080) doesn''t match the container''s listening port (e.g. 80), so requests are refused.
 
 
   OBJECTIVE: Confirm the pods are Ready but Service requests are refused; Compare the Service targetPort
@@ -93,7 +93,7 @@ hints:
 
     2. Wait for rollout (`kubectl rollout status`).
 
-    3. Confirm `bash check.sh` succeeds.
+    3. Confirm `kubectl get pods` succeeds.
 
 
     WHY: Kubernetes labs grade real cluster state.'

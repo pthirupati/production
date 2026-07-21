@@ -12,8 +12,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `PVC 
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster. A PVC specifies storageClassName: fast-ssd,
-  but no such StorageClass exists. The PVC remains Pending and its pod stays ContainerCreating.
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A PVC specifies storageClassName: fast-ssd, but no such
+  StorageClass exists. The PVC remains Pending and its pod stays ContainerCreating.
 
 
   OBJECTIVE: Confirm the PVC is Pending due to a missing StorageClass; List the StorageClasses that actually

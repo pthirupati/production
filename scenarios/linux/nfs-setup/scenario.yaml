@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server acting as both NFS server and client for this lab.
-  The directory
+  SYMPTOM / STARTING STATE: RHEL 9 server acting as both NFS server and client for this lab. The directory
 
   /srv/shared exists and contains sample files. The nfs-utils package is not installed.
 

@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server being prepared as a Kubernetes node. lsmod | grep
-  br_netfilter
+  SYMPTOM / STARTING STATE: RHEL 9 server being prepared as a Kubernetes node. lsmod | grep br_netfilter
 
   returns nothing, and there is no /etc/modules-load.d drop-in to load it at boot. kubeadm
 
@@ -82,28 +81,39 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not in Running state.'
+    1. Inspect the current state with terminal and config files under /etc and /var.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+    1. From the evidence above, decide which single part of required kernel module not loaded at boot
+    is at fault.
 
-    2. `kubectl describe pod <name>` — read Events at the bottom.
+    2. Re-run the most relevant of terminal and config files under /etc and /var focused on just that
+    part to confirm it.
 
-    3. `kubectl logs <name> [--previous]` if the container restarted.'
+    3. State a one-line hypothesis: the smallest change that would move the state from ''required kernel
+    module not loaded at boot is not behaving as the scenario objectives require'' toward ''`check.sh`
+    exits successfully''.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Fix the root cause (image name, env var, volume mount, or probe).
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
 
-    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
 
-    3. Confirm `kubectl get pods` shows every pod Running.
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: Kubernetes only reports healthy when the workload actually runs.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

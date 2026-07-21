@@ -104,7 +104,7 @@ hints:
 
     2. Run `nginx -t`, then `systemctl enable --now nginx`.
 
-    3. Confirm `systemctl is-active nginx`` returns active.
+    3. Confirm `systemctl is-active nginx` returns active.
 
 
     WHY: stream proxies fail when the TCP upstream or listen directive is wrong.'

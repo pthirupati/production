@@ -74,27 +74,28 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Inspect GitOps state: `cat /opt/gitops/application.yaml` and `cat /opt/gitops/flux-kustomization.yaml`.
-    Look for OutOfSync / Ready=False.'
+    Run `terraform validate` in the module directory for precise error paths.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm sync/health status in the Application manifest.
+    1. `terraform init` if providers are missing.
 
-    2. Check `syncPolicy` and source path/repoURL.
+    2. `terraform validate` — read file:line references.
 
-    3. Compare with the Flux Kustomization Ready condition.'
+    3. Cross-check variable names and resource blocks against the error.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Repair `/opt/gitops/application.yaml` so sync is healthy (Synced/Healthy).
+    1. Fix the reported syntax or reference error.
 
-    2. Fix Flux reconciliation errors in `/opt/gitops/flux-kustomization.yaml`.
+    2. Re-run `terraform validate` until it prints Success.
 
-    3. Click Check Solution once the documented remediation is applied (grader: `grep -q FIXED-OK /opt/fixitlab/academy/academy-terraform-099-backup-drift-10.conf`
-    succeeds after the documented fix).'
+    3. Optionally `terraform plan` to confirm no new errors.
+
+
+    WHY: validate catches config errors before any apply.'
 summary: Complete the configuration drift — backup lab terraform lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

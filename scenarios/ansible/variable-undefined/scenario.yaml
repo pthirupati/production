@@ -12,8 +12,8 @@ description: 'CONTEXT: A team operating Ansible automation has raised a ticket f
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: control node. Playbook deploy.yml fails on the "Configure nginx"
-  task with an undefined variable error. Other tasks have already run.
+  SYMPTOM / STARTING STATE: control node. Playbook deploy.yml fails on the "Configure nginx" task with
+  an undefined variable error. Other tasks have already run.
 
 
   OBJECTIVE: Read the error to identify the exact variable name and task that failed; Fix the variable

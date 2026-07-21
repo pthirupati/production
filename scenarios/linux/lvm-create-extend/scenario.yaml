@@ -13,8 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. A second disk /dev/sdb is visible via lsblk but has
-  no
+  SYMPTOM / STARTING STATE: RHEL 9 server. A second disk /dev/sdb is visible via lsblk but has no
 
   partitions or LVM metadata. The /mnt/data directory exists but is empty and unmounted.
 

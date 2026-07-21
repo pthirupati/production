@@ -12,7 +12,8 @@ description: 'CONTEXT: A team operating Prometheus monitoring has raised a ticke
   incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: TLS module doesn''t export probe_ssl_earliest_cert_expiry. The Prometheus console renders the broken state; the configuration file /etc/prometheus/blackbox.yml must be corrected.
+  SYMPTOM / STARTING STATE: TLS module doesn''t export probe_ssl_earliest_cert_expiry. The Prometheus
+  console renders the broken state; the configuration file /etc/prometheus/blackbox.yml must be corrected.
 
 
   OBJECTIVE: Open the Prometheus console from the lab toolbar and sign in (lab_prometheus / lab_prometheus@123);

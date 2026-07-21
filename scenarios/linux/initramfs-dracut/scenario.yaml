@@ -9,8 +9,8 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server. Boot stalls at the dracut initqueue and times out
-  into the dracut emergency shell; the root device isn''t being found by the current initramfs.
+  SYMPTOM / STARTING STATE: RHEL 9 server. Boot stalls at the dracut initqueue and times out into the
+  dracut emergency shell; the root device isn''t being found by the current initramfs.
 
 
   OBJECTIVE: Recognize the dracut initqueue timeout and that root can''t be assembled; Determine the missing

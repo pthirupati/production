@@ -13,9 +13,9 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `I
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: AWS environment where an IAM user policy grants iam:PassRole with
-  a wildcard resource alongside ec2:RunInstances. This allows the user to attach high-privilege roles
-  to instances and gain indirect admin access.
+  SYMPTOM / STARTING STATE: AWS environment where an IAM user policy grants iam:PassRole with a wildcard
+  resource alongside ec2:RunInstances. This allows the user to attach high-privilege roles to instances
+  and gain indirect admin access.
 
 
   OBJECTIVE: Identify the dangerous iam:PassRole + ec2:RunInstances combination in the IAM policy; Remove

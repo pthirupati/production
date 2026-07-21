@@ -12,9 +12,8 @@ description: 'CONTEXT: A team operating Grafana observability has raised a ticke
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Eval interval of 30m makes alerts dangerously slow. The Grafana console
-  renders the broken state; the configuration file /etc/grafana/provisioning/alerting/rules.yaml must
-  be corrected.
+  SYMPTOM / STARTING STATE: Eval interval of 30m makes alerts dangerously slow. The Grafana console renders
+  the broken state; the configuration file /etc/grafana/provisioning/alerting/rules.yaml must be corrected.
 
 
   OBJECTIVE: Open the Grafana console from the lab toolbar and sign in (lab_grafana / lab_grafana@123);

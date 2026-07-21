@@ -83,28 +83,37 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `nvidia-smi` and `dmesg | grep -i nvidia` for driver visibility.'
+    1. Inspect the current state with racks, PDUs, cooling, cabling, and physical servers.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Check if the GPU appears in `lspci | grep -i nvidia`.
+    1. From the evidence above, decide which single part of field tech is at fault.
 
-    2. Verify the correct driver module is loaded (`lsmod | grep nvidia`).
+    2. Re-run the most relevant of racks, PDUs, cooling, cabling, and physical servers focused on just
+    that part to confirm it.
 
-    3. Look for Xid errors or fallen-off-bus messages in dmesg.'
+    3. State a one-line hypothesis: the smallest change that would move the state from ''field tech is
+    not behaving as the scenario objectives require'' toward ''`check.sh` exits successfully''.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Reload driver, rebind PCI, or fix persistence mode per the scenario.
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
 
-    2. Re-run `nvidia-smi`.
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
 
-    3. Confirm GPU name and memory report without errors.
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: workloads need the driver to see the device.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Diagnose a dropped network link on db-prod-01 by trying the low-risk cable reseat first, then
   replacing the failed NIC card when that doesn't clear the fault.
 estimated_minutes: 15

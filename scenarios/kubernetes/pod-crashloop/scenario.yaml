@@ -9,8 +9,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Pod 
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster. An nginx pod enters CrashLoopBackOff: it starts,
-  the container immediately exits non-zero, and the kubelet keeps restarting it with growing backoff.
+  SYMPTOM / STARTING STATE: Kubernetes cluster. An nginx pod enters CrashLoopBackOff: it starts, the container
+  immediately exits non-zero, and the kubelet keeps restarting it with growing backoff.
 
 
   OBJECTIVE: Identify the crash-looping pod and its restart count; Read the crashing container''s logs

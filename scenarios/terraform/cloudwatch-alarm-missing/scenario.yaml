@@ -12,9 +12,9 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `C
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: AWS environment with a CloudWatch alarm attached to an EC2 instance
-  metric. The alarm threshold is set to an unreachable value (e.g., 99999) or the metric name does not
-  match the actual emitted metric, so ALARM is never triggered.
+  SYMPTOM / STARTING STATE: AWS environment with a CloudWatch alarm attached to an EC2 instance metric.
+  The alarm threshold is set to an unreachable value (e.g., 99999) or the metric name does not match the
+  actual emitted metric, so ALARM is never triggered.
 
 
   OBJECTIVE: Determine why the alarm stays in OK / INSUFFICIENT_DATA; Identify the wrong metric name,

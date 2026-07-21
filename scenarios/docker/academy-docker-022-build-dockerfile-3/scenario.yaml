@@ -77,25 +77,28 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `systemctl status docker` and `journalctl -u docker -n 50`.'
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm `docker` is failed/inactive.
+    1. Identify the exited/unhealthy container and read its logs.
 
-    2. Read the unit journal for the root cause.
+    2. Inspect the image, env vars, and volume mounts (`docker inspect`).
 
-    3. Apply the smallest fix that restores the unit.'
+    3. Compare container state to the scenario objectives.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Repair the underlying config/cause for `docker`.
+    1. Fix the Dockerfile, compose file, or runtime config.
 
-    2. `systemctl enable --now docker`.
+    2. Rebuild/restart the container.
 
-    3. Verify with `systemctl is-active docker` (expect active).'
+    3. Confirm `systemctl is-active docker` succeeds.
+
+
+    WHY: Docker labs grade real container state.'
 summary: Complete the dockerfiles — build lab docker lab and verify success with the checker
 estimated_minutes: 15
 xp_reward: 100

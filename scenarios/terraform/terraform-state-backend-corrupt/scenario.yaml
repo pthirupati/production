@@ -13,8 +13,8 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `T
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: environment with a Terraform S3 backend where S3 versioning is enabled.
-  The current state file version is corrupted (truncated JSON). Previous valid versions exist in S3 object
+  SYMPTOM / STARTING STATE: environment with a Terraform S3 backend where S3 versioning is enabled. The
+  current state file version is corrupted (truncated JSON). Previous valid versions exist in S3 object
   version history and can be restored.
 
 

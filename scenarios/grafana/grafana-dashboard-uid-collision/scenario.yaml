@@ -11,7 +11,8 @@ description: 'CONTEXT: A team operating Grafana observability has raised a ticke
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Two dashboards share a UID; one silently overwrites the other. The Grafana console renders the broken state; the configuration file /etc/grafana/provisioning/dashboards/dashboards.yaml
+  SYMPTOM / STARTING STATE: Two dashboards share a UID; one silently overwrites the other. The Grafana
+  console renders the broken state; the configuration file /etc/grafana/provisioning/dashboards/dashboards.yaml
   must be corrected.
 
 

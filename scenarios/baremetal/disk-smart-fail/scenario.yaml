@@ -12,8 +12,8 @@ description: 'CONTEXT: A team operating bare metal operations has raised a ticke
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: bare-metal RHEL host. smartd has logged a SMART warning for /dev/sda;
-  its reallocated/pending sector counts are rising and overall SMART health is marginal.
+  SYMPTOM / STARTING STATE: bare-metal RHEL host. smartd has logged a SMART warning for /dev/sda; its
+  reallocated/pending sector counts are rising and overall SMART health is marginal.
 
 
   OBJECTIVE: Read the disk''s SMART attributes and overall health assessment; Run a self-test and identify

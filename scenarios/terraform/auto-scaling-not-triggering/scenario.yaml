@@ -13,9 +13,9 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `A
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: AWS environment with an Auto Scaling group, a CloudWatch alarm,
-  and EC2 instances. The alarm metric namespace or dimension is misconfigured, preventing it from detecting
-  high CPU and triggering scale-out.
+  SYMPTOM / STARTING STATE: AWS environment with an Auto Scaling group, a CloudWatch alarm, and EC2 instances.
+  The alarm metric namespace or dimension is misconfigured, preventing it from detecting high CPU and
+  triggering scale-out.
 
 
   OBJECTIVE: Inspect the CloudWatch alarm configuration and identify why it never enters ALARM state;

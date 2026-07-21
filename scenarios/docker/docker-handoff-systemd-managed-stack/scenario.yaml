@@ -28,8 +28,8 @@ description: 'CONTEXT: A team operating Docker containers has raised a ticket fo
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant docker CLI, images, containers, and compose files), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active appstack``` returns
-  active.
+  Check your work continuously against the objective — success means `systemctl is-active appstack```
+  returns active.
 
 
   VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active appstack`` returns active.

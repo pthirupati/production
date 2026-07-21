@@ -13,9 +13,8 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `E
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: AWS environment with an EC2 instance and a security group that has
-  a permissive inbound rule: port 22 open to all IPv4 addresses. This violates least-privilege network
-  access principles.
+  SYMPTOM / STARTING STATE: AWS environment with an EC2 instance and a security group that has a permissive
+  inbound rule: port 22 open to all IPv4 addresses. This violates least-privilege network access principles.
 
 
   OBJECTIVE: Identify the security group with the 0.0.0.0/0 SSH rule using the AWS CLI; Revoke the world-open

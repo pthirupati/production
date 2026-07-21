@@ -12,8 +12,8 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Netw
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Kubernetes cluster with NetworkPolicies enforced. A NetworkPolicy
-  on the backend denies ingress from the frontend pods, so frontend-to-backend calls time out.
+  SYMPTOM / STARTING STATE: Kubernetes cluster with NetworkPolicies enforced. A NetworkPolicy on the backend
+  denies ingress from the frontend pods, so frontend-to-backend calls time out.
 
 
   OBJECTIVE: Reproduce the blocked frontend-to-backend connection; Inspect the NetworkPolicy selecting

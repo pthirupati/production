@@ -13,9 +13,9 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `T
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: environment where an S3 bucket or EC2 security group was created
-  outside of Terraform. The resource exists in AWS but is absent from the Terraform state file, causing
-  plan to show a conflicting create action.
+  SYMPTOM / STARTING STATE: environment where an S3 bucket or EC2 security group was created outside of
+  Terraform. The resource exists in AWS but is absent from the Terraform state file, causing plan to show
+  a conflicting create action.
 
 
   OBJECTIVE: Identify the existing AWS resource that is absent from Terraform state; Write the matching
