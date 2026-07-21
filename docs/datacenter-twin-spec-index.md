@@ -20,14 +20,14 @@ prompt) into FixitLab’s **Lab Environment** architecture.
 |---|--------|------------------|--------------|
 | 1 | Real physics | P4 formulas + P7 Rapier (tipping, cable bits, gravity) | Facade + lite Rapier |
 | 2 | Entire campus | Campus rooms + plant assets + 3D CRAC/PDU | Rooms live; photoreal campus deferred |
-| 3 | Complete rack FRU | Cage nuts, rails, blanking, PDU outlets, QR/labels | Not every screw |
+| 3 | Complete rack FRU | Cage nuts, rails, blanking, PDU, QR/U labels (P9) | Dense facade |
 | 4 | Server OEMs | Fleet profiles + vendor BOM/BMC/RAID | Live multi-OEM |
 | 5 | CPU generations | Catalog + motherboard die maps | Catalog + facade |
 | 6 | GPU systems | Catalog + gpu_node / AI panels | Catalog + facade |
 | 7 | Motherboard + buses | MotherboardPanel + BusAnimPanel + service ops | Interactive facade |
 | 8 | Cables | Catalog + cable/label/route/bend | Facade |
 | 9 | Switches | Multi-vendor CLI + blink/counters | Facade |
-| 10 | Console / BIOS / BMC | Serial + BIOS + iDRAC/iLO/IPMI panels | Facade |
+| 10 | Console / BIOS / BMC / PXE | Serial + BIOS + BMC + MAAS/PXE (P9) | Facade |
 | 11 | Storage | NVMe/SAS + Ceph/ZFS/SAN/NAS | Facade |
 | 12 | Networking | BGP/OSPF/VXLAN/EVPN/MPLS + tools | Facade |
 | 13 | Hypervisors | Burn-in/Staging ComputeAiPanel | Facade |
