@@ -25,7 +25,13 @@ class DatacenterFacilityTests(SimpleTestCase):
         state = dc.get_state(self.session_id)["state"]
         self.assertTrue(state.get("rooms"))
         room_ids = {r["id"] for r in state["rooms"]}
-        self.assertEqual(room_ids, {"data-hall-a", "mdf", "mechanical", "electrical"})
+        self.assertIn("data-hall-a", room_ids)
+        self.assertIn("mdf", room_ids)
+        self.assertIn("mechanical", room_ids)
+        self.assertIn("electrical", room_ids)
+        self.assertIn("campus", room_ids)
+        self.assertIn("generator-yard", room_ids)
+        self.assertGreaterEqual(len(room_ids), 15)
         hall = next(r for r in state["rooms"] if r["id"] == "data-hall-a")
         self.assertIn("R01", hall["racks"])
         mdf = next(r for r in state["rooms"] if r["id"] == "mdf")
@@ -207,3 +213,46 @@ class DatacenterFacilityTests(SimpleTestCase):
         dc.apply_action(sid, "power_cycle", {"asset_id": "srv-r01-u14"})
         ok, msg = dc.validate_datacenter_lab(sid, "datacenter-power-replace")
         self.assertTrue(ok, msg)
+
+    # ── Digital twin: motherboard / RAID / BIOS / BMC ─────────────────────
+    def test_server_has_motherboard_raid_bios(self):
+        state = dc.get_state(self.session_id)["state"]
+        web = next(s for s in state["servers"] if s["hostname"] == "web-prod-01")
+        self.assertIn("motherboard", web)
+        self.assertTrue(web["motherboard"]["cpu_sockets"])
+        self.assertTrue(web["motherboard"]["dimm_slots"])
+        self.assertIn("raid", web)
+        self.assertTrue(web["raid"]["physical_disks"])
+        self.assertIn("bios", web)
+        self.assertEqual(web["bios"]["mode"], "UEFI")
+        self.assertTrue(web["bmc"].get("product"))
+        self.assertIn("Redfish", web["bmc"].get("protocols_enabled") or [])
+        self.assertTrue(state.get("campus", {}).get("generators"))
+
+    def test_raid_fail_and_rebuild(self):
+        dc.get_state(self.session_id)
+        r = dc.apply_action(self.session_id, "raid_fail_disk", {"asset_id": "srv-r01-u12", "disk_id": "PD0"})
+        self.assertTrue(r["ok"], r)
+        state = dc.get_state(self.session_id)["state"]
+        web = next(s for s in state["servers"] if s["id"] == "srv-r01-u12")
+        pd0 = next(d for d in web["raid"]["physical_disks"] if d["id"] == "PD0")
+        self.assertEqual(pd0["status"], "failed")
+        r2 = dc.apply_action(self.session_id, "raid_rebuild", {"asset_id": "srv-r01-u12", "vd_id": "VD0"})
+        self.assertTrue(r2["ok"], r2)
+        state = dc.get_state(self.session_id)["state"]
+        web = next(s for s in state["servers"] if s["id"] == "srv-r01-u12")
+        vd0 = next(v for v in web["raid"]["virtual_disks"] if v["id"] == "VD0")
+        self.assertEqual(vd0["status"], "optimal")
+
+    def test_bios_setup_and_bmc_virtual_media(self):
+        dc.get_state(self.session_id)
+        r = dc.apply_action(self.session_id, "bios_enter_setup", {"asset_id": "srv-r01-u12"})
+        self.assertTrue(r["ok"], r)
+        self.assertTrue(r["bios"]["setup_open"])
+        r2 = dc.apply_action(
+            self.session_id, "bmc_mount_virtual_media",
+            {"asset_id": "srv-r01-u12", "image": "ubuntu-22.04.iso"},
+        )
+        self.assertTrue(r2["ok"], r2)
+        self.assertTrue(r2["bmc"]["virtual_media"]["mounted"])
+        self.assertEqual(r2["bmc"]["virtual_media"]["image"], "ubuntu-22.04.iso")

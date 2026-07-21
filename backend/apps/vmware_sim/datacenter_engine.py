@@ -104,18 +104,24 @@ def _event(state: dict, message: str, severity: str = "info") -> None:
 # ── Rooms / building layout ───────────────────────────────────────────────
 
 def _rooms() -> list[dict]:
-    return [
-        {
-            "id": "data-hall-a", "name": "Data Hall A", "type": "data_hall",
-            "aisle": "hot_cold", "racks": list(_DATA_HALL_RACKS),
-        },
-        {
-            "id": "mdf", "name": "Network / MDF", "type": "network",
-            "racks": list(_MDF_RACKS),
-        },
-        {"id": "mechanical", "name": "Mechanical / Cooling", "type": "mechanical", "racks": []},
-        {"id": "electrical", "name": "Electrical", "type": "electrical", "racks": []},
-    ]
+    from apps.vmware_sim.datacenter_digital_twin import campus_rooms
+    hall = list(_DATA_HALL_RACKS)
+    mdf = list(_MDF_RACKS)
+    rooms = campus_rooms()
+    for r in rooms:
+        if r["id"] == "data-hall-a":
+            r["racks"] = hall
+            r["aisle"] = "hot_cold"
+        elif r["id"] == "mdf":
+            r["racks"] = mdf
+        elif r.get("racks") is None:
+            r["racks"] = []
+    return rooms
+
+
+def _campus() -> dict:
+    from apps.vmware_sim.datacenter_digital_twin import campus_assets
+    return campus_assets()
 
 
 def _room_for_rack(rooms: list[dict], rack_id: str | None) -> str:
@@ -128,28 +134,29 @@ def _room_for_rack(rooms: list[dict], rack_id: str | None) -> str:
 # ── BMC facade ─────────────────────────────────────────────────────────────
 
 def _bmc(hostname: str, power_state: str, *, inlet_c: float = 22.1, exhaust_c: float = 34.0,
-         fans_rpm: int = 4200, protocol: str = "redfish") -> dict:
-    return {
-        "endpoint": f"https://bmc-{hostname}.mgmt.corp.local",
-        "protocol": protocol,
-        "power": "on" if power_state == "on" else "off",
-        "sensors": {"inlet_c": inlet_c, "exhaust_c": exhaust_c, "fans_rpm": fans_rpm},
-        "sel": [{"time": _now_iso(), "message": "BMC self-test passed, sensors nominal"}],
-    }
+         fans_rpm: int = 4200, protocol: str = "redfish", vendor: str = "Dell") -> dict:
+    from apps.vmware_sim.datacenter_digital_twin import build_bmc
+    bmc = build_bmc(hostname, vendor, power_state)
+    bmc["protocol"] = protocol
+    bmc["sensors"]["inlet_c"] = inlet_c
+    bmc["sensors"]["exhaust_c"] = exhaust_c
+    bmc["sensors"]["fans_rpm"] = fans_rpm
+    return bmc
 
 
 def _server(asset_id: str, rack: str, u_slot: int, hostname: str, **overrides) -> dict:
+    from apps.vmware_sim.datacenter_digital_twin import enrich_server
     components = {k: "healthy" for k in _COMPONENT_KEYS}
     components.update(overrides.pop("components", {}))
     power_state = overrides.get("power_state", "on")
     role = overrides.pop("role", None)
     bmc_override = overrides.pop("bmc", None)
-    bmc = bmc_override or _bmc(hostname, power_state)
     # Alternate Dell / HPE fleets so FRU tickets go to the right OEM
     rack_num = int("".join(ch for ch in rack if ch.isdigit()) or "1")
     default_vendor = "HPE" if rack_num % 2 == 0 else "Dell"
     vendor = overrides.pop("vendor", default_vendor)
     service_tag = overrides.pop("service_tag", f"{'MX' if vendor == 'HPE' else 'DL'}{abs(hash(asset_id)) % 10_000_000:07d}")
+    bmc = bmc_override or _bmc(hostname, power_state, vendor=vendor)
     server = {
         "id": asset_id,
         "rack": rack,
@@ -166,7 +173,7 @@ def _server(asset_id: str, rack: str, u_slot: int, hostname: str, **overrides) -
         **({"role": role} if role else {}),
         **{k: v for k, v in overrides.items() if k != "power_state"},
     }
-    return server
+    return enrich_server(server)
 
 
 # ── Power chain ────────────────────────────────────────────────────────────
@@ -336,6 +343,9 @@ def _base_state() -> dict:
         "events": [],
         "tickets": [],
         "console": {"open": False, "asset_id": None, "lines": []},
+        "campus": _campus(),
+        "inventory": [],
+        "digital_twin": {"version": 2, "persisted_changes": []},
     }
 
 
@@ -469,8 +479,28 @@ def _sync_power(session_id: str, server_id: str, power_state: str) -> None:
 
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
+    from apps.vmware_sim.datacenter_digital_twin import enrich_server, campus_rooms, campus_assets
     entry = _ensure(session_id, scenario_slug)
     state = entry["state"]
+    # Migrate older sessions: campus rooms + twin hardware surfaces
+    existing_ids = {r["id"] for r in state.get("rooms", [])}
+    if "campus" not in existing_ids or len(state.get("rooms", [])) < 10:
+        hall = list(_DATA_HALL_RACKS)
+        mdf = list(_MDF_RACKS)
+        rooms = campus_rooms()
+        for r in rooms:
+            if r["id"] == "data-hall-a":
+                r["racks"] = hall
+            elif r["id"] == "mdf":
+                r["racks"] = mdf
+            elif r.get("racks") is None:
+                r["racks"] = []
+        state["rooms"] = rooms
+    if not state.get("campus"):
+        state["campus"] = campus_assets()
+    for srv in state.get("servers", []):
+        enrich_server(srv)
+    _save(session_id, entry)
     _sync_identity(session_id, state)
     state_copy = copy.deepcopy(state)
     rooms = state_copy.get("rooms", [])
@@ -826,6 +856,261 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["console"] = {"open": False, "asset_id": None, "lines": []}
         _save(session_id, entry)
         return {"ok": True, "message": "Serial console closed"}
+
+    if action == "open_motherboard":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        from apps.vmware_sim.datacenter_digital_twin import enrich_server
+        enrich_server(srv)
+        state["selected_asset"] = srv["id"]
+        _save(session_id, entry)
+        return {"ok": True, "message": "Motherboard map open", "motherboard": srv.get("motherboard")}
+
+    if action == "toggle_chassis_cover":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        mb = srv.setdefault("motherboard", {})
+        mb["cover_open"] = not mb.get("cover_open", False)
+        if mb["cover_open"]:
+            mb["maintenance_mode"] = True
+        _event(state, f"Chassis cover {'opened' if mb['cover_open'] else 'closed'} on {srv['id']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Chassis cover toggled", "motherboard": mb}
+
+    if action == "replace_dimm_slot":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        slot_id = payload.get("slot_id") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        mb = srv.setdefault("motherboard", {})
+        slot = next((d for d in mb.get("dimm_slots", []) if d.get("id") == slot_id), None)
+        if not slot:
+            return {"ok": False, "error": f"DIMM slot {slot_id} not found"}
+        slot["status"] = "healthy"
+        slot["ecc_corrections_24h"] = 0
+        srv["components"]["dimm"] = "healthy"
+        if broken.get("server") == srv["id"] and broken.get("component") == "dimm":
+            broken.clear()
+        _event(state, f"Replaced DIMM in slot {slot_id} on {srv['id']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"DIMM {slot_id} replaced"}
+
+    if action == "apply_thermal_paste":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        socket_id = payload.get("socket_id") or "CPU1"
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        mb = srv.setdefault("motherboard", {})
+        sock = next((c for c in mb.get("cpu_sockets", []) if c.get("id") == socket_id), None)
+        if not sock:
+            return {"ok": False, "error": f"Socket {socket_id} not found"}
+        sock["paste_applied"] = True
+        sock["temp_c"] = max(35.0, (sock.get("temp_c") or 55) - 6)
+        _event(state, f"Thermal paste reapplied on {socket_id} ({srv['id']})", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Thermal paste applied to {socket_id}"}
+
+    if action == "raid_create_vd":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        raid = srv.setdefault("raid", {})
+        level = payload.get("raid_level") or "RAID1"
+        name = payload.get("name") or f"VD{len(raid.get('virtual_disks') or [])}"
+        members = payload.get("members") or []
+        vd = {
+            "id": f"VD{len(raid.get('virtual_disks') or [])}",
+            "name": name,
+            "raid_level": level,
+            "size_gb": int(payload.get("size_gb") or 1920),
+            "members": members,
+            "status": "optimal",
+            "read_policy": "ReadAhead",
+            "write_policy": payload.get("write_policy") or "WriteBack",
+            "stripe_kb": int(payload.get("stripe_kb") or 64),
+            "rebuild_pct": None,
+        }
+        raid.setdefault("virtual_disks", []).append(vd)
+        raid.setdefault("operations", []).insert(0, {"time": _now_iso(), "op": "create_vd", "detail": vd["id"]})
+        _event(state, f"Created {level} volume {name} on {srv['id']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Virtual disk {name} created", "raid": raid}
+
+    if action == "raid_fail_disk":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        disk_id = payload.get("disk_id") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        raid = srv.setdefault("raid", {})
+        disk = next((d for d in raid.get("physical_disks", []) if d.get("id") == disk_id), None)
+        if not disk:
+            return {"ok": False, "error": f"Disk {disk_id} not found"}
+        disk["status"] = "failed"
+        disk["smart"] = "Predictive Failure"
+        srv["components"]["disk"] = "failed"
+        for vd in raid.get("virtual_disks", []):
+            if disk_id in (vd.get("members") or []):
+                vd["status"] = "degraded"
+                vd["rebuild_pct"] = 0
+        _event(state, f"Disk {disk_id} failed on {srv['id']}", "danger")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"{disk_id} marked failed", "raid": raid}
+
+    if action == "raid_rebuild":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        vd_id = payload.get("vd_id") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        raid = srv.setdefault("raid", {})
+        vd = next((v for v in raid.get("virtual_disks", []) if v.get("id") == vd_id), None)
+        if not vd:
+            return {"ok": False, "error": f"VD {vd_id} not found"}
+        # Promote hotspare if available
+        spare = next((d for d in raid.get("physical_disks", []) if d.get("status") == "hotspare"), None)
+        failed = next((d for d in raid.get("physical_disks", []) if d.get("status") == "failed"), None)
+        if spare:
+            spare["status"] = "online"
+            if failed and failed["id"] in (vd.get("members") or []):
+                vd["members"] = [spare["id"] if m == failed["id"] else m for m in vd["members"]]
+        vd["status"] = "rebuilding"
+        vd["rebuild_pct"] = 100
+        vd["status"] = "optimal"
+        for d in raid.get("physical_disks", []):
+            if d.get("status") == "failed":
+                d["status"] = "online"
+                d["smart"] = "OK"
+        srv["components"]["disk"] = "healthy"
+        if broken.get("server") == srv["id"] and broken.get("component") == "disk":
+            broken.clear()
+        raid.setdefault("operations", []).insert(0, {"time": _now_iso(), "op": "rebuild", "detail": vd_id})
+        _event(state, f"RAID rebuild completed for {vd_id} on {srv['id']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"{vd_id} rebuild complete", "raid": raid}
+
+    if action == "raid_set_cache":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        raid = srv.setdefault("raid", {})
+        cache = raid.setdefault("cache", {})
+        if payload.get("mode"):
+            cache["mode"] = payload["mode"]
+        _event(state, f"RAID cache set to {cache.get('mode')} on {srv['id']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Cache policy updated", "raid": raid}
+
+    if action == "bios_enter_setup":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        bios = srv.setdefault("bios", {})
+        bios["setup_open"] = True
+        bios["post_state"] = "setup"
+        _event(state, f"Entered BIOS/UEFI setup on {srv['id']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "BIOS setup open", "bios": bios}
+
+    if action == "bios_exit_setup":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        bios = srv.setdefault("bios", {})
+        bios["setup_open"] = False
+        bios["post_state"] = "idle"
+        _save(session_id, entry)
+        return {"ok": True, "message": "Exited BIOS setup", "bios": bios}
+
+    if action == "bios_set":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        key = payload.get("key") or ""
+        value = payload.get("value")
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        bios = srv.setdefault("bios", {})
+        if key == "boot_order" and isinstance(value, list):
+            bios["boot_order"] = value
+        elif key in bios.get("settings", {}):
+            bios["settings"][key] = value
+        elif key in ("secure_boot", "mode"):
+            bios[key] = value
+        else:
+            return {"ok": False, "error": f"Unknown BIOS setting: {key}"}
+        _event(state, f"BIOS {key}={value} on {srv['id']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"BIOS {key} updated", "bios": bios}
+
+    if action == "bios_cmos_reset":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        from apps.vmware_sim.datacenter_digital_twin import build_bios
+        srv["bios"] = build_bios(srv.get("vendor") or "Dell")
+        srv["bios"]["cmos_cleared"] = True
+        _event(state, f"CMOS cleared on {srv['id']}", "warning")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CMOS reset complete", "bios": srv["bios"]}
+
+    if action == "bmc_mount_virtual_media":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        image = payload.get("image") or "rhel-9.4-x86_64-dvd.iso"
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        bmc = srv.setdefault("bmc", {})
+        bmc.setdefault("virtual_media", {})["mounted"] = True
+        bmc["virtual_media"]["image"] = image
+        bmc.setdefault("sel", []).insert(0, {"time": _now_iso(), "severity": "info", "message": f"Virtual media mounted: {image}"})
+        _event(state, f"Virtual media {image} mounted on {srv['id']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Mounted {image}", "bmc": bmc}
+
+    if action == "bmc_run_diagnostics":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        suite = payload.get("suite") or "Memory"
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        bmc = srv.setdefault("bmc", {})
+        diag = bmc.setdefault("diagnostics", {})
+        failed = any(v != "healthy" for v in srv.get("components", {}).values())
+        diag["last_run"] = _now_iso()
+        diag["result"] = "FAIL" if failed and suite in ("Memory", "Storage", "CPU") else "PASS"
+        diag["suite"] = suite
+        bmc.setdefault("sel", []).insert(0, {
+            "time": _now_iso(), "severity": "warning" if diag["result"] == "FAIL" else "info",
+            "message": f"ePSA/Insight Diagnostics {suite}: {diag['result']}",
+        })
+        _event(state, f"Diagnostics {suite}={diag['result']} on {srv['id']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"{suite} diagnostics {diag['result']}", "bmc": bmc}
+
+    if action == "bmc_update_network":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        bmc = srv.setdefault("bmc", {})
+        net = bmc.setdefault("network", {})
+        for k in ("ipv4", "gateway", "vlan", "mode"):
+            if k in payload and payload[k] is not None:
+                net[k] = payload[k]
+        _event(state, f"BMC network updated on {srv['id']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "BMC network updated", "bmc": bmc}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

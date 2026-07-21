@@ -74,6 +74,48 @@ export const datacenterApi = {
   restoreCrac(sessionId, cracId) {
     return datacenterApi.action(sessionId, 'restore_crac', { crac_id: cracId })
   },
+  toggleChassisCover(sessionId, assetId) {
+    return datacenterApi.action(sessionId, 'toggle_chassis_cover', { asset_id: assetId })
+  },
+  replaceDimmSlot(sessionId, assetId, slotId) {
+    return datacenterApi.action(sessionId, 'replace_dimm_slot', { asset_id: assetId, slot_id: slotId })
+  },
+  applyThermalPaste(sessionId, assetId, socketId) {
+    return datacenterApi.action(sessionId, 'apply_thermal_paste', { asset_id: assetId, socket_id: socketId })
+  },
+  raidFailDisk(sessionId, assetId, diskId) {
+    return datacenterApi.action(sessionId, 'raid_fail_disk', { asset_id: assetId, disk_id: diskId })
+  },
+  raidRebuild(sessionId, assetId, vdId) {
+    return datacenterApi.action(sessionId, 'raid_rebuild', { asset_id: assetId, vd_id: vdId })
+  },
+  raidSetCache(sessionId, assetId, mode) {
+    return datacenterApi.action(sessionId, 'raid_set_cache', { asset_id: assetId, mode })
+  },
+  raidCreateVd(sessionId, assetId, payload) {
+    return datacenterApi.action(sessionId, 'raid_create_vd', { asset_id: assetId, ...payload })
+  },
+  biosEnterSetup(sessionId, assetId) {
+    return datacenterApi.action(sessionId, 'bios_enter_setup', { asset_id: assetId })
+  },
+  biosExitSetup(sessionId, assetId) {
+    return datacenterApi.action(sessionId, 'bios_exit_setup', { asset_id: assetId })
+  },
+  biosSet(sessionId, assetId, key, value) {
+    return datacenterApi.action(sessionId, 'bios_set', { asset_id: assetId, key, value })
+  },
+  biosCmosReset(sessionId, assetId) {
+    return datacenterApi.action(sessionId, 'bios_cmos_reset', { asset_id: assetId })
+  },
+  bmcMountIso(sessionId, assetId, image) {
+    return datacenterApi.action(sessionId, 'bmc_mount_virtual_media', { asset_id: assetId, image })
+  },
+  bmcRunDiagnostics(sessionId, assetId, suite) {
+    return datacenterApi.action(sessionId, 'bmc_run_diagnostics', { asset_id: assetId, suite })
+  },
+  bmcUpdateNetwork(sessionId, assetId, payload) {
+    return datacenterApi.action(sessionId, 'bmc_update_network', { asset_id: assetId, ...payload })
+  },
 }
 
 export default datacenterApi

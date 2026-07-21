@@ -9,6 +9,9 @@ import {
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { useSimSession } from '../sim/shared'
+import {
+  MotherboardPanel, RaidPanel, BiosPanel, BmcPanel, CampusRoomView,
+} from './ServerTwinPanels'
 import '../../styles/sim-products.css'
 import './DatacenterSimulator.css'
 
@@ -30,7 +33,11 @@ const COMPONENT_META = {
   hba: { label: 'HBA', icon: Network },
 }
 
-const ROOM_ICONS = { data_hall: Building2, network: Router, mechanical: Thermometer, electrical: Plug }
+const ROOM_ICONS = {
+  data_hall: Building2, network: Router, mechanical: Thermometer, electrical: Plug,
+  campus: Building2, security: ShieldCheck, office: Building2, ops: MonitorCog,
+  logistics: Boxes, safety: AlertTriangle,
+}
 
 const ROLE_META = {
   esxi_host: { label: 'ESXi Host', icon: Boxes },
@@ -76,6 +83,7 @@ export default function DatacenterSimulator({
   const [expandedRack, setExpandedRack] = useState(null)
   const [selectedServerId, setSelectedServerId] = useState(null)
   const [flashId, setFlashId] = useState(null)
+  const [drawerTab, setDrawerTab] = useState('overview')
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const dragRef = useRef(null)
   const movedRef = useRef(false)
@@ -92,6 +100,7 @@ export default function DatacenterSimulator({
   const network = st.network || { switches: [], topology: [] }
   const powerChain = st.power_chain || {}
   const facility = st.facility || {}
+  const campus = st.campus || {}
   const currentRoomId = st.current_room || 'data-hall-a'
   const currentRoom = rooms.find((r) => r.id === currentRoomId) || rooms[0] || { type: 'data_hall', racks: [] }
 
@@ -301,7 +310,7 @@ export default function DatacenterSimulator({
                           return (
                             <button key={s.id} type="button"
                               className={`dc-server-card ${flashId === s.id ? 'dc-flash' : ''} ${hasFailure ? 'dc-server-alert' : ''}`}
-                              onClick={(e) => { e.stopPropagation(); setSelectedServerId(s.id) }}>
+                              onClick={(e) => { e.stopPropagation(); setSelectedServerId(s.id); setDrawerTab('overview') }}>
                               <span className="dc-server-u">U{s.u_slot}</span>
                               <span className="dc-server-host">{s.hostname}</span>
                               <span className={`dc-server-power ${s.power_state === 'on' ? 'dc-power-on' : 'dc-power-off'}`}>
@@ -321,20 +330,20 @@ export default function DatacenterSimulator({
         </div>
       )}
 
-      {currentRoom.type === 'network' && (
+      {currentRoom.type === 'network' && currentRoom.id === 'mdf' && (
         <div className="dc-room-body">
-          <NetworkRoomView network={network} servers={servers} onSelectServer={setSelectedServerId} />
+          <NetworkRoomView network={network} servers={servers} onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }} />
         </div>
       )}
 
-      {currentRoom.type === 'mechanical' && (
+      {currentRoom.type === 'mechanical' && currentRoom.id === 'mechanical' && (
         <div className="dc-room-body">
           <MechanicalRoomView cooling={cooling} busy={busy}
             onRestore={(cracId) => doAction(() => datacenterApi.restoreCrac(sessionId, cracId), 'CRAC restored')} />
         </div>
       )}
 
-      {currentRoom.type === 'electrical' && (
+      {currentRoom.type === 'electrical' && currentRoom.id === 'electrical' && (
         <div className="dc-room-body">
           <ElectricalRoomView powerChain={powerChain} facility={facility} busy={busy}
             onTrip={(pduId) => doAction(() => datacenterApi.tripPduBreaker(sessionId, pduId), 'Breaker tripped')}
@@ -342,19 +351,96 @@ export default function DatacenterSimulator({
         </div>
       )}
 
+      {currentRoom.type !== 'data_hall'
+        && !(currentRoom.type === 'network' && currentRoom.id === 'mdf')
+        && !(currentRoom.type === 'mechanical' && currentRoom.id === 'mechanical')
+        && !(currentRoom.type === 'electrical' && currentRoom.id === 'electrical') && (
+        <div className="dc-room-body">
+          <CampusRoomView room={currentRoom} campus={campus} />
+        </div>
+      )}
+
       {selectedServer && (
         <div className="dc-drawer-backdrop" onClick={() => setSelectedServerId(null)}>
-          <div className="dc-drawer" onClick={(e) => e.stopPropagation()}>
+          <div className="dc-drawer dc-drawer-wide" onClick={(e) => e.stopPropagation()}>
             <div className="dc-drawer-head">
               <div>
                 <div className="dc-drawer-title">
                   {selectedServer.hostname} <RoleBadge role={selectedServer.role} />
                 </div>
-                <div className="dc-drawer-sub">{selectedServer.rack} · U{selectedServer.u_slot} · power {selectedServer.power_state}</div>
+                <div className="dc-drawer-sub">{selectedServer.vendor} {selectedServer.model} · {selectedServer.rack} U{selectedServer.u_slot} · {selectedServer.power_state}</div>
               </div>
               <button type="button" onClick={() => setSelectedServerId(null)} className="dc-drawer-close"><X size={16} /></button>
             </div>
 
+            <div className="dc-drawer-tabs">
+              {[
+                ['overview', 'Overview'],
+                ['motherboard', 'Motherboard'],
+                ['raid', 'RAID'],
+                ['bios', 'BIOS/UEFI'],
+                ['bmc', selectedServer.bmc?.product || 'iDRAC/iLO'],
+              ].map(([key, label]) => (
+                <button key={key} type="button"
+                  className={`dc-drawer-tab ${drawerTab === key ? 'dc-drawer-tab-active' : ''}`}
+                  onClick={() => setDrawerTab(key)}>{label}</button>
+              ))}
+            </div>
+
+            {drawerTab === 'motherboard' && (
+              <div className="dc-drawer-section">
+                <MotherboardPanel
+                  motherboard={selectedServer.motherboard}
+                  busy={busy}
+                  onToggleCover={() => doAction(() => datacenterApi.toggleChassisCover(sessionId, selectedServer.id), 'Chassis cover toggled', selectedServer.id)}
+                  onReplaceDimm={(slotId) => doAction(() => datacenterApi.replaceDimmSlot(sessionId, selectedServer.id, slotId), `DIMM ${slotId} replaced`, selectedServer.id)}
+                  onApplyPaste={(socketId) => doAction(() => datacenterApi.applyThermalPaste(sessionId, selectedServer.id, socketId), `Paste on ${socketId}`, selectedServer.id)}
+                />
+              </div>
+            )}
+
+            {drawerTab === 'raid' && (
+              <div className="dc-drawer-section">
+                <RaidPanel
+                  raid={selectedServer.raid}
+                  busy={busy}
+                  onFailDisk={(diskId) => doAction(() => datacenterApi.raidFailDisk(sessionId, selectedServer.id, diskId), `${diskId} failed`, selectedServer.id)}
+                  onRebuild={(vdId) => doAction(() => datacenterApi.raidRebuild(sessionId, selectedServer.id, vdId), `${vdId} rebuilt`, selectedServer.id)}
+                  onSetCache={(mode) => doAction(() => datacenterApi.raidSetCache(sessionId, selectedServer.id, mode), `Cache ${mode}`, selectedServer.id)}
+                  onCreateVd={(payload) => doAction(() => datacenterApi.raidCreateVd(sessionId, selectedServer.id, payload), 'VD created', selectedServer.id)}
+                />
+              </div>
+            )}
+
+            {drawerTab === 'bios' && (
+              <div className="dc-drawer-section">
+                <BiosPanel
+                  bios={selectedServer.bios}
+                  busy={busy}
+                  onEnter={() => doAction(() => datacenterApi.biosEnterSetup(sessionId, selectedServer.id), 'BIOS setup', selectedServer.id)}
+                  onExit={() => doAction(() => datacenterApi.biosExitSetup(sessionId, selectedServer.id), 'BIOS exit', selectedServer.id)}
+                  onSet={(key, value) => doAction(() => datacenterApi.biosSet(sessionId, selectedServer.id, key, value), `BIOS ${key}`, selectedServer.id)}
+                  onCmosReset={() => doAction(() => datacenterApi.biosCmosReset(sessionId, selectedServer.id), 'CMOS reset', selectedServer.id)}
+                />
+              </div>
+            )}
+
+            {drawerTab === 'bmc' && (
+              <div className="dc-drawer-section">
+                <BmcPanel
+                  bmc={selectedServer.bmc}
+                  vendor={selectedServer.vendor}
+                  busy={busy}
+                  onPower={(mode) => doAction(() => datacenterApi.bmcPower(sessionId, selectedServer.id, mode), `BMC ${mode}`, selectedServer.id)}
+                  onMountIso={(image) => doAction(() => datacenterApi.bmcMountIso(sessionId, selectedServer.id, image), 'ISO mounted', selectedServer.id)}
+                  onDiag={(suite) => doAction(() => datacenterApi.bmcRunDiagnostics(sessionId, selectedServer.id, suite), `${suite} diagnostics`, selectedServer.id)}
+                  onUpdateNet={(payload) => doAction(() => datacenterApi.bmcUpdateNetwork(sessionId, selectedServer.id, payload), 'BMC network', selectedServer.id)}
+                />
+              </div>
+            )}
+
+            {drawerTab === 'overview' && (
+              <>
             <div className="dc-drawer-section">
               <div className="dc-drawer-label">Component health</div>
               <div className="dc-component-grid">
@@ -565,6 +651,8 @@ export default function DatacenterSimulator({
                   )}
                 </div>
               </div>
+            )}
+            </>
             )}
           </div>
         </div>

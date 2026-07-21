@@ -1,0 +1,363 @@
+import { useState } from 'react'
+import {
+  CircuitBoard, Cpu, HardDrive, MonitorCog, Shield, Zap, RefreshCw, Disc,
+} from 'lucide-react'
+
+/** Interactive motherboard map — component pickers + bus util bars */
+export function MotherboardPanel({ motherboard, busy, onToggleCover, onReplaceDimm, onApplyPaste }) {
+  const [selected, setSelected] = useState(null)
+  if (!motherboard) return <p className="dc-muted">No motherboard data.</p>
+  const sel = selected && (
+    motherboard.cpu_sockets?.find((c) => c.id === selected)
+    || motherboard.dimm_slots?.find((d) => d.id === selected)
+    || motherboard.pcie_slots?.find((p) => p.id === selected)
+    || motherboard.chips?.find((c) => c.id === selected)
+  )
+
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><CircuitBoard size={13} /> {motherboard.model}</span>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={onToggleCover}>
+          {motherboard.cover_open ? 'Close cover' : 'Open cover / service mode'}
+        </button>
+      </div>
+      {motherboard.maintenance_mode && (
+        <div className="dc-objective-note">Maintenance mode — cover open. Replace FRUs, reapply paste, then close cover.</div>
+      )}
+      <div className="dc-mb-canvas">
+        <div className="dc-mb-zone">
+          <div className="dc-mb-zone-label">CPU / VRM</div>
+          {(motherboard.cpu_sockets || []).map((c) => (
+            <button key={c.id} type="button"
+              className={`dc-mb-chip ${selected === c.id ? 'dc-mb-chip-sel' : ''} ${c.status !== 'healthy' ? 'dc-mb-chip-bad' : ''}`}
+              onClick={() => setSelected(c.id)}>
+              <Cpu size={12} /> {c.id}<br /><span>{c.die}</span>
+            </button>
+          ))}
+        </div>
+        <div className="dc-mb-zone">
+          <div className="dc-mb-zone-label">DIMM</div>
+          <div className="dc-mb-dimm-grid">
+            {(motherboard.dimm_slots || []).map((d) => (
+              <button key={d.id} type="button"
+                className={`dc-mb-dimm ${selected === d.id ? 'dc-mb-chip-sel' : ''} ${d.status !== 'healthy' ? 'dc-mb-chip-bad' : ''}`}
+                onClick={() => setSelected(d.id)} title={d.module}>
+                {d.id}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="dc-mb-zone">
+          <div className="dc-mb-zone-label">PCIe</div>
+          {(motherboard.pcie_slots || []).map((p) => (
+            <button key={p.id} type="button"
+              className={`dc-mb-chip ${selected === p.id ? 'dc-mb-chip-sel' : ''}`}
+              onClick={() => setSelected(p.id)}>
+              {p.id} x{p.lanes} · {p.device || 'empty'}
+            </button>
+          ))}
+        </div>
+        <div className="dc-mb-zone">
+          <div className="dc-mb-zone-label">BMC / BIOS / TPM</div>
+          {(motherboard.chips || []).map((c) => (
+            <button key={c.id} type="button"
+              className={`dc-mb-chip ${selected === c.id ? 'dc-mb-chip-sel' : ''}`}
+              onClick={() => setSelected(c.id)}>
+              {c.id}: {c.model}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="dc-bus-bars">
+        {(motherboard.buses || []).map((b) => (
+          <div key={b.id} className="dc-bus-row">
+            <span className="dc-bus-name" style={{ color: b.color }}>{b.id}</span>
+            <div className="dc-bus-track">
+              <div className="dc-bus-fill" style={{ width: `${b.util_pct}%`, background: b.color }} />
+            </div>
+            <span className="dc-bus-pct">{b.util_pct}% · err {b.errors}</span>
+          </div>
+        ))}
+      </div>
+      {sel && (
+        <div className="dc-mb-detail">
+          <strong>{sel.id || sel.model}</strong>
+          <pre className="dc-mb-json">{JSON.stringify(sel, null, 2)}</pre>
+          {sel.module && (
+            <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
+              onClick={() => onReplaceDimm?.(sel.id)}>Replace DIMM</button>
+          )}
+          {sel.die && (
+            <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+              onClick={() => onApplyPaste?.(sel.id)}>Reapply thermal paste</button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** PERC / Smart Array style RAID manager */
+export function RaidPanel({ raid, busy, onFailDisk, onRebuild, onSetCache, onCreateVd }) {
+  const [level, setLevel] = useState('RAID1')
+  const [name, setName] = useState('NEWVD')
+  if (!raid) return <p className="dc-muted">No RAID controller.</p>
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><HardDrive size={13} /> {raid.controller}</span>
+        <span className="dc-muted">FW {raid.firmware}</span>
+      </div>
+      <div className="dc-raid-cache">
+        Cache: <strong>{raid.cache?.mode}</strong> · BBU {raid.cache?.bbu} ({raid.cache?.bbu_charge_pct}%)
+        <div className="dc-action-row mt-1">
+          {['WriteBack', 'WriteThrough'].map((m) => (
+            <button key={m} type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+              onClick={() => onSetCache?.(m)}>{m}</button>
+          ))}
+        </div>
+      </div>
+      <div className="dc-drawer-label">Physical disks</div>
+      <table className="dc-port-table">
+        <thead><tr><th>ID</th><th>Bay</th><th>Model</th><th>Size</th><th>Status</th><th>SMART</th><th /></tr></thead>
+        <tbody>
+          {(raid.physical_disks || []).map((d) => (
+            <tr key={d.id}>
+              <td>{d.id}</td><td>{d.bay}</td><td>{d.model}</td>
+              <td>{d.size_gb}G</td>
+              <td><span className={`dc-port-badge ${d.status === 'online' || d.status === 'hotspare' ? 'dc-port-up' : 'dc-port-down'}`}>{d.status}</span></td>
+              <td>{d.smart} · {d.temp_c}°C · wear {d.wear_pct}%</td>
+              <td>
+                {d.status !== 'failed' && (
+                  <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
+                    onClick={() => onFailDisk?.(d.id)}>Fail</button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="dc-drawer-label mt-2">Virtual disks</div>
+      {(raid.virtual_disks || []).map((vd) => (
+        <div key={vd.id} className="dc-vd-card">
+          <div className="dc-vd-head">
+            <strong>{vd.id} · {vd.name}</strong>
+            <span>{vd.raid_level} · {vd.size_gb} GB · {vd.status}</span>
+          </div>
+          <div className="dc-muted">Members: {(vd.members || []).join(', ')} · {vd.write_policy}</div>
+          {vd.status === 'degraded' && (
+            <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs mt-1"
+              onClick={() => onRebuild?.(vd.id)}><RefreshCw size={11} /> Rebuild / promote hotspare</button>
+          )}
+        </div>
+      ))}
+      <div className="dc-drawer-label mt-2">Create virtual disk</div>
+      <div className="dc-action-row">
+        <input className="dc-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
+        <select className="dc-input" value={level} onChange={(e) => setLevel(e.target.value)}>
+          {['RAID0', 'RAID1', 'RAID5', 'RAID6', 'RAID10', 'RAID50', 'RAID60'].map((l) => (
+            <option key={l} value={l}>{l}</option>
+          ))}
+        </select>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onCreateVd?.({ name, raid_level: level, members: ['PD0', 'PD1'], size_gb: 1920 })}>
+          Create VD
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** BIOS / UEFI setup screen */
+export function BiosPanel({ bios, busy, onEnter, onExit, onSet, onCmosReset }) {
+  if (!bios) return <p className="dc-muted">No BIOS data.</p>
+  if (!bios.setup_open) {
+    return (
+      <div className="dc-twin-panel">
+        <div className="dc-twin-title"><MonitorCog size={13} /> UEFI {bios.version} · {bios.mode}</div>
+        <p className="dc-muted">Secure Boot {bios.secure_boot ? 'On' : 'Off'} · TPM {bios.tpm}</p>
+        <button type="button" disabled={busy} className="dc-btn-primary" onClick={onEnter}>
+          Enter Setup (F2)
+        </button>
+        <button type="button" disabled={busy} className="dc-btn-outline ml-2" onClick={onCmosReset}>
+          CMOS Reset
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div className="dc-bios-screen">
+      <div className="dc-bios-bar">System Setup — {bios.vendor} UEFI {bios.version}
+        <button type="button" className="dc-btn-outline dc-btn-xs" onClick={onExit} disabled={busy}>Exit</button>
+      </div>
+      <div className="dc-bios-grid">
+        <div>
+          <div className="dc-drawer-label">Boot Order</div>
+          <ol className="dc-bios-boot">
+            {(bios.boot_order || []).map((b) => <li key={b}>{b}</li>)}
+          </ol>
+          <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+            onClick={() => {
+              const o = [...(bios.boot_order || [])]
+              if (o.length > 1) { const x = o.shift(); o.push(x); onSet?.('boot_order', o) }
+            }}>Rotate boot order</button>
+        </div>
+        <div>
+          <div className="dc-drawer-label">Settings</div>
+          {Object.entries(bios.settings || {}).map(([k, v]) => (
+            <div key={k} className="dc-bios-row">
+              <span>{k}</span>
+              <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                onClick={() => onSet?.(k, v === 'Enabled' ? 'Disabled' : 'Enabled')}>
+                {String(v)}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** iDRAC9 / iLO 5 management console */
+export function BmcPanel({ bmc, vendor, busy, onPower, onMountIso, onDiag, onUpdateNet }) {
+  const [iso, setIso] = useState('rhel-9.4-x86_64-dvd.iso')
+  if (!bmc) return <p className="dc-muted">No BMC.</p>
+  const s = bmc.sensors || {}
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><Shield size={13} /> {bmc.product} · {bmc.chip}</span>
+        <span className="dc-muted">FW {bmc.firmware}</span>
+      </div>
+      <div className="dc-bmc-row"><span className="dc-bmc-key">URL</span><span className="dc-bmc-mono">{bmc.endpoint}</span></div>
+      <div className="dc-bmc-row"><span className="dc-bmc-key">IP</span>
+        <span className="dc-bmc-val">{bmc.network?.ipv4} · VLAN {bmc.network?.vlan} · {bmc.network?.mode}</span>
+      </div>
+      <div className="dc-bmc-sensors">
+        <span>Inlet {s.inlet_c}°C</span>
+        <span>CPU1 {s.cpu1_c}°C</span>
+        <span>CPU2 {s.cpu2_c}°C</span>
+        <span>Fans {s.fans_rpm} RPM</span>
+        <span>PSU {s.psu1_w}/{s.psu2_w} W</span>
+        <span>12V {s['12v']}V</span>
+      </div>
+      <div className="dc-action-row">
+        {['on', 'off', 'reset', 'cycle'].map((m) => (
+          <button key={m} type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+            onClick={() => onPower?.(m)}>{m}</button>
+        ))}
+      </div>
+      <div className="dc-drawer-label mt-2">Virtual media</div>
+      <div className="dc-action-row">
+        <input className="dc-input" value={iso} onChange={(e) => setIso(e.target.value)} />
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onMountIso?.(iso)}>
+          <Disc size={11} /> Mount ISO
+        </button>
+        {bmc.virtual_media?.mounted && <span className="dc-text-ok">Mounted: {bmc.virtual_media.image}</span>}
+      </div>
+      <div className="dc-drawer-label mt-2">{vendor === 'HPE' ? 'Insight Diagnostics' : 'ePSA Diagnostics'}</div>
+      <div className="dc-action-row">
+        {(bmc.diagnostics?.suites || ['Memory', 'CPU', 'Storage']).map((suite) => (
+          <button key={suite} type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+            onClick={() => onDiag?.(suite)}>{suite}</button>
+        ))}
+      </div>
+      {bmc.diagnostics?.last_run && (
+        <div className="dc-muted mt-1">Last: {bmc.diagnostics.suite} → {bmc.diagnostics.result} @ {bmc.diagnostics.last_run}</div>
+      )}
+      <div className="dc-drawer-label mt-2">SEL</div>
+      <div className="dc-bmc-sel">
+        {(bmc.sel || []).slice(0, 5).map((e, i) => (
+          <div key={i} className="dc-bmc-sel-row"><span className="dc-bmc-sel-time">{e.time}</span> {e.message}</div>
+        ))}
+      </div>
+      <div className="dc-drawer-label mt-2">Protocols</div>
+      <div className="dc-action-row">
+        {(bmc.protocols_enabled || []).map((p) => <span key={p} className="dc-topology-chip">{p}</span>)}
+      </div>
+      <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs mt-2"
+        onClick={() => onUpdateNet?.({ vlan: 90 })}>
+        <Zap size={11} /> Refresh BMC network
+      </button>
+    </div>
+  )
+}
+
+/** Campus / plant room overview cards */
+export function CampusRoomView({ room, campus }) {
+  if (!room) return null
+  const c = campus || {}
+  if (room.type === 'campus' || room.id === 'campus') {
+    return (
+      <div className="dc-campus-grid">
+        <CampusCard title="Parking" body={`${c.parking?.occupied ?? 0} / ${c.parking?.spaces ?? 0} occupied`} />
+        <CampusCard title="Access" body={`Gate ${c.access?.gate} · Biometrics ${c.access?.biometrics} · ${c.access?.cameras} cameras`} />
+        <CampusCard title="Generators" body={(c.generators || []).map((g) => `${g.id} ${g.status} ${g.fuel_pct}% fuel`).join(' · ')} />
+        <CampusCard title="Diesel" body={(c.diesel_tanks || []).map((t) => `${t.id} ${t.level_pct}%`).join(' · ')} />
+        <CampusCard title="Cooling towers" body={(c.cooling_towers || []).map((t) => `${t.id} ${t.status}`).join(' · ')} />
+        <CampusCard title="Chillers" body={(c.chillers || []).map((t) => `${t.id} ${t.status}`).join(' · ')} />
+        <CampusCard title="Transformers" body={(c.transformers || []).map((t) => `${t.id} ${t.load_pct}%`).join(' · ')} />
+      </div>
+    )
+  }
+  if (room.id === 'generator-yard') {
+    return (
+      <div className="dc-campus-grid">
+        {(c.generators || []).map((g) => (
+          <CampusCard key={g.id} title={g.id} body={`${g.kw} kW · ${g.status} · fuel ${g.fuel_pct}%`} />
+        ))}
+        {(c.diesel_tanks || []).map((t) => (
+          <CampusCard key={t.id} title={t.id} body={`${t.liters} L · ${t.level_pct}%`} />
+        ))}
+      </div>
+    )
+  }
+  if (room.id === 'chillers' || (room.type === 'mechanical' && room.id !== 'mechanical')) {
+    return (
+      <div className="dc-campus-grid">
+        {(c.chillers || []).map((ch) => (
+          <CampusCard key={ch.id} title={ch.id} body={`${ch.tons} tons · ${ch.status}${ch.cop ? ` · COP ${ch.cop}` : ''}`} />
+        ))}
+        {(c.cooling_towers || []).map((t) => (
+          <CampusCard key={t.id} title={t.id} body={`${t.status} · approach ${t.approach_c}°C`} />
+        ))}
+      </div>
+    )
+  }
+  if (room.id === 'substation' || room.id === 'battery') {
+    return (
+      <div className="dc-campus-grid">
+        {(c.transformers || []).map((x) => (
+          <CampusCard key={x.id} title={x.id} body={`${x.kva} kVA · ${x.status} · load ${x.load_pct}%`} />
+        ))}
+        {room.id === 'battery' && <CampusCard title="VRLA strings" body="Battery room online · float charge nominal" />}
+      </div>
+    )
+  }
+  return (
+    <div className="dc-campus-empty">
+      <BuildingHint room={room} />
+    </div>
+  )
+}
+
+function CampusCard({ title, body }) {
+  return (
+    <div className="dc-crac-card">
+      <div className="dc-crac-id">{title}</div>
+      <div className="dc-crac-zone">{body}</div>
+    </div>
+  )
+}
+
+function BuildingHint({ room }) {
+  return (
+    <div className="dc-crac-card" style={{ maxWidth: 480 }}>
+      <div className="dc-crac-id">{room.name}</div>
+      <div className="dc-crac-zone">Zone: {room.zone || room.type}. Use Data Hall / MDF / Mechanical / Electrical for live rack and plant controls. This zone is part of the digital-twin campus map for training navigation.</div>
+    </div>
+  )
+}
