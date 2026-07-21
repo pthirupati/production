@@ -107,7 +107,7 @@ export function renderDockerV2Page({ nav, daemon, sessionId, busy, run }) {
           {
             key: 'actions', label: '',
             render: (r) => (
-              <button type="button" className="docker-btn-sm" disabled={busy}
+              <button type="button" className="docker-btn-ghost" disabled={busy}
                 onClick={(e) => { e.stopPropagation(); run(() => dockerApi.registryPull(sessionId, r.name, r.tag), 'Pulled') }}>
                 Pull
               </button>
