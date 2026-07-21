@@ -69,21 +69,27 @@ export function HyperV() {
   const [sel, setSel] = useState('')
   const [settings, setSettings] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [consoleMsg, setConsoleMsg] = useState('')
+  const [showNet, setShowNet] = useState(false)
   const VMS = (hypervVms && hypervVms.length) ? hypervVms : FALLBACK_VMS
   const cur = VMS.find((v) => v.name === (sel || VMS[0]?.name)) || VMS[0]
 
-  const act = async (action, name) => {
+  const act = async (action, name, extra = {}) => {
     if (!labAction || busy) return
     setBusy(true)
-    try { await labAction(action, { name }) }
-    finally { setBusy(false) }
+    try {
+      const res = await labAction(action, { name, ...extra })
+      if (action === 'hyperv_connect' && res?.message) setConsoleMsg(res.message)
+    } finally { setBusy(false) }
   }
 
   return (
     <div className="winos-app">
       <div className="winos-toolbar">
         <span style={{ fontSize: 12 }}>File &nbsp; Action &nbsp; View &nbsp; Help</span>
-        <button type="button" className="winos-btn" style={{ marginLeft: 'auto' }} disabled={busy || !labAction}
+        <button type="button" className="winos-btn" style={{ marginLeft: 'auto' }} disabled={busy}
+          onClick={() => setShowNet((v) => !v)}>Virtual Switch Manager…</button>
+        <button type="button" className="winos-btn" disabled={busy || !labAction}
           onClick={() => act('hyperv_create', `NEW-VM-${Date.now().toString(36).slice(-3).toUpperCase()}`)}>
           New…
         </button>
@@ -93,6 +99,26 @@ export function HyperV() {
           <div className="winos-tree-row sel"><Box size={13} /> SERVER01</div>
         </div>
         <div className="winos-main" style={{ display: 'flex', flexDirection: 'column' }}>
+          {showNet && (
+            <div style={{ padding: 10, borderBottom: '1px solid #ddd', fontSize: 12 }}>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Virtual switches</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                {['External', 'Internal', 'Private'].map((t) => (
+                  <button key={t} type="button" className="winos-btn" disabled={busy || !labAction}
+                    onClick={() => act('hyperv_create_vswitch', `Lab-${t}-${Date.now().toString(36).slice(-3)}`, { type: t, name: `Lab-${t}-${Date.now().toString(36).slice(-3)}` })}>
+                    New {t}
+                  </button>
+                ))}
+              </div>
+              <p style={{ color: '#666', margin: 0 }}>Use Settings → Network Adapter to attach a VM to a switch. Create VHDX via New VM or disk actions.</p>
+            </div>
+          )}
+          {consoleMsg && (
+            <div style={{ padding: '8px 12px', background: '#1a1a2e', color: '#9fef00', fontFamily: 'Consolas, monospace', fontSize: 12 }}>
+              {consoleMsg}
+              <button type="button" className="winos-btn" style={{ marginLeft: 12 }} onClick={() => setConsoleMsg('')}>Close</button>
+            </div>
+          )}
           <div style={{ flex: 1, overflow: 'auto' }}>
             <table className="winos-table">
               <thead><tr><th>Name</th><th>State</th><th>CPU Usage</th><th>Assigned Memory</th><th>Uptime</th><th>Status</th></tr></thead>
@@ -108,8 +134,9 @@ export function HyperV() {
           {cur && (
             <div style={{ borderTop: '2px solid #ccc', padding: 12, fontSize: 12 }}>
               <div style={{ fontWeight: 600, marginBottom: 6 }}>{cur.name}</div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button type="button" className="winos-btn">Connect</button>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button type="button" className="winos-btn" disabled={busy || !labAction}
+                  onClick={() => act('hyperv_connect', cur.name)}>Connect</button>
                 <button type="button" className="winos-btn" onClick={() => setSettings(cur)}>Settings…</button>
                 <button type="button" className="winos-btn" disabled={busy || cur.state === 'Running'}
                   onClick={() => act('hyperv_start', cur.name)}>Start</button>
@@ -117,21 +144,38 @@ export function HyperV() {
                   onClick={() => act('hyperv_stop', cur.name)}>Turn Off…</button>
                 <button type="button" className="winos-btn" disabled={busy}
                   onClick={() => act('hyperv_checkpoint', cur.name)}>Checkpoint</button>
+                <button type="button" className="winos-btn" disabled={busy || !labAction}
+                  onClick={() => act('hyperv_create_vhdx', '', { path: `C:\\Hyper-V\\${cur.name}-data.vhdx`, attached_to: cur.name, size_gb: 40 })}>
+                  New VHDX…
+                </button>
               </div>
             </div>
           )}
         </div>
       </div>
-      {settings && <VMSettings vm={settings} onClose={() => setSettings(null)} />}
+      {settings && <VMSettings vm={settings} onClose={() => setSettings(null)} onApply={async (patch) => {
+        await act('hyperv_apply_settings', settings.name, patch)
+        setSettings(null)
+      }} busy={busy} />}
     </div>
   )
 }
 
-function VMSettings({ vm, onClose }) {
+function VMSettings({ vm, onClose, onApply, busy }) {
   const [tab, setTab] = useState('Memory')
+  const [mem, setMem] = useState(vm.memory_startup_mb || vm.mem || 2048)
+  const [cpus, setCpus] = useState(vm.processors || 2)
+  const [vswitch, setVswitch] = useState(vm.vswitch || 'Default Switch')
+  const [name, setName] = useState(vm.name)
   return (
     <Dialog title={`Settings for ${vm.name} on SERVER01`} onClose={onClose} width={580}
-      footer={<><button className="winos-btn primary" onClick={onClose}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button><button className="winos-btn">Apply</button></>}>
+      footer={
+        <>
+          <button className="winos-btn primary" disabled={busy} onClick={() => onApply?.({ memory_mb: Number(mem), processors: Number(cpus), vswitch, new_name: name !== vm.name ? name : undefined })}>OK</button>
+          <button className="winos-btn" onClick={onClose}>Cancel</button>
+          <button className="winos-btn" disabled={busy} onClick={() => onApply?.({ memory_mb: Number(mem), processors: Number(cpus), vswitch, new_name: name !== vm.name ? name : undefined })}>Apply</button>
+        </>
+      }>
       <div style={{ display: 'flex', gap: 12, minHeight: 280 }}>
         <div style={{ width: 170, flex: 'none', fontSize: 12, borderRight: '1px solid #eee' }}>
           <div style={{ fontWeight: 600, padding: '4px 6px' }}>Hardware</div>
@@ -145,25 +189,29 @@ function VMSettings({ vm, onClose }) {
         </div>
         <div style={{ flex: 1, fontSize: 12.5 }}>
           {tab === 'Memory' && <div className="winos-grid2">
-            <span>RAM:</span><span><input className="winos-input" defaultValue={vm.mem || 2048} style={{ width: 90 }} /> MB</span>
+            <span>RAM:</span><span><input className="winos-input" value={mem} onChange={(e) => setMem(e.target.value)} style={{ width: 90 }} /> MB</span>
             <span>Dynamic Memory:</span><label><input type="checkbox" /> Enable Dynamic Memory</label>
             <span>Minimum RAM:</span><span><input className="winos-input" defaultValue={512} style={{ width: 90 }} /> MB</span>
             <span>Maximum RAM:</span><span><input className="winos-input" defaultValue={1048576} style={{ width: 110 }} /> MB</span>
           </div>}
           {tab === 'Processor' && <div className="winos-grid2">
-            <span>Number of virtual processors:</span><input className="winos-input" type="number" defaultValue={2} min={1} max={8} style={{ width: 70 }} />
+            <span>Number of virtual processors:</span><input className="winos-input" type="number" value={cpus} min={1} max={8} style={{ width: 70 }} onChange={(e) => setCpus(e.target.value)} />
             <span>Virtual machine reserve (%):</span><input className="winos-input" defaultValue={0} style={{ width: 70 }} />
             <span>Virtual machine limit (%):</span><input className="winos-input" defaultValue={100} style={{ width: 70 }} />
           </div>}
           {tab === 'Network Adapter' && <div className="winos-grid2">
-            <span>Virtual switch:</span><select className="winos-input"><option>External Switch</option><option>Internal Switch</option><option>Private Switch</option><option>Default Switch</option></select>
+            <span>Virtual switch:</span>
+            <select className="winos-input" value={vswitch} onChange={(e) => setVswitch(e.target.value)}>
+              <option>External Switch</option><option>Internal Switch</option><option>Private Switch</option><option>Default Switch</option>
+            </select>
             <span>VLAN ID:</span><label><input type="checkbox" /> Enable virtual LAN identification</label>
+            <span>VHDX:</span><span className="font-mono" style={{ fontSize: 11 }}>{vm.vhd_path || '—'}</span>
           </div>}
           {tab === 'Firmware' && <div><div style={{ marginBottom: 6 }}>Boot order:</div><ol style={{ paddingLeft: 20 }}><li>Hard Drive</li><li>DVD Drive</li><li>Network Adapter</li></ol><label style={{ marginTop: 8, display: 'block' }}><input type="checkbox" defaultChecked /> Enable Secure Boot</label></div>}
           {tab === 'Integration Services' && ['Operating system shutdown', 'Time synchronization', 'Data Exchange', 'Heartbeat', 'Backup (volume shadow copy)', 'Guest services'].map((s) => (
             <label key={s} style={{ display: 'block', padding: '2px 0' }}><input type="checkbox" defaultChecked={s !== 'Guest services'} /> {s}</label>
           ))}
-          {tab === 'Name' && <div className="winos-grid2"><span>Name:</span><input className="winos-input" defaultValue={vm.name} /><span>Notes:</span><textarea className="winos-input" rows={3} /></div>}
+          {tab === 'Name' && <div className="winos-grid2"><span>Name:</span><input className="winos-input" value={name} onChange={(e) => setName(e.target.value)} /><span>Notes:</span><textarea className="winos-input" rows={3} /></div>}
           {['Add Hardware', 'Security', 'SCSI Controller', 'Checkpoints', 'Automatic Start Action', 'Automatic Stop Action'].includes(tab) && (
             <div style={{ color: '#555' }}>{tab === 'Automatic Start Action' ? <><label style={{ display: 'block' }}><input type="radio" name="sa" /> Nothing</label><label style={{ display: 'block' }}><input type="radio" name="sa" defaultChecked /> Automatically start if it was running when the service stopped</label><label style={{ display: 'block' }}><input type="radio" name="sa" /> Always start this virtual machine automatically</label></> : `${tab} settings for ${vm.name}.`}</div>
           )}

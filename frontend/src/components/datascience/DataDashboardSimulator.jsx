@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BarChart3, LineChart, Table2, PieChart, RefreshCw, ArrowLeft, StopCircle,
   Lightbulb, XCircle, Target, Filter, Layers, Sigma, History, RotateCcw,
-  Database, CheckCircle2,
+  Database, CheckCircle2, FileCode2, Terminal, Sparkles,
 } from 'lucide-react'
 import { datascienceApi } from '../../api/datascience'
 import LabChromeBar from '../lab/LabChromeBar'
@@ -90,6 +90,9 @@ const ACCENT = '#34d399'
 const DS_TABS = [
   { key: 'chart', label: 'Dashboard', icon: BarChart3 },
   { key: 'data', label: 'Dataset', icon: Database },
+  { key: 'notebook', label: 'Notebook', icon: FileCode2 },
+  { key: 'sql', label: 'SQL', icon: Terminal },
+  { key: 'clean', label: 'Clean', icon: Sparkles },
   { key: 'events', label: 'Activity', icon: History },
 ]
 
@@ -286,7 +289,10 @@ export default function DataDashboardSimulator({
   const [state, setState] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [tab, setTab] = useState('chart') // chart | data | events
+  const [tab, setTab] = useState('chart') // chart | data | notebook | sql | clean | events
+  const [sqlText, setSqlText] = useState('SELECT * FROM dataset LIMIT 20')
+  const [sqlPreview, setSqlPreview] = useState(null)
+  const [cleanCol, setCleanCol] = useState('')
   const pollRef = useRef(null)
 
   const load = useCallback(async () => {
@@ -602,6 +608,96 @@ export default function DataDashboardSimulator({
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {tab === 'notebook' && (
+          <div className="space-y-3">
+            {((state?.notebooks || [])[0]?.cells || []).map((cell) => (
+              <div key={cell.id} className="ds-card p-3">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-[11px] uppercase" style={{ color: 'var(--ds-muted)' }}>{cell.type} · {cell.id}</span>
+                  {cell.type === 'code' && (
+                    <button type="button" className="ds-btn !text-xs" disabled={busy}
+                      onClick={() => fire(() => datascienceApi.action(sessionId, 'run_notebook_cell', { cell_id: cell.id }))}>
+                      Run
+                    </button>
+                  )}
+                </div>
+                <pre className="ds-mono text-xs whitespace-pre-wrap p-2 rounded" style={{ background: '#061008' }}>{cell.source}</pre>
+                {cell.output && (
+                  <div className="mt-2 text-xs border-t pt-2" style={{ borderColor: 'var(--ds-border)' }}>
+                    {cell.output.type === 'table' ? (
+                      <pre className="ds-mono overflow-auto">{JSON.stringify(cell.output.rows, null, 2)}</pre>
+                    ) : (
+                      <span className="ds-mono">{cell.output.text}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+            <button type="button" className="ds-btn" disabled={busy}
+              onClick={() => fire(() => datascienceApi.action(sessionId, 'add_notebook_cell', { type: 'code', source: 'df.shape' }))}>
+              Add code cell
+            </button>
+          </div>
+        )}
+
+        {tab === 'sql' && (
+          <div className="ds-card p-4 space-y-3">
+            <label className="ds-label">SQL against Lab Environment dataset</label>
+            <textarea className="ds-select !h-28 font-mono text-xs" value={sqlText} onChange={(e) => setSqlText(e.target.value)} />
+            <button type="button" className="ds-btn" disabled={busy}
+              onClick={async () => {
+                setBusy(true)
+                try {
+                  const res = await datascienceApi.action(sessionId, 'run_sql', { sql: sqlText })
+                  if (res?.ok === false) setError(res.error || 'Query failed')
+                  else { setSqlPreview(res.preview || res.result?.preview || []); setError('') }
+                  await load()
+                } finally { setBusy(false) }
+              }}>
+              Run query
+            </button>
+            {sqlPreview && (
+              <pre className="ds-mono text-xs overflow-auto max-h-64 p-2 rounded" style={{ background: '#061008' }}>
+                {JSON.stringify(sqlPreview, null, 2)}
+              </pre>
+            )}
+            {(state?.sql_history || []).length > 0 && (
+              <div className="text-xs" style={{ color: 'var(--ds-muted)' }}>
+                Recent: {(state.sql_history || []).slice().reverse().map((h) => h.sql).join(' · ')}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === 'clean' && (
+          <div className="ds-card p-4 space-y-3">
+            <div className="flex flex-wrap gap-2 items-end">
+              <div>
+                <label className="ds-label">Column</label>
+                <select className="ds-select" value={cleanCol} onChange={(e) => setCleanCol(e.target.value)}>
+                  <option value="">— pick —</option>
+                  {columns.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <button type="button" className="ds-btn" disabled={busy || !cleanCol}
+                onClick={() => fire(() => datascienceApi.action(sessionId, 'add_clean_step', { op: 'drop_nulls', column: cleanCol }))}>
+                Drop nulls
+              </button>
+              <button type="button" className="ds-btn" disabled={busy || !cleanCol}
+                onClick={() => fire(() => datascienceApi.action(sessionId, 'add_clean_step', { op: 'fill_nulls', column: cleanCol, value: '0' }))}>
+                Fill nulls
+              </button>
+            </div>
+            <div className="space-y-1">
+              {(state?.cleaning_steps || []).length === 0 ? (
+                <div className="text-sm" style={{ color: 'var(--ds-muted)' }}>No cleaning steps yet.</div>
+              ) : (state.cleaning_steps || []).map((s) => (
+                <div key={s.id} className="text-xs ds-mono">{s.op} {s.column || ''} · {s.at}</div>
+              ))}
+            </div>
           </div>
         )}
 

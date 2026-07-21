@@ -35,6 +35,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .wireshark_v2_facades import apply_v2_action, ensure_v2, rebuild_analysis, v2_public
+
 SESSION_TTL = 7200  # 2-hour TTL matching VMware/K8s/Docker/monitoring sessions
 
 
@@ -582,9 +584,17 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
+    ensure_v2(entry["state"])
     state = copy.deepcopy(entry["state"])
     captured = _captured_packets(state)
     view = _filtered_view(state)
+    rebuild_analysis(state, view)
+    # Persist analysis back onto the live session
+    entry["state"]["expert_info"] = state.get("expert_info")
+    entry["state"]["endpoints"] = state.get("endpoints")
+    entry["state"]["flow_graph"] = state.get("flow_graph")
+    entry["state"]["analysis_at"] = state.get("analysis_at")
+    _save_session(str(session_id), entry)
     followed = state.get("followed_stream")
     stream_packets = (
         [p for p in captured if p.get("stream_id") == followed] if followed is not None else []
@@ -620,6 +630,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "task": state.get("task", ""),
         },
         "events": entry.get("events", []),
+        **v2_public(state),
     }
 
 
@@ -714,6 +725,20 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["followed_stream"] = None
         _save_session(str(session_id), entry)
         return {"ok": True, "message": "Display filter cleared"}
+
+    ensure_v2(state)
+    if action in ("refresh_analysis", "compute_expert", "compute_endpoints", "compute_flow_graph"):
+        view = _filtered_view(state)
+        from .wireshark_v2_facades import rebuild_analysis as _rebuild
+        analysis = _rebuild(state, view)
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Analysis refreshed", **analysis}
+
+    v2 = apply_v2_action(state, action, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            _save_session(str(session_id), entry)
+        return v2
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

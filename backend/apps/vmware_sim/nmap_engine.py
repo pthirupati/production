@@ -37,6 +37,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .nmap_v2_facades import apply_v2_action, enrich_scan, ensure_v2, v2_public
+
 SESSION_TTL = 7200  # 2-hour TTL matching the other simulator engines
 
 # Wall-clock delay (seconds) before a service state change a learner makes
@@ -961,10 +963,13 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     # reflects real time even when no scan/action has happened since the change.
     if _advance_ports(entry["state"]["inventory"]):
         _save_session(str(session_id), entry)
+    ensure_v2(entry["state"])
+    _save_session(str(session_id), entry)
     state = copy.deepcopy(entry["state"])
     inv = state["inventory"]
     disc = state.get("discovered", {})
     goal = state.get("goal", {})
+    tr_cache = state.get("traceroute_cache") or {}
 
     # The client UI sees the *topology shell* (subnet, gateway, firewall, the
     # scanner) and whatever it has discovered — never the ground-truth ports of
@@ -985,6 +990,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
                     "hostname": meta.get("hostname", ""),
                     "mac": meta.get("mac", ""),
                     "os": disc.get("os", {}).get(ip, ""),
+                    "traceroute": tr_cache.get(ip),
                     "ports": [
                         {"port": int(pn), **pd,
                          "version": disc.get("versions", {}).get(ip, {}).get(pn, "")}
@@ -1026,6 +1032,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "goal_title": goal.get("title", ""),
             "objective": goal.get("objective", ""),
         },
+        **v2_public(state),
     }
 
 
@@ -1084,6 +1091,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             targets, flags, sudo = parsed["targets"], parsed["flags"], parsed["sudo"]
 
         scan = _run_scan(inv, targets, flags, sudo)
+        enrich_scan(state, scan, flags=flags, inventory=inv)
         _record_discovery(state, scan)
         _save_session(str(session_id), entry)
         return {"ok": True, "message": scan["summary"], "scan": scan}
@@ -1123,8 +1131,20 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["discovered"] = {
             "live_hosts": {}, "ports": {}, "versions": {}, "os": {}, "scans": [],
         }
+        ensure_v2(state)
+        state["nse_results"] = []
+        state["traceroute_cache"] = {}
+        state["compare_baseline"] = None
+        state["compare_last"] = None
         _save_session(str(session_id), entry)
         return {"ok": True, "message": "Discovery state reset"}
+
+    ensure_v2(state)
+    v2 = apply_v2_action(state, action, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            _save_session(str(session_id), entry)
+        return v2
 
     return {"ok": False, "error": f"unknown action: {action}"}
 

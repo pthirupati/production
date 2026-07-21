@@ -796,6 +796,9 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "settings": world.get("settings", {}),
         "sccm": world.get("sccm", {}),
         "hyperv_vms": world.get("hyperv_vms") or (world.get("v2") or {}).get("hyperv_vms") or [],
+        "vswitches": world.get("vswitches") or (world.get("v2") or {}).get("vswitches") or [],
+        "vhdx_disks": world.get("vhdx_disks") or (world.get("v2") or {}).get("vhdx_disks") or [],
+        "console_sessions": world.get("console_sessions") or (world.get("v2") or {}).get("console_sessions") or [],
         # Human-readable goal (objective/title) — never leaks the answer beyond
         # what the objective already tells the learner.
         "goal": {

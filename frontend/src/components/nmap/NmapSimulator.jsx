@@ -290,6 +290,7 @@ export default function NmapSimulator({
   const [scanProgress, setScanProgress] = useState(0)     // 0..100 for the progress bar
   const [portFilter, setPortFilter] = useState('')        // Search Scan Results → filters the ports table
   const [topoZoom, setTopoZoom] = useState(1)             // functional topology zoom (replaces decorative buttons)
+  const [compareDiff, setCompareDiff] = useState(null)
   const pollRef = useRef(null)
   const streamTimersRef = useRef([])   // setTimeout ids for the progressive reveal
   const streamingRef = useRef(false)   // true while a scan animation is in flight (pauses poll clobber)
@@ -555,10 +556,16 @@ export default function NmapSimulator({
     ['-sV', 'Version'], ['-O', 'OS (sudo)'], ['-A', 'Aggressive'], ['-Pn', 'Skip discovery'], ['--traceroute', 'Traceroute'],
   ]
 
-  const handleMenu = (item) => {
+  const handleMenu = async (item) => {
     setMenuOpen(null)
     if (item === 'NSE Scripts Browser') setModal('nse')
-    else if (item === 'Compare Results') setModal('compare')
+    else if (item === 'Compare Results') {
+      setModal('compare')
+      try {
+        const res = await nmapApi.action(sessionId, 'compare_scans', {})
+        if (res?.ok) setCompareDiff(res.compare || null)
+      } catch { /* ignore */ }
+    }
     else if (item === 'Command Wizard') setModal('wizard')
     else if (item === 'About') setModal('about')
     else if (item === 'Search Scan Results') setModal('search')
@@ -933,8 +940,14 @@ export default function NmapSimulator({
                   <table className="nm-table"><tbody><tr><td>{activeHost.os || 'Linux 5.x / Ubuntu 20.04'}</td><td>{activeHost.os_accuracy || 96}%</td><td className="nm-mono">cpe:/o:linux:linux_kernel</td></tr></tbody></table>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold mb-2" style={{ color: 'var(--nm-muted)' }}>Traceroute</div>
-                  <table className="nm-table"><thead><tr><th>TTL</th><th>RTT</th><th>Address</th><th>Hostname</th></tr></thead><tbody>{(activeHost.traceroute || [{ ttl: 1, rtt: '0.45ms', address: inventory.gateway || '192.168.1.1' }, { ttl: 2, rtt: '1.22ms', address: activeHost.ip }]).map((r, i) => <tr key={i}><td>{r.ttl || i + 1}</td><td>{r.rtt}</td><td>{r.address}</td><td>{r.hostname || '—'}</td></tr>)}</tbody></table>
+                  <div className="text-xs font-semibold mb-2 flex items-center justify-between" style={{ color: 'var(--nm-muted)' }}>
+                    <span>Traceroute</span>
+                    <button type="button" className="nm-btn !text-xs" onClick={async () => {
+                      await nmapApi.action(sessionId, 'traceroute', { ip: activeHost.ip })
+                      await load()
+                    }}>Run traceroute</button>
+                  </div>
+                  <table className="nm-table"><thead><tr><th>TTL</th><th>RTT</th><th>Address</th><th>Hostname</th></tr></thead><tbody>{(activeHost.traceroute || state?.traceroute_cache?.[activeHost.ip] || [{ ttl: 1, rtt: '0.45ms', address: inventory.gateway || '192.168.1.1' }, { ttl: 2, rtt: '1.22ms', address: activeHost.ip }]).map((r, i) => <tr key={i}><td>{r.ttl || i + 1}</td><td>{r.rtt}</td><td>{r.address}</td><td>{r.hostname || '—'}</td></tr>)}</tbody></table>
                 </div>
               </div>
             )}
@@ -1002,7 +1015,21 @@ export default function NmapSimulator({
                   ))}
                 </tbody>
               </table>
-              <button className="mt-3 px-3 py-1.5 rounded bg-green-600 text-white text-sm" onClick={() => { setFlags((prev) => new Set([...prev, '--script', scriptCategory])); setModal(null) }}>Add category to command</button>
+              <button className="mt-3 px-3 py-1.5 rounded bg-green-600 text-white text-sm mr-2" onClick={() => { setFlags((prev) => new Set([...prev, '--script', scriptCategory])); setModal(null) }}>Add category to command</button>
+              <button className="mt-3 px-3 py-1.5 rounded border text-sm" disabled={!selectedHost && !(state?.inventory?.discovered_hosts || [])[0]} onClick={async () => {
+                const ip = selectedHost || (state?.inventory?.discovered_hosts || [])[0]?.ip
+                if (!ip) return
+                await nmapApi.action(sessionId, 'run_nse', { ip, script: scriptCategory === 'default' ? 'http-title' : scriptCategory })
+                await load()
+                setModal(null)
+              }}>Run on selected host</button>
+              {(state?.nse_results || []).length > 0 && (
+                <div className="mt-4 text-xs space-y-1 max-h-40 overflow-auto">
+                  {(state.nse_results || []).slice().reverse().slice(0, 8).map((r) => (
+                    <div key={r.id} className="font-mono border-t pt-1">{r.host} · {r.script}: {r.output}</div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </NmapModal>
@@ -1023,11 +1050,25 @@ export default function NmapSimulator({
 
       {modal === 'compare' && (
         <NmapModal title="Compare Scans" onClose={() => setModal(null)}>
-          <div className="flex items-center gap-2 mb-3 text-sm"><GitCompare size={16} /> Compare current scan against previous scan history.</div>
+          <div className="flex items-center gap-2 mb-3 text-sm"><GitCompare size={16} /> Compare current scan against a saved baseline.</div>
+          <div className="flex gap-2 mb-3">
+            <button className="px-3 py-1.5 rounded bg-green-600 text-white text-sm" onClick={async () => {
+              await nmapApi.action(sessionId, 'save_compare_baseline', {})
+              const res = await nmapApi.action(sessionId, 'compare_scans', {})
+              if (res?.ok) setCompareDiff(res.compare || null)
+              await load()
+            }}>Save baseline</button>
+            <button className="px-3 py-1.5 rounded border text-sm" onClick={async () => {
+              const res = await nmapApi.action(sessionId, 'compare_scans', {})
+              if (res?.ok) setCompareDiff(res.compare || null)
+            }}>Refresh diff</button>
+          </div>
           <table className="w-full text-sm"><tbody>
-            <tr className="border-t"><td className="p-2">New hosts</td><td className="p-2 font-mono">{scanHosts.length}</td></tr>
-            <tr className="border-t"><td className="p-2">Open ports</td><td className="p-2 font-mono">{allPorts.filter((p) => p.state === 'open').length}</td></tr>
-            <tr className="border-t"><td className="p-2">Changed services</td><td className="p-2 font-mono">{services.length}</td></tr>
+            <tr className="border-t"><td className="p-2">New hosts</td><td className="p-2 font-mono">{(compareDiff?.new_hosts || []).join(', ') || '—'}</td></tr>
+            <tr className="border-t"><td className="p-2">Missing hosts</td><td className="p-2 font-mono">{(compareDiff?.missing_hosts || []).join(', ') || '—'}</td></tr>
+            <tr className="border-t"><td className="p-2">Open ports Δ</td><td className="p-2 font-mono">{compareDiff?.open_ports_delta ?? '—'}</td></tr>
+            <tr className="border-t"><td className="p-2">Hosts up (current)</td><td className="p-2 font-mono">{compareDiff?.current?.hosts_up ?? scanHosts.length}</td></tr>
+            <tr className="border-t"><td className="p-2">Open ports (current)</td><td className="p-2 font-mono">{compareDiff?.current?.open_ports ?? allPorts.filter((p) => p.state === 'open').length}</td></tr>
           </tbody></table>
         </NmapModal>
       )}

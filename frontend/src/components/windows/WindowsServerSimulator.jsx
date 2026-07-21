@@ -1199,7 +1199,7 @@ export default function WindowsServerSimulator({
   // Every GUI verb routes through here: apply the action, surface its message,
   // and refresh from the returned `state` (or re-fetch) so the UI is live.
   const runAction = useCallback(async (action, payload) => {
-    if (busy) return
+    if (busy) return null
     setBusy(true)
     try {
       const res = await windowsApi.action(sessionId, action, payload)
@@ -1211,8 +1211,10 @@ export default function WindowsServerSimulator({
       // The action endpoint echoes the fresh state — use it when present.
       if (res?.state) setState(res.state)
       else load()
+      return res
     } catch {
       setFlash({ kind: 'err', message: 'Action failed — try again' })
+      return null
     } finally {
       setBusy(false)
     }

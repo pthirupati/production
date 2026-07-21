@@ -31,6 +31,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .datascience_v2_facades import apply_v2_action, ensure_v2, v2_public
+
 SESSION_TTL = 7200  # 2-hour TTL matching the other simulator engines
 
 _AGGREGATIONS = ("sum", "avg", "count", "min", "max")
@@ -340,6 +342,8 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
+    ensure_v2(entry["state"])
+    _save_session(str(session_id), entry)
     state = copy.deepcopy(entry["state"])
     _recompute(state)
     ds = state["dataset"]
@@ -389,6 +393,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "dashboard_built": dash.get("computed", False),
             "objective": state.get("objective", ""),
         },
+        **v2_public(state),
     }
 
 
@@ -495,6 +500,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, "Dashboard reset")
         _save_session(str(session_id), entry)
         return {"ok": True, "message": "Dashboard reset"}
+
+    ensure_v2(state)
+    v2 = apply_v2_action(state, action, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            if action == "add_clean_step":
+                _recompute(state)
+            _event(state, v2.get("message") or action)
+            _save_session(str(session_id), entry)
+        return v2
 
     return {"ok": False, "error": f"unknown action: {action}"}
 

@@ -479,6 +479,11 @@ export default function WiresharkSimulator({
     else if (item === 'Protocol Hierarchy') setModal('protocol-hierarchy')
     else if (item === 'Conversations') setModal('conversations')
     else if (item === 'I/O Graph') setModal('io-graph')
+    else if (item === 'Expert Information') setModal('expert')
+    else if (item === 'Endpoints') setModal('endpoints')
+    else if (item === 'Flow Graph') setModal('flow-graph')
+    else if (item === 'Capture File Properties') setModal('file-props')
+    else if (item === 'Packet Lengths') setModal('packet-lengths')
     else if (item.includes('Follow') && streamPayload.length) setModal('stream')
     else if (item === 'Start') setCapturing(true)
     else if (item === 'Stop') setCapturing(false)
@@ -963,6 +968,88 @@ export default function WiresharkSimulator({
               <button className="ws-btn ws-btn-primary" onClick={() => { applyCaptureFilter(); setCapturing(true); setModal(null) }}><Radio size={13} /> Start</button>
             </div>
           </div>
+        </ModalShell>
+      )}
+
+      {modal === 'expert' && (
+        <ModalShell title="Expert Information" onClose={() => setModal(null)}>
+          <table className="ws-light-table">
+            <thead><tr><th>Severity</th><th>Group</th><th>Protocol</th><th>Summary</th><th>Packet</th></tr></thead>
+            <tbody>
+              {(state?.expert_info || []).length === 0 ? (
+                <tr><td colSpan={5} className="text-slate-500">No expert events — refresh analysis after capturing.</td></tr>
+              ) : (state.expert_info || []).map((e, i) => (
+                <tr key={i}><td>{e.severity}</td><td>{e.group}</td><td>{e.protocol}</td><td>{e.summary}</td><td>{e.packet ?? '—'}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </ModalShell>
+      )}
+
+      {modal === 'endpoints' && (
+        <ModalShell title="Endpoints" onClose={() => setModal(null)}>
+          <table className="ws-light-table">
+            <thead><tr><th>Address</th><th>Packets</th><th>Bytes</th><th>Tx</th><th>Rx</th></tr></thead>
+            <tbody>
+              {(state?.endpoints || []).map((e) => (
+                <tr key={e.address}><td className="font-mono">{e.address}</td><td>{e.packets}</td><td>{e.bytes}</td><td>{e.tx_packets}</td><td>{e.rx_packets}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </ModalShell>
+      )}
+
+      {modal === 'flow-graph' && (
+        <ModalShell title="Flow Graph" onClose={() => setModal(null)}>
+          <div className="font-mono text-xs space-y-1 max-h-[55vh] overflow-auto">
+            {(state?.flow_graph || []).length === 0 ? (
+              <div className="text-slate-500">No flows in the current view.</div>
+            ) : (state.flow_graph || []).map((f, i) => (
+              <div key={i} className="flex gap-2 border-b border-slate-100 py-1">
+                <span className="text-slate-400 w-10">{f.no}</span>
+                <span className="w-28 truncate">{f.src}</span>
+                <span className="text-blue-600">→</span>
+                <span className="w-28 truncate">{f.dst}</span>
+                <span className="text-slate-500">{f.proto}</span>
+                <span className="truncate flex-1">{f.label}</span>
+              </div>
+            ))}
+          </div>
+        </ModalShell>
+      )}
+
+      {modal === 'file-props' && (
+        <ModalShell title="Capture File Properties" onClose={() => setModal(null)}>
+          <table className="ws-light-table"><tbody>
+            <tr><td>Filename</td><td className="font-mono">fixitlab-session.pcapng</td></tr>
+            <tr><td>Packets</td><td>{summary.wire_packets ?? packets.length}</td></tr>
+            <tr><td>Displayed</td><td>{packets.length}</td></tr>
+            <tr><td>Interface</td><td>{inv.interface || 'Ethernet0'}</td></tr>
+            <tr><td>Analysis</td><td>{state?.analysis_at || '—'}</td></tr>
+          </tbody></table>
+        </ModalShell>
+      )}
+
+      {modal === 'packet-lengths' && (
+        <ModalShell title="Packet Lengths" onClose={() => setModal(null)}>
+          <table className="ws-light-table">
+            <thead><tr><th>Range</th><th>Count</th></tr></thead>
+            <tbody>
+              {(() => {
+                const buckets = { '0-63': 0, '64-127': 0, '128-255': 0, '256-511': 0, '512-1023': 0, '1024+': 0 }
+                packets.forEach((p) => {
+                  const n = Number(p.length || p.len || 0)
+                  if (n < 64) buckets['0-63'] += 1
+                  else if (n < 128) buckets['64-127'] += 1
+                  else if (n < 256) buckets['128-255'] += 1
+                  else if (n < 512) buckets['256-511'] += 1
+                  else if (n < 1024) buckets['512-1023'] += 1
+                  else buckets['1024+'] += 1
+                })
+                return Object.entries(buckets).map(([k, v]) => <tr key={k}><td>{k}</td><td>{v}</td></tr>)
+              })()}
+            </tbody>
+          </table>
         </ModalShell>
       )}
 
