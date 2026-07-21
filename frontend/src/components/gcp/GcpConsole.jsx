@@ -95,6 +95,9 @@ export default function GcpConsole({
   const [sqlName, setSqlName] = useState('sql-lab')
   const [createSecOpen, setCreateSecOpen] = useState(false)
   const [secName, setSecName] = useState('api-key')
+  const [createVmOpen, setCreateVmOpen] = useState(false)
+  const [vmName, setVmName] = useState('lab-vm')
+  const [vmMachineType, setVmMachineType] = useState('e2-medium')
 
   const st = state?.state || {}
   const loggedIn = st?.session?.logged_in
@@ -208,7 +211,13 @@ export default function GcpConsole({
 
   const renderInstances = () => (
     <div className="space-y-3">
-      <h2 className="text-lg font-semibold">VM instances</h2>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="text-lg font-semibold">VM instances</h2>
+        <button type="button" className="gcp-btn-primary flex items-center gap-1" disabled={busy}
+          onClick={() => { setVmName(`lab-vm-${Date.now().toString(36).slice(-4)}`); setCreateVmOpen(true) }}>
+          <Plus size={14} /> Create instance
+        </button>
+      </div>
       {broken.vm_undersized && (
         <div className="gcp-banner">
           <AlertTriangle size={14} /> <strong>{broken.vm_undersized}</strong> looks undersized for its current workload — consider a larger machine type.
@@ -574,6 +583,27 @@ export default function GcpConsole({
         </label>
         <label className="block text-sm mt-3">Size (GB)
           <input type="number" className="w-full mt-1 border rounded px-2 py-1.5" value={newDiskSize} onChange={(e) => setNewDiskSize(e.target.value)} />
+        </label>
+      </SimModal>
+
+      <SimModal open={createVmOpen} onClose={() => setCreateVmOpen(false)} title="Create VM instance"
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setCreateVmOpen(false)}>Cancel</button>
+          <button type="button" className="gcp-btn-primary" disabled={busy || !vmName.trim()} onClick={() => {
+            run(() => gcpApi.createInstance(sessionId, {
+              name: vmName.trim(),
+              machine_type: vmMachineType,
+            }), 'Instance created')
+            setCreateVmOpen(false)
+          }}>Create</button>
+        </>}>
+        <label className="block text-sm">Name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={vmName} onChange={(e) => setVmName(e.target.value)} />
+        </label>
+        <label className="block text-sm mt-3">Machine type
+          <select className="w-full mt-1 border rounded px-2 py-1.5" value={vmMachineType} onChange={(e) => setVmMachineType(e.target.value)}>
+            {MACHINE_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
         </label>
       </SimModal>
 

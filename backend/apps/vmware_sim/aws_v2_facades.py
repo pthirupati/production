@@ -833,6 +833,201 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         clusters.append(row)
         return {"ok": True, "message": f"Created ECS cluster {name}", "cluster": row}
 
+    if action == "create_ecs_task":
+        name = (payload.get("name") or f"task-{_hex(4)}").strip()
+        tasks = gr.setdefault("ecs", {}).setdefault("tasks", [])
+        if any(t.get("name") == name for t in tasks):
+            return {"ok": False, "error": f"Task '{name}' already exists"}
+        row = _row(payload.get("id") or f"ecstask-{_hex()}", name, {
+            "launchType": payload.get("launchType") or "FARGATE",
+            "count": int(payload.get("count") or 1),
+            "status": payload.get("status") or "RUNNING",
+        })
+        tasks.append(row)
+        return {"ok": True, "message": f"Created ECS task {name}", "task": row}
+
+    if action == "create_rds_snapshot":
+        name = (payload.get("name") or f"snap-{_hex(4)}").strip()
+        snaps = gr.setdefault("rds", {}).setdefault("snapshots", [])
+        if any(s.get("name") == name for s in snaps):
+            return {"ok": False, "error": f"Snapshot '{name}' already exists"}
+        row = _row(payload.get("id") or f"snap-{_hex()}", name, {
+            "engine": payload.get("engine") or "PostgreSQL",
+            "status": payload.get("status") or "available",
+            "created": payload.get("created") or _now(),
+        })
+        snaps.append(row)
+        return {"ok": True, "message": f"Created RDS snapshot {name}", "snapshot": row}
+
+    if action == "create_elasticache_cluster":
+        name = (payload.get("name") or f"cache-{_hex(4)}").strip()
+        clusters = gr.setdefault("elasticache", {}).setdefault("clusters", [])
+        if any(c.get("name") == name for c in clusters):
+            return {"ok": False, "error": f"Cluster '{name}' already exists"}
+        row = _row(payload.get("id") or f"cache-{_hex()}", name, {
+            "engine": payload.get("engine") or "Redis OSS",
+            "nodeType": payload.get("nodeType") or "cache.t3.micro",
+            "nodes": int(payload.get("nodes") or 1),
+            "status": payload.get("status") or "available",
+        })
+        clusters.append(row)
+        return {"ok": True, "message": f"Created ElastiCache cluster {name}", "cluster": row}
+
+    if action == "create_redshift_cluster":
+        name = (payload.get("name") or f"rs-{_hex(4)}").strip()
+        clusters = gr.setdefault("redshift", {}).setdefault("clusters", [])
+        if any(c.get("name") == name for c in clusters):
+            return {"ok": False, "error": f"Cluster '{name}' already exists"}
+        row = _row(payload.get("id") or f"redshift-{_hex()}", name, {
+            "nodeType": payload.get("nodeType") or "ra3.xlplus",
+            "nodes": int(payload.get("nodes") or 2),
+            "status": payload.get("status") or "available",
+        })
+        clusters.append(row)
+        return {"ok": True, "message": f"Created Redshift cluster {name}", "cluster": row}
+
+    if action == "create_opensearch_domain":
+        name = (payload.get("name") or f"os-{_hex(4)}").strip()
+        domains = gr.setdefault("opensearch", {}).setdefault("domains", [])
+        if any(d.get("name") == name for d in domains):
+            return {"ok": False, "error": f"Domain '{name}' already exists"}
+        row = _row(payload.get("id") or f"os-{_hex()}", name, {
+            "version": payload.get("version") or "OpenSearch 2.13",
+            "nodes": int(payload.get("nodes") or 3),
+            "status": payload.get("status") or "Active",
+        })
+        domains.append(row)
+        return {"ok": True, "message": f"Created OpenSearch domain {name}", "domain": row}
+
+    if action == "create_kinesis_stream":
+        name = (payload.get("name") or f"stream-{_hex(4)}").strip()
+        streams = gr.setdefault("kinesis", {}).setdefault("streams", [])
+        if any(s.get("name") == name for s in streams):
+            return {"ok": False, "error": f"Stream '{name}' already exists"}
+        row = _row(payload.get("id") or f"kinesis-{_hex()}", name, {
+            "mode": payload.get("mode") or "On-demand",
+            "shards": int(payload.get("shards") or 1),
+            "status": payload.get("status") or "Active",
+        })
+        streams.append(row)
+        return {"ok": True, "message": f"Created Kinesis stream {name}", "stream": row}
+
+    if action == "create_glue_job":
+        name = (payload.get("name") or f"job-{_hex(4)}").strip()
+        jobs = gr.setdefault("glue", {}).setdefault("jobs", [])
+        if any(j.get("name") == name for j in jobs):
+            return {"ok": False, "error": f"Job '{name}' already exists"}
+        row = _row(payload.get("id") or f"glue-job-{_hex()}", name, {
+            "type": payload.get("type") or "Spark",
+            "runs": int(payload.get("runs") or 0),
+            "status": payload.get("status") or "Active",
+        })
+        jobs.append(row)
+        return {"ok": True, "message": f"Created Glue job {name}", "job": row}
+
+    if action == "create_glue_database":
+        name = (payload.get("name") or f"db-{_hex(4)}").strip()
+        dbs = gr.setdefault("glue", {}).setdefault("databases", [])
+        if any(d.get("name") == name for d in dbs):
+            return {"ok": False, "error": f"Database '{name}' already exists"}
+        row = _row(payload.get("id") or f"glue-db-{_hex()}", name, {
+            "tables": int(payload.get("tables") or 0),
+            "status": payload.get("status") or "Active",
+        })
+        dbs.append(row)
+        return {"ok": True, "message": f"Created Glue database {name}", "database": row}
+
+    if action == "create_athena_workgroup":
+        name = (payload.get("name") or f"wg-{_hex(4)}").strip()
+        groups = gr.setdefault("athena", {}).setdefault("workgroups", [])
+        if any(g.get("name") == name for g in groups):
+            return {"ok": False, "error": f"Workgroup '{name}' already exists"}
+        row = _row(payload.get("id") or f"athena-{_hex()}", name, {
+            "queries": int(payload.get("queries") or 0),
+            "bytesScanned": payload.get("bytesScanned") or "0 GB",
+            "status": payload.get("status") or "Enabled",
+        })
+        groups.append(row)
+        return {"ok": True, "message": f"Created Athena workgroup {name}", "workgroup": row}
+
+    if action == "create_budget":
+        name = (payload.get("name") or f"budget-{_hex(4)}").strip()
+        budgets = gr.setdefault("billing", {}).setdefault("budgets", [])
+        if any(b.get("name") == name for b in budgets):
+            return {"ok": False, "error": f"Budget '{name}' already exists"}
+        row = _row(payload.get("id") or f"budget-{_hex()}", name, {
+            "amount": float(payload.get("amount") or 100),
+            "actual": float(payload.get("actual") or 0),
+            "status": payload.get("status") or "OK",
+        })
+        budgets.append(row)
+        return {"ok": True, "message": f"Created budget {name}", "budget": row}
+
+    if action == "create_org_account":
+        name = (payload.get("name") or f"account-{_hex(4)}").strip()
+        accounts = gr.setdefault("organizations", {}).setdefault("accounts", [])
+        if any(a.get("name") == name for a in accounts):
+            return {"ok": False, "error": f"Account '{name}' already exists"}
+        row = _row(payload.get("id") or f"{random.randint(100000000000, 999999999999)}", name, {
+            "email": payload.get("email") or f"{name}@example.com",
+            "ou": payload.get("ou") or "Engineering",
+            "status": payload.get("status") or "ACTIVE",
+        })
+        accounts.append(row)
+        return {"ok": True, "message": f"Created org account {name}", "account": row}
+
+    if action == "create_quota_request":
+        name = (payload.get("name") or f"quota-{_hex(4)}").strip()
+        reqs = gr.setdefault("servicequotas", {}).setdefault("requests", [])
+        if any(r.get("name") == name for r in reqs):
+            return {"ok": False, "error": f"Quota request '{name}' already exists"}
+        row = _row(payload.get("id") or f"qr-{_hex()}", name, {
+            "service": payload.get("service") or "EC2",
+            "requested": int(payload.get("requested") or 64),
+            "status": payload.get("status") or "CASE_OPENED",
+        })
+        reqs.append(row)
+        return {"ok": True, "message": f"Created quota request {name}", "request": row}
+
+    if action == "create_health_event":
+        name = (payload.get("name") or f"event-{_hex(4)}").strip()
+        events = gr.setdefault("health", {}).setdefault("events", [])
+        if any(e.get("name") == name for e in events):
+            return {"ok": False, "error": f"Health event '{name}' already exists"}
+        row = _row(payload.get("id") or f"health-{_hex()}", name, {
+            "service": payload.get("service") or "EC2",
+            "impact": payload.get("impact") or "Informational",
+            "status": payload.get("status") or "open",
+        })
+        events.append(row)
+        return {"ok": True, "message": f"Created health event {name}", "event": row}
+
+    if action == "create_trusted_advisor_check":
+        name = (payload.get("name") or f"check-{_hex(4)}").strip()
+        checks = gr.setdefault("trustedadvisor", {}).setdefault("checks", [])
+        if any(c.get("name") == name for c in checks):
+            return {"ok": False, "error": f"Check '{name}' already exists"}
+        row = _row(payload.get("id") or f"ta-{_hex()}", name, {
+            "category": payload.get("category") or "Security",
+            "affected": int(payload.get("affected") or 0),
+            "status": payload.get("status") or "OK",
+        })
+        checks.append(row)
+        return {"ok": True, "message": f"Created Trusted Advisor check {name}", "check": row}
+
+    if action == "create_wa_workload":
+        name = (payload.get("name") or f"workload-{_hex(4)}").strip()
+        workloads = gr.setdefault("wellarchitected", {}).setdefault("workloads", [])
+        if any(w.get("name") == name for w in workloads):
+            return {"ok": False, "error": f"Workload '{name}' already exists"}
+        row = _row(payload.get("id") or f"wa-{_hex()}", name, {
+            "lenses": payload.get("lenses") or "AWS Well-Architected Framework",
+            "risks": int(payload.get("risks") or 0),
+            "status": payload.get("status") or "Active",
+        })
+        workloads.append(row)
+        return {"ok": True, "message": f"Created Well-Architected workload {name}", "workload": row}
+
     if action == "send_sqs":
         qname = payload.get("name") or "lab-queue"
         queues = gr.setdefault("sqs", {}).setdefault("queues", [])

@@ -1736,6 +1736,21 @@ export const useAwsStore = create(
         else if (service === 'lambda' && resource === 'layers') syncAction = 'create_lambda_layer'
         else if (service === 'eks' && resource === 'node-groups') syncAction = 'create_eks_node_group'
         else if (service === 'ecs' && resource === 'clusters') syncAction = 'create_ecs_cluster'
+        else if (service === 'ecs' && resource === 'tasks') syncAction = 'create_ecs_task'
+        else if (service === 'rds' && resource === 'snapshots') syncAction = 'create_rds_snapshot'
+        else if (service === 'elasticache' && resource === 'clusters') syncAction = 'create_elasticache_cluster'
+        else if (service === 'redshift' && resource === 'clusters') syncAction = 'create_redshift_cluster'
+        else if (service === 'opensearch' && resource === 'domains') syncAction = 'create_opensearch_domain'
+        else if (service === 'kinesis' && resource === 'streams') syncAction = 'create_kinesis_stream'
+        else if (service === 'glue' && resource === 'jobs') syncAction = 'create_glue_job'
+        else if (service === 'glue' && resource === 'databases') syncAction = 'create_glue_database'
+        else if (service === 'athena' && resource === 'workgroups') syncAction = 'create_athena_workgroup'
+        else if (service === 'billing' && resource === 'budgets') syncAction = 'create_budget'
+        else if (service === 'organizations' && resource === 'accounts') syncAction = 'create_org_account'
+        else if (service === 'servicequotas' && resource === 'requests') syncAction = 'create_quota_request'
+        else if (service === 'health' && resource === 'events') syncAction = 'create_health_event'
+        else if (service === 'trustedadvisor' && resource === 'checks') syncAction = 'create_trusted_advisor_check'
+        else if (service === 'wellarchitected' && resource === 'workloads') syncAction = 'create_wa_workload'
         get()._syncAction(syncAction, syncPayload)
         if (created.pendingTransition) get()._ensureTick()
         return created
