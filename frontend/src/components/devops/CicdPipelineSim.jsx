@@ -55,6 +55,62 @@ function fmtDur(ms) {
   return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
 }
 
+/** Extract per-job image + script from GitLab / GitHub-ish YAML for lab-server sync. */
+function extractPipelineJobFields(source) {
+  const reserved = new Set([
+    'stages', 'variables', 'default', 'include', 'workflow', 'image', 'services',
+    'before_script', 'after_script', 'cache', 'pages', 'name', 'on', 'env', 'jobs',
+  ])
+  const out = {}
+  let current = null
+  let inScript = false
+  for (const raw of String(source || '').split('\n')) {
+    const line = raw.replace(/\t/g, '  ')
+    const top = line.match(/^([A-Za-z0-9_.-]+):\s*(.*)$/)
+    if (top && !line.startsWith(' ') && !line.startsWith('\t')) {
+      const key = top[1]
+      inScript = false
+      if (reserved.has(key) || key.startsWith('.')) {
+        current = null
+        continue
+      }
+      current = key
+      out[current] = out[current] || { image: null, script: [] }
+      const inline = (top[2] || '').trim()
+      if (inline && !inline.startsWith('|') && !inline.startsWith('>')) {
+        // ignore inline maps; job body continues below
+      }
+      continue
+    }
+    if (!current) continue
+    if (/^\S/.test(line) && line.includes(':')) {
+      current = null
+      inScript = false
+      continue
+    }
+    const img = line.match(/^\s{2,}image:\s*(.+?)\s*$/)
+    if (img) {
+      out[current].image = img[1].replace(/^['"]|['"]$/g, '').trim()
+      inScript = false
+      continue
+    }
+    if (/^\s{2,}(?:script|run):\s*$/.test(line)) {
+      inScript = true
+      out[current].script = []
+      continue
+    }
+    if (inScript) {
+      const step = line.match(/^\s{2,}-\s+(.+)$/)
+      if (step) {
+        out[current].script.push(step[1].replace(/^['"]|['"]$/g, '').trim())
+        continue
+      }
+      if (/^\s{2,}\w[\w-]*:\s*/.test(line)) inScript = false
+    }
+  }
+  return out
+}
+
 export default function CicdPipelineSim({
   scenario,
   sessionId,
@@ -281,6 +337,15 @@ export default function CicdPipelineSim({
     resetRunState()
     setRunning(true)
 
+    // Mirror YAML image/script edits to the lab server before the grading run.
+    if (sessionId) {
+      const fields = extractPipelineJobFields(source)
+      await Promise.all(Object.entries(fields).map(async ([id, f]) => {
+        if (f.image) await cicdApi.setImage(sessionId, id, f.image).catch(() => {})
+        if (f.script?.length) await cicdApi.fixJob(sessionId, id, f.script).catch(() => {})
+      }))
+    }
+
     // Compute artifacts up front for the graph/history.
     const runArtifacts = {}
     for (const job of pipeline.jobs) {
@@ -337,6 +402,7 @@ export default function CicdPipelineSim({
 
   const [serverState, setServerState] = useState(null)
   const [gitopsBusy, setGitopsBusy] = useState(false)
+  const [yamlBusy, setYamlBusy] = useState(false)
   const reloadServer = useCallback(async () => {
     if (!sessionId) return
     try {
@@ -374,6 +440,21 @@ export default function CicdPipelineSim({
       setGitopsBusy(false)
     }
   }, [reloadServer])
+
+  const applyYamlToLab = useCallback(async () => {
+    if (!sessionId || hasBlockingErrors) return
+    setYamlBusy(true)
+    try {
+      const fields = extractPipelineJobFields(source)
+      await Promise.all(Object.entries(fields).map(async ([id, f]) => {
+        if (f.image) await cicdApi.setImage(sessionId, id, f.image).catch(() => {})
+        if (f.script?.length) await cicdApi.fixJob(sessionId, id, f.script).catch(() => {})
+      }))
+      await reloadServer()
+    } finally {
+      setYamlBusy(false)
+    }
+  }, [sessionId, hasBlockingErrors, source, reloadServer])
 
   // Re-load a past run's captured event log into the graph/console (read-only view).
   const loadHistory = useCallback((entry) => {
@@ -614,13 +695,26 @@ export default function CicdPipelineSim({
                 Editing <code style={{ color: 'var(--cicd-accent)' }}>{providerSeeds.find((s) => s.slug === seedSlug)?.file || 'pipeline'}</code>
                 {' '}— the parsed model drives the graph live.
               </span>
-              {errors.length === 0 ? (
-                <span className="cicd-lint-ok flex items-center gap-1.5 text-[12px]"><CheckCircle2 size={14} /> Pipeline is valid</span>
-              ) : (
-                <span className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--cicd-red)' }}>
-                  <XCircle size={14} /> {errors.length} problem{errors.length > 1 ? 's' : ''}
-                </span>
-              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                {errors.length === 0 ? (
+                  <span className="cicd-lint-ok flex items-center gap-1.5 text-[12px]"><CheckCircle2 size={14} /> Pipeline is valid</span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--cicd-red)' }}>
+                    <XCircle size={14} /> {errors.length} problem{errors.length > 1 ? 's' : ''}
+                  </span>
+                )}
+                {sessionId && (
+                  <button
+                    type="button"
+                    className="cicd-btn cicd-btn-sm"
+                    disabled={yamlBusy || hasBlockingErrors}
+                    onClick={applyYamlToLab}
+                    title="Sync image and script edits to the lab server"
+                  >
+                    {yamlBusy ? 'Applying…' : 'Apply to lab'}
+                  </button>
+                )}
+              </div>
             </div>
 
             {errors.length > 0 && (

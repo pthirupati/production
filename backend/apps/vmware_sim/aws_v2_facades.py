@@ -573,6 +573,85 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         dists.append(row)
         return {"ok": True, "message": f"Created CloudFront distribution {name}", "distribution": row}
 
+    if action == "create_hosted_zone":
+        name = (payload.get("name") or f"lab-{_hex(4)}.internal").strip()
+        zones = gr.setdefault("route53", {}).setdefault("hosted-zones", [])
+        if any(z.get("name") == name for z in zones):
+            return {"ok": False, "error": f"Hosted zone '{name}' already exists"}
+        row = _row(payload.get("id") or f"Z{_hex(13).upper()}", name, {
+            "type": payload.get("type") or "Public",
+            "records": int(payload.get("records") or 2),
+            "status": payload.get("status") or "available",
+            "recordSets": payload.get("recordSets") if isinstance(payload.get("recordSets"), list) else [],
+        })
+        zones.append(row)
+        return {"ok": True, "message": f"Created hosted zone {name}", "zone": row}
+
+    if action == "create_health_check":
+        name = (payload.get("name") or f"hc-{_hex(4)}").strip()
+        checks = gr.setdefault("route53", {}).setdefault("health-checks", [])
+        if any(c.get("name") == name for c in checks):
+            return {"ok": False, "error": f"Health check '{name}' already exists"}
+        row = _row(payload.get("id") or f"hc-{_hex()}", name, {
+            "protocol": payload.get("protocol") or "HTTPS",
+            "status": payload.get("status") or "Healthy",
+        })
+        checks.append(row)
+        return {"ok": True, "message": f"Created health check {name}", "health_check": row}
+
+    if action == "create_ecr_repository":
+        name = (payload.get("name") or f"repo-{_hex(4)}").strip()
+        repos = gr.setdefault("ecr", {}).setdefault("repositories", [])
+        if any(r.get("name") == name for r in repos):
+            return {"ok": False, "error": f"Repository '{name}' already exists"}
+        row = _row(payload.get("id") or f"repo-{_hex()}", name, {
+            "visibility": payload.get("visibility") or "Private",
+            "tagMutability": payload.get("tagMutability") or "Mutable",
+            "scanOnPush": payload.get("scanOnPush") or "Enabled",
+            "images": int(payload.get("images") or 0),
+            "status": payload.get("status") or "Active",
+        })
+        repos.append(row)
+        return {"ok": True, "message": f"Created ECR repository {name}", "repository": row}
+
+    if action == "create_parameter":
+        name = (payload.get("name") or f"/lab/param-{_hex(4)}").strip()
+        params = gr.setdefault("systemsmanager", {}).setdefault("parameters", [])
+        if any(p.get("name") == name for p in params):
+            return {"ok": False, "error": f"Parameter '{name}' already exists"}
+        row = _row(payload.get("id") or f"param-{_hex()}", name, {
+            "type": payload.get("type") or "String",
+            "tier": payload.get("tier") or "Standard",
+            "status": payload.get("status") or "Active",
+        })
+        params.append(row)
+        return {"ok": True, "message": f"Created parameter {name}", "parameter": row}
+
+    if action == "create_key":
+        name = (payload.get("name") or f"alias/lab-key-{_hex(4)}").strip()
+        keys = gr.setdefault("kms", {}).setdefault("keys", [])
+        if any(k.get("name") == name for k in keys):
+            return {"ok": False, "error": f"Key '{name}' already exists"}
+        row = _row(payload.get("id") or f"key-{_hex()}", name, {
+            "usage": payload.get("usage") or "Encrypt and decrypt",
+            "rotation": payload.get("rotation") or "Enabled",
+            "status": payload.get("status") or "Enabled",
+        })
+        keys.append(row)
+        return {"ok": True, "message": f"Created KMS key {name}", "key": row}
+
+    if action == "create_sns_subscription":
+        name = (payload.get("name") or payload.get("endpoint") or f"sub-{_hex(4)}@example.com").strip()
+        subs = gr.setdefault("sns", {}).setdefault("subscriptions", [])
+        if any(s.get("name") == name for s in subs):
+            return {"ok": False, "error": f"Subscription '{name}' already exists"}
+        row = _row(payload.get("id") or f"sub-{_hex()}", name, {
+            "protocol": payload.get("protocol") or "Email",
+            "status": payload.get("status") or "Confirmed",
+        })
+        subs.append(row)
+        return {"ok": True, "message": f"Created SNS subscription {name}", "subscription": row}
+
     if action == "send_sqs":
         qname = payload.get("name") or "lab-queue"
         queues = gr.setdefault("sqs", {}).setdefault("queues", [])

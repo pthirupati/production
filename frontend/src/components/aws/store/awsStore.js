@@ -1715,6 +1715,13 @@ export const useAwsStore = create(
         else if (service === 'secretsmanager' && resource === 'secrets') syncAction = 'create_secret'
         else if (service === 'acm' && resource === 'certificates') syncAction = 'request_certificate'
         else if (service === 'cloudfront' && resource === 'distributions') syncAction = 'create_cloudfront_distribution'
+        else if (service === 'route53' && resource === 'hosted-zones') syncAction = 'create_hosted_zone'
+        else if (service === 'route53' && resource === 'health-checks') syncAction = 'create_health_check'
+        else if (service === 'ecr' && resource === 'repositories') syncAction = 'create_ecr_repository'
+        else if (service === 'cloudformation' && resource === 'stacks') syncAction = 'create_cfn_stack'
+        else if (service === 'systemsmanager' && resource === 'parameters') syncAction = 'create_parameter'
+        else if (service === 'kms' && resource === 'keys') syncAction = 'create_key'
+        else if (service === 'sns' && resource === 'subscriptions') syncAction = 'create_sns_subscription'
         get()._syncAction(syncAction, syncPayload)
         if (created.pendingTransition) get()._ensureTick()
         return created
