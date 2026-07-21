@@ -954,6 +954,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "prom_flags": state.get("prom_flags", []),
         "service_discovery": state.get("service_discovery", []),
         "grafana_browse": state.get("grafana_browse", {}),
+        "grafana_admin": state.get("grafana_admin", {}),
         "summary": summary,
     }
 

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   Bell, BellOff, Radio, GitBranch, Layers, ListChecks,
-  AlertTriangle, CheckCircle2, Clock, ChevronRight, Mail, MessageSquare,
+  AlertTriangle, CheckCircle2, Clock, ChevronRight, Mail, MessageSquare, Plus,
 } from 'lucide-react'
 import { monitoringApi } from '../../api/monitoring'
 
@@ -180,72 +180,122 @@ export default function GrafanaAlertingPanel({ graf = {}, sessionId, silences: l
 
       {/* ── Alert rules ── */}
       {sub === 'rules' && (
-        <div className="mon-card !p-0 overflow-hidden">
-          {rules.length === 0 ? (
-            <div className="text-[#8a93b2] text-xs p-6 text-center">No alert rules configured.</div>
-          ) : (
-            <table className="mon-table">
-              <thead>
-                <tr>
-                  <th>Alert rule</th><th>Folder</th><th>For</th>
-                  <th>Severity</th><th>Contact point</th><th>State</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rules.map((r, i) => (
-                  <tr key={r.uid || `${r.title}-${i}`}>
-                    <td className="font-medium text-[#d8def0]">{r.title}</td>
-                    <td>{r.folder || '—'}</td>
-                    <td className="font-mono">{r.for || '0s'}</td>
-                    <td><span className={`mon-badge ${severityClass(r.severity)}`}>{r.severity || 'none'}</span></td>
-                    <td className="font-mono opacity-80">{r.contact_point || '—'}</td>
-                    <td>
-                      <span className={`mon-badge ${stateBadgeClass(r.state)}`}>
-                        {String(r.state || '').toLowerCase() === 'alerting' && <AlertTriangle size={12} />}
-                        {r.state || 'Normal'}
-                      </span>
-                    </td>
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              className="mon-btn-primary flex items-center gap-1.5"
+              style={{ background: ACCENT }}
+              disabled={busy || !sessionId}
+              onClick={async () => {
+                if (!sessionId) return
+                setBusy(true)
+                try {
+                  await monitoringApi.createGrafanaAlertRule(sessionId, {
+                    title: `Lab rule ${Date.now().toString(36).slice(-4)}`,
+                    severity: 'warning',
+                  })
+                  onReload?.()
+                } finally {
+                  setBusy(false)
+                }
+              }}
+            >
+              <Plus size={14} /> New alert rule
+            </button>
+          </div>
+          <div className="mon-card !p-0 overflow-hidden">
+            {rules.length === 0 ? (
+              <div className="text-[#8a93b2] text-xs p-6 text-center">No alert rules configured.</div>
+            ) : (
+              <table className="mon-table">
+                <thead>
+                  <tr>
+                    <th>Alert rule</th><th>Folder</th><th>For</th>
+                    <th>Severity</th><th>Contact point</th><th>State</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody>
+                  {rules.map((r, i) => (
+                    <tr key={r.uid || `${r.title}-${i}`}>
+                      <td className="font-medium text-[#d8def0]">{r.title}</td>
+                      <td>{r.folder || '—'}</td>
+                      <td className="font-mono">{r.for || '0s'}</td>
+                      <td><span className={`mon-badge ${severityClass(r.severity)}`}>{r.severity || 'none'}</span></td>
+                      <td className="font-mono opacity-80">{r.contact_point || '—'}</td>
+                      <td>
+                        <span className={`mon-badge ${stateBadgeClass(r.state)}`}>
+                          {String(r.state || '').toLowerCase() === 'alerting' && <AlertTriangle size={12} />}
+                          {r.state || 'Normal'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       )}
 
       {/* ── Contact points ── */}
       {sub === 'contacts' && (
-        <div className="mon-card !p-0 overflow-hidden">
-          {contacts.length === 0 ? (
-            <div className="text-[#8a93b2] text-xs p-6 text-center">No contact points configured.</div>
-          ) : (
-            <table className="mon-table">
-              <thead>
-                <tr><th>Name</th><th>Type</th><th>Address</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                {contacts.map((c, i) => {
-                  const Ico = icoForType(c.type)
-                  return (
-                    <tr key={c.name || i}>
-                      <td className="font-medium text-[#d8def0] flex items-center gap-2">
-                        <Ico size={13} style={{ color: ACCENT }} /> {c.name}
-                      </td>
-                      <td>{c.type || '—'}</td>
-                      <td className="font-mono opacity-80">{c.address || '—'}</td>
-                      <td>
-                        <span className={`mon-badge ${c.configured ? 'mon-badge-up' : 'mon-badge-down'}`}>
-                          {c.configured
-                            ? <><CheckCircle2 size={12} /> Configured</>
-                            : <><AlertTriangle size={12} /> Not configured</>}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              className="mon-btn-primary flex items-center gap-1.5"
+              style={{ background: ACCENT }}
+              disabled={busy || !sessionId}
+              onClick={async () => {
+                if (!sessionId) return
+                setBusy(true)
+                try {
+                  await monitoringApi.createContactPoint(sessionId, {
+                    name: `cp-${Date.now().toString(36).slice(-4)}`,
+                    type: 'email',
+                  })
+                  onReload?.()
+                } finally {
+                  setBusy(false)
+                }
+              }}
+            >
+              <Plus size={14} /> New contact point
+            </button>
+          </div>
+          <div className="mon-card !p-0 overflow-hidden">
+            {contacts.length === 0 ? (
+              <div className="text-[#8a93b2] text-xs p-6 text-center">No contact points configured.</div>
+            ) : (
+              <table className="mon-table">
+                <thead>
+                  <tr><th>Name</th><th>Type</th><th>Address</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  {contacts.map((c, i) => {
+                    const Ico = icoForType(c.type)
+                    return (
+                      <tr key={c.name || i}>
+                        <td className="font-medium text-[#d8def0] flex items-center gap-2">
+                          <Ico size={13} style={{ color: ACCENT }} /> {c.name}
+                        </td>
+                        <td>{c.type || '—'}</td>
+                        <td className="font-mono opacity-80">{c.address || '—'}</td>
+                        <td>
+                          <span className={`mon-badge ${c.configured ? 'mon-badge-up' : 'mon-badge-down'}`}>
+                            {c.configured
+                              ? <><CheckCircle2 size={12} /> Configured</>
+                              : <><AlertTriangle size={12} /> Not configured</>}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       )}
 

@@ -39,7 +39,10 @@ export default function TaskManager({ win }) {
     e.preventDefault(); setSel(p.pid)
     ctx.open(e.clientX, e.clientY, [
       { label: 'Expand' }, { sep: true },
-      { label: 'End task', onClick: () => os.endProcess(p.pid) },
+      { label: 'End task', onClick: () => {
+        os.endProcess(p.pid)
+        if (os.labAction) os.labAction('end_process', { pid: p.pid, name: p.desc || p.name })
+      } },
       { label: 'Set priority', sub: ['Realtime', 'High', 'Above normal', 'Normal', 'Below normal', 'Low'].map((pr) => ({ label: (p.priority === pr ? '● ' : '') + pr, onClick: () => os.setProcessPriority(p.pid, pr) })) },
       { label: 'Set affinity' }, { sep: true },
       { label: 'Open file location' }, { label: 'Search online' }, { label: 'Properties' }, { label: 'Go to details' },
@@ -77,7 +80,12 @@ export default function TaskManager({ win }) {
             </tbody>
           </table>
           <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 8 }}>
-            <button className="winos-btn primary" disabled={!sel} onClick={() => { os.endProcess(sel); setSel(null) }}>End task</button>
+            <button className="winos-btn primary" disabled={!sel} onClick={() => {
+              const proc = os.processes.find((p) => p.pid === sel)
+              os.endProcess(sel)
+              if (os.labAction) os.labAction('end_process', { pid: sel, name: proc?.desc || proc?.name })
+              setSel(null)
+            }}>End task</button>
           </div>
         </div>
       )}

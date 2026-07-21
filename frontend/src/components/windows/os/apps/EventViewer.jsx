@@ -53,7 +53,10 @@ export default function EventViewer() {
             <span style={{ flex: 1 }} />
             <button className="winos-btn" onClick={() => setFilter({ levels: ['Critical', 'Error', 'Warning', 'Information'], ids: '' })}>Filter Current Log…</button>
             {active && <button className="winos-btn" onClick={() => setActive(null)}>Clear Filter</button>}
-            <button className="winos-btn" onClick={() => os.clearLog(log)} disabled={log === 'Administrative Events'}>Clear Log…</button>
+            <button className="winos-btn" onClick={() => {
+              os.clearLog(log)
+              if (os.labAction) os.labAction('clear_event_log', { log })
+            }} disabled={log === 'Administrative Events'}>Clear Log…</button>
           </div>
           <div style={{ flex: '1 1 55%', overflow: 'auto' }}>
             <table className="winos-table">

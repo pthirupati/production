@@ -3,6 +3,7 @@ import {
   Users, UsersRound, KeyRound, SlidersHorizontal, Settings2,
   Search, Shield, ShieldCheck, Plus, Copy, Check, Mail, Clock, Lock,
 } from 'lucide-react'
+import { monitoringApi } from '../../api/monitoring'
 import '../../styles/monitoring-sim.css'
 
 /* ── role badge: maps a Grafana org role to a mon-badge variant ── */
@@ -154,25 +155,38 @@ function ServiceAccountRow({ acct }) {
 }
 
 /**
- * GrafanaAdministrationPanel — an original functional emulation of Grafana's
- * "Administration" section for a hands-on learning lab. Purely presentational:
- * it synthesizes original sample org data (the engine has none) so the panel
- * always renders. Resilient to a missing/empty `scenario` prop.
+ * GrafanaAdministrationPanel — org users, teams, and service accounts for the lab.
+ * Prefers live grafana_admin from the lab server; falls back to SAMPLE_* defaults.
  *
- * Props: { scenario }
+ * Props: { scenario, sessionId, admin, onReload }
  */
-export default function GrafanaAdministrationPanel({ scenario }) {
+export default function GrafanaAdministrationPanel({ scenario, sessionId, admin = {}, onReload }) {
   const [sub, setSub] = useState('users')
   const [userFilter, setUserFilter] = useState('')
+  const [busy, setBusy] = useState(false)
 
   const orgName = scenario?.title || scenario?.slug || 'Main Org.'
+  const users = (admin.users?.length ? admin.users : SAMPLE_USERS)
+  const teams = (admin.teams?.length ? admin.teams : SAMPLE_TEAMS)
+  const serviceAccounts = (admin.service_accounts?.length ? admin.service_accounts : SAMPLE_SERVICE_ACCOUNTS)
 
   const filteredUsers = useMemo(() => {
     const q = userFilter.trim().toLowerCase()
-    if (!q) return SAMPLE_USERS
-    return SAMPLE_USERS.filter(u =>
+    if (!q) return users
+    return users.filter(u =>
       [u.login, u.name, u.email, u.role].some(f => String(f).toLowerCase().includes(q)))
-  }, [userFilter])
+  }, [userFilter, users])
+
+  const run = async (fn) => {
+    if (!sessionId) return
+    setBusy(true)
+    try {
+      await fn()
+      onReload?.()
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="mon-sim">
@@ -206,7 +220,11 @@ export default function GrafanaAdministrationPanel({ scenario }) {
               <input className="mon-input w-full !pl-8" placeholder="Search users by login, name, email or role"
                      value={userFilter} onChange={e => setUserFilter(e.target.value)} spellCheck={false} />
             </div>
-            <button type="button" className="mon-btn-primary" style={{ background: '#f7913b' }}>
+            <button type="button" className="mon-btn-primary" style={{ background: '#f7913b' }} disabled={busy}
+              onClick={() => run(() => monitoringApi.createGrafanaUser(sessionId, {
+                login: `user${Date.now().toString(36).slice(-4)}`,
+                role: 'Viewer',
+              }))}>
               <Plus size={14} /> New user
             </button>
           </div>
@@ -235,7 +253,7 @@ export default function GrafanaAdministrationPanel({ scenario }) {
               </tbody>
             </table>
           </div>
-          <div className="mon-panel-sub">{filteredUsers.length} of {SAMPLE_USERS.length} users</div>
+          <div className="mon-panel-sub">{filteredUsers.length} of {users.length} users</div>
         </div>
       )}
 
@@ -244,7 +262,10 @@ export default function GrafanaAdministrationPanel({ scenario }) {
         <div className="space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="mon-panel-sub">Teams group users so dashboard and folder permissions can be granted in bulk.</div>
-            <button type="button" className="mon-btn-primary" style={{ background: '#f7913b' }}>
+            <button type="button" className="mon-btn-primary" style={{ background: '#f7913b' }} disabled={busy}
+              onClick={() => run(() => monitoringApi.createGrafanaTeam(sessionId, {
+                name: `Team ${Date.now().toString(36).slice(-4)}`,
+              }))}>
               <Plus size={14} /> New team
             </button>
           </div>
@@ -254,7 +275,7 @@ export default function GrafanaAdministrationPanel({ scenario }) {
                 <tr><th>Name</th><th>Email</th><th>Members</th><th>Your role</th></tr>
               </thead>
               <tbody>
-                {SAMPLE_TEAMS.map(t => (
+                {teams.map(t => (
                   <tr key={t.name}>
                     <td className="font-medium text-[#d8def0] flex items-center gap-2">
                       <UsersRound size={13} style={{ color: '#f7913b' }} /> {t.name}
@@ -275,7 +296,10 @@ export default function GrafanaAdministrationPanel({ scenario }) {
         <div className="space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="mon-panel-sub">Service accounts and their tokens authenticate automation, CI and provisioning to the Grafana API.</div>
-            <button type="button" className="mon-btn-primary" style={{ background: '#f7913b' }}>
+            <button type="button" className="mon-btn-primary" style={{ background: '#f7913b' }} disabled={busy}
+              onClick={() => run(() => monitoringApi.createServiceAccount(sessionId, {
+                name: `sa-${Date.now().toString(36).slice(-4)}`,
+              }))}>
               <Plus size={14} /> Add service account
             </button>
           </div>
@@ -285,7 +309,7 @@ export default function GrafanaAdministrationPanel({ scenario }) {
                 <tr><th>Name</th><th>Role</th><th>Token</th><th>Tokens</th><th>State</th></tr>
               </thead>
               <tbody>
-                {SAMPLE_SERVICE_ACCOUNTS.map(a => <ServiceAccountRow key={a.name} acct={a} />)}
+                {serviceAccounts.map(a => <ServiceAccountRow key={a.name} acct={a} />)}
               </tbody>
             </table>
           </div>

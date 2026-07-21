@@ -45,12 +45,29 @@ export default function RegistryEditor() {
     e.preventDefault()
     ctx.open(e.clientX, e.clientY, [
       { label: 'New', sub: [
-        { label: 'Key', onClick: () => { const name = 'New Key #1'; os.regNewKey(p, name); setExpanded((x) => ({ ...x, [p.join('/')]: true })) } },
+        { label: 'Key', onClick: () => {
+          const name = 'New Key #1'
+          os.regNewKey(p, name)
+          setExpanded((x) => ({ ...x, [p.join('/')]: true }))
+          if (os.labAction) os.labAction('reg_new_key', { path: p, name })
+        } },
         { sep: true },
-        { label: 'String Value', onClick: () => os.regSetValue(p, 'New Value #1', 'REG_SZ', '') },
-        { label: 'DWORD (32-bit) Value', onClick: () => os.regSetValue(p, 'New Value #1', 'REG_DWORD', '0x00000000 (0)') },
-        { label: 'Multi-String Value', onClick: () => os.regSetValue(p, 'New Value #1', 'REG_MULTI_SZ', '') },
-        { label: 'Expandable String Value', onClick: () => os.regSetValue(p, 'New Value #1', 'REG_EXPAND_SZ', '') },
+        { label: 'String Value', onClick: () => {
+          os.regSetValue(p, 'New Value #1', 'REG_SZ', '')
+          if (os.labAction) os.labAction('reg_set_value', { path: p, name: 'New Value #1', type: 'REG_SZ', data: '' })
+        } },
+        { label: 'DWORD (32-bit) Value', onClick: () => {
+          os.regSetValue(p, 'New Value #1', 'REG_DWORD', '0x00000000 (0)')
+          if (os.labAction) os.labAction('reg_set_value', { path: p, name: 'New Value #1', type: 'REG_DWORD', data: '0x00000000 (0)' })
+        } },
+        { label: 'Multi-String Value', onClick: () => {
+          os.regSetValue(p, 'New Value #1', 'REG_MULTI_SZ', '')
+          if (os.labAction) os.labAction('reg_set_value', { path: p, name: 'New Value #1', type: 'REG_MULTI_SZ', data: '' })
+        } },
+        { label: 'Expandable String Value', onClick: () => {
+          os.regSetValue(p, 'New Value #1', 'REG_EXPAND_SZ', '')
+          if (os.labAction) os.labAction('reg_set_value', { path: p, name: 'New Value #1', type: 'REG_EXPAND_SZ', data: '' })
+        } },
       ] },
       { sep: true }, { label: 'Delete' }, { label: 'Rename' }, { sep: true },
       { label: 'Copy Key Name', onClick: () => navigator.clipboard?.writeText('Computer\\' + p.join('\\')) },
@@ -62,7 +79,12 @@ export default function RegistryEditor() {
     ctx.open(e.clientX, e.clientY, [
       { label: 'Modify…', onClick: () => setEdit(v) },
       { label: 'Modify Binary Data…', onClick: () => setEdit(v) },
-      { sep: true }, { label: 'Delete', onClick: () => os.regDeleteValue(pathArr, v.name) }, { label: 'Rename' },
+      { sep: true },
+      { label: 'Delete', onClick: () => {
+        os.regDeleteValue(pathArr, v.name)
+        if (os.labAction) os.labAction('reg_delete_value', { path: pathArr, name: v.name })
+      } },
+      { label: 'Rename' },
     ])
   }
 
@@ -106,7 +128,9 @@ function EditValue({ v, pathArr, onClose }) {
     <Dialog title={v.type === 'REG_DWORD' ? 'Edit DWORD (32-bit) Value' : 'Edit String'} onClose={onClose} width={420}
       footer={<><button className="winos-btn primary" onClick={() => {
         const out = v.type === 'REG_DWORD' ? `0x${Number(data).toString(16).padStart(8, '0')} (${data})` : data
-        os.regSetValue(pathArr, v.name, v.type, out); onClose()
+        os.regSetValue(pathArr, v.name, v.type, out)
+        if (os.labAction) os.labAction('reg_set_value', { path: pathArr, name: v.name, type: v.type, data: out })
+        onClose()
       }}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button></>}>
       <div style={{ fontSize: 12.5 }}>
         <div style={{ marginBottom: 6 }}>Value name:</div>

@@ -799,6 +799,18 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "vswitches": world.get("vswitches") or (world.get("v2") or {}).get("vswitches") or [],
         "vhdx_disks": world.get("vhdx_disks") or (world.get("v2") or {}).get("vhdx_disks") or [],
         "console_sessions": world.get("console_sessions") or (world.get("v2") or {}).get("console_sessions") or [],
+        "iis_sites": world.get("iis_sites") or (world.get("v2") or {}).get("iis_sites") or [],
+        "iis_bindings": world.get("iis_bindings") or (world.get("v2") or {}).get("iis_bindings") or [],
+        "iis_app_pools": world.get("iis_app_pools") or (world.get("v2") or {}).get("iis_app_pools") or [],
+        "dns_records": world.get("dns_records") or (world.get("v2") or {}).get("dns_records") or [],
+        "dhcp_reservations": world.get("dhcp_reservations") or (world.get("v2") or {}).get("dhcp_reservations") or [],
+        "firewall_rules": world.get("firewall_rules") or (world.get("v2") or {}).get("firewall_rules") or [],
+        "scheduled_tasks": world.get("scheduled_tasks") or (world.get("v2") or {}).get("scheduled_tasks") or [],
+        "perf_counters": world.get("perf_counters") or (world.get("v2") or {}).get("perf_counters") or [],
+        "registry_values": world.get("registry_values") or (world.get("v2") or {}).get("registry_values") or [],
+        "registry_keys": world.get("registry_keys") or (world.get("v2") or {}).get("registry_keys") or [],
+        "cleared_event_logs": world.get("cleared_event_logs") or (world.get("v2") or {}).get("cleared_event_logs") or [],
+        "ended_processes": world.get("ended_processes") or (world.get("v2") or {}).get("ended_processes") or [],
         # Human-readable goal (objective/title) — never leaks the answer beyond
         # what the objective already tells the learner.
         "goal": {

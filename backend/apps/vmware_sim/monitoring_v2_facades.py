@@ -93,6 +93,21 @@ def seed_v2() -> dict[str, Any]:
                 {"uid": "home-overview", "title": "Home Overview", "folder": "General", "tags": ["home"], "updated": "2026-06-20"},
             ],
         },
+        "grafana_admin": {
+            "users": [
+                {"login": "admin", "name": "Org Admin", "email": "admin@fixitlab.local", "role": "Admin", "lastSeen": "2 minutes ago"},
+                {"login": "j.editor", "name": "Jordan Lee", "email": "jordan.lee@fixitlab.local", "role": "Editor", "lastSeen": "3 hours ago"},
+                {"login": "v.viewer", "name": "Vik Rao", "email": "vik.rao@fixitlab.local", "role": "Viewer", "lastSeen": "2 days ago"},
+            ],
+            "teams": [
+                {"name": "Observability", "email": "obs@fixitlab.local", "members": 6, "role": "Admin"},
+                {"name": "Platform", "email": "platform@fixitlab.local", "members": 9, "role": "Editor"},
+            ],
+            "service_accounts": [
+                {"name": "ci-dashboards", "role": "Editor", "tokens": 2, "token": "glsa_lab_ci", "disabled": False},
+                {"name": "terraform-provisioner", "role": "Admin", "tokens": 1, "token": "glsa_lab_tf", "disabled": False},
+            ],
+        },
     }
 
 
@@ -100,7 +115,7 @@ def ensure_v2(state: dict) -> None:
     for key, value in seed_v2().items():
         if key not in state or state.get(key) is None:
             state[key] = value if not isinstance(value, dict) else dict(value)
-        elif key == "grafana_browse" and isinstance(value, dict) and isinstance(state.get(key), dict):
+        elif key in ("grafana_browse", "grafana_admin") and isinstance(value, dict) and isinstance(state.get(key), dict):
             for nested, nested_val in value.items():
                 state[key].setdefault(nested, nested_val)
 
@@ -272,5 +287,82 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         row = {"id": fid, "name": name, "dashboards": 0}
         browse.setdefault("folders", []).append(row)
         return {"ok": True, "message": f"Folder {name} created", "folder": row}
+
+    if action == "create_grafana_user":
+        admin = state.setdefault("grafana_admin", seed_v2()["grafana_admin"])
+        login = (payload.get("login") or payload.get("name") or f"user{len(admin.get('users') or []) + 1}").strip()
+        if any(u.get("login") == login for u in admin.get("users") or []):
+            return {"ok": False, "error": f"User '{login}' already exists"}
+        row = {
+            "login": login,
+            "name": payload.get("display") or payload.get("name") or login,
+            "email": payload.get("email") or f"{login}@fixitlab.local",
+            "role": payload.get("role") or "Viewer",
+            "lastSeen": "Just now",
+        }
+        admin.setdefault("users", []).append(row)
+        return {"ok": True, "message": f"Created Grafana user {login}", "user": row}
+
+    if action == "create_grafana_team":
+        admin = state.setdefault("grafana_admin", seed_v2()["grafana_admin"])
+        name = (payload.get("name") or f"Team {len(admin.get('teams') or []) + 1}").strip()
+        if any(t.get("name") == name for t in admin.get("teams") or []):
+            return {"ok": False, "error": f"Team '{name}' already exists"}
+        row = {
+            "name": name,
+            "email": payload.get("email") or f"{name.lower().replace(' ', '-')}@fixitlab.local",
+            "members": int(payload.get("members") or 1),
+            "role": payload.get("role") or "Editor",
+        }
+        admin.setdefault("teams", []).append(row)
+        return {"ok": True, "message": f"Created team {name}", "team": row}
+
+    if action == "create_service_account":
+        admin = state.setdefault("grafana_admin", seed_v2()["grafana_admin"])
+        name = (payload.get("name") or f"sa-{len(admin.get('service_accounts') or []) + 1}").strip()
+        if any(s.get("name") == name for s in admin.get("service_accounts") or []):
+            return {"ok": False, "error": f"Service account '{name}' already exists"}
+        row = {
+            "name": name,
+            "role": payload.get("role") or "Editor",
+            "tokens": int(payload.get("tokens") or 1),
+            "token": payload.get("token") or f"glsa_lab_{name[:8]}",
+            "disabled": False,
+        }
+        admin.setdefault("service_accounts", []).append(row)
+        return {"ok": True, "message": f"Created service account {name}", "service_account": row}
+
+    if action == "create_grafana_alert_rule":
+        graf = state.setdefault("grafana", {})
+        title = (payload.get("title") or payload.get("name") or f"Rule {len(graf.get('alert_rules') or []) + 1}").strip()
+        row = {
+            "uid": payload.get("uid") or f"rule-{title.lower().replace(' ', '-')[:24]}",
+            "title": title,
+            "folder": payload.get("folder") or "General",
+            "group": payload.get("group") or "default",
+            "condition": payload.get("condition") or payload.get("expr") or "up == 0",
+            "for": payload.get("for") or "5m",
+            "severity": payload.get("severity") or "warning",
+            "state": payload.get("state") or "Normal",
+            "contact_point": payload.get("contact_point") or "grafana-default-email",
+            "datasource": payload.get("datasource") or "Prometheus",
+            "no_data_state": "NoData",
+        }
+        graf.setdefault("alert_rules", []).append(row)
+        return {"ok": True, "message": f"Created alert rule {title}", "rule": row}
+
+    if action == "create_contact_point":
+        graf = state.setdefault("grafana", {})
+        name = (payload.get("name") or f"contact-{len(graf.get('contact_points') or []) + 1}").strip()
+        if any(c.get("name") == name for c in graf.get("contact_points") or []):
+            return {"ok": False, "error": f"Contact point '{name}' already exists"}
+        row = {
+            "name": name,
+            "type": payload.get("type") or "email",
+            "configured": True,
+            "address": payload.get("address") or "oncall@fixitlab.local",
+        }
+        graf.setdefault("contact_points", []).append(row)
+        return {"ok": True, "message": f"Created contact point {name}", "contact_point": row}
 
     return None

@@ -3,7 +3,7 @@ import { dockerApi } from '../../api/docker'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Container, Image, Network, HardDrive, Layers,
-  Play, Square, Trash2, RotateCw, Plus, Download, Hexagon, KeyRound, Archive, Terminal, Info, Eraser,
+  Play, Square, Trash2, RotateCw, Plus, Download, Hexagon, KeyRound, Archive, Terminal, Info, Eraser, Activity,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
@@ -196,6 +196,10 @@ export default function DockerConsole({
                     <button type="button" title="Inspect" className="p-1 rounded hover:bg-slate-100" disabled={busy}
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.inspectContainer(sessionId, r.shortName), 'Inspected') }}>
                       <Info size={14} />
+                    </button>
+                    <button type="button" title="Stats" className="p-1 rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
+                      onClick={(e) => { e.stopPropagation(); run(() => dockerApi.statsContainer(sessionId, r.shortName), 'Stats OK') }}>
+                      <Activity size={14} />
                     </button>
                     <button type="button" title="Remove" className="p-1 rounded hover:bg-slate-100" disabled={busy}
                       onClick={(e) => {

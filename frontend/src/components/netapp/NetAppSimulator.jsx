@@ -192,6 +192,17 @@ export default function NetAppSimulator({
                   e.stopPropagation()
                   run(() => netappApi.takeSnapshot(sessionId, r.name), 'Snapshot created')
                 }}>Snap</button>
+                {String(r.state).toLowerCase() === 'online' ? (
+                  <button type="button" className="na-btn-sm na-btn-outline" onClick={(e) => {
+                    e.stopPropagation()
+                    run(() => netappApi.offlineVolume(sessionId, r.name), 'Volume offline')
+                  }}>Offline</button>
+                ) : (
+                  <button type="button" className="na-btn-sm" onClick={(e) => {
+                    e.stopPropagation()
+                    run(() => netappApi.onlineVolume(sessionId, r.name), 'Volume online')
+                  }}>Online</button>
+                )}
               </div>
             ) },
           ]} rows={st.volumes || []} searchKeys={['name', 'svm']} />

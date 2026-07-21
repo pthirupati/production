@@ -895,7 +895,14 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
 
         {sub === 'connections' && <GrafanaConnectionsPanel datasources={graf.datasources || []} sessionId={sessionId} onReload={onReload} />}
 
-        {sub === 'administration' && <GrafanaAdministrationPanel scenario={scenario} />}
+        {sub === 'administration' && (
+          <GrafanaAdministrationPanel
+            scenario={scenario}
+            sessionId={sessionId}
+            admin={state.grafana_admin || {}}
+            onReload={onReload}
+          />
+        )}
       </div>
     </div>
   )

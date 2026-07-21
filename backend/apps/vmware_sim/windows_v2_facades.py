@@ -70,6 +70,10 @@ def seed_v2() -> dict[str, Any]:
         "perf_counters": [
             {"counter": "% Processor Time", "instance": "_Total", "object": "Processor", "computer": "\\\\SERVER01", "color": "Green", "scale": 1.0},
         ],
+        "registry_values": [],
+        "registry_keys": [],
+        "cleared_event_logs": [],
+        "ended_processes": [],
     }
 
 
@@ -83,7 +87,7 @@ def ensure_v2(world: dict) -> None:
     world["vswitches"] = v2.get("vswitches") or []
     world["vhdx_disks"] = v2.get("vhdx_disks") or []
     world["console_sessions"] = v2.get("console_sessions") or []
-    for key in ("iis_sites", "iis_bindings", "iis_app_pools", "dns_records", "dhcp_reservations", "firewall_rules", "scheduled_tasks", "perf_counters"):
+    for key in ("iis_sites", "iis_bindings", "iis_app_pools", "dns_records", "dhcp_reservations", "firewall_rules", "scheduled_tasks", "perf_counters", "registry_values", "registry_keys", "cleared_event_logs", "ended_processes"):
         world[key] = v2.get(key) or []
 
 
@@ -364,5 +368,69 @@ def apply_v2_action(world: dict, action: str, payload: dict | None = None) -> di
             counters.append(row)
         world["v2"]["perf_counters"] = world["perf_counters"]
         return {"ok": True, "message": f"Added counter {counter}", "counter": row}
+
+    if action == "reg_set_value":
+        path = payload.get("path") or payload.get("key") or ""
+        if isinstance(path, list):
+            path = "\\".join(str(p) for p in path)
+        name = (payload.get("name") or payload.get("value") or "(Default)").strip()
+        row = {
+            "path": path,
+            "name": name,
+            "type": payload.get("type") or "REG_SZ",
+            "data": payload.get("data") if "data" in payload else "",
+        }
+        values = world.setdefault("registry_values", [])
+        existing = next((v for v in values if v.get("path") == path and v.get("name") == name), None)
+        if existing:
+            existing.update(row)
+        else:
+            values.append(row)
+        world["v2"]["registry_values"] = world["registry_values"]
+        return {"ok": True, "message": f"Set {path}\\{name}", "value": row}
+
+    if action == "reg_new_key":
+        path = payload.get("path") or ""
+        if isinstance(path, list):
+            path = "\\".join(str(p) for p in path)
+        name = (payload.get("name") or "New Key #1").strip()
+        full = f"{path}\\{name}" if path else name
+        keys = world.setdefault("registry_keys", [])
+        if not any(k.get("path") == full for k in keys):
+            keys.append({"path": full, "name": name, "parent": path})
+        world["v2"]["registry_keys"] = world["registry_keys"]
+        return {"ok": True, "message": f"Created key {full}", "key": {"path": full}}
+
+    if action == "reg_delete_value":
+        path = payload.get("path") or ""
+        if isinstance(path, list):
+            path = "\\".join(str(p) for p in path)
+        name = (payload.get("name") or "").strip()
+        values = world.setdefault("registry_values", [])
+        world["registry_values"] = [
+            v for v in values
+            if not (v.get("path") == path and v.get("name") == name and not v.get("deleted"))
+        ]
+        world["registry_values"].append({"path": path, "name": name, "deleted": True})
+        world["v2"]["registry_values"] = world["registry_values"]
+        return {"ok": True, "message": f"Deleted {path}\\{name}"}
+
+    if action == "clear_event_log":
+        log = (payload.get("log") or payload.get("name") or "System").strip()
+        cleared = world.setdefault("cleared_event_logs", [])
+        if log not in cleared:
+            cleared.append(log)
+        world["v2"]["cleared_event_logs"] = world["cleared_event_logs"]
+        return {"ok": True, "message": f"Cleared {log} log", "log": log}
+
+    if action == "end_process":
+        pid = payload.get("pid")
+        name = payload.get("name") or payload.get("process") or ""
+        row = {"pid": pid, "name": name, "ended_at": _now()}
+        ended = world.setdefault("ended_processes", [])
+        if not any(p.get("pid") == pid for p in ended if pid is not None):
+            ended.append(row)
+        world["v2"]["ended_processes"] = world["ended_processes"]
+        return {"ok": True, "message": f"Ended process {pid or name}", "process": row}
 
     return None
