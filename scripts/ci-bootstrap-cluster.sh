@@ -71,10 +71,27 @@ remote() {
     return 0
   fi
   _build_ssh_opts "$via_edge"
-  ssh "${SSH_OPTS[@]}" "root@${target_ip}" "bash -s" <<EOF
+  # Parallel SSH + ProxyJump flakes (Broken pipe) are common on DO; retry a few
+  # times before failing the whole cluster bootstrap.
+  local attempt=1 max_attempts=3
+  while true; do
+    if ssh "${SSH_OPTS[@]}" -o ServerAliveInterval=30 -o ServerAliveCountMax=4 \
+        "root@${target_ip}" "bash -s" <<EOF
 set -e
 ${script}
 EOF
+    then
+      return 0
+    fi
+    local rc=$?
+    if [ "$attempt" -ge "$max_attempts" ]; then
+      echo "ERROR: ssh bootstrap to ${target_ip} failed after ${max_attempts} attempts (rc=${rc})" >&2
+      return "$rc"
+    fi
+    echo "WARN: ssh bootstrap to ${target_ip} failed (attempt ${attempt}/${max_attempts}, rc=${rc}) — retrying in $((attempt * 5))s" >&2
+    sleep $((attempt * 5))
+    attempt=$((attempt + 1))
+  done
 }
 
 # Write the cluster-wired env onto a node from the file in CLUSTER_ENV_FILE. The

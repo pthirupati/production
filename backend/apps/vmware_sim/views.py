@@ -93,9 +93,10 @@ def _require_session_console_access(request, session, technology_slug: str):
     Prevents a Linux-only subscriber from opening an unrelated VMware/AWS console
     by guessing another session id, while still allowing intentional cross-tech labs.
 
-    Critical: cross_technology / vmware_link must NOT unlock every console — only
-    the linked target (VMware). Otherwise a Linux cross-tech lab becomes a free
-    Azure/GCP/Datacenter catalog bypass (revenue breach).
+    Critical: ``cross_technology`` alone must NOT unlock VMware (or monitoring).
+    Academy “integration” stamps set ``cross_technology`` widely; only explicit
+    ``vmware_link`` / ``datacenter_link`` opt a session into those consoles without
+    a matching technology subscription (revenue protection).
     """
     scenario = getattr(session, "scenario", None)
     if scenario is None:
@@ -108,15 +109,17 @@ def _require_session_console_access(request, session, technology_slug: str):
     sim_type = (getattr(scenario, "simulation_type", None) or "").strip().lower()
     if sim_type == technology_slug:
         return None
+    # Monitoring family aliases (scenario tech or simulation_type).
+    if technology_slug in ("grafana", "prometheus", "monitoring"):
+        if scen_slug in ("grafana", "prometheus", "monitoring") or sim_type in (
+            "grafana", "prometheus", "monitoring",
+        ):
+            return None
 
-    # Opt-in cross-console links — allowlist by target, never blanket.
-    if technology_slug == "vmware" and (
-        getattr(scenario, "cross_technology", False) or getattr(scenario, "vmware_link", False)
-    ):
+    # Opt-in cross-console links — allowlist by explicit link flag only.
+    if technology_slug == "vmware" and bool(getattr(scenario, "vmware_link", False)):
         return None
     if technology_slug == "datacenter" and bool(getattr(scenario, "datacenter_link", False)):
-        return None
-    if technology_slug in ("grafana", "prometheus", "monitoring") and getattr(scenario, "cross_technology", False):
         return None
 
     # Session belongs to another technology — require a real subscription.

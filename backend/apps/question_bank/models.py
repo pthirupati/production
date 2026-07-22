@@ -201,22 +201,22 @@ class Scenario(models.Model):
     )
 
     # ── Cross-technology scenarios (VMware ⇄ Linux terminal) ──
-    # When cross_technology is True the SAME server exists in both the VMware
-    # simulator and the Linux lab terminal for one lab session, and an action in
-    # VMware (e.g. Add Hard Disk) reflects in the terminal after a rescan/reboot.
-    # vmware_link tells the LabRunner to surface an "Open VMware" affordance so the
-    # operator can perform the hypervisor-side step.
+    # cross_technology is a curriculum / integration stamp (shared guest story).
+    # It does NOT unlock VMware console APIs or LabRunner "Open VMware" — that
+    # requires explicit vmware_link (revenue protection: Linux-only subscribers
+    # must not open full VMware via a stamped cross-tech flag alone).
+    # vmware_link / datacenter_link opt the session into those consoles.
     cross_technology = models.BooleanField(
         default=False,
-        help_text="Server is shared across the VMware simulator and the Linux terminal in one session",
+        help_text="Curriculum stamp: shared guest story across technologies (does not unlock consoles)",
     )
     vmware_link = models.BooleanField(
         default=False,
-        help_text="Surface an 'Open VMware' link in the lab so the user can perform the hypervisor-side action",
+        help_text="Opt-in: surface Open VMware and allow session-scoped VMware console without a VMware sub",
     )
     datacenter_link = models.BooleanField(
         default=False,
-        help_text="Surface an 'Open Datacenter' link for physical rack / BMC / PDU steps on the same server",
+        help_text="Opt-in: surface Open Datacenter for physical rack / BMC / PDU steps on the same server",
     )
     certification_only = models.BooleanField(
         default=False,

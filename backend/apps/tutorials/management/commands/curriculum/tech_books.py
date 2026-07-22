@@ -107,7 +107,7 @@ CATEGORY_SECTIONS: dict[str, dict[str, list[str]]] = {
             "Modules encapsulate reusable patterns. CI runs plan on PR; apply from trusted pipeline with OIDC to cloud — not long-lived keys on laptops.",
         ],
         "labs": [
-            "Write modules, run init/plan/apply, simulate drift, import existing resources, and use FixitLab Terraform simulator.",
+            "Write modules, run init/plan/apply, practice drift detection, import existing resources, and use the FixitLab Terraform Lab Environment.",
         ],
         "notes": [
             "terraform apply without plan review is how outages happen.",
@@ -263,7 +263,7 @@ CATEGORY_SECTIONS: dict[str, dict[str, list[str]]] = {
             "HA, DRS, and vMotion provide resilience and load balancing. Snapshots are not backups.",
         ],
         "labs": [
-            "Navigate inventory, create VMs, configure port groups, practice vMotion, and troubleshoot in FixitLab VMware simulator.",
+            "Navigate inventory, create VMs, configure port groups, practice vMotion, and troubleshoot in the FixitLab VMware Lab Environment.",
         ],
         "notes": [
             "CPU ready time and storage latency dominate VM performance issues.",
@@ -275,7 +275,7 @@ CATEGORY_SECTIONS: dict[str, dict[str, list[str]]] = {
             "Hybrid identity with Azure AD Connect links on-prem to cloud identity.",
         ],
         "labs": [
-            "Use Server Manager, create AD users, apply GPO, analyze event logs, practice in FixitLab Windows GUI simulator.",
+            "Use Server Manager, create AD users, apply GPO, analyze event logs, practice in the FixitLab Windows GUI Lab Environment.",
         ],
         "notes": [
             "Patch Tuesday — test patches in staging AD lab first.",
@@ -307,13 +307,13 @@ CATEGORY_SECTIONS: dict[str, dict[str, list[str]]] = {
     },
     "simulation": {
         "theory": [
-            "FixitLab simulates production systems safely: terminal markers, GUI simulators, cross-tech sessions, and graded scenarios.",
+            "FixitLab Lab Environments mirror production safely: terminal markers, GUI consoles, cross-tech sessions, and graded scenarios.",
         ],
         "labs": [
-            "Open simulators from lab toolbar, complete objectives, use hints sparingly, validate with Check Solution.",
+            "Open Lab Environments from the lab toolbar, complete objectives, use hints sparingly, validate with Check Solution.",
         ],
         "notes": [
-            "Treat sim output like staging — build habits that transfer to real on-call.",
+            "Treat Lab Server output like staging — build habits that transfer to real on-call.",
         ],
     },
 }
@@ -346,9 +346,9 @@ _DEFAULT_SECTION_PARAS: dict[str, list[str]] = {
         "Never paste production secrets into lab environments.",
     ],
     "simulations": [
-        "Use FixitLab simulators to practice without production risk.",
-        "Compare simulator output to real vendor UIs and CLI — build transferable habits.",
-        "Cross-tech labs link terminal fixes to GUI simulator state.",
+        "Use FixitLab Lab Environments to practice without production risk.",
+        "Compare Lab Environment output to real vendor UIs and CLI — build transferable habits.",
+        "Cross-tech labs link terminal fixes to GUI console state on the same Lab Server.",
     ],
     "projects": [
         "Deliver capstone with architecture diagram, IaC, CI output, dashboard, and rollback doc.",
@@ -606,7 +606,7 @@ def build_book_section(
         "concepts": "Core concepts",
         "use_cases": "Use cases",
         "labs": "Hands-on labs",
-        "simulations": "Interactive simulations",
+        "simulations": "Lab Environment practice",
         "projects": "Projects",
         "troubleshooting": "Troubleshooting",
         "interview": "Interview questions",

@@ -1,8 +1,21 @@
 import api from './client'
 
-// Mirrors api/vmware.js: a session-scoped call that transparently falls back to
-// the per-user demo sandbox so the Grafana/Prometheus simulator ALWAYS loads
-// (expired session, non-monitoring lab, or a reloaded standalone URL).
+function isSubscriptionDenied(err) {
+  const code = err?.response?.data?.code
+  return err?.response?.status === 403 && (
+    code === 'SUBSCRIPTION_REQUIRED' || code === 'SUBSCRIPTION_EXPIRED'
+  )
+}
+
+/**
+ * Session-scoped monitoring console with careful demo fallback.
+ *
+ * Never fall back to the demo on SUBSCRIPTION_REQUIRED — that would let a
+ * non-monitoring subscriber open Grafana/Prometheus via a 403 soft-open
+ * (same class of revenue breach as the VMware demo fallback).
+ *
+ * Demo fallback is only for expired/missing sessions (404/400).
+ */
 async function getStateWithFallback(sessionId, scenario) {
   const params = scenario ? { scenario } : undefined
   if (!sessionId) {
@@ -13,10 +26,16 @@ async function getStateWithFallback(sessionId, scenario) {
     const { data } = await api.get(`/vmware/monitoring/sessions/${sessionId}/`, { params, silentError: true })
     return data
   } catch (err) {
+    if (isSubscriptionDenied(err)) throw err
     const status = err?.response?.status
-    if (status === 404 || status === 400 || status === 403) {
-      const { data } = await api.get('/vmware/monitoring/demo/', { params, silentError: true })
-      return data
+    if (status === 404 || status === 400) {
+      try {
+        const { data } = await api.get('/vmware/monitoring/demo/', { params, silentError: true })
+        return data
+      } catch (demoErr) {
+        if (isSubscriptionDenied(demoErr)) throw demoErr
+        throw err
+      }
     }
     throw err
   }
@@ -31,10 +50,16 @@ async function actionWithFallback(sessionId, action, payload) {
     const { data } = await api.post(`/vmware/monitoring/sessions/${sessionId}/action/`, { action, payload }, { silentError: true })
     return data
   } catch (err) {
+    if (isSubscriptionDenied(err)) throw err
     const status = err?.response?.status
-    if (status === 404 || status === 400 || status === 403) {
-      const { data } = await api.post('/vmware/monitoring/demo/action/', { action, payload }, { silentError: true })
-      return data
+    if (status === 404 || status === 400) {
+      try {
+        const { data } = await api.post('/vmware/monitoring/demo/action/', { action, payload }, { silentError: true })
+        return data
+      } catch (demoErr) {
+        if (isSubscriptionDenied(demoErr)) throw demoErr
+        throw err
+      }
     }
     throw err
   }

@@ -280,7 +280,7 @@ TOPIC_PROFILES: dict[str, dict] = {
     "Simulation": {
         "tagline": "FixitLab hands-on training without production risk",
         "concepts": {
-            "grading": "Terminal labs use real state checks; GUI simulators validate VMware, Grafana, Terraform, Windows, and other tool state.",
+            "grading": "Terminal labs use real state checks; GUI Lab Environments validate VMware, Grafana, Terraform, Windows, and other tool state.",
             "cross tech": "Shared session links terminal fixes to GUI state.",
         },
     },

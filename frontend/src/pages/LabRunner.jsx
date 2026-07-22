@@ -1600,22 +1600,21 @@ export default function LabRunner() {
   ).toLowerCase()
   const hostedAsLabel = session?.hosted_as || session?.lab_hosts?.[0]?.hosted_as || ''
   const scenarioSlug = scenario?.slug || ''
+  // Open VMware only with explicit vmware_link — never from host-platform
+  // rotation (linux/rhel labs rotate aws|vmware|azure|gcp and were advertising
+  // unpaid consoles) or loose slug matches (e.g. Commvault "vmware-discovery").
   const explicitVmwareScenario = scenario?.vmware_link === true
-    || scenario?.cross_technology === true
-    || hostPlatform === 'vmware'
-    || /(?:^|-)(vmware|vcenter|vsphere)(?:-|$)/i.test(scenarioSlug)
   const vmwareServerHref = `/vmware/${sessionId}?scenario=${scenario?.slug || ''}`
   const showSimVmwareLink = explicitVmwareScenario && (
     isAwxLab || isMonitoringLab || isWindowsGuiLab || isCommvaultLab || isTerraformSimLab
-    || hostPlatform === 'vmware'
   )
+  // Datacenter overlay only when the scenario opts in (not host flavor alone).
   const explicitDatacenterScenario = scenario?.datacenter_link === true
-    || hostPlatform === 'datacenter'
-    || /(?:^|-)(datacenter|rack|physical|dc|bmc|ipmi|pdu|remote-hands)(?:-|$)/i.test(scenarioSlug)
   const showDatacenterLink = !isDatacenterLab && explicitDatacenterScenario
-  const showHostedAwsLink = !isAwsLab && hostPlatform === 'aws'
-  const showHostedAzureLink = !isAzureLab && hostPlatform === 'azure'
-  const showHostedGcpLink = !isGcpLab && hostPlatform === 'gcp'
+  // Host-platform rotation is flavor text only — do not surface Open AWS/Azure/GCP.
+  const showHostedAwsLink = false
+  const showHostedAzureLink = false
+  const showHostedGcpLink = false
   // When a dedicated console is primary, keep a visible "Lab console" chip so
   // learners never wonder where the GUI went (VMware-parity affordance).
   const primaryConsoleLabel = {
@@ -1643,12 +1642,8 @@ export default function LabRunner() {
     peoplesoft: 'PeopleSoft',
     baremetal: 'Bare Metal',
   }[primarySimKind] || null
-  const showTerminalVmwareLink = !isCrossTech && !isVmwareLab && (
-    scenario?.vmware_link === true
-    || hostPlatform === 'vmware'
-    || /(?:^|-)(vmware|vcenter|vsphere)(?:-|$)/i.test(scenarioSlug)
-  )
-  const showCrossTechVmwareLink = isCrossTech
+  const showTerminalVmwareLink = !isVmwareLab && scenario?.vmware_link === true
+  const showCrossTechVmwareLink = Boolean(scenario?.vmware_link) && !isVmwareLab
   // Ansible terminal labs run playbooks from the shell, so the terminal stays
   // primary (we do NOT make them AWX-primary). Surface Open AWX only when the
   // scenario opts in (awx_link) or is clearly an AWX/controller lab.

@@ -27,7 +27,7 @@ function sectionTheme(heading) {
   if (h.includes('theory')) return 'tutorial-section-theory'
   if (h.includes('architecture')) return 'tutorial-section-architecture'
   if (h.includes('concept')) return 'tutorial-section-concepts'
-  if (h.includes('lab') || h.includes('hands-on') || h.includes('simulation') || h.includes('project')) return 'tutorial-section-labs'
+  if (h.includes('lab') || h.includes('hands-on') || h.includes('simulation') || h.includes('lab environment') || h.includes('project')) return 'tutorial-section-labs'
   if (h.includes('troubleshoot') || h.includes('incident') || h.includes('rca') || h.includes('root cause')) return 'tutorial-section-troubleshooting'
   if (h.includes('security')) return 'tutorial-section-security'
   if (h.includes('enterprise') || h.includes('production')) return 'tutorial-section-enterprise'
@@ -49,7 +49,7 @@ const LEVEL_CLASS = {
 // scans like a structured course instead of a flat wall of cards.
 const PHASES = [
   { label: 'Learn', hint: 'Concepts & architecture', match: ['overview', 'key concept', 'concept', 'theory', 'architecture', 'use case', 'prerequisite'] },
-  { label: 'Practice', hint: 'Hands-on walkthrough', match: ['walkthrough', 'hands-on', 'lab', 'simulation', 'project', 'worked example'] },
+  { label: 'Practice', hint: 'Hands-on walkthrough', match: ['walkthrough', 'hands-on', 'lab', 'simulation', 'lab environment', 'project', 'worked example'] },
   { label: 'Operate', hint: 'Pitfalls & production', match: ['pitfall', 'troubleshoot', 'best practice', 'security', 'performance', 'monitor', 'incident', 'root cause', 'rca', 'enterprise', 'production'] },
   { label: 'Assess', hint: 'Prove mastery', match: ['practice & assess', 'assess', 'key takeaway', 'takeaway', 'interview', 'scenario question', 'assessment', 'certification', 'quiz', 'notes', 'summary', 'cheat'] },
 ]

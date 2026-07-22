@@ -46,18 +46,17 @@ SECTION_SUBTOPIC_TEMPLATES: dict[str, list[tuple[str, str]]] = {
     ],
     "labs": [
         ("Objective", "Complete hands-on tasks for {module} in the {topic} playground or linked FixitLab scenario."),
-        ("Setup", "Open terminal/simulator, confirm identity/context, snapshot baseline metrics."),
+        ("Setup", "Open the Lab Environment (terminal or console), confirm identity/context, snapshot baseline metrics."),
         ("Exercise steps", "Reproduce issue → diagnose → apply fix → validate → document runbook entry."),
         ("Validation", "Use Check Solution, health endpoints, or peer checklist before marking done."),
         ("Stretch goals", "Break the system intentionally and recover twice to build muscle memory."),
         ("Lab hygiene", "Never use production credentials in training; use synthetic data only."),
     ],
     "simulations": [
-        ("Simulator access", "Open {topic} simulator from FixitLab lab toolbar (Terraform, Grafana, VMware, Windows, AWX, etc.)."),
-        ("What to compare", "Match simulated logs, metrics, and UI labels to production expectations."),
-        ("Grading model", "Real simulator state checks and API checks — treat sim like staging."),
-        ("Cross-tech labs", "Some scenarios link terminal fixes to GUI simulator state."),
-        ("Repeatability", "Run break/fix cycle three times until steps are automatic."),
+        ("Lab Environment access", "Open the {topic} Lab Environment from the FixitLab lab toolbar (Terraform, Grafana, VMware, Windows, AWX, etc.)."),
+        ("What to compare", "Match lab logs, metrics, and UI labels to production expectations."),
+        ("Grading model", "Real Lab Server state checks and API checks — treat the lab like staging."),
+        ("Cross-tech labs", "Some scenarios link terminal fixes to GUI console state on the same Lab Server."),
     ],
     "projects": [
         ("Scope", "End-to-end {module_lower} implementation in sandbox with IaC and CI gate."),
@@ -88,7 +87,7 @@ SECTION_SUBTOPIC_TEMPLATES: dict[str, list[tuple[str, str]]] = {
     ],
     "assessment": [
         ("Self-check rubric", "Rate 1–5: explain, execute, troubleshoot, teach, defend to security."),
-        ("Retake criteria", "Score below 4 → repeat labs and simulations."),
+        ("Retake criteria", "Score below 4 → repeat labs and Lab Environment practice."),
         ("Cert alignment", "Map weak areas to FixitLab certification objectives."),
     ],
     "certification": [
@@ -207,7 +206,7 @@ def get_module_checklist(topic: str, module: str) -> str:
         f"**End-of-module checklist for {module}:**\n\n"
         f"1. □ I can explain the theory without reading notes\n"
         f"2. □ I drew the architecture and labeled failure domains\n"
-        f"3. □ I completed hands-on labs or simulation\n"
+        f"3. □ I completed hands-on labs or Lab Environment practice\n"
         f"4. □ I answered scenario and interview questions aloud\n"
         f"5. □ I documented commands and warnings in my runbook\n"
         f"6. □ I am ready for the next {topic} module"

@@ -656,6 +656,13 @@ def _run_line_check(
                 if f"# broken configuration for {slug}" in content:
                     failures.append(f"{marker_path} not corrected — apply the documented fix")
                     return True
+        # Match check.sh: `firewall-cmd --state | grep -q running` — do not
+        # auto-pass when firewalld is failed/stopped (grader-integrity fail-open).
+        fw = (getattr(state, "services", {}) or {}).get("firewalld")
+        active = (getattr(fw, "active", None) or "").strip().lower() if fw is not None else ""
+        if active not in ("active", "running"):
+            failures.append("firewalld is not running")
+            return True
         return True
 
     if "python3 -m py_compile" in stripped or "py_compile" in stripped:

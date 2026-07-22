@@ -182,6 +182,16 @@ def _fault_network_security(state: Any, slug: str) -> bool:
         state.services["firewalld"] = SimService(
             "firewalld", active="failed", enabled="enabled", description="firewalld",
         )
+        # Academy list-ports labs grade via is_port_open(80). Default FirewallState
+        # includes the "http" service, which auto-passes without learner work —
+        # strip http/ports so the unfixed world fail-closes (grader-integrity).
+        from .scenario_presets import _preset_firewalld_blocked
+        _preset_firewalld_blocked(state)
+        # Keep firewalld failed after the nginx/firewall preset (preset may leave
+        # other services active; firewalld itself must stay down until started).
+        state.services["firewalld"] = SimService(
+            "firewalld", active="failed", enabled="enabled", description="firewalld",
+        )
     if "selinux" in slug:
         state.selinux_mode = "Permissive"
     if "vlan" in slug or "bonding" in slug or "mtu" in slug or "nat" in slug:
