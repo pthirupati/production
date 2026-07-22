@@ -872,8 +872,9 @@ export default function InterviewRoom() {
         }
       }
       // Let the gesture warm line finish (or fail) before the real bootstrap.
+      // Keep the speech hold ACTIVE across bootstrap — releasing here was the
+      // main post-Join silence bug (Chrome drops the gesture grant after await).
       await gestureWarm
-      releaseSpeechHold()
       unlockSpeech({ soft: true })
       resumeSpeechSynthesis()
       const bootstrap = [introText, firstQ?.content].filter(Boolean).join(' ')

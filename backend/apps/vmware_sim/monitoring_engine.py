@@ -1159,15 +1159,33 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         instance = (payload.get("instance") or "").strip()
         targets = state["prometheus"].setdefault("targets", [])
         before = len(targets)
-        state["prometheus"]["targets"] = [
-            t for t in targets
-            if not (
+        removed = []
+        kept = []
+        for t in targets:
+            hit = (
                 (url and t.get("scrape_url") == url)
                 or (instance and (t.get("instance") or t.get("labels", {}).get("instance")) == instance)
             )
-        ]
-        if len(state["prometheus"]["targets"]) == before:
+            if hit:
+                removed.append(t)
+            else:
+                kept.append(t)
+        state["prometheus"]["targets"] = kept
+        if len(kept) == before:
             return {"ok": False, "error": "target not found"}
+        # Keep broken.targets_down in sync so graders don't see a ghost DOWN.
+        broken = state.setdefault("broken", {})
+        down = list(broken.get("targets_down") or [])
+        drop = set()
+        for t in removed:
+            drop.add(t.get("instance") or "")
+            drop.add(t.get("scrape_url") or "")
+            drop.add((t.get("labels") or {}).get("instance") or "")
+        if instance:
+            drop.add(instance)
+        if url:
+            drop.add(url)
+        broken["targets_down"] = [d for d in down if d and d not in drop]
         _save_session(str(session_id), entry)
         return {"ok": True, "message": "Scrape target removed"}
 

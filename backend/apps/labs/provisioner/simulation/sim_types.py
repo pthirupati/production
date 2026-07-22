@@ -143,6 +143,13 @@ def lab_server_banner(sim_type: str, slug: str = "") -> str:
             title = platform_banners[platform]
         elif platform == "aws" and st == "aws":
             title = by_type["aws"]
+        # Keep "Lab Server" in the banner even when host rotation picks Azure/GCP/…
+        if "Lab Server" not in title:
+            if " — " in title:
+                left, right = title.split(" — ", 1)
+                title = f"{left} Lab Server — {right}"
+            else:
+                title = f"{title} Lab Server"
         # Always append Hosted-as so every tech terminal shows where the guest lives.
         hosted = hosted_as_line(platform)
         if hosted and "Hosted as:" in hosted:
@@ -150,6 +157,10 @@ def lab_server_banner(sim_type: str, slug: str = "") -> str:
         return title
     except Exception:
         pass
+    if "Lab Server" not in title:
+        title = f"{title} Lab Server" if " — " not in title else (
+            f"{title.split(' — ', 1)[0]} Lab Server — {title.split(' — ', 1)[1]}"
+        )
     return title
 
 

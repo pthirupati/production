@@ -1297,8 +1297,10 @@ class SimulationProvisioner:
                 return validate_baremetal_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
                 return False, "Bare metal simulation session not found"
-        # AWS console simulator: sim_type "aws" (may normalize to "generic") or an
-        # aws-* / ec2-* / s3-* slug. Gate on the raw type read off the scenario.
+        # AWS console simulator: sim_type "aws" OR aws-/ec2-/s3-/iam- slug.
+        # Academy packs (academy-aws-*) are terminal FIXED-OK labs — do NOT
+        # intercept them here (same class of bug as G-06 cicd_engine). Console
+        # heroes keep validate_aws_lab.
         _raw_aws_type = sim_type
         if not _raw_aws_type or _raw_aws_type == "generic":
             from apps.labs.models import LabSession
@@ -1307,7 +1309,10 @@ class SimulationProvisioner:
                 _raw_aws_type = (getattr(_aws_session.scenario, "simulation_type", "") or "")
             except LabSession.DoesNotExist:
                 _raw_aws_type = ""
-        if _raw_aws_type == "aws" or low_slug.startswith(("aws-", "ec2-", "s3-", "iam-")):
+        _is_aws_academy = low_slug.startswith("academy-aws-")
+        if not _is_aws_academy and (
+            _raw_aws_type == "aws" or low_slug.startswith(("aws-", "ec2-", "s3-", "iam-"))
+        ):
             from apps.labs.models import LabSession
             from apps.vmware_sim.aws_engine import validate_aws_lab, _ensure as aws_ensure
             try:

@@ -308,6 +308,13 @@ def validate_simulation_state(
     if failures:
         return False, failures[0]
 
+    # Engine-driven repairs (terraform_fixed, Windows GUI, helm/k8s/networking
+    # state) do not rewrite planted academy sentinels. Honor those flags and
+    # skip the sweep for non-academy heroes so CrossTech / helm / MTU labs can
+    # pass after a real engine fix. Academy packs still require FIXED-OK below.
+    if getattr(state, "terraform_fixed", False) or getattr(state, "windows_fixed", False):
+        return True, "Lab validation passed"
+
     # ── Fail-closed sweep for preset-planted broken config files ──
     # Hundreds of scenario presets plant a file whose content is the sentinel
     # "# broken configuration for <slug>". Many of those scenarios ship a
@@ -317,7 +324,7 @@ def validate_simulation_state(
     # scenario, the incident is by definition unresolved: fail with a pointer
     # to the exact file the learner must repair.
     slug = (getattr(state, "scenario_slug", "") or "").strip()
-    if slug:
+    if slug and slug.startswith("academy-"):
         sentinel = f"# broken configuration for {slug}"
         for path, node in state.vfs.items():
             if not isinstance(node, dict) or node.get("type") != "file":
@@ -1054,6 +1061,8 @@ def _run_line_check(
     # check.sh pattern: `systemctl is-failed --quiet; test $? -ne 0` — pass only
     # when no units are failed AND no broken-configuration sentinel remains.
     if "systemctl is-failed" in stripped:
+        if getattr(state, "terraform_fixed", False) or getattr(state, "windows_fixed", False):
+            return True
         slug = (getattr(state, "scenario_slug", "") or "").strip()
         found_break = False
         if slug:

@@ -153,7 +153,7 @@ def ensure_v2(state: dict) -> None:
             ("mysql", "mysql-1:9104", "up"),
             ("redis", "redis-1:9121", "up"),
             ("nginx", "nginx-1:9113", "up"),
-            ("node_exporter", "10.0.1.5:9100", "down"),
+            ("node_exporter", "10.0.1.5:9100", "up"),
         ]
         existing = {(t.get("job"), t.get("instance")) for t in targets}
         for job, inst, health in extra_jobs:

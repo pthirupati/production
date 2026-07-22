@@ -237,14 +237,20 @@ def _preset_postgres_down(state: RHELOSState) -> None:
 
 
 def _preset_firewalld_blocked(state: RHELOSState) -> None:
+    from .rhel_os import SimService
+
     state._mkdir("/etc/nginx")
     state._mkdir("/etc/nginx/sites-enabled")
     state._write_file(
         "/etc/nginx/sites-enabled/default",
         "server {\n    listen 80;\n    server_name localhost;\n    root /var/www/html;\n}\n",
     )
+    if "nginx" not in state.services:
+        state.services["nginx"] = SimService("nginx", "active", "enabled", "nginx web server")
     state.services["nginx"].active = "active"
     state.services["nginx"].sub_state = "running"
+    # Strip default "http" service so list-ports / is_port_open(80) fail-closes
+    # until the learner opens port 80 (grader-integrity).
     state.firewall.runtime["public"] = {"services": ["ssh", "dhcpv6-client"], "ports": []}
     state.firewall.permanent["public"] = {"services": ["ssh", "dhcpv6-client"], "ports": []}
 
@@ -290,14 +296,17 @@ def _preset_disk_full(state: RHELOSState) -> None:
     state.lvm.set_root_used_pct(98.0)
     state._mkdir("/var/log")
     state._mkdir("/var/log/webapp")
+    state._mkdir("/var/log/app")
     state._mkdir("/tmp/.hidden_cache")
     state._mkdir("/var/cache")
     if hasattr(state, "_write_large_file"):
         state._write_large_file("/var/log/webapp/application.log", 100 * 1024 * 1024)  # 100MB
+        state._write_large_file("/var/log/app/application.log", 100 * 1024 * 1024)
         state._write_large_file("/tmp/.hidden_cache/cache.dat", 50 * 1024 * 1024)  # 50MB
         state._write_large_file("/var/log/messages", 3 * 1024 * 1024 * 1024)
     else:
         state._write_file("/var/log/webapp/application.log", "# oversized\n" * 2000)
+        state._write_file("/var/log/app/application.log", "# oversized\n" * 2000)
         state._write_file("/tmp/.hidden_cache/cache.dat", "# cache\n" * 2000)
     state.processes = list(getattr(state, "processes", []) or [])
     state.processes.append(

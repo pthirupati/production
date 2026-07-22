@@ -192,7 +192,8 @@ def _fault_network_security(state: Any, slug: str) -> bool:
         state.services["firewalld"] = SimService(
             "firewalld", active="failed", enabled="enabled", description="firewalld",
         )
-    if "selinux" in slug:
+    if "selinux" in slug and "httpd-port" not in slug:
+        # httpd-port-denied must stay Enforcing (fix via semanage, not setenforce 0).
         state.selinux_mode = "Permissive"
     if "vlan" in slug or "bonding" in slug or "mtu" in slug or "nat" in slug:
         state._write_file(
