@@ -83,8 +83,7 @@ NEW_SCENARIOS: dict[str, tuple[str, list[str]]] = {
     "db-postgres-max-connections": (
         "database/db-postgres-max-connections",
         [
-            "sed -i 's/max_connections = 20/max_connections = 200/' "
-            "/var/lib/pgsql/data/postgresql.conf",
+            "sed -i 's/max_connections = 20/max_connections = 200/' /var/lib/pgsql/data/postgresql.conf",
             "systemctl restart postgresql",
         ],
     ),

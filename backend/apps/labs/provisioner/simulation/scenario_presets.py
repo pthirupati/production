@@ -11,16 +11,21 @@ def apply_scenario_preset(slug: str, state: RHELOSState) -> None:
 
     # Topic-aware faults FIRST so narrative (git/CI/gitops/aws/ACL) wins over
     # recycled academy nginx/rsyslog breaks and COMPLETE_TECH markers alone.
+    # Explicit _PRESETS entries still run afterward — they are the scenario's
+    # authoritative broken state (e.g. mysql CRASHED marker, containerd unit).
+    topic_applied = False
     try:
         from .topic_faults import apply_topic_fault
-        if apply_topic_fault(slug, state):
-            return
+        topic_applied = bool(apply_topic_fault(slug, state))
     except Exception:
-        pass
+        topic_applied = False
 
     preset = _PRESETS.get(slug)
     if preset:
         preset(state)
+        return
+
+    if topic_applied:
         return
 
     if (

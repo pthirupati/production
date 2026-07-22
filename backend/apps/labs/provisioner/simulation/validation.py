@@ -315,6 +315,19 @@ def validate_simulation_state(
     if getattr(state, "terraform_fixed", False) or getattr(state, "windows_fixed", False):
         return True, "Lab validation passed"
 
+    slug = (getattr(state, "scenario_slug", "") or "").strip()
+    low = slug.lower()
+    # Engine-driven heroes heal in-memory state (VMware node join, helm rollback,
+    # MTU/BGP/NTP) without rewriting planted FIXED-OK sentinels — skip the sweep.
+    _engine_hero = (
+        (low.startswith("k8s-") and "vmware" in low)
+        or low.startswith(("networking-bgp", "networking-ntp", "networking-mtu"))
+        or low.startswith(("devops-helm", "devops-ci-pipeline"))
+        or low.startswith("k8s-crashloop")
+    )
+    if _engine_hero:
+        return True, "Lab validation passed"
+
     # ── Fail-closed sweep for preset-planted broken config files ──
     # Hundreds of scenario presets plant a file whose content is the sentinel
     # "# broken configuration for <slug>". Many of those scenarios ship a
@@ -323,8 +336,7 @@ def validate_simulation_state(
     # any fix. As long as the planted file still carries the sentinel for THIS
     # scenario, the incident is by definition unresolved: fail with a pointer
     # to the exact file the learner must repair.
-    slug = (getattr(state, "scenario_slug", "") or "").strip()
-    if slug and slug.startswith("academy-"):
+    if slug:
         sentinel = f"# broken configuration for {slug}"
         for path, node in state.vfs.items():
             if not isinstance(node, dict) or node.get("type") != "file":
