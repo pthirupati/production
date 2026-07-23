@@ -679,9 +679,13 @@ export function useInterviewVoice() {
 
       // Chrome: cancel() after an await often kills the gesture unlock and the
       // next utterance never starts. If Join/Test already unlocked speech, leave
-      // the queue alone (the near-silent hold utterance drains quickly).
+      // the queue alone — EXCEPT clear near-silent hold primes so they cannot
+      // starve the real interviewer line (holdSpeechUnlock ticks every ~1.8s).
       const synth = window.speechSynthesis
-      if (!_speechGestureUnlocked && (synth.speaking || synth.pending)) {
+      if (_speechHoldActive && (synth.speaking || synth.pending)) {
+        try { synth.cancel() } catch { /* */ }
+        await new Promise((r) => setTimeout(r, 40))
+      } else if (!_speechGestureUnlocked && (synth.speaking || synth.pending)) {
         try { synth.cancel() } catch { /* */ }
         await new Promise((r) => setTimeout(r, 35))
       }

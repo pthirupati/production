@@ -22,6 +22,10 @@ def apply_scenario_preset(slug: str, state: RHELOSState) -> None:
 
     preset = _PRESETS.get(slug)
     if preset:
+        # Drop topic-planted academy sentinels before the authoritative preset
+        # runs (preset may re-plant if it IS a marker lab).
+        if topic_applied:
+            _drop_academy_broken_sentinel(slug, state)
         preset(state)
         return
 
@@ -123,6 +127,31 @@ def _plant_broken_config_sentinel(slug: str, state: RHELOSState) -> None:
         "# complete the lab objective, then apply the documented remediation\n"
         "# this file needs the documented fix\n",
     )
+
+
+def _drop_academy_broken_sentinel(slug: str, state: RHELOSState) -> None:
+    """Remove an unfixed academy sentinel so an explicit preset can own the break.
+
+    Topic faults often plant `/opt/fixitlab/academy/<slug>.conf` for keyword
+    matches (e.g. selinux). When a dedicated `_PRESETS` entry then applies the
+    real broken state (semanage port, CRASHED table, …), leaving the sentinel
+    would make the end-of-validation sweep fail-close after a genuine fix that
+    never touches that file.
+    """
+    path = f"/opt/fixitlab/academy/{slug}.conf"
+    content = ""
+    try:
+        content = state.read_file(path) or ""
+    except Exception:
+        content = ""
+    if f"# broken configuration for {slug}" not in content:
+        return
+    if "FIXED-OK" in content:
+        return
+    try:
+        state.vfs.pop(path, None)
+    except Exception:
+        pass
 
 
 def _preset_wrong_nginx_root(state: RHELOSState) -> None:

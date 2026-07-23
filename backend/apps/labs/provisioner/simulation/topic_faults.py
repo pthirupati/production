@@ -202,7 +202,9 @@ def _fault_network_security(state: Any, slug: str) -> bool:
         )
         from .scenario_presets import _plant_broken_config_sentinel
         _plant_broken_config_sentinel(slug, state)
-    elif "selinux" in slug:
+    elif "selinux" in slug and "httpd-port" not in slug:
+        # httpd-port-denied is healed via semanage — do not plant a FIXED-OK
+        # academy sentinel that would block after the real remediation.
         from .scenario_presets import _plant_broken_config_sentinel
         _plant_broken_config_sentinel(slug, state)
     # firewall/dns/chrony are graded via systemctl is-active <unit> — no sentinel.
