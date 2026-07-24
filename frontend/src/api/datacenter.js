@@ -164,6 +164,14 @@ export const datacenterApi = {
   bmcOpenKvm(sessionId, assetId) {
     return datacenterApi.action(sessionId, 'bmc_open_kvm', { asset_id: assetId })
   },
+  bmcLogin(sessionId, assetId, username, password) {
+    return datacenterApi.action(sessionId, 'bmc_login', {
+      asset_id: assetId, username, password,
+    })
+  },
+  bmcLogout(sessionId, assetId) {
+    return datacenterApi.action(sessionId, 'bmc_logout', { asset_id: assetId })
+  },
   bmcSetGeneration(sessionId, assetId, generation) {
     return datacenterApi.action(sessionId, 'bmc_set_generation', { asset_id: assetId, generation })
   },

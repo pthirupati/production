@@ -359,6 +359,9 @@ export default function LabRunner() {
   const [guidedDone, setGuidedDone] = useState({})
   const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [stopping, setStopping] = useState(false)
+  // Same-tab BroadcastChannel delivers lab_stopped to THIS tab too — ignore
+  // while we are mid-stop so we do not navigate before cloud teardown finishes.
+  const stoppingRef = useRef(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [terminalFullscreen, setTerminalFullscreen] = useState(false)
   // Feature: Lab time extension
@@ -567,6 +570,8 @@ export default function LabRunner() {
         return
       }
       if (type === 'lab_stopped' && stoppedId === sessionId) {
+        // User-initiated stop on this tab owns navigation after teardown.
+        if (stoppingRef.current) return
         const finish = () => {
           cleanupLabResources()
           const msg = reason === 'completed' ? 'Lab completed in another tab!'
@@ -596,10 +601,10 @@ export default function LabRunner() {
     let cancelled = false
 
     const pollInterval = setInterval(async () => {
-      if (cancelled) return
+      if (cancelled || stoppingRef.current) return
       try {
         const lab = await labApi.getSessionStatus(sessionId)
-        if (cancelled) return
+        if (cancelled || stoppingRef.current) return
         if (lab.status === 'TERMINATED' || lab.status === 'EXPIRED' || lab.status === 'FAILED' || lab.status === 'COMPLETED') {
           cleanupLabResources()
           const msg = lab.status === 'COMPLETED' ? 'Lab completed!'
@@ -1133,47 +1138,51 @@ export default function LabRunner() {
   }
 
   const handleStop = async () => {
+    stoppingRef.current = true
     setStopping(true)
     try {
       if (isTerraformLab(scenario) || /aws/.test(`${scenario?.slug || ''} ${scenario?.technology?.slug || ''}`.toLowerCase())) {
         resetTerraformAwsLabState()
       }
+      // Keep the lab UI mounted until teardown finishes — clearing session early
+      // races the status poll and bounced users to the scenario page mid-stop.
       const result = await labApi.stopLab(sessionId)
-      clearSession()
-      stopTimer()
 
-      broadcastLabStopped(sessionId, 'stopped')
+      // Close sibling tabs early, but do NOT broadcast lab_stopped to this tab's
+      // channel until teardown completes (BroadcastChannel includes the sender).
       closeLabChildTabs(sessionId)
-      // Broadcast to other tabs that this lab was stopped
-      if (labChannelRef.current) {
-        labChannelRef.current.postMessage({ type: 'lab_stopped', sessionId, reason: 'stopped' })
-      }
 
       // For cloud labs, wait until the EC2/DO instance is fully terminated
       if (result?.is_cloud) {
-        toast('Terminating cloud server — please wait...', { icon: '☁️', duration: 5000, ...TOAST })
-        const maxWait = 30 // max 30 seconds polling
+        toast('Terminating cloud server — please wait...', { icon: '☁️', duration: 8000, ...TOAST })
+        const maxWait = 90 // seconds — DO/EC2 destroy can exceed 30s
         const start = Date.now()
         while ((Date.now() - start) / 1000 < maxWait) {
-          await new Promise(r => setTimeout(r, 2000))
+          await new Promise(r => setTimeout(r, 2500))
           try {
             const labs = await labApi.getActiveLabs()
             const lab = labs.find(l => l.id === sessionId)
-            // Session gone or terminated — done
-            if (!lab || lab.status === 'TERMINATED') break
+            if (!lab || lab.status === 'TERMINATED' || lab.status === 'EXPIRED') break
+            if (lab.status === 'STOPPING' || lab.status === 'TERMINATING') continue
           } catch {
-            break // If API fails, just exit
+            break
           }
         }
       }
 
       const stopDest = getLabExitPath(session, '', techSlugRef, scenarioSlugRef)
+      clearSession()
+      stopTimer()
+      broadcastLabStopped(sessionId, 'stopped')
+      if (labChannelRef.current) {
+        labChannelRef.current.postMessage({ type: 'lab_stopped', sessionId, reason: 'stopped' })
+      }
       toast.success('Lab stopped successfully')
       navigate(stopDest)
     } catch {
-      toast.error('Failed to stop lab')
-      navigate(getLabExitPath(session, '', techSlugRef, scenarioSlugRef))
+      toast.error('Failed to stop lab — still on this page so you can retry')
     } finally {
+      stoppingRef.current = false
       setStopping(false)
       setShowStopConfirm(false)
     }
@@ -1418,16 +1427,18 @@ export default function LabRunner() {
     || _awxHay.includes('automation controller')
   )
   const isTerraformSimLab = !isCrossTech && isTerraformLab(scenario)
-  // AWS labs get a one-click link into the full in-app AWS Management Console
-  // simulator (/aws-sim) so learners can drive the same scenario from the
-  // console (EC2/S3/IAM/VPC/...) alongside the CLI terminal. Match the AWS
-  // technology slug or aws-* scenario slugs, but never Terraform labs (which
-  // merely target AWS providers and have their own simulator).
-  const isAwsLab = !isCrossTech && !isTerraformSimLab && (
+  // AWS console heroes (aws-/ec2-/…) use the AWS Console as primary UI.
+  // Academy packs (academy-aws-*) grade via the Lab Server terminal FIXED-OK
+  // path — keep the terminal primary so learners are not stuck in a console
+  // that never satisfies Check Solution.
+  const isAwsAcademyLab = (scenario?.slug || '').startsWith('academy-aws-')
+  const isAwsLab = !isCrossTech && !isTerraformSimLab && !isAwsAcademyLab && (
     scenario?.simulation_type === 'aws'
     || scenario?.technology?.slug === 'aws'
     || (scenario?.slug || '').startsWith('aws-')
-    || (scenario?.slug || '').startsWith('academy-aws-')
+    || (scenario?.slug || '').startsWith('ec2-')
+    || (scenario?.slug || '').startsWith('s3-')
+    || (scenario?.slug || '').startsWith('iam-')
   )
   const techSlugLc = (scenario?.technology?.slug || '').toLowerCase()
   const isBaremetalGuiLab = !isCrossTech && (

@@ -309,19 +309,67 @@ export function BiosPanel({ bios, busy, onEnter, onExit, onSet, onCmosReset, onP
   )
 }
 
-/** iDRAC9 / iLO 5 management console */
+/** iDRAC / iLO / IPMI web UI — requires login before management controls. */
 export function BmcPanel({
   bmc, vendor, busy, onPower, onMountIso, onDiag, onUpdateNet, onNmi, onFlash, onKvm, onSetGeneration,
+  onLogin, onLogout,
 }) {
   const [iso, setIso] = useState('rhel-9.4-x86_64-dvd.iso')
+  const [user, setUser] = useState('root')
+  const [pass, setPass] = useState('')
+  const [loginErr, setLoginErr] = useState('')
   if (!bmc) return <p className="dc-muted">No BMC.</p>
   const s = bmc.sensors || {}
   const gens = bmc.generations_available || []
+  const product = bmc.product || 'BMC'
+  const authed = !!bmc.session?.authenticated
+  const isHpe = /ilo/i.test(product) || /hpe|hp/i.test(vendor || '')
+  const brandTitle = isHpe ? 'HPE iLO' : /xclarity|lenovo/i.test(product) ? 'Lenovo XClarity' : /supermicro/i.test(product) ? 'Supermicro IPMI' : 'Dell iDRAC'
+
+  if (!authed) {
+    return (
+      <div className="dc-bmc-login">
+        <div className="dc-bmc-login-chrome">
+          <div className="dc-bmc-login-brand">{brandTitle}</div>
+          <div className="dc-bmc-login-sub">{product} · {bmc.firmware} · {bmc.chip}</div>
+          <div className="dc-bmc-login-url">{bmc.endpoint}</div>
+          <div className="dc-bmc-login-ip">Dedicated NIC · {bmc.network?.ipv4}</div>
+          <label className="dc-bmc-login-label">Username
+            <input className="dc-input" value={user} onChange={(e) => setUser(e.target.value)} autoComplete="username" />
+          </label>
+          <label className="dc-bmc-login-label">Password
+            <input className="dc-input" type="password" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="current-password" />
+          </label>
+          {loginErr && <div className="dc-bmc-login-err">{loginErr}</div>}
+          <button
+            type="button"
+            disabled={busy || !user || !pass}
+            className="dc-btn-primary"
+            onClick={async () => {
+              setLoginErr('')
+              try {
+                await onLogin?.(user, pass)
+              } catch (e) {
+                setLoginErr(e?.response?.data?.error || e?.message || 'Login failed')
+              }
+            }}
+          >
+            Sign in to {product}
+          </button>
+          <p className="dc-muted mt-2">Lab hint: {bmc.login_hint || 'root / calvin'}</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="dc-twin-panel">
       <div className="dc-twin-toolbar">
-        <span className="dc-twin-title"><Shield size={13} /> {bmc.product} · {bmc.chip}</span>
-        <span className="dc-muted">FW {bmc.firmware}</span>
+        <span className="dc-twin-title"><Shield size={13} /> {product} · {bmc.chip}</span>
+        <span className="dc-muted">FW {bmc.firmware} · signed in as {bmc.session?.user}</span>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onLogout?.()}>
+          Log out
+        </button>
       </div>
       {gens.length > 0 && (
         <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>

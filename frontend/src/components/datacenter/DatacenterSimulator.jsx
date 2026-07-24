@@ -101,7 +101,7 @@ export default function DatacenterSimulator({
   const [flashId, setFlashId] = useState(null)
   const [drawerTab, setDrawerTab] = useState('overview')
   const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [floorView, setFloorView] = useState('2d') // '2d' | '3d'
+  const [floorView, setFloorView] = useState('3d') // default 3D twin; 2D is fallback overview
   const dragRef = useRef(null)
   const movedRef = useRef(false)
   const liveTickInFlight = useRef(false)
@@ -357,6 +357,19 @@ export default function DatacenterSimulator({
             expandedRack={expandedRack}
             onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}
             onSelectRack={(id) => setExpandedRack((cur) => (cur === id ? null : id))}
+            onOpenBmc={(id) => { setSelectedServerId(id); setDrawerTab('bmc') }}
+            onUnplugCable={(cableId) => {
+              const srv = selectedServerId
+                ? servers.find((s) => s.id === selectedServerId)
+                : servers.find((s) => (s.hardware?.cables || []).some((c) => c.status === 'loose' || c.status === 'damaged'))
+              if (!srv) return
+              const loose = (srv.hardware?.cables || []).find((c) => c.status === 'loose' || c.status === 'damaged')
+              doAction(
+                () => datacenterApi.reseatCable(sessionId, srv.id, loose?.id || cableId),
+                'Cable unplugged / reseated from 3D',
+                srv.id,
+              )
+            }}
           />
         </Suspense>
       )}
@@ -788,6 +801,15 @@ export default function DatacenterSimulator({
                   bmc={selectedServer.bmc}
                   vendor={selectedServer.vendor}
                   busy={busy}
+                  onLogin={(username, password) => run(
+                    () => datacenterApi.bmcLogin(sessionId, selectedServer.id, username, password),
+                    `Signed into ${selectedServer.bmc?.product || 'BMC'}`,
+                  )}
+                  onLogout={() => doAction(
+                    () => datacenterApi.bmcLogout(sessionId, selectedServer.id),
+                    'BMC logged out',
+                    selectedServer.id,
+                  )}
                   onPower={(mode) => doAction(() => datacenterApi.bmcPower(sessionId, selectedServer.id, mode), `BMC ${mode}`, selectedServer.id)}
                   onMountIso={(image) => doAction(() => datacenterApi.bmcMountIso(sessionId, selectedServer.id, image), 'ISO mounted', selectedServer.id)}
                   onDiag={(suite) => doAction(() => datacenterApi.bmcRunDiagnostics(sessionId, selectedServer.id, suite), `${suite} diagnostics`, selectedServer.id)}

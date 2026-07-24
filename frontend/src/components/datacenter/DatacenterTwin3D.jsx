@@ -187,40 +187,79 @@ function CracUnits({ cooling = [] }) {
   )
 }
 
-function PduStrips({ racks = [], pdus = [] }) {
+function FanSpinner({ position, powered, rpmScale = 1 }) {
+  const hub = useRef()
+  const blades = useRef()
+  useFrame((_, dt) => {
+    if (!blades.current || !powered) return
+    blades.current.rotation.z += dt * (14 + rpmScale * 10)
+  })
+  return (
+    <group position={position}>
+      <mesh ref={hub}>
+        <cylinderGeometry args={[0.018, 0.018, 0.008, 10]} />
+        <meshStandardMaterial color="#0f172a" metalness={0.7} />
+      </mesh>
+      <group ref={blades}>
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <mesh key={i} rotation={[0, 0, (i / 6) * Math.PI * 2]} position={[0, 0, 0.001]}>
+            <boxGeometry args={[0.055, 0.012, 0.003]} />
+            <meshStandardMaterial color="#94a3b8" metalness={0.55} roughness={0.35} />
+          </mesh>
+        ))}
+      </group>
+      <mesh position={[0, 0, 0.006]}>
+        <ringGeometry args={[0.05, 0.056, 16]} />
+        <meshStandardMaterial color="#334155" metalness={0.6} />
+      </mesh>
+    </group>
+  )
+}
+
+function PduStrips({ racks = [], pdus = [], onSelectPdu }) {
   return (
     <group>
       {racks.map((rack, i) => {
         const { x, z } = rackPosition(i)
         const pdu = pdus.find((p) => p.rack === rack.id) || {}
         const tripped = pdu.status === 'tripped' || pdu.breaker === 'open'
+        const load = Math.min(1, (pdu.load_amps || pdu.amps || 12) / 32)
         return (
-          <mesh key={`pdu-${rack.id}`} position={[x + RACK_W / 2 + 0.08, RACK_H / 2, z]} castShadow>
-            <boxGeometry args={[0.08, RACK_H * 0.92, 0.12]} />
-            <meshStandardMaterial
-              color={tripped ? '#7f1d1d' : '#334155'}
-              emissive={tripped ? '#ef4444' : '#22c55e'}
-              emissiveIntensity={tripped ? 0.55 : 0.2}
-              metalness={0.6}
-            />
-          </mesh>
+          <group key={`pdu-${rack.id}`} position={[x + RACK_W / 2 + 0.08, RACK_H / 2, z]}>
+            <mesh
+              castShadow
+              onClick={(e) => { e.stopPropagation(); onSelectPdu?.(pdu.id || rack.id) }}
+            >
+              <boxGeometry args={[0.09, RACK_H * 0.92, 0.14]} />
+              <meshStandardMaterial
+                color={tripped ? '#7f1d1d' : '#1e293b'}
+                emissive={tripped ? '#ef4444' : '#22c55e'}
+                emissiveIntensity={tripped ? 0.55 : 0.12}
+                metalness={0.65}
+              />
+            </mesh>
+            {/* C13/C19 outlet LEDs along the strip */}
+            {Array.from({ length: 12 }).map((_, oi) => {
+              const oy = -RACK_H * 0.4 + oi * (RACK_H * 0.78 / 11)
+              const lit = !tripped && oi / 12 < load + 0.15
+              return (
+                <mesh key={oi} position={[0.05, oy, 0.04]}>
+                  <boxGeometry args={[0.02, 0.035, 0.03]} />
+                  <meshStandardMaterial
+                    color={lit ? '#0f172a' : '#334155'}
+                    emissive={tripped ? '#ef4444' : lit ? '#22c55e' : '#000'}
+                    emissiveIntensity={tripped ? 0.7 : lit ? 0.45 : 0}
+                  />
+                </mesh>
+              )
+            })}
+            <Html distanceFactor={8} position={[0.12, RACK_H * 0.42, 0]} style={{ pointerEvents: 'none' }}>
+              <div className="dc-3d-chip">{tripped ? 'PDU TRIP' : `${Math.round(load * 100)}%`}</div>
+            </Html>
+          </group>
         )
       })}
     </group>
-  )
-}
-
-function FanSpinner({ position, powered }) {
-  const ref = useRef()
-  useFrame((_, dt) => {
-    if (!ref.current || !powered) return
-    ref.current.rotation.z += dt * 18
-  })
-  return (
-    <mesh ref={ref} position={position}>
-      <cylinderGeometry args={[0.04, 0.04, 0.01, 8]} />
-      <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.25} />
-    </mesh>
   )
 }
 
@@ -284,8 +323,8 @@ function RackDoor({ open, side = 'left' }) {
   )
 }
 
-/** Instanced U-slot chassis + sparse LED/fan overlays. */
-function ServerStack({ servers, onSelect, animBoost = 1 }) {
+/** Per-U chassis with drive-bay LEDs, dual PSU glow, NIC activity, fans. */
+function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
   const meshRef = useRef()
   const geo = useMemo(() => new THREE.BoxGeometry(RACK_W * 0.88, U_H * 0.9, RACK_D * 0.72), [])
   const mat = useMemo(() => new THREE.MeshStandardMaterial({ metalness: 0.45, roughness: 0.35, vertexColors: true }), [])
@@ -328,17 +367,52 @@ function ServerStack({ servers, onSelect, animBoost = 1 }) {
           const id = e.instanceId
           if (id != null && servers[id]) onSelect?.(servers[id].id)
         }}
+        onDoubleClick={(e) => {
+          e.stopPropagation()
+          const id = e.instanceId
+          if (id != null && servers[id]) onOpenBmc?.(servers[id].id)
+        }}
         onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }}
         onPointerOut={() => { document.body.style.cursor = 'default' }}
       />
       {servers.map((s) => {
         const failed = Object.values(s.components || {}).some((x) => x !== 'healthy')
+        const diskFail = (s.components || {}).disk === 'failed' || (s.components || {}).disk === 'degraded'
         const powered = s.power_state === 'on'
         const y = ((s.u_slot || 1) - 1) * U_H + U_H * 0.5 + 0.05
         return (
           <group key={s.id} position={[0, y, -0.04]}>
-            <StatusLed position={[RACK_W * 0.38, 0, RACK_D * 0.38]} failed={failed} powered={powered} />
-            <FanSpinner position={[-RACK_W * 0.32, 0, RACK_D * 0.38]} powered={powered && !failed && animBoost > 0} />
+            <StatusLed position={[RACK_W * 0.38, 0.02, RACK_D * 0.38]} failed={failed} powered={powered} />
+            {/* Dual PSU status LEDs */}
+            <StatusLed position={[RACK_W * 0.38, -0.025, RACK_D * 0.38]} failed={false} powered={powered} />
+            <StatusLed position={[RACK_W * 0.32, -0.025, RACK_D * 0.38]} failed={(s.components || {}).power === 'failed'} powered={powered} />
+            {/* Drive bay activity row */}
+            {[0, 1, 2, 3].map((di) => (
+              <mesh key={di} position={[-RACK_W * 0.28 + di * 0.08, 0.01, RACK_D * 0.37]}>
+                <boxGeometry args={[0.05, 0.035, 0.02]} />
+                <meshStandardMaterial
+                  color="#0f172a"
+                  emissive={diskFail && di === 0 ? '#ef4444' : powered ? '#22c55e' : '#000'}
+                  emissiveIntensity={diskFail && di === 0 ? 0.8 : powered ? 0.25 + (di % 2) * 0.15 : 0}
+                />
+              </mesh>
+            ))}
+            {/* NIC RJ45 / SFP cages */}
+            {[0, 1].map((ni) => (
+              <mesh key={`nic-${ni}`} position={[RACK_W * 0.1 + ni * 0.07, -0.02, RACK_D * 0.37]}>
+                <boxGeometry args={[0.04, 0.025, 0.025]} />
+                <meshStandardMaterial
+                  color="#111827"
+                  emissive={powered ? '#38bdf8' : '#000'}
+                  emissiveIntensity={powered ? 0.35 + Math.sin(ni) * 0.1 : 0}
+                />
+              </mesh>
+            ))}
+            <FanSpinner position={[-RACK_W * 0.32, 0, RACK_D * 0.38]} powered={powered && !failed && animBoost > 0} rpmScale={failed ? 0.4 : 1} />
+            <FanSpinner position={[-RACK_W * 0.22, 0, RACK_D * 0.38]} powered={powered && animBoost > 0} rpmScale={0.85} />
+            <Html distanceFactor={10} position={[0, U_H * 0.35, RACK_D * 0.4]} style={{ pointerEvents: 'none' }}>
+              <div className="dc-3d-chip dc-3d-chip-sm">{s.hostname || s.id}</div>
+            </Html>
           </group>
         )
       })}
@@ -346,9 +420,10 @@ function ServerStack({ servers, onSelect, animBoost = 1 }) {
   )
 }
 
-function CableStrand({ from, to, color = '#94a3b8', loose = false, traffic = true }) {
+function CableStrand({ from, to, color = '#94a3b8', loose = false, traffic = true, onUnplug }) {
   const groupRef = useRef()
   const packetRef = useRef()
+  const drag = useRef(null)
   const curve = useMemo(() => {
     const mid = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5)
     mid.y -= loose ? 0.38 : 0.14
@@ -374,18 +449,50 @@ function CableStrand({ from, to, color = '#94a3b8', loose = false, traffic = tru
 
   return (
     <group ref={groupRef}>
-      <mesh geometry={tube}>
+      <mesh
+        geometry={tube}
+        onPointerDown={(e) => {
+          e.stopPropagation()
+          drag.current = { x: e.clientX, y: e.clientY }
+          e.target.setPointerCapture?.(e.pointerId)
+        }}
+        onPointerUp={(e) => {
+          e.stopPropagation()
+          if (!drag.current) return
+          const dx = e.clientX - drag.current.x
+          const dy = e.clientY - drag.current.y
+          drag.current = null
+          if (Math.hypot(dx, dy) > 28) onUnplug?.()
+        }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'grab' }}
+        onPointerOut={() => { document.body.style.cursor = 'default' }}
+      >
         <meshStandardMaterial
           color={color}
-          roughness={0.65}
-          emissive={loose ? '#b45309' : color}
-          emissiveIntensity={loose ? 0.45 : 0.15}
+          emissive={loose ? '#f59e0b' : color}
+          emissiveIntensity={loose ? 0.45 : 0.2}
+          metalness={0.3}
+          roughness={0.55}
         />
       </mesh>
-      <mesh ref={packetRef}>
-        <sphereGeometry args={[0.028, 10, 10]} />
-        <meshStandardMaterial color="#e0f2fe" emissive="#38bdf8" emissiveIntensity={1.2} />
+      {/* Port terminations */}
+      <mesh position={from}>
+        <sphereGeometry args={[0.022, 8, 8]} />
+        <meshStandardMaterial color="#f8fafc" emissive={color} emissiveIntensity={0.5} />
       </mesh>
+      <mesh position={to}>
+        <sphereGeometry args={[0.022, 8, 8]} />
+        <meshStandardMaterial color="#f8fafc" emissive={color} emissiveIntensity={0.5} />
+      </mesh>
+      <mesh ref={packetRef}>
+        <sphereGeometry args={[0.028, 8, 8]} />
+        <meshStandardMaterial color="#fff" emissive="#38bdf8" emissiveIntensity={1.2} />
+      </mesh>
+      {loose && (
+        <Html position={curve.getPointAt(0.5)} distanceFactor={10} style={{ pointerEvents: 'none' }}>
+          <div className="dc-3d-chip">Drag to unplug</div>
+        </Html>
+      )}
     </group>
   )
 }
@@ -414,7 +521,7 @@ function rackPosition(index) {
 }
 
 function RackInner({
-  rack, servers, selectedId, expanded, onSelectRack, onSelectServer, tip, animBoost,
+  rack, servers, selectedId, expanded, onSelectRack, onSelectServer, onOpenBmc, tip, animBoost,
 }) {
   const anyFail = servers.some((s) => Object.values(s.components || {}).some((c) => c !== 'healthy'))
   const group = useRef()
@@ -449,7 +556,7 @@ function RackInner({
       </mesh>
       <RackDoor open={open} side="left" />
       <RackDoor open={open} side="right" />
-      <ServerStack servers={servers} onSelect={onSelectServer} animBoost={animBoost} />
+      <ServerStack servers={servers} onSelect={onSelectServer} onOpenBmc={onOpenBmc} animBoost={animBoost} />
       <SelectionAura active={!!selectedId && servers.some((s) => s.id === selectedId)} />
       <Html position={[0, RACK_H / 2 + 0.14, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
         <div className={`dc-3d-label ${open ? 'dc-3d-label-hot' : ''}`}>
@@ -463,7 +570,7 @@ function RackInner({
 }
 
 function RackMesh({
-  rack, servers, index, selectedId, expandedRack, onSelectRack, onSelectServer, physicsEnabled, animBoost,
+  rack, servers, index, selectedId, expandedRack, onSelectRack, onSelectServer, onOpenBmc, physicsEnabled, animBoost,
 }) {
   const tip = rack.physics?.tip_risk === 'high'
   const { x, z } = rackPosition(index)
@@ -486,6 +593,7 @@ function RackMesh({
       expanded={expandedRack === rack.id}
       onSelectRack={onSelectRack}
       onSelectServer={onSelectServer}
+      onOpenBmc={onOpenBmc}
       tip={tip}
       animBoost={animBoost}
     />
@@ -534,7 +642,7 @@ function PulsingLight() {
 
 function SceneContent({
   racks, serversByRack, network, cooling, pdus, selectedId, expandedRack,
-  onSelectServer, onSelectRack, physicsEnabled, onFps, animBoost, intro,
+  onSelectServer, onSelectRack, onOpenBmc, onUnplugCable, physicsEnabled, onFps, animBoost, intro,
 }) {
   const thermalStress = useMemo(() => {
     const units = cooling || []
@@ -616,6 +724,7 @@ function SceneContent({
             expandedRack={expandedRack}
             onSelectRack={onSelectRack}
             onSelectServer={onSelectServer}
+            onOpenBmc={onOpenBmc}
             physicsEnabled={physicsEnabled}
             animBoost={animBoost}
           />
@@ -630,6 +739,7 @@ function SceneContent({
           color={c.color}
           loose={c.loose}
           traffic={animBoost > 0}
+          onUnplug={() => onUnplugCable?.(c.id)}
         />
       ))}
 
@@ -668,6 +778,8 @@ export default function DatacenterTwin3D({
   expandedRack,
   onSelectServer,
   onSelectRack,
+  onOpenBmc,
+  onUnplugCable,
 }) {
   const [physicsEnabled, setPhysicsEnabled] = useState(true)
   const [animBoost, setAnimBoost] = useState(1)
@@ -709,7 +821,7 @@ export default function DatacenterTwin3D({
           Replay intro
         </button>
         <span className="dc-muted">
-          ~{fps || '—'} FPS · CRAC {cooling.length} · PDU {pdus.length} · instanced U · BVH
+          ~{fps || '—'} FPS · drag loose cables to unplug · double-click chassis → BMC
         </span>
       </div>
       <div className="dc-3d-canvas-wrap">
@@ -731,6 +843,8 @@ export default function DatacenterTwin3D({
                 expandedRack={expandedRack}
                 onSelectServer={onSelectServer}
                 onSelectRack={onSelectRack}
+                onOpenBmc={onOpenBmc}
+                onUnplugCable={onUnplugCable}
                 physicsEnabled={physicsEnabled}
                 onFps={setFps}
                 animBoost={animBoost}

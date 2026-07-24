@@ -46,6 +46,110 @@ class RHELShell:
         except Exception:
             pass
 
+    def _sync_host_power_from_bridges(self, session_id: str) -> None:
+        """Mirror Azure/GCP/AWS/OpenStack/identity/VMware power into a sticky off flag.
+
+        When the linked host is Stopped / poweredOff / BMC off, further shell
+        commands must fail closed — same as a real SSH session to a dead box.
+
+        Precedence: any OFF signal wins. ON only clears when no OFF signal is
+        present in this pass (never let a stale primary "on" wipe a fresh Stop).
+        """
+        off_actions = {"stop", "off", "poweroff", "deallocate"}
+        on_actions = {"start", "on", "restart", "reset", "reboot"}
+        saw_off = False
+        saw_on = False
+        consumers = []
+        try:
+            from .azure_bridge import consume_power as _az
+            consumers.append(_az)
+        except Exception:
+            pass
+        try:
+            from .gcp_bridge import consume_power as _gcp
+            consumers.append(_gcp)
+        except Exception:
+            pass
+        try:
+            from .aws_bridge import consume_power as _aws
+            consumers.append(_aws)
+        except Exception:
+            pass
+        try:
+            from .openstack_bridge import consume_power as _os
+            consumers.append(_os)
+        except Exception:
+            pass
+        try:
+            from .datacenter_bridge import consume_power as _dc
+            consumers.append(_dc)
+        except Exception:
+            pass
+        for consume in consumers:
+            try:
+                action = consume(session_id)
+            except Exception:
+                action = None
+            if not action:
+                continue
+            low = str(action).lower()
+            if low in off_actions:
+                saw_off = True
+            elif low in on_actions:
+                saw_on = True
+        try:
+            from .vmware_bridge import get_terminal_link_state
+            if get_terminal_link_state(session_id) == "disconnected":
+                saw_off = True
+        except Exception:
+            pass
+        try:
+            from .server_identity import list_servers, get_primary
+            servers = list_servers(session_id) or []
+            primary = get_primary(session_id)
+            host = (getattr(self.state, "hostname", "") or "").lower()
+            relevant = []
+            for s in servers:
+                tags = s.get("tags") or {}
+                role = (tags.get("role") or "").lower()
+                sid = (s.get("id") or "").lower()
+                shost = (s.get("hostname") or "").lower()
+                if primary and s.get("id") == primary.get("id"):
+                    relevant.append(s)
+                elif role == "primary":
+                    relevant.append(s)
+                elif host and (shost == host or host in shost or shost in host):
+                    relevant.append(s)
+                elif sid.startswith(("azure-", "gcp-", "aws-", "maas-")):
+                    relevant.append(s)
+            eng = getattr(self, "_engine", None)
+            sel = getattr(eng, "_dc_power_gate_id", None) if eng else None
+            if sel:
+                relevant.extend([s for s in servers if s.get("id") == sel])
+            if not relevant and primary:
+                relevant = [primary]
+            if any((s.get("power") or "on").lower() == "off" for s in relevant):
+                saw_off = True
+            elif relevant and all(
+                (s.get("power") or "on").lower() in ("on", "reboot_pending")
+                for s in relevant
+            ):
+                saw_on = True
+        except Exception:
+            pass
+        engine = getattr(self, "_engine", None)
+        if engine is not None:
+            ps = getattr(engine, "_power_state", None)
+            if ps == "off":
+                saw_off = True
+            elif ps == "on":
+                saw_on = True
+
+        if saw_off:
+            self.state._host_powered_off = True
+        elif saw_on:
+            self.state._host_powered_off = False
+
     @property
     def prompt(self) -> str:
         u = self.state.current_user
@@ -123,7 +227,16 @@ class RHELShell:
                     self._publish_resize_applied(session_id, resize)
             except Exception:
                 pass
+            # Drain power events from cloud / hypervisor consoles so a Stopped
+            # VM freezes this Lab Server terminal (SSH would also refuse).
+            self._sync_host_power_from_bridges(session_id)
 
+        if getattr(self.state, "_host_powered_off", False):
+            self.state.last_exit_code = 255
+            return (
+                "Connection to Lab Server closed — host is powered off.\r\n"
+                "Power the instance/VM/chassis on from the console (or BMC), then reconnect."
+            )
         # Command-list operators. A real shell splits on `;` (run sequentially,
         # ignoring exit codes), `&&` (run next only on success) and `||` (run
         # next only on failure). We handle them here — before dispatch — so any
@@ -5272,13 +5385,34 @@ class RHELShell:
         # powers the guest off. Both propagate to the VMware VM power state.
         if "-r" in p:
             self.state.boot_time = time.time()
+            self.state._host_powered_off = False
             self._notify_guest_power("reboot")
             return "__REBOOT__"
+        self.state._host_powered_off = True
         self._notify_guest_power("poweroff")
+        try:
+            sid = getattr(self.state, "session_id", None)
+            if sid:
+                from .server_identity import get_primary, set_power
+                primary = get_primary(sid)
+                if primary:
+                    set_power(sid, primary["id"], "off", source="terminal")
+        except Exception:
+            pass
         return "System shutdown simulated. The system is going down NOW!"
 
     def _cmd_poweroff(self, p: list[str]) -> str:
+        self.state._host_powered_off = True
         self._notify_guest_power("poweroff")
+        try:
+            sid = getattr(self.state, "session_id", None)
+            if sid:
+                from .server_identity import get_primary, set_power
+                primary = get_primary(sid)
+                if primary:
+                    set_power(sid, primary["id"], "off", source="terminal")
+        except Exception:
+            pass
         return "Powering off."
 
     def _cmd_exit(self, p: list[str]) -> str:

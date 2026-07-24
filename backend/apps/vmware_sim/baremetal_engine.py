@@ -337,6 +337,24 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         target = (payload.get("power") or ("off" if m.get("power") == "on" else "on")).lower()
         m["power"] = "on" if target == "on" else "off"
         _log(m, f"Power {'on' if target == 'on' else 'off'} via IPMI")
+        try:
+            from apps.labs.provisioner.simulation.server_identity import get_primary, set_power, upsert_server
+            upsert_server(
+                session_id,
+                {
+                    "id": f"maas-{m.get('hostname') or mid}",
+                    "hostname": m.get("hostname") or f"node-{mid}",
+                    "power": m["power"],
+                    "tags": {"role": "primary"},
+                },
+                source="baremetal",
+            )
+            primary = get_primary(session_id)
+            if primary:
+                set_power(session_id, primary["id"], m["power"], source="baremetal")
+            set_power(session_id, f"maas-{m.get('hostname') or mid}", m["power"], source="baremetal")
+        except Exception:
+            pass
         _save(session_id, entry)
         return {"ok": True, "message": f"Power {m['power']}"}
 
@@ -365,6 +383,24 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             _log(m, "PXE: DHCP request on eth0 (vlan pxe) — awaiting next-server")
             state["events"].insert(0, {"time": _now_iso(),
                                        "message": f"{m.get('hostname')} power-cycled via IPMI", "severity": "info"})
+            try:
+                from apps.labs.provisioner.simulation.server_identity import get_primary, set_power, upsert_server
+                upsert_server(
+                    session_id,
+                    {
+                        "id": f"maas-{m.get('hostname') or mid}",
+                        "hostname": m.get("hostname") or f"node-{mid}",
+                        "power": "on",
+                        "tags": {"role": "primary"},
+                    },
+                    source="baremetal",
+                )
+                primary = get_primary(session_id)
+                if primary:
+                    set_power(session_id, primary["id"], "on", source="baremetal")
+                set_power(session_id, f"maas-{m.get('hostname') or mid}", "on", source="baremetal")
+            except Exception:
+                pass
             _save(session_id, entry)
             return {"ok": True, "message": f"Power cycle issued to {m.get('hostname')}",
                     "power": "on"}
@@ -373,6 +409,24 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _log(m, f"IPMI chassis power {target}")
         if bmc is not None:
             bmc["power"] = target
+        try:
+            from apps.labs.provisioner.simulation.server_identity import get_primary, set_power, upsert_server
+            upsert_server(
+                session_id,
+                {
+                    "id": f"maas-{m.get('hostname') or mid}",
+                    "hostname": m.get("hostname") or f"node-{mid}",
+                    "power": target,
+                    "tags": {"role": "primary"},
+                },
+                source="baremetal",
+            )
+            primary = get_primary(session_id)
+            if primary:
+                set_power(session_id, primary["id"], target, source="baremetal")
+            set_power(session_id, f"maas-{m.get('hostname') or mid}", target, source="baremetal")
+        except Exception:
+            pass
         _save(session_id, entry)
         return {"ok": True, "message": f"Chassis Power set to {target}", "power": target}
 

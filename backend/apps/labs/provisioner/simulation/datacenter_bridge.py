@@ -21,15 +21,38 @@ def _key(session_id: str) -> str:
 def _load(session_id: str) -> dict:
     raw = cache.get(_key(str(session_id)))
     if raw is None:
-        return {"pending_disk": None, "pending_nic": None}
+        return {"pending_disk": None, "pending_nic": None, "instance_power": None, "power_asset_id": None}
     data = json.loads(raw) if isinstance(raw, str) else raw
     data.setdefault("pending_disk", None)
     data.setdefault("pending_nic", None)
+    data.setdefault("instance_power", None)
+    data.setdefault("power_asset_id", None)
     return data
 
 
 def _save(session_id: str, data: dict) -> None:
     cache.set(_key(str(session_id)), json.dumps(data, default=str), BRIDGE_TTL)
+
+
+def record_power(session_id: str, action: str, *, asset_id: str = "") -> None:
+    """BMC / chassis power change → Lab Server terminal freeze/thaw."""
+    if action not in ("on", "off", "start", "stop", "reset", "cycle"):
+        return
+    data = _load(session_id)
+    # Normalize to consume_power vocabulary used by RHELShell.
+    data["instance_power"] = "stop" if action in ("off", "stop") else "start"
+    data["power_asset_id"] = asset_id or None
+    _save(session_id, data)
+
+
+def consume_power(session_id: str) -> str | None:
+    data = _load(session_id)
+    action = data.get("instance_power")
+    if not action:
+        return None
+    data["instance_power"] = None
+    _save(session_id, data)
+    return action
 
 
 def record_disk_replaced(session_id: str, asset_id: str, *, size_gb: int = 1920) -> None:

@@ -1085,6 +1085,13 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             record_hypervisor_reboot(str(session_id))
         except Exception:
             pass
+        try:
+            from apps.labs.provisioner.simulation.server_identity import get_primary, set_power
+            primary = get_primary(str(session_id))
+            if primary:
+                set_power(str(session_id), primary["id"], "on", source="vmware")
+        except Exception:
+            pass
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} powered on successfully"}
 
@@ -1106,6 +1113,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         tasks.insert(0, _task("Power Off Virtual Machine", vm["name"]))
         # Cross-tech k8s: powering off a worker-node VM removes that node.
         _bridge_k8s_node(entry, vm, "offline")
+        # Freeze the linked Lab Server terminal — SSH to a powered-off guest fails.
+        try:
+            from apps.labs.provisioner.simulation.vmware_bridge import set_terminal_link_state
+            from apps.labs.provisioner.simulation.server_identity import get_primary, set_power
+            set_terminal_link_state(str(session_id), "disconnected")
+            primary = get_primary(str(session_id))
+            if primary:
+                set_power(str(session_id), primary["id"], "off", source="vmware")
+        except Exception:
+            pass
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} powered off"}
 
@@ -1123,6 +1140,15 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm["mem_pct"] = 0
         events.append(_event(f"Shut down guest OS on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Shut Down Guest", vm["name"]))
+        try:
+            from apps.labs.provisioner.simulation.vmware_bridge import set_terminal_link_state
+            from apps.labs.provisioner.simulation.server_identity import get_primary, set_power
+            set_terminal_link_state(str(session_id), "disconnected")
+            primary = get_primary(str(session_id))
+            if primary:
+                set_power(str(session_id), primary["id"], "off", source="vmware")
+        except Exception:
+            pass
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} shut down gracefully"}
 

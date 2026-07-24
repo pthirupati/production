@@ -626,10 +626,23 @@ def _sync_identity(session_id: str, state: dict) -> None:
 
 def _sync_power(session_id: str, server_id: str, power_state: str) -> None:
     try:
-        from apps.labs.provisioner.simulation.server_identity import set_power
+        from apps.labs.provisioner.simulation.server_identity import set_power, get_primary
     except Exception:  # pragma: no cover
         return
     set_power(session_id, server_id, power_state, source="datacenter")
+    # Also gate the lab terminal primary — BMC off on the working asset must
+    # freeze SSH/shell just like a dead chassis.
+    try:
+        primary = get_primary(session_id)
+        if primary and primary.get("id") != server_id:
+            set_power(session_id, primary["id"], power_state, source="datacenter")
+    except Exception:
+        pass
+    try:
+        from apps.labs.provisioner.simulation.datacenter_bridge import record_power
+        record_power(session_id, "off" if power_state == "off" else "on", asset_id=server_id)
+    except Exception:
+        pass
 
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
@@ -839,6 +852,45 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["selected_asset"] = srv["id"]
         _save(session_id, entry)
         return {"ok": True, "message": f"Opened BMC console for {srv['id']}", "bmc": srv.get("bmc"), "asset": srv}
+
+    if action == "bmc_login":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        user = (payload.get("username") or payload.get("user") or "").strip()
+        password = (payload.get("password") or "").strip()
+        bmc = srv.setdefault("bmc", {})
+        allowed = {u.get("name") for u in (bmc.get("users") or []) if u.get("enabled")}
+        # Factory defaults: root/calvin (Dell) or Administrator/password (iLO-style)
+        ok_cred = (
+            (user in allowed or user in ("root", "Administrator", "admin"))
+            and password in ("calvin", "password", "admin", "changeme")
+        )
+        if not ok_cred:
+            bmc.setdefault("sel", []).insert(0, {
+                "time": _now_iso(), "severity": "warning",
+                "message": f"Failed login attempt for user '{user or '?'}'",
+            })
+            _save(session_id, entry)
+            return {"ok": False, "error": "Invalid BMC credentials"}
+        bmc["session"] = {"authenticated": True, "user": user}
+        bmc.setdefault("sel", []).insert(0, {
+            "time": _now_iso(), "severity": "info",
+            "message": f"User {user} authenticated to {bmc.get('product', 'BMC')} web UI",
+        })
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Logged into {bmc.get('product')}", "bmc": bmc}
+
+    if action == "bmc_logout":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        bmc = srv.setdefault("bmc", {})
+        bmc["session"] = {"authenticated": False, "user": None}
+        _save(session_id, entry)
+        return {"ok": True, "message": "BMC session ended", "bmc": bmc}
 
     if action == "bmc_power":
         asset_id = payload.get("asset_id") or state.get("selected_asset") or broken.get("server") or ""

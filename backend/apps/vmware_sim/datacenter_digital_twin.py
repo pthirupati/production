@@ -336,6 +336,9 @@ def build_bmc(hostname: str, vendor: str, power_state: str = "on", *, generation
             "result": None,
             "suites": ["Memory", "CPU", "Storage", "PCIe", "Network", "Thermal", "Power", "Burn-In"],
         },
+        # Web UI session — learners open the BMC IP and authenticate like real iDRAC/iLO.
+        "session": {"authenticated": False, "user": None},
+        "login_hint": "root / calvin",
     }
 
 
