@@ -640,6 +640,82 @@ function PulsingLight() {
   return <pointLight ref={ref} position={[-4, 3, -2]} color="#38bdf8" />
 }
 
+function TorSwitch({ position = [5.5, 0.95, -1.2], label = 'MDF / Agg', ports = 48 }) {
+  const leds = useRef([])
+  useFrame(({ clock }) => {
+    leds.current.forEach((m, i) => {
+      if (!m?.material) return
+      const blink = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(clock.elapsedTime * (6 + (i % 7)) + i))
+      m.material.emissiveIntensity = blink
+    })
+  })
+  const cols = 12
+  return (
+    <Float speed={1.2} floatIntensity={0.1} rotationIntensity={0.04}>
+      <group position={position}>
+        <RoundedBox args={[1.1, 0.22, 0.55]} radius={0.015} castShadow>
+          <meshStandardMaterial color="#0b1220" metalness={0.65} roughness={0.3} />
+        </RoundedBox>
+        <mesh position={[0.42, 0, 0.22]}>
+          <boxGeometry args={[0.18, 0.16, 0.08]} />
+          <meshStandardMaterial color="#1e293b" metalness={0.5} />
+        </mesh>
+        {Array.from({ length: ports }).map((_, i) => {
+          const col = i % cols
+          const row = Math.floor(i / cols)
+          const x = -0.48 + col * 0.08
+          const y = 0.04 - row * 0.07
+          return (
+            <mesh
+              key={i}
+              ref={(el) => { if (el) leds.current[i] = el }}
+              position={[x, y, 0.28]}
+            >
+              <boxGeometry args={[0.05, 0.035, 0.02]} />
+              <meshStandardMaterial
+                color="#022c22"
+                emissive={i % 5 === 0 ? '#f59e0b' : '#22c55e'}
+                emissiveIntensity={0.6}
+                metalness={0.4}
+              />
+            </mesh>
+          )
+        })}
+        <Html position={[0, 0.22, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
+          <div className="dc-3d-label dc-3d-label-hot">{label} · {ports}p</div>
+        </Html>
+      </group>
+    </Float>
+  )
+}
+
+function CableTray() {
+  return (
+    <group position={[0, 2.55, -1.6]}>
+      <mesh>
+        <boxGeometry args={[12, 0.04, 0.55]} />
+        <meshStandardMaterial color="#334155" metalness={0.7} roughness={0.4} />
+      </mesh>
+      {[-5, -2.5, 0, 2.5, 5].map((x) => (
+        <mesh key={x} position={[x, -0.12, 0]}>
+          <boxGeometry args={[0.04, 0.22, 0.55]} />
+          <meshStandardMaterial color="#475569" metalness={0.6} />
+        </mesh>
+      ))}
+      {[-0.12, 0, 0.12].map((z, i) => (
+        <mesh key={z} position={[0, 0.04, z]}>
+          <cylinderGeometry args={[0.025, 0.025, 11.5, 8]} />
+          <meshStandardMaterial
+            color={i === 1 ? '#38bdf8' : '#f97316'}
+            emissive={i === 1 ? '#0ea5e9' : '#ea580c'}
+            emissiveIntensity={0.25}
+          />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
 function SceneContent({
   racks, serversByRack, network, cooling, pdus, selectedId, expandedRack,
   onSelectServer, onSelectRack, onOpenBmc, onUnplugCable, physicsEnabled, onFps, animBoost, intro,
@@ -652,27 +728,49 @@ function SceneContent({
     return Math.min(1, failed / units.length + hot * 0.15)
   }, [cooling])
 
+  const switchCount = (network?.switches || []).length
+  const mdfPos = useMemo(() => new THREE.Vector3(5.5, 1.05, -1.2), [])
+
   const cables = useMemo(() => {
     const links = []
-    const switches = network?.switches || []
     racks.forEach((rack, i) => {
-      if (!switches.length) return
+      // Always draw plant cabling — not only when switch inventory is seeded.
+      if (switchCount === 0 && i > 8) return
       const { x: sx, z: sz } = rackPosition(i)
-      const srv = (serversByRack[rack.id] || [])[0]
+      const srvList = serversByRack[rack.id] || []
+      const srv = srvList[0]
       const loose = (srv?.hardware?.cables || []).some((c) => c.status === 'loose' || c.status === 'damaged')
+      const tray = new THREE.Vector3(sx, 2.45, -1.6)
       links.push({
-        id: `${rack.id}-uplink`,
-        from: new THREE.Vector3(sx, 1.6, sz + RACK_D / 2),
-        to: new THREE.Vector3(5.5, 1.4, -1.2),
+        id: `${rack.id}-to-tray`,
+        from: new THREE.Vector3(sx, 1.65, sz + RACK_D / 2),
+        to: tray,
         loose,
-        color: loose ? '#f59e0b' : '#38bdf8',
+        color: loose ? '#f59e0b' : '#22d3ee',
+      })
+      links.push({
+        id: `${rack.id}-tray-mdf`,
+        from: tray,
+        to: mdfPos.clone(),
+        loose: false,
+        color: '#38bdf8',
+      })
+      srvList.slice(0, 2).forEach((s, si) => {
+        const uy = ((s.u_slot || (si + 1)) - 1) * U_H - RACK_H / 2 + U_H / 2
+        links.push({
+          id: `${s.id}-nic0`,
+          from: new THREE.Vector3(sx + RACK_W * 0.2, uy + RACK_H / 2, sz + RACK_D / 2),
+          to: new THREE.Vector3(sx, 1.55, sz + RACK_D / 2 + 0.08),
+          loose: (s.hardware?.cables || []).some((c) => c.status === 'loose'),
+          color: '#a78bfa',
+        })
       })
     })
     return links
-  }, [racks, serversByRack, network])
+  }, [racks, serversByRack, switchCount, mdfPos])
 
   const cableAnchors = useMemo(
-    () => cables.map((c) => [
+    () => cables.filter((c) => c.loose).map((c) => [
       (c.from.x + c.to.x) / 2,
       Math.max(0.2, (c.from.y + c.to.y) / 2 - 0.2),
       (c.from.z + c.to.z) / 2,
@@ -691,6 +789,7 @@ function SceneContent({
       <PulsingLight />
       <Environment preset="warehouse" />
       <Floor />
+      <CableTray />
       <HotAisleGlow z={-1.6} />
       <HotAisleGlow z={-3.8} />
       {animBoost > 0 && (
@@ -702,16 +801,8 @@ function SceneContent({
       <CracUnits cooling={cooling} />
       <PduStrips racks={racks} pdus={pdus} />
 
-      <Float speed={1.5} floatIntensity={0.15} rotationIntensity={0.05}>
-        <group position={[5.5, 0.9, -1.2]}>
-          <RoundedBox args={[0.7, 1.8, 0.9]} radius={0.02} castShadow>
-            <meshStandardMaterial color="#111827" metalness={0.5} roughness={0.4} emissive="#0ea5e9" emissiveIntensity={0.06} />
-          </RoundedBox>
-          <Html position={[0, 1.05, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
-            <div className="dc-3d-label dc-3d-label-hot">MDF / Agg</div>
-          </Html>
-        </group>
-      </Float>
+      <TorSwitch position={[5.5, 0.95, -1.2]} label="MDF / Spine" ports={48} />
+      <TorSwitch position={[5.5, 1.25, -1.2]} label="Leaf / ToR agg" ports={36} />
 
       <Bvh firstHitOnly>
         {racks.map((rack, i) => (
@@ -739,7 +830,7 @@ function SceneContent({
           color={c.color}
           loose={c.loose}
           traffic={animBoost > 0}
-          onUnplug={() => onUnplugCable?.(c.id)}
+          onUnplug={c.loose ? () => onUnplugCable?.(c.id) : undefined}
         />
       ))}
 
