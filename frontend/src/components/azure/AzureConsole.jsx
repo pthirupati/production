@@ -219,7 +219,7 @@ export default function AzureConsole({
         { key: 'name', label: 'Name', sortable: true },
         { key: 'location', label: 'Region', sortable: true },
         { key: 'resources', label: 'Resources', render: () => vms.length + vnets.length + nsgs.length + disks.length + storageAccounts.length },
-      ]} searchKeys={['name', 'location', 'resources']} rows={resourceGroups} searchKeys={['name']} />
+      ]} searchKeys={['name', 'location', 'resources']} rows={resourceGroups} />
       <h2 className="text-lg font-semibold pt-2">Subscription glance</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
         <div className="az-tile"><Server size={16} /> <div><div className="az-tile-num">{vms.length}</div><div className="az-tile-label">VMs</div></div></div>
@@ -243,7 +243,7 @@ export default function AzureConsole({
         { key: 'sku', label: 'SKU' },
         { key: 'allocation', label: 'Allocation' },
         { key: 'attached_to', label: 'Associated to', render: (r) => r.attached_to || '—' },
-      ]} searchKeys={['name', 'ip', 'sku', 'allocation', 'attached_to']} rows={publicIps} searchKeys={['name', 'ip']} />
+      ]} searchKeys={['name', 'ip', 'sku', 'allocation', 'attached_to']} rows={publicIps} />
     </div>
   )
 
@@ -292,7 +292,7 @@ export default function AzureConsole({
             </button>
           </div>
         ) },
-      ]} searchKeys={['name', 'power_state', 'size', 'private_ip', 'public_ip', 'resource_group']} rows={vms} searchKeys={['name']} onRowClick={(r) => { setVmDetail(r); setResizeTo(r.size) }} />
+      ]} searchKeys={['name', 'power_state', 'size', 'private_ip', 'public_ip', 'resource_group']} rows={vms} onRowClick={(r) => { setVmDetail(r); setResizeTo(r.size) }} />
     </div>
   )
 
@@ -322,7 +322,7 @@ export default function AzureConsole({
               <Plus size={11} /> Add subnet
             </button>
           ) },
-        ]} searchKeys={['name', 'address_space', 'subnets']} rows={vnets} searchKeys={['name']} />
+        ]} searchKeys={['name', 'address_space', 'subnets']} rows={vnets} />
       </div>
       <div>
         <h2 className="text-lg font-semibold mb-2">Network security groups</h2>
@@ -433,7 +433,7 @@ export default function AzureConsole({
             </button>
           </div>
         ) },
-      ]} searchKeys={['name', 'size_gb', 'sku', 'state', 'attached_to']} rows={disks} searchKeys={['name']} />
+      ]} searchKeys={['name', 'size_gb', 'sku', 'state', 'attached_to']} rows={disks} />
       {snapshots.length > 0 && (
         <>
           <h2 className="text-lg font-semibold pt-2">Snapshots</h2>
@@ -442,7 +442,7 @@ export default function AzureConsole({
             { key: 'source_disk', label: 'Source disk' },
             { key: 'size_gb', label: 'Size', render: (r) => `${r.size_gb} GiB` },
             { key: 'created', label: 'Created' },
-          ]} searchKeys={['name', 'source_disk', 'size_gb', 'created']} rows={snapshots} searchKeys={['name']} />
+          ]} searchKeys={['name', 'source_disk', 'size_gb', 'created']} rows={snapshots} />
         </>
       )}
     </div>
@@ -528,7 +528,7 @@ export default function AzureConsole({
             Remove
           </button>
         ) },
-      ]} searchKeys={['principal', 'role', 'scope']} rows={roleAssignments} searchKeys={['principal', 'role']} />
+      ]} searchKeys={['principal', 'role', 'scope']} rows={roleAssignments} />
     </div>
   )
 
@@ -540,7 +540,7 @@ export default function AzureConsole({
         { key: 'operation', label: 'Operation', render: (r) => r.operation || r.message },
         { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={(r.status || '').includes('Fail') || r.severity === 'error' ? 'error' : 'success'} label={r.status || r.severity || 'Succeeded'} /> },
         { key: 'caller', label: 'Caller', render: (r) => r.caller || '—' },
-      ]} searchKeys={['time', 'operation', 'status', 'caller']} rows={activityLog} searchKeys={['operation', 'message', 'caller']} pageSize={25} />
+      ]} searchKeys={['time', 'operation', 'status', 'caller']} rows={activityLog} pageSize={25} />
     </div>
   )
 

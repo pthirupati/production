@@ -67,7 +67,6 @@ export function renderAzureV2Page({
               ),
             },
           ]} searchKeys={['name', 'sku', 'capacity', 'orchestration', 'upgrade_policy']} rows={vmss}
-          searchKeys={['name']}
           expandRow={(r) => (
             <div className="az-detail-panel text-sm space-y-2 p-3">
               <div><strong>Autoscale:</strong> min {r.autoscale?.min} / max {r.autoscale?.max} · CPU out {r.autoscale?.cpu_out}%</div>
@@ -120,7 +119,7 @@ export function renderAzureV2Page({
             { key: 'os', label: 'OS' },
             { key: 'apps', label: 'Apps' },
             { key: 'location', label: 'Region' },
-          ]} searchKeys={['name', 'sku', 'os', 'apps', 'location']} rows={plans} searchKeys={['name']} />
+          ]} searchKeys={['name', 'sku', 'os', 'apps', 'location']} rows={plans} />
         </div>
         <div>
           <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
@@ -146,7 +145,7 @@ export function renderAzureV2Page({
                 ),
               },
             ]} searchKeys={['name', 'state', 'runtime', 'plan', 'url']} rows={webApps}
-            searchKeys={['name']}
+            
             expandRow={(r) => (
               <div className="az-detail-panel text-sm p-3 space-y-2">
                 <div>HTTPS only: {r.https_only ? 'On' : 'Off'} · Always On: {r.always_on ? 'On' : 'Off'}</div>
@@ -198,7 +197,7 @@ export function renderAzureV2Page({
             { key: 'plan', label: 'Plan' },
             { key: 'functions', label: 'Functions', render: (r) => (r.functions || []).length },
           ]} searchKeys={['name', 'state', 'runtime', 'plan', 'functions']} rows={funcs}
-          searchKeys={['name']}
+          
           expandRow={(r) => (
             <div className="az-detail-panel text-sm p-3 space-y-2">
               <div className="flex justify-between items-center">
@@ -269,7 +268,6 @@ export function renderAzureV2Page({
               { key: 'memory', label: 'Memory' },
               { key: 'ingress', label: 'Ingress' },
             ]} searchKeys={['name', 'environment', 'replicas', 'cpu', 'memory', 'ingress']} rows={cas}
-            searchKeys={['name']}
             expandRow={(r) => (
               <div className="az-detail-panel text-sm p-3 space-y-1">
                 <div>Image: <code>{r.image}</code></div>
@@ -344,7 +342,7 @@ export function renderAzureV2Page({
               ),
             },
           ]} searchKeys={['name', 'kubernetes_version', 'sku', 'network_plugin', 'nodes', 'provisioning_state']} rows={aksClusters}
-          searchKeys={['name']}
+          
           expandRow={(r) => (
             <div className="az-detail-panel text-sm p-3 space-y-2">
               <div>FQDN: <code>{r.fqdn}</code></div>
@@ -476,7 +474,6 @@ export function renderAzureV2Page({
             { key: 'location', label: 'Region' },
             { key: 'databases', label: 'Databases', render: (r) => (r.databases || []).length },
           ]} searchKeys={['name', 'api', 'consistency', 'location', 'databases']} rows={cosmos}
-          searchKeys={['name']}
           expandRow={(r) => (
             <div className="az-detail-panel text-sm p-3 space-y-2">
               {(r.databases || []).map((db) => (
@@ -588,7 +585,7 @@ export function renderAzureV2Page({
             { key: 'upn', label: 'User principal name', sortable: true },
             { key: 'type', label: 'User type' },
             { key: 'mfa', label: 'MFA', render: (r) => (r.mfa ? 'Registered' : 'Not registered') },
-          ]} searchKeys={['display', 'upn', 'type', 'mfa']} rows={entra.users || []} searchKeys={['upn', 'display']} />
+          ]} searchKeys={['display', 'upn', 'type', 'mfa']} rows={entra.users || []} />
         </div>
         <div>
           <div className="flex justify-between items-center mb-2 flex-wrap gap-2">

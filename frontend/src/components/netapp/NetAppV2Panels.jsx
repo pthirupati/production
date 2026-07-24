@@ -20,7 +20,7 @@ export function renderNetAppV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'constituents', label: 'Constituents' },
           { key: 'used_pct', label: 'Used %' },
           { key: 'health', label: 'Health', render: (r) => <SimStatusBadge status="success" label={r.health} /> },
-        ]} searchKeys={['name', 'svm', 'size_tb', 'constituents', 'used_pct', 'health']} rows={st.flexgroups || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'svm', 'size_tb', 'constituents', 'used_pct', 'health']} rows={st.flexgroups || []} />
       </div>
     )
   }

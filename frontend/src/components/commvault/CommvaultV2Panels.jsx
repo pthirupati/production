@@ -47,7 +47,7 @@ export function renderCommvaultV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'plan', label: 'Plan' },
           { key: 'pvcs', label: 'PVCs' },
           { key: 'last_backup', label: 'Last backup', render: (r) => <SimStatusBadge status={r.last_backup === 'Success' ? 'success' : 'pending'} label={r.last_backup} /> },
-        ]} searchKeys={['name', 'distribution', 'namespaces', 'plan', 'pvcs', 'last_backup']} rows={st.k8s_apps || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'distribution', 'namespaces', 'plan', 'pvcs', 'last_backup']} rows={st.k8s_apps || []} />
       </div>
     )
   }
@@ -67,7 +67,7 @@ export function renderCommvaultV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'workloads', label: 'Workloads', render: (r) => (r.workloads || []).join(', ') },
           { key: 'users', label: 'Users' },
           { key: 'last_backup', label: 'Last backup' },
-        ]} searchKeys={['name', 'type', 'workloads', 'users', 'last_backup']} rows={st.saas_apps || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'type', 'workloads', 'users', 'last_backup']} rows={st.saas_apps || []} />
       </div>
     )
   }
@@ -89,7 +89,7 @@ export function renderCommvaultV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'encryption', label: 'Encryption' },
           { key: 'secondary_copy', label: 'Secondary', render: (r) => (r.secondary_copy ? 'Yes' : 'No') },
           { key: 'workloads', label: 'Workloads' },
-        ]} searchKeys={['name', 'type', 'rpo_hours', 'retention_days', 'encryption', 'secondary_copy']} rows={st.plans || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'type', 'rpo_hours', 'retention_days', 'encryption', 'secondary_copy']} rows={st.plans || []} />
       </div>
     )
   }

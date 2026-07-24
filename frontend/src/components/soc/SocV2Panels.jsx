@@ -65,7 +65,7 @@ export function renderSocV2Page({ nav, st, sessionId, busy, run }) {
               ) : null,
             },
           ]} searchKeys={['cve', 'title', 'cvss', 'epss', 'asset', 'status']} rows={st.vulnerabilities || []}
-          searchKeys={['cve', 'asset']}
+          
         />
       </div>
     )

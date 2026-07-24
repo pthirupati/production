@@ -40,7 +40,7 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
               ) : null,
             },
           ]} searchKeys={['name', 'namespace', 'sync_status', 'health', 'repo', 'path']} rows={st.argo_apps || []}
-          searchKeys={['name', 'namespace']}
+          
         />
       </div>
     )
@@ -182,7 +182,7 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
                 ) : null,
               },
             ]} searchKeys={['number', 'title', 'state', 'labels', 'author']} rows={issues}
-            searchKeys={['title', 'author']}
+            
           />
         </div>
         <div>
@@ -214,7 +214,7 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
                 ) : null,
               },
             ]} searchKeys={['number', 'title', 'state', 'head', 'checks', 'review']} rows={prs}
-            searchKeys={['title', 'head']}
+            
           />
         </div>
         <div>

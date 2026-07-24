@@ -39,7 +39,6 @@ export function renderGcpV2Page({
               ),
             },
           ]} searchKeys={['name', 'region', 'url', 'cpu', 'memory']} rows={services}
-          searchKeys={['name']}
           expandRow={(r) => (
             <div className="gcp-detail-panel text-sm p-3 space-y-2">
               <div>Image: <code>{r.image}</code> · Concurrency {r.concurrency} · Scale {r.min_instances}–{r.max_instances}</div>
@@ -96,7 +95,6 @@ export function renderGcpV2Page({
               ),
             },
           ]} searchKeys={['name', 'message_retention', 'subscriptions']} rows={topics}
-          searchKeys={['name']}
           expandRow={(r) => (
             <SimDataTable columns={[
               { key: 'name', label: 'Subscription' },
@@ -141,7 +139,7 @@ export function renderGcpV2Page({
             { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
             { key: 'endpoint', label: 'Endpoint' },
           ]} searchKeys={['name', 'location', 'mode', 'version', 'status', 'endpoint']} rows={clusters}
-          searchKeys={['name']}
+          
           expandRow={(r) => (
             <div className="gcp-detail-panel text-sm p-3 space-y-2">
               <SimDataTable
@@ -198,7 +196,7 @@ export function renderGcpV2Page({
           { key: 'trigger', label: 'Trigger' },
           { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
           { key: 'invocations_24h', label: 'Invocations (24h)' },
-        ]} searchKeys={['name', 'gen', 'runtime', 'trigger', 'status', 'invocations_24h']} rows={fns} searchKeys={['name']} />
+        ]} searchKeys={['name', 'gen', 'runtime', 'trigger', 'status', 'invocations_24h']} rows={fns} />
         <SimModal open={createFnOpen} onClose={() => setCreateFnOpen(false)} title="Create function"
           footer={<>
             <button type="button" className="text-sm px-3" onClick={() => setCreateFnOpen(false)}>Cancel</button>
@@ -233,7 +231,7 @@ export function renderGcpV2Page({
             { key: 'state', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.state} /> },
             { key: 'ip', label: 'Public IP' },
           ]} searchKeys={['name', 'database_version', 'tier', 'state', 'ip']} rows={instances}
-          searchKeys={['name']}
+          
           expandRow={(r) => (
             <div className="gcp-detail-panel text-sm p-3 space-y-2">
               <div className="flex justify-between">
@@ -290,7 +288,6 @@ export function renderGcpV2Page({
               ),
             },
           ]} searchKeys={['name', 'versions']} rows={secrets}
-          searchKeys={['name']}
           expandRow={(r) => (
             <SimDataTable columns={[
               { key: 'version', label: 'Version' },
@@ -415,7 +412,6 @@ export function renderGcpV2Page({
             { key: 'location', label: 'Location' },
             { key: 'tables', label: 'Tables', render: (r) => (r.tables || []).length },
           ]} searchKeys={['dataset_id', 'location', 'tables']} rows={datasets}
-          searchKeys={['dataset_id']}
           expandRow={(r) => (
             <div className="gcp-detail-panel text-sm p-3 space-y-2">
               <button type="button" className="gcp-btn-sm" disabled={busy}
@@ -471,7 +467,7 @@ export function renderGcpV2Page({
               { key: 'backend_service', label: 'Backend service' },
               { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
             ]} searchKeys={['name', 'protocol', 'ip', 'port', 'backend_service', 'status']} rows={lbs}
-            searchKeys={['name']}
+            
             expandRow={(r) => (
               <div className="gcp-detail-panel text-sm p-3 space-y-1">
                 <div>Health check: <code>{r.health_check}</code> · SSL: <code>{r.ssl_cert}</code></div>
@@ -515,7 +511,6 @@ export function renderGcpV2Page({
                 ),
               },
             ]} searchKeys={['name', 'zone', 'network', 'size', 'template']} rows={igs}
-            searchKeys={['name']}
           />
         </div>
       </div>
