@@ -5,7 +5,7 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* Product-accurate fonts */
+/* Product-accurate fonts + forced readable body colors on light portals */
 .az-shell.sim-product { font-family: 'Segoe UI', 'Segoe UI Web (West European)', system-ui, sans-serif; color: #323130; }
 .gcp-shell.sim-product { font-family: 'Google Sans', 'Roboto', Arial, sans-serif; color: #202124; }
 .cv-shell.sim-product { font-family: 'Segoe UI', system-ui, sans-serif; color: #1e293b; }
@@ -13,6 +13,54 @@
 .de-shell.sim-product { font-family: 'Segoe UI', system-ui, sans-serif; color: #0b1d33; }
 .soc-shell.sim-product { font-family: 'Inter', system-ui, sans-serif; color: #e6edf3; }
 .dc-shell.sim-product { font-family: 'IBM Plex Sans', 'Inter', system-ui, sans-serif; color: #e6e9f0; }
+
+/* Light portal panes: keep Fluent/Material body ink; remap washed-out dark-theme utilities */
+.az-shell main,
+.gcp-shell main,
+.cv-shell main,
+.na-shell main,
+.de-shell main {
+  color: inherit;
+}
+.az-shell main h1, .az-shell main h2, .az-shell main h3,
+.gcp-shell main h1, .gcp-shell main h2, .gcp-shell main h3,
+.cv-shell main h1, .cv-shell main h2, .cv-shell main h3,
+.na-shell main h1, .na-shell main h2, .na-shell main h3,
+.de-shell main h1, .de-shell main h2, .de-shell main h3 {
+  color: inherit;
+}
+.az-shell main input:not([type='checkbox']):not([type='radio']),
+.az-shell main select,
+.az-shell main textarea,
+.gcp-shell main input:not([type='checkbox']):not([type='radio']),
+.gcp-shell main select,
+.gcp-shell main textarea,
+.cv-shell main input:not([type='checkbox']):not([type='radio']),
+.cv-shell main select,
+.cv-shell main textarea,
+.na-shell main input:not([type='checkbox']):not([type='radio']),
+.na-shell main select,
+.na-shell main textarea,
+.de-shell main input:not([type='checkbox']):not([type='radio']),
+.de-shell main select,
+.de-shell main textarea {
+  color: #201f1e;
+  background: #fff;
+}
+.az-shell main .text-slate-300,
+.az-shell main .text-slate-400,
+.az-shell main .text-\[\#e6edf3\],
+.gcp-shell main .text-slate-300,
+.gcp-shell main .text-slate-400,
+.gcp-shell main .text-\[\#e6edf3\],
+.cv-shell main .text-slate-300,
+.cv-shell main .text-slate-400,
+.na-shell main .text-slate-300,
+.na-shell main .text-slate-400,
+.de-shell main .text-slate-300,
+.de-shell main .text-slate-400 {
+  color: #605e5c !important;
+}
 
 /* Status badges — deep text on light portals; pastel on dark shells */
 .sim-badge { border-width: 1px; border-style: solid; }
