@@ -214,6 +214,11 @@ class GcpLinuxResizeBridgeTests(GcpEngineBase):
 
         ge.apply_action(self.sid, "stop_instance", {"instance_name": "web01"})
         ge.apply_action(self.sid, "set_machine_type", {"instance_name": "web01", "machine_type": "e2-standard-2"})
+        # Lab Server must refuse while the instance is stopped (real SSH would too).
+        blocked = shell.run("nproc")
+        self.assertIn("powered off", blocked.lower())
+
+        ge.apply_action(self.sid, "start_instance", {"instance_name": "web01"})
         out = shell.run("nproc").strip()
         self.assertEqual(out, "2")
         self.assertEqual(shell.state.mem_mb, 8192)
