@@ -47,7 +47,7 @@ export function renderDockerV2Page({ nav, daemon, sessionId, busy, run }) {
               </div>
             ),
           },
-        ]} rows={services} searchKeys={['name', 'image']} />
+        ]} searchKeys={['name', 'image', 'replicas', 'ports', 'status']} rows={services} searchKeys={['name', 'image']} />
       </div>
     )
   }
@@ -66,7 +66,7 @@ export function renderDockerV2Page({ nav, daemon, sessionId, busy, run }) {
           { key: 'name', label: 'Name', sortable: true },
           { key: 'id', label: 'ID' },
           { key: 'created', label: 'Created' },
-        ]} rows={daemon.secrets || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'id', 'created']} rows={daemon.secrets || []} searchKeys={['name']} />
         <div className="flex justify-between items-center flex-wrap gap-2">
           <h2 className="text-lg font-semibold">Configs</h2>
           <button type="button" className="docker-btn-primary flex items-center gap-1" disabled={busy}
@@ -78,7 +78,7 @@ export function renderDockerV2Page({ nav, daemon, sessionId, busy, run }) {
           { key: 'name', label: 'Name', sortable: true },
           { key: 'id', label: 'ID' },
           { key: 'created', label: 'Created' },
-        ]} rows={daemon.configs || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'id', 'created']} rows={daemon.configs || []} searchKeys={['name']} />
       </div>
     )
   }
@@ -113,7 +113,7 @@ export function renderDockerV2Page({ nav, daemon, sessionId, busy, run }) {
               </button>
             ),
           },
-        ]} rows={reg.images || []} searchKeys={['name', 'tag']} />
+        ]} searchKeys={['name', 'tag', 'size_mb', 'pushed']} rows={reg.images || []} searchKeys={['name', 'tag']} />
       </div>
     )
   }

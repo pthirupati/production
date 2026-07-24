@@ -21,7 +21,7 @@ export function renderK8sV2Page({ nav, cluster, sessionId, busy, run, isOpenShif
           { key: 'namespace', label: 'Namespace' },
           { key: 'className', label: 'Class' },
           { key: 'rules', label: 'Hosts', render: (r) => (r.rules || []).map((x) => x.host).join(', ') },
-        ]} rows={cluster.ingresses || []} searchKeys={['name', 'namespace']} />
+        ]} searchKeys={['name', 'namespace', 'className', 'rules']} rows={cluster.ingresses || []} searchKeys={['name', 'namespace']} />
       </div>
     )
   }
@@ -53,7 +53,7 @@ export function renderK8sV2Page({ nav, cluster, sessionId, busy, run, isOpenShif
               </button>
             ),
           },
-        ]} rows={cluster.configmaps || []} searchKeys={['name']}
+        ]} searchKeys={['name', 'namespace', 'data']} rows={cluster.configmaps || []} searchKeys={['name']}
           expandRow={(r) => (
             <pre className="text-xs p-2 bg-slate-50 overflow-auto">{JSON.stringify(r.data || {}, null, 2)}</pre>
           )}
@@ -77,7 +77,7 @@ export function renderK8sV2Page({ nav, cluster, sessionId, busy, run, isOpenShif
           { key: 'namespace', label: 'Namespace' },
           { key: 'type', label: 'Type' },
           { key: 'keys', label: 'Keys', render: (r) => (r.keys || Object.keys(r.data || {})).join(', ') },
-        ]} rows={cluster.secrets || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'namespace', 'type', 'keys']} rows={cluster.secrets || []} searchKeys={['name']} />
       </div>
     )
   }
@@ -99,7 +99,7 @@ export function renderK8sV2Page({ nav, cluster, sessionId, busy, run, isOpenShif
           { key: 'namespace', label: 'Namespace' },
           { key: 'policy_types', label: 'Types', render: (r) => (r.policy_types || []).join(', ') },
           { key: 'pod_selector', label: 'Selector', render: (r) => JSON.stringify(r.pod_selector || {}) },
-        ]} rows={cluster.network_policies || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'namespace', 'policy_types', 'pod_selector']} rows={cluster.network_policies || []} searchKeys={['name']} />
       </div>
     )
   }
@@ -142,7 +142,7 @@ export function renderK8sV2Page({ nav, cluster, sessionId, busy, run, isOpenShif
               </div>
             ),
           },
-        ]} rows={cluster.helm_releases || []} searchKeys={['name', 'chart']} />
+        ]} searchKeys={['name', 'namespace', 'chart', 'version', 'status', 'revision']} rows={cluster.helm_releases || []} searchKeys={['name', 'chart']} />
       </div>
     )
   }
@@ -165,7 +165,7 @@ export function renderK8sV2Page({ nav, cluster, sessionId, busy, run, isOpenShif
           { key: 'max_replicas', label: 'Max' },
           { key: 'current_replicas', label: 'Current' },
           { key: 'cpu_target', label: 'CPU %' },
-        ]} rows={cluster.hpas || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'namespace', 'target_ref', 'min_replicas', 'max_replicas', 'current_replicas']} rows={cluster.hpas || []} searchKeys={['name']} />
       </div>
     )
   }
@@ -187,14 +187,14 @@ export function renderK8sV2Page({ nav, cluster, sessionId, busy, run, isOpenShif
           { key: 'name', label: 'Name' },
           { key: 'namespace', label: 'Namespace' },
           { key: 'rules', label: 'Rules', render: (r) => (r.rules || []).length },
-        ]} rows={cluster.roles || []} />
+        ]} searchKeys={['name', 'namespace', 'rules']} rows={cluster.roles || []} />
         <h3 className="text-sm font-semibold text-slate-600">RoleBindings</h3>
         <SimDataTable columns={[
           { key: 'name', label: 'Name' },
           { key: 'namespace', label: 'Namespace' },
           { key: 'roleRef', label: 'Role', render: (r) => r.roleRef?.name },
           { key: 'subjects', label: 'Subjects', render: (r) => (r.subjects || []).map((s) => s.name).join(', ') },
-        ]} rows={cluster.role_bindings || []} />
+        ]} searchKeys={['name', 'namespace', 'roleRef', 'subjects']} rows={cluster.role_bindings || []} />
       </div>
     )
   }
@@ -215,7 +215,7 @@ export function renderK8sV2Page({ nav, cluster, sessionId, busy, run, isOpenShif
           { key: 'name', label: 'Name', sortable: true },
           { key: 'display_name', label: 'Display name' },
           { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
-        ]} rows={cluster.openshift_projects || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'display_name', 'status']} rows={cluster.openshift_projects || []} searchKeys={['name']} />
       </div>
     )
   }
@@ -239,7 +239,7 @@ export function renderK8sV2Page({ nav, cluster, sessionId, busy, run, isOpenShif
           { key: 'to', label: 'Service' },
           { key: 'tls', label: 'TLS' },
           { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
-        ]} rows={cluster.openshift_routes || []} searchKeys={['name', 'host']} />
+        ]} searchKeys={['name', 'namespace', 'host', 'to', 'tls', 'status']} rows={cluster.openshift_routes || []} searchKeys={['name', 'host']} />
       </div>
     )
   }
@@ -260,13 +260,13 @@ export function renderK8sV2Page({ nav, cluster, sessionId, busy, run, isOpenShif
           { key: 'from', label: 'From' },
           { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
           { key: 'duration_s', label: 'Duration (s)' },
-        ]} rows={cluster.openshift_builds || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'namespace', 'from', 'status', 'duration_s']} rows={cluster.openshift_builds || []} searchKeys={['name']} />
         <h3 className="text-sm font-semibold text-slate-600 pt-2">Security Context Constraints</h3>
         <SimDataTable columns={[
           { key: 'name', label: 'SCC' },
           { key: 'priority', label: 'Priority' },
           { key: 'users', label: 'Users', render: (r) => (r.users || []).join(', ') },
-        ]} rows={cluster.sccs || []} />
+        ]} searchKeys={['name', 'priority', 'users']} rows={cluster.sccs || []} />
       </div>
     )
   }

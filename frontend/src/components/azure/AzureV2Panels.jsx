@@ -66,8 +66,7 @@ export function renderAzureV2Page({
                 </div>
               ),
             },
-          ]}
-          rows={vmss}
+          ]} searchKeys={['name', 'sku', 'capacity', 'orchestration', 'upgrade_policy']} rows={vmss}
           searchKeys={['name']}
           expandRow={(r) => (
             <div className="az-detail-panel text-sm space-y-2 p-3">
@@ -77,8 +76,7 @@ export function renderAzureV2Page({
                   { key: 'name', label: 'Instance' },
                   { key: 'power_state', label: 'Power', render: (i) => <SimStatusBadge status={i.power_state === 'running' ? 'success' : 'pending'} label={i.power_state} /> },
                   { key: 'private_ip', label: 'Private IP' },
-                ]}
-                rows={r.instances || []}
+                ]} searchKeys={['name', 'power_state', 'private_ip']} rows={r.instances || []}
               />
             </div>
           )}
@@ -122,7 +120,7 @@ export function renderAzureV2Page({
             { key: 'os', label: 'OS' },
             { key: 'apps', label: 'Apps' },
             { key: 'location', label: 'Region' },
-          ]} rows={plans} searchKeys={['name']} />
+          ]} searchKeys={['name', 'sku', 'os', 'apps', 'location']} rows={plans} searchKeys={['name']} />
         </div>
         <div>
           <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
@@ -147,8 +145,7 @@ export function renderAzureV2Page({
                   </button>
                 ),
               },
-            ]}
-            rows={webApps}
+            ]} searchKeys={['name', 'state', 'runtime', 'plan', 'url']} rows={webApps}
             searchKeys={['name']}
             expandRow={(r) => (
               <div className="az-detail-panel text-sm p-3 space-y-2">
@@ -157,12 +154,12 @@ export function renderAzureV2Page({
                 <SimDataTable columns={[
                   { key: 'name', label: 'Slot' },
                   { key: 'traffic_pct', label: 'Traffic %' },
-                ]} rows={r.slots || []} />
+                ]} searchKeys={['name', 'traffic_pct']} rows={r.slots || []} />
                 <div><strong>Application settings</strong></div>
                 <SimDataTable columns={[
                   { key: 'name', label: 'Name' },
                   { key: 'value', label: 'Value' },
-                ]} rows={r.app_settings || []} />
+                ]} searchKeys={['name', 'value']} rows={r.app_settings || []} />
               </div>
             )}
           />
@@ -200,8 +197,7 @@ export function renderAzureV2Page({
             { key: 'runtime', label: 'Runtime', render: (r) => `${r.runtime} ${r.version || ''}`.trim() },
             { key: 'plan', label: 'Plan' },
             { key: 'functions', label: 'Functions', render: (r) => (r.functions || []).length },
-          ]}
-          rows={funcs}
+          ]} searchKeys={['name', 'state', 'runtime', 'plan', 'functions']} rows={funcs}
           searchKeys={['name']}
           expandRow={(r) => (
             <div className="az-detail-panel text-sm p-3 space-y-2">
@@ -217,7 +213,7 @@ export function renderAzureV2Page({
                 { key: 'trigger', label: 'Trigger' },
                 { key: 'auth_level', label: 'Auth level' },
                 { key: 'invocations_24h', label: 'Invocations (24h)' },
-              ]} rows={r.functions || []} />
+              ]} searchKeys={['name', 'trigger', 'auth_level', 'invocations_24h']} rows={r.functions || []} />
             </div>
           )}
         />
@@ -255,7 +251,7 @@ export function renderAzureV2Page({
             { key: 'plan', label: 'Plan' },
             { key: 'log_analytics', label: 'Log Analytics' },
             { key: 'location', label: 'Region' },
-          ]} rows={envs} />
+          ]} searchKeys={['name', 'plan', 'log_analytics', 'location']} rows={envs} />
         </div>
         <div>
           <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
@@ -272,8 +268,7 @@ export function renderAzureV2Page({
               { key: 'cpu', label: 'CPU' },
               { key: 'memory', label: 'Memory' },
               { key: 'ingress', label: 'Ingress' },
-            ]}
-            rows={cas}
+            ]} searchKeys={['name', 'environment', 'replicas', 'cpu', 'memory', 'ingress']} rows={cas}
             searchKeys={['name']}
             expandRow={(r) => (
               <div className="az-detail-panel text-sm p-3 space-y-1">
@@ -283,7 +278,7 @@ export function renderAzureV2Page({
                   { key: 'name', label: 'Revision' },
                   { key: 'active', label: 'Active', render: (x) => (x.active ? 'Yes' : 'No') },
                   { key: 'traffic_pct', label: 'Traffic %' },
-                ]} rows={r.revisions || []} />
+                ]} searchKeys={['name', 'active', 'traffic_pct']} rows={r.revisions || []} />
               </div>
             )}
           />
@@ -348,8 +343,7 @@ export function renderAzureV2Page({
                 </button>
               ),
             },
-          ]}
-          rows={aksClusters}
+          ]} searchKeys={['name', 'kubernetes_version', 'sku', 'network_plugin', 'nodes', 'provisioning_state']} rows={aksClusters}
           searchKeys={['name']}
           expandRow={(r) => (
             <div className="az-detail-panel text-sm p-3 space-y-2">
@@ -361,8 +355,7 @@ export function renderAzureV2Page({
                   { key: 'count', label: 'Count' },
                   { key: 'vm_size', label: 'Size' },
                   { key: 'autoscaling', label: 'Autoscale', render: (p) => (p.autoscaling ? 'On' : 'Off') },
-                ]}
-                rows={r.node_pools || []}
+                ]} searchKeys={['name', 'mode', 'count', 'vm_size', 'autoscaling']} rows={r.node_pools || []}
               />
             </div>
           )}
@@ -402,8 +395,7 @@ export function renderAzureV2Page({
               { key: 'sku', label: 'SKU' },
               { key: 'public_ip', label: 'Public IP' },
               { key: 'threat_intel', label: 'Threat intel' },
-            ]}
-            rows={firewalls}
+            ]} searchKeys={['name', 'sku', 'public_ip', 'threat_intel']} rows={firewalls}
             expandRow={(r) => (
               <div className="az-detail-panel text-sm p-3 space-y-2">
                 <div className="flex justify-between">
@@ -422,14 +414,14 @@ export function renderAzureV2Page({
                   { key: 'dest', label: 'Destination' },
                   { key: 'ports', label: 'Ports' },
                   { key: 'action', label: 'Action' },
-                ]} rows={r.network_rules || []} />
+                ]} searchKeys={['name', 'source', 'dest', 'ports']} rows={r.network_rules || []} />
                 <strong>Application rules</strong>
                 <SimDataTable columns={[
                   { key: 'name', label: 'Name' },
                   { key: 'source', label: 'Source' },
                   { key: 'fqdns', label: 'FQDNs' },
                   { key: 'action', label: 'Action' },
-                ]} rows={r.app_rules || []} />
+                ]} searchKeys={['name', 'source', 'fqdns']} rows={r.app_rules || []} />
               </div>
             )}
           />
@@ -449,15 +441,14 @@ export function renderAzureV2Page({
               { key: 'generation', label: 'Generation' },
               { key: 'bgp_asn', label: 'BGP ASN' },
               { key: 'connections', label: 'Connections', render: (r) => (r.connections || []).length },
-            ]}
-            rows={vpnGateways}
+            ]} searchKeys={['name', 'sku', 'generation', 'bgp_asn', 'connections']} rows={vpnGateways}
             expandRow={(r) => (
               <SimDataTable columns={[
                 { key: 'name', label: 'Connection' },
                 { key: 'type', label: 'Type' },
                 { key: 'status', label: 'Status', render: (c) => <SimStatusBadge status={c.status === 'Connected' ? 'success' : 'pending'} label={c.status} /> },
                 { key: 'local_network', label: 'Local network gateway' },
-              ]} rows={r.connections || []} />
+              ]} searchKeys={['name', 'type', 'status', 'local_network']} rows={r.connections || []} />
             )}
           />
         </div>
@@ -484,8 +475,7 @@ export function renderAzureV2Page({
             { key: 'consistency', label: 'Consistency' },
             { key: 'location', label: 'Region' },
             { key: 'databases', label: 'Databases', render: (r) => (r.databases || []).length },
-          ]}
-          rows={cosmos}
+          ]} searchKeys={['name', 'api', 'consistency', 'location', 'databases']} rows={cosmos}
           searchKeys={['name']}
           expandRow={(r) => (
             <div className="az-detail-panel text-sm p-3 space-y-2">
@@ -507,8 +497,7 @@ export function renderAzureV2Page({
                           </button>
                         ),
                       },
-                    ]}
-                    rows={db.containers || []}
+                    ]} searchKeys={['name', 'partition_key', 'throughput', 'items']} rows={db.containers || []}
                   />
                 </div>
               ))}
@@ -544,8 +533,7 @@ export function renderAzureV2Page({
                   </button>
                 ) : null,
               },
-            ]}
-            rows={sentinel.incidents || []}
+            ]} searchKeys={['id', 'title', 'severity', 'status', 'tactics']} rows={sentinel.incidents || []}
           />
         </div>
         <div>
@@ -567,14 +555,14 @@ export function renderAzureV2Page({
                 </button>
               ),
             },
-          ]} rows={sentinel.analytics_rules || []} />
+          ]} searchKeys={['name', 'kind', 'enabled', 'firings_30d']} rows={sentinel.analytics_rules || []} />
         </div>
         <div>
           <h2 className="text-lg font-semibold mb-2">Data connectors</h2>
           <SimDataTable columns={[
             { key: 'name', label: 'Connector' },
             { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
-          ]} rows={sentinel.connectors || []} />
+          ]} searchKeys={['name', 'status']} rows={sentinel.connectors || []} />
         </div>
       </div>
     )
@@ -600,7 +588,7 @@ export function renderAzureV2Page({
             { key: 'upn', label: 'User principal name', sortable: true },
             { key: 'type', label: 'User type' },
             { key: 'mfa', label: 'MFA', render: (r) => (r.mfa ? 'Registered' : 'Not registered') },
-          ]} rows={entra.users || []} searchKeys={['upn', 'display']} />
+          ]} searchKeys={['display', 'upn', 'type', 'mfa']} rows={entra.users || []} searchKeys={['upn', 'display']} />
         </div>
         <div>
           <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
@@ -617,7 +605,7 @@ export function renderAzureV2Page({
             { key: 'name', label: 'Name' },
             { key: 'type', label: 'Type' },
             { key: 'members', label: 'Members' },
-          ]} rows={entra.groups || []} />
+          ]} searchKeys={['name', 'type', 'members']} rows={entra.groups || []} />
         </div>
         <div>
           <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
@@ -631,7 +619,7 @@ export function renderAzureV2Page({
             { key: 'name', label: 'Name' },
             { key: 'app_id', label: 'Application (client) ID' },
             { key: 'secrets', label: 'Secrets' },
-          ]} rows={entra.app_registrations || []} />
+          ]} searchKeys={['name', 'app_id', 'secrets']} rows={entra.app_registrations || []} />
         </div>
         <div>
           <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
@@ -651,7 +639,7 @@ export function renderAzureV2Page({
                 </button>
               ),
             },
-          ]} rows={entra.conditional_access || []} />
+          ]} searchKeys={['name', 'state', 'users', 'grant']} rows={entra.conditional_access || []} />
         </div>
         <SimModal open={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite external user"
           footer={<>

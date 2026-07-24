@@ -256,7 +256,7 @@ export default function GcpConsole({
             </button>
           </div>
         ) },
-      ]} rows={instances} searchKeys={['name']} onRowClick={(r) => { setInstanceDetail(r); setResizeTo(r.machine_type) }} />
+      ]} searchKeys={['name', 'status', 'machine_type', 'internal_ip', 'zone']} rows={instances} searchKeys={['name']} onRowClick={(r) => { setInstanceDetail(r); setResizeTo(r.machine_type) }} />
     </div>
   )
 
@@ -275,7 +275,7 @@ export default function GcpConsole({
           { key: 'name', label: 'Name', sortable: true },
           { key: 'mode', label: 'Subnet mode', sortable: true },
           { key: 'subnets', label: 'Subnets', render: (r) => (r.subnets || []).map((s) => `${s.name} (${s.range})`).join(', ') },
-        ]} rows={networks} searchKeys={['name']} />
+        ]} searchKeys={['name', 'mode', 'subnets']} rows={networks} searchKeys={['name']} />
       </div>
       <div>
         <div className="flex items-center justify-between mb-2">
@@ -296,7 +296,7 @@ export default function GcpConsole({
               Delete
             </button>
           ) },
-        ]} rows={firewallRules} pageSize={20} searchKeys={['name']} />
+        ]} searchKeys={['priority', 'name', 'direction', 'protocols']} rows={firewallRules} pageSize={20} searchKeys={['name']} />
       </div>
     </div>
   )
@@ -338,7 +338,7 @@ export default function GcpConsole({
             </button>
           </div>
         ) },
-      ]} rows={disks} searchKeys={['name']} />
+      ]} searchKeys={['name', 'size_gb', 'type', 'attached_to']} rows={disks} searchKeys={['name']} />
       {snapshots.length > 0 && (
         <>
           <h2 className="text-lg font-semibold pt-2">Snapshots</h2>
@@ -347,7 +347,7 @@ export default function GcpConsole({
             { key: 'source_disk', label: 'Source disk' },
             { key: 'size_gb', label: 'Size', render: (r) => `${r.size_gb} GB` },
             { key: 'status', label: 'Status' },
-          ]} rows={snapshots} searchKeys={['name']} />
+          ]} searchKeys={['name', 'source_disk', 'size_gb', 'status']} rows={snapshots} searchKeys={['name']} />
         </>
       )}
     </div>
@@ -383,7 +383,7 @@ export default function GcpConsole({
           <SimDataTable columns={[
             { key: 'name', label: 'Object' },
             { key: 'size_kb', label: 'Size', render: (r) => `${r.size_kb} KB` },
-          ]} rows={b.objects || []} pageSize={8} />
+          ]} searchKeys={['name', 'size_kb']} rows={b.objects || []} pageSize={8} />
         </div>
       ))}
     </div>
@@ -405,7 +405,7 @@ export default function GcpConsole({
             Remove
           </button>
         ) },
-      ]} rows={iamBindings} searchKeys={['member', 'role']} />
+      ]} searchKeys={['member', 'role']} rows={iamBindings} searchKeys={['member', 'role']} />
     </div>
   )
 
@@ -416,7 +416,7 @@ export default function GcpConsole({
         { key: 'time', label: 'Time', render: (r) => r.time || r.created },
         { key: 'description', label: 'Description', render: (r) => r.description || r.message },
         { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={(r.status || '').includes('ERROR') || r.severity === 'error' ? 'error' : 'success'} label={r.status || r.severity || 'DONE'} /> },
-      ]} rows={operations} searchKeys={['description', 'message']} pageSize={25} />
+      ]} searchKeys={['time', 'description', 'status']} rows={operations} searchKeys={['description', 'message']} pageSize={25} />
     </div>
   )
 
@@ -442,7 +442,7 @@ export default function GcpConsole({
             { key: 'dest', label: 'Destination' },
             { key: 'next_hop', label: 'Next hop' },
             { key: 'priority', label: 'Priority' },
-          ]} rows={routes} searchKeys={['name']} />
+          ]} searchKeys={['name', 'dest', 'next_hop', 'priority']} rows={routes} searchKeys={['name']} />
         </div>
         <div>
           <div className="flex justify-between items-center mb-2">
@@ -456,7 +456,7 @@ export default function GcpConsole({
             { key: 'ip', label: 'IP' },
             { key: 'port', label: 'Port' },
             { key: 'target', label: 'Target' },
-          ]} rows={forwardingRules} searchKeys={['name']} />
+          ]} searchKeys={['name', 'ip', 'port', 'target']} rows={forwardingRules} searchKeys={['name']} />
         </div>
         <button type="button" className="gcp-btn-sm" onClick={() => {
           const net = networks[0]?.name || 'vpc-prod'

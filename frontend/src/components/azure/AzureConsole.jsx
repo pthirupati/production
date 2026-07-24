@@ -219,7 +219,7 @@ export default function AzureConsole({
         { key: 'name', label: 'Name', sortable: true },
         { key: 'location', label: 'Region', sortable: true },
         { key: 'resources', label: 'Resources', render: () => vms.length + vnets.length + nsgs.length + disks.length + storageAccounts.length },
-      ]} rows={resourceGroups} searchKeys={['name']} />
+      ]} searchKeys={['name', 'location', 'resources']} rows={resourceGroups} searchKeys={['name']} />
       <h2 className="text-lg font-semibold pt-2">Subscription glance</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
         <div className="az-tile"><Server size={16} /> <div><div className="az-tile-num">{vms.length}</div><div className="az-tile-label">VMs</div></div></div>
@@ -243,7 +243,7 @@ export default function AzureConsole({
         { key: 'sku', label: 'SKU' },
         { key: 'allocation', label: 'Allocation' },
         { key: 'attached_to', label: 'Associated to', render: (r) => r.attached_to || '—' },
-      ]} rows={publicIps} searchKeys={['name', 'ip']} />
+      ]} searchKeys={['name', 'ip', 'sku', 'allocation', 'attached_to']} rows={publicIps} searchKeys={['name', 'ip']} />
     </div>
   )
 
@@ -292,7 +292,7 @@ export default function AzureConsole({
             </button>
           </div>
         ) },
-      ]} rows={vms} searchKeys={['name']} onRowClick={(r) => { setVmDetail(r); setResizeTo(r.size) }} />
+      ]} searchKeys={['name', 'power_state', 'size', 'private_ip', 'public_ip', 'resource_group']} rows={vms} searchKeys={['name']} onRowClick={(r) => { setVmDetail(r); setResizeTo(r.size) }} />
     </div>
   )
 
@@ -322,7 +322,7 @@ export default function AzureConsole({
               <Plus size={11} /> Add subnet
             </button>
           ) },
-        ]} rows={vnets} searchKeys={['name']} />
+        ]} searchKeys={['name', 'address_space', 'subnets']} rows={vnets} searchKeys={['name']} />
       </div>
       <div>
         <h2 className="text-lg font-semibold mb-2">Network security groups</h2>
@@ -347,7 +347,7 @@ export default function AzureConsole({
                   Remove
                 </button>
               ) },
-            ]} rows={nsg.rules || []} pageSize={20} />
+            ]} searchKeys={['priority', 'name', 'direction', 'protocol', 'destination_port', 'access']} rows={nsg.rules || []} pageSize={20} />
           </div>
         ))}
       </div>
@@ -380,14 +380,14 @@ export default function AzureConsole({
             { key: 'frontend_port', label: 'Frontend port' },
             { key: 'backend_port', label: 'Backend port' },
             { key: 'protocol', label: 'Protocol' },
-          ]} rows={lb.rules || []} pageSize={10} />
+          ]} searchKeys={['name', 'frontend_port', 'backend_port', 'protocol']} rows={lb.rules || []} pageSize={10} />
           <h3 className="text-sm font-semibold mt-3 mb-1">Health probes</h3>
           <SimDataTable columns={[
             { key: 'name', label: 'Name' },
             { key: 'protocol', label: 'Protocol' },
             { key: 'port', label: 'Port' },
             { key: 'path', label: 'Path', render: (r) => r.path || '—' },
-          ]} rows={lb.probes || []} pageSize={10} />
+          ]} searchKeys={['name', 'protocol', 'port', 'path']} rows={lb.probes || []} pageSize={10} />
         </div>
       ))}
       {!loadBalancers.length && <p className="text-sm text-slate-500">No load balancers in this subscription lab.</p>}
@@ -433,7 +433,7 @@ export default function AzureConsole({
             </button>
           </div>
         ) },
-      ]} rows={disks} searchKeys={['name']} />
+      ]} searchKeys={['name', 'size_gb', 'sku', 'state', 'attached_to']} rows={disks} searchKeys={['name']} />
       {snapshots.length > 0 && (
         <>
           <h2 className="text-lg font-semibold pt-2">Snapshots</h2>
@@ -442,7 +442,7 @@ export default function AzureConsole({
             { key: 'source_disk', label: 'Source disk' },
             { key: 'size_gb', label: 'Size', render: (r) => `${r.size_gb} GiB` },
             { key: 'created', label: 'Created' },
-          ]} rows={snapshots} searchKeys={['name']} />
+          ]} searchKeys={['name', 'source_disk', 'size_gb', 'created']} rows={snapshots} searchKeys={['name']} />
         </>
       )}
     </div>
@@ -471,7 +471,7 @@ export default function AzureConsole({
             { key: 'name', label: 'Container' },
             { key: 'public_access', label: 'Public access' },
             { key: 'blobs', label: 'Blobs' },
-          ]} rows={sa.blob_containers || []} pageSize={10} />
+          ]} searchKeys={['name', 'public_access', 'blobs']} rows={sa.blob_containers || []} pageSize={10} />
         </div>
       ))}
     </div>
@@ -498,13 +498,13 @@ export default function AzureConsole({
             { key: 'name', label: 'Name' },
             { key: 'enabled', label: 'Enabled', render: (r) => <SimStatusBadge status={r.enabled ? 'success' : 'error'} label={r.enabled ? 'Yes' : 'No'} /> },
             { key: 'content_type', label: 'Content type' },
-          ]} rows={kv.secrets || []} pageSize={10} />
+          ]} searchKeys={['name', 'enabled', 'content_type']} rows={kv.secrets || []} pageSize={10} />
           <h3 className="text-xs font-semibold uppercase text-slate-500 mt-3 mb-1">Certificates</h3>
           <SimDataTable columns={[
             { key: 'name', label: 'Name' },
             { key: 'enabled', label: 'Enabled', render: (r) => r.enabled ? 'Yes' : 'No' },
             { key: 'expires', label: 'Expires' },
-          ]} rows={kv.certificates || []} pageSize={10} />
+          ]} searchKeys={['name', 'enabled', 'expires']} rows={kv.certificates || []} pageSize={10} />
         </div>
       ))}
     </div>
@@ -528,7 +528,7 @@ export default function AzureConsole({
             Remove
           </button>
         ) },
-      ]} rows={roleAssignments} searchKeys={['principal', 'role']} />
+      ]} searchKeys={['principal', 'role', 'scope']} rows={roleAssignments} searchKeys={['principal', 'role']} />
     </div>
   )
 
@@ -540,7 +540,7 @@ export default function AzureConsole({
         { key: 'operation', label: 'Operation', render: (r) => r.operation || r.message },
         { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={(r.status || '').includes('Fail') || r.severity === 'error' ? 'error' : 'success'} label={r.status || r.severity || 'Succeeded'} /> },
         { key: 'caller', label: 'Caller', render: (r) => r.caller || '—' },
-      ]} rows={activityLog} searchKeys={['operation', 'message', 'caller']} pageSize={25} />
+      ]} searchKeys={['time', 'operation', 'status', 'caller']} rows={activityLog} searchKeys={['operation', 'message', 'caller']} pageSize={25} />
     </div>
   )
 

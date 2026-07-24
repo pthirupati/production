@@ -20,7 +20,7 @@ export function renderNetAppV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'constituents', label: 'Constituents' },
           { key: 'used_pct', label: 'Used %' },
           { key: 'health', label: 'Health', render: (r) => <SimStatusBadge status="success" label={r.health} /> },
-        ]} rows={st.flexgroups || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'svm', 'size_tb', 'constituents', 'used_pct', 'health']} rows={st.flexgroups || []} searchKeys={['name']} />
       </div>
     )
   }
@@ -40,7 +40,7 @@ export function renderNetAppV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'type', label: 'Type' },
           { key: 'retention_days', label: 'Retention (d)' },
           { key: 'worm_files', label: 'WORM files' },
-        ]} rows={st.snaplock_volumes || []} />
+        ]} searchKeys={['name', 'svm', 'type', 'retention_days', 'worm_files']} rows={st.snaplock_volumes || []} />
       </div>
     )
   }
@@ -63,7 +63,7 @@ export function renderNetAppV2Page({ nav, st, sessionId, busy, run }) {
               </button>
             ),
           },
-        ]} rows={st.svm_dr || []} />
+        ]} searchKeys={['source_svm', 'dest_svm', 'state', 'lag_sec', 'last_transfer']} rows={st.svm_dr || []} />
       </div>
     )
   }
@@ -83,7 +83,7 @@ export function renderNetAppV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'capacity_gb', label: 'Capacity (GB)' },
           { key: 'objects', label: 'Objects' },
           { key: 'versioning', label: 'Versioning', render: (r) => (r.versioning ? 'On' : 'Off') },
-        ]} rows={st.s3_buckets || []} />
+        ]} searchKeys={['name', 'svm', 'capacity_gb', 'objects', 'versioning']} rows={st.s3_buckets || []} />
       </div>
     )
   }
@@ -105,7 +105,7 @@ export function renderNetAppV2Page({ nav, st, sessionId, busy, run }) {
             { key: 'severity', label: 'Severity' },
             { key: 'detail', label: 'Detail' },
             { key: 'time', label: 'Time' },
-          ]} rows={st.arp_events || []} />
+          ]} searchKeys={['id', 'volume', 'mode', 'severity', 'detail', 'time']} rows={st.arp_events || []} />
         </div>
         <div>
           <h2 className="text-lg font-semibold mb-2">Multi-admin verification</h2>
@@ -124,7 +124,7 @@ export function renderNetAppV2Page({ nav, st, sessionId, busy, run }) {
                 </button>
               ) : null,
             },
-          ]} rows={st.mav_approvals || []} />
+          ]} searchKeys={['operation', 'target', 'requested_by', 'approvals', 'status']} rows={st.mav_approvals || []} />
         </div>
         <div>
           <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
@@ -143,7 +143,7 @@ export function renderNetAppV2Page({ nav, st, sessionId, busy, run }) {
             { key: 'svm', label: 'SVM' },
             { key: 'size_gb', label: 'Size (GB)' },
             { key: 'hit_ratio_pct', label: 'Hit ratio %' },
-          ]} rows={st.flexcaches || []} />
+          ]} searchKeys={['name', 'origin', 'svm', 'size_gb', 'hit_ratio_pct']} rows={st.flexcaches || []} />
         </div>
       </div>
     )

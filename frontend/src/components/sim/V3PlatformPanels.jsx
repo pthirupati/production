@@ -39,8 +39,7 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
                 </button>
               ) : null,
             },
-          ]}
-          rows={st.argo_apps || []}
+          ]} searchKeys={['name', 'namespace', 'sync_status', 'health', 'repo', 'path']} rows={st.argo_apps || []}
           searchKeys={['name', 'namespace']}
         />
       </div>
@@ -91,8 +90,7 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
                   </div>
                 ),
               },
-            ]}
-            rows={flux.kustomizations || []}
+            ]} searchKeys={['name', 'ready', 'revision', 'path', 'suspended']} rows={flux.kustomizations || []}
           />
         </div>
         <div>
@@ -136,7 +134,7 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
                 </div>
               ),
             },
-          ]} rows={flux.helm_releases || []} />
+          ]} searchKeys={['name', 'namespace', 'chart', 'version', 'ready', 'suspended']} rows={flux.helm_releases || []} />
         </div>
       </div>
     )
@@ -183,8 +181,7 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
                   </button>
                 ) : null,
               },
-            ]}
-            rows={issues}
+            ]} searchKeys={['number', 'title', 'state', 'labels', 'author']} rows={issues}
             searchKeys={['title', 'author']}
           />
         </div>
@@ -216,8 +213,7 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
                   </div>
                 ) : null,
               },
-            ]}
-            rows={prs}
+            ]} searchKeys={['number', 'title', 'state', 'head', 'checks', 'review']} rows={prs}
             searchKeys={['title', 'head']}
           />
         </div>
@@ -240,8 +236,7 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
                   </button>
                 ) : null,
               },
-            ]}
-            rows={runs}
+            ]} searchKeys={['id', 'workflow', 'branch', 'status', 'duration_s']} rows={runs}
           />
         </div>
       </div>
@@ -276,7 +271,7 @@ export function renderOpenStackV2Page({ nav, st, sessionId, busy, run }) {
               </button>
             ),
           },
-        ]} rows={st.routers || []} />
+        ]} searchKeys={['name', 'status', 'external_network', 'ha', 'interfaces']} rows={st.routers || []} />
       </div>
     )
   }
@@ -296,7 +291,7 @@ export function renderOpenStackV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'status', label: 'Status' },
           { key: 'pool', label: 'Algorithm', render: (r) => r.pool?.algorithm },
           { key: 'members', label: 'Members', render: (r) => r.pool?.members },
-        ]} rows={st.load_balancers || []} />
+        ]} searchKeys={['name', 'vip', 'status', 'pool', 'members']} rows={st.load_balancers || []} />
       </div>
     )
   }
@@ -324,7 +319,7 @@ export function renderOpenStackV2Page({ nav, st, sessionId, busy, run }) {
               </button>
             ),
           },
-        ]} rows={st.heat_stacks || []}
+        ]} searchKeys={['name', 'status', 'resources', 'created']} rows={st.heat_stacks || []}
           expandRow={(r) => (
             <div className="text-sm p-2 space-y-1">
               {(r.resources || []).map((res) => (
@@ -350,7 +345,7 @@ export function renderOpenStackV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'name', label: 'Name' },
           { key: 'fingerprint', label: 'Fingerprint' },
           { key: 'type', label: 'Type' },
-        ]} rows={st.keypairs || []} />
+        ]} searchKeys={['name', 'fingerprint', 'type']} rows={st.keypairs || []} />
       </div>
     )
   }
@@ -369,7 +364,7 @@ export function renderOpenStackV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'objects', label: 'Objects' },
           { key: 'bytes', label: 'Bytes', render: (r) => `${Math.round((r.bytes || 0) / 1024)} KiB` },
           { key: 'public', label: 'Public', render: (r) => (r.public ? 'Yes' : 'No') },
-        ]} rows={st.object_containers || []} />
+        ]} searchKeys={['name', 'objects', 'bytes', 'public']} rows={st.object_containers || []} />
       </div>
     )
   }
@@ -384,7 +379,7 @@ export function renderOpenStackV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'ram', label: 'RAM (GiB)', render: (r) => `${r.ram_used_gb}/${r.ram_gb}` },
           { key: 'vms', label: 'VMs' },
           { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'up' ? 'success' : 'error'} label={r.status} /> },
-        ]} rows={st.hypervisors || []} />
+        ]} searchKeys={['hostname', 'type', 'vcpus', 'ram', 'vms', 'status']} rows={st.hypervisors || []} />
       </div>
     )
   }
@@ -407,7 +402,7 @@ export function renderOpenStackV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'size_gb', label: 'Size (GiB)' },
           { key: 'status', label: 'Status' },
           { key: 'created', label: 'Created' },
-        ]} rows={st.volume_snapshots || []} />
+        ]} searchKeys={['name', 'volume', 'size_gb', 'status', 'created']} rows={st.volume_snapshots || []} />
       </div>
     )
   }
@@ -427,7 +422,7 @@ export function renderOpenStackV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'name', label: 'Name' },
           { key: 'policy', label: 'Policy' },
           { key: 'members', label: 'Members' },
-        ]} rows={st.server_groups || []} />
+        ]} searchKeys={['name', 'policy', 'members']} rows={st.server_groups || []} />
       </div>
     )
   }
@@ -458,14 +453,14 @@ export function renderAimlV2Page({ nav, st, sessionId, busy, run, ragQuery, setR
           { key: 'runs', label: 'Runs' },
           { key: 'tags', label: 'Tags', render: (r) => (r.tags || []).join(', ') },
           { key: 'created', label: 'Created' },
-        ]} rows={st.experiments || []} />
+        ]} searchKeys={['name', 'runs', 'tags', 'created']} rows={st.experiments || []} />
         <h2 className="text-lg font-semibold text-[#E2E2F0]">Runs</h2>
         <SimDataTable variant="dark" columns={[
           { key: 'name', label: 'Run' },
           { key: 'status', label: 'Status' },
           { key: 'metrics', label: 'Metrics', render: (r) => Object.entries(r.metrics || {}).map(([k, v]) => `${k}=${v}`).join(' ') },
           { key: 'params', label: 'Params', render: (r) => Object.entries(r.params || {}).map(([k, v]) => `${k}=${v}`).join(' ') },
-        ]} rows={st.ml_runs || []} />
+        ]} searchKeys={['name', 'status', 'metrics', 'params']} rows={st.ml_runs || []} />
       </div>
     )
   }
@@ -495,7 +490,7 @@ export function renderAimlV2Page({ nav, st, sessionId, busy, run, ragQuery, setR
               </button>
             ) : null,
           },
-        ]} rows={st.model_registry || []} />
+        ]} searchKeys={['name', 'latest_version', 'stage']} rows={st.model_registry || []} />
       </div>
     )
   }
@@ -516,7 +511,7 @@ export function renderAimlV2Page({ nav, st, sessionId, busy, run, ragQuery, setR
           { key: 'score', label: 'Score' },
           { key: 'source', label: 'Source' },
           { key: 'text', label: 'Text' },
-        ]} rows={st.rag_results || []} />
+        ]} searchKeys={['score', 'source', 'text']} rows={st.rag_results || []} />
         <div className="flex justify-between items-center flex-wrap gap-2 pt-2">
           <h2 className="text-lg font-semibold text-[#E2E2F0]">Knowledge Bases</h2>
           <button type="button" className="px-3 py-1.5 rounded bg-[#7C3AED] text-white text-sm" disabled={busy}
@@ -535,7 +530,7 @@ export function renderAimlV2Page({ nav, st, sessionId, busy, run, ragQuery, setR
           { key: 'chunks', label: 'Chunks' },
           { key: 'embedding_model', label: 'Embedding' },
           { key: 'status', label: 'Status' },
-        ]} rows={st.knowledge_bases || []} />
+        ]} searchKeys={['name', 'vector_store', 'documents', 'chunks', 'embedding_model', 'status']} rows={st.knowledge_bases || []} />
       </div>
     )
   }
@@ -612,7 +607,7 @@ export function renderMonitoringV2Extras({ nav, st, sessionId, busy, run }) {
               </button>
             ) : null,
           },
-        ]} rows={silences} />
+        ]} searchKeys={['id', 'created_by', 'comment', 'state', 'ends_at']} rows={silences} />
       </div>
     )
   }
@@ -634,7 +629,7 @@ export function renderMonitoringV2Extras({ nav, st, sessionId, busy, run }) {
           { key: 'module', label: 'Module' },
           { key: 'success', label: 'Success', render: (r) => <SimStatusBadge status={r.success ? 'success' : 'error'} label={r.success ? 'OK' : 'FAIL'} /> },
           { key: 'duration_s', label: 'Duration (s)' },
-        ]} rows={probes} />
+        ]} searchKeys={['target', 'module', 'success', 'duration_s']} rows={probes} />
         <div className="flex justify-between items-center flex-wrap gap-2">
           <h2 className="text-lg font-semibold">Pushgateway</h2>
           <button type="button" className="px-3 py-1.5 rounded bg-[#E6522C] text-white text-sm" disabled={busy}
@@ -651,7 +646,7 @@ export function renderMonitoringV2Extras({ nav, st, sessionId, busy, run }) {
           { key: 'instance', label: 'Instance' },
           { key: 'metrics', label: 'Metrics' },
           { key: 'last_push', label: 'Last push' },
-        ]} rows={groups} />
+        ]} searchKeys={['job', 'instance', 'metrics', 'last_push']} rows={groups} />
       </div>
     )
   }

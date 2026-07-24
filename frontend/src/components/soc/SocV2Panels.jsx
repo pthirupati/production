@@ -31,8 +31,7 @@ export function renderSocV2Page({ nav, st, sessionId, busy, run }) {
                 </button>
               ) : null,
             },
-          ]}
-          rows={st.pam_sessions || []}
+          ]} searchKeys={['id', 'user', 'target', 'protocol', 'status', 'suspicious']} rows={st.pam_sessions || []}
         />
       </div>
     )
@@ -65,8 +64,7 @@ export function renderSocV2Page({ nav, st, sessionId, busy, run }) {
                 </button>
               ) : null,
             },
-          ]}
-          rows={st.vulnerabilities || []}
+          ]} searchKeys={['cve', 'title', 'cvss', 'epss', 'asset', 'status']} rows={st.vulnerabilities || []}
           searchKeys={['cve', 'asset']}
         />
       </div>
@@ -101,8 +99,7 @@ export function renderSocV2Page({ nav, st, sessionId, busy, run }) {
                 </button>
               ),
             },
-          ]}
-          rows={st.firewall_policies || []}
+          ]} searchKeys={['priority', 'name', 'src_zone', 'dst_zone', 'app', 'enabled']} rows={st.firewall_policies || []}
         />
       </div>
     )
@@ -135,8 +132,7 @@ export function renderSocV2Page({ nav, st, sessionId, busy, run }) {
                 </button>
               ) : null,
             },
-          ]}
-          rows={st.packet_captures || []}
+          ]} searchKeys={['id', 'iface', 'filter', 'status', 'packets', 'bytes']} rows={st.packet_captures || []}
         />
       </div>
     )
@@ -159,8 +155,7 @@ export function renderSocV2Page({ nav, st, sessionId, busy, run }) {
             { key: 'passed', label: 'Passed' },
             { key: 'total', label: 'Total' },
             { key: 'last_check', label: 'Last check', render: (r) => r.last_check || '—' },
-          ]}
-          rows={st.compliance_frameworks || []}
+          ]} searchKeys={['name', 'score_pct', 'passed', 'total', 'last_check']} rows={st.compliance_frameworks || []}
         />
       </div>
     )

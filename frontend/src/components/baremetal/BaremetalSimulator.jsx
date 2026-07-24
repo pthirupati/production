@@ -63,6 +63,7 @@ export default function BaremetalSimulator({
   const [tab, setTab] = useState('maas')
   const [busy, setBusy] = useState(false)
   const [detailId, setDetailId] = useState(null)
+  const [listQ, setListQ] = useState('')
   const slug = scenario?.slug || ''
   const pollRef = useRef(null)
 
@@ -87,6 +88,24 @@ export default function BaremetalSimulator({
   const goal = st?.goal || {}
   const broken = st?.broken || {}
   const machines = useMemo(() => st.maas?.machines || [], [st.maas])
+  const listNeedle = listQ.trim().toLowerCase()
+  const filteredMachines = useMemo(() => {
+    if (!listNeedle) return machines
+    return machines.filter((m) => {
+      const blob = [m.hostname, m.ip, m.status, m.power, m.arch, ...(m.tags || [])].join(' ').toLowerCase()
+      return blob.includes(listNeedle)
+    })
+  }, [machines, listNeedle])
+  const filteredLxd = useMemo(() => {
+    const rows = st.lxd?.containers || []
+    if (!listNeedle) return rows
+    return rows.filter((c) => [c.name, c.image, c.ipv4, c.status].join(' ').toLowerCase().includes(listNeedle))
+  }, [st.lxd, listNeedle])
+  const filteredKvm = useMemo(() => {
+    const rows = st.kvm?.vms || []
+    if (!listNeedle) return rows
+    return rows.filter((v) => [v.name, v.state, v.status, v.ip].join(' ').toLowerCase().includes(listNeedle))
+  }, [st.kvm, listNeedle])
   const anyTransient = useMemo(
     () => machines.some((m) => TRANSIENT.has(m.status)),
     [machines],
@@ -193,15 +212,22 @@ export default function BaremetalSimulator({
 
           {tab === 'maas' && !detailMachine && (
             <div className="space-y-3">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center gap-3 flex-wrap">
                 <h2 className="text-lg font-semibold">MAAS Machines</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    type="search"
+                    value={listQ}
+                    onChange={(e) => setListQ(e.target.value)}
+                    placeholder="Filter hostname, IP, tag…"
+                    className="text-xs border px-2 py-1.5 rounded bg-white min-w-[180px]"
+                  />
                   <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'maas_enlist', {}), 'Machine enlisted via PXE')}
                     className="text-xs flex items-center gap-1 border px-2 py-1 rounded bg-white"><Rocket size={12} /> Enlist (PXE)</button>
                   <button onClick={refresh} className="text-xs flex items-center gap-1 border px-2 py-1 rounded bg-white"><RefreshCw size={12} /> Refresh</button>
                 </div>
               </div>
-              {machines.map((m) => (
+              {filteredMachines.map((m) => (
                 <div key={m.id} className="bm-card p-3">
                   <div className="flex items-center justify-between gap-3">
                     <button className="text-left" onClick={() => setDetailId(m.id)}>
@@ -278,8 +304,17 @@ export default function BaremetalSimulator({
 
           {tab === 'lxd' && (
             <div className="space-y-3">
-              <h2 className="text-lg font-semibold">LXD Containers</h2>
-              {(st.lxd?.containers || []).map((c) => (
+              <div className="flex justify-between items-center gap-3 flex-wrap">
+                <h2 className="text-lg font-semibold">LXD Containers</h2>
+                <input
+                  type="search"
+                  value={listQ}
+                  onChange={(e) => setListQ(e.target.value)}
+                  placeholder="Filter containers…"
+                  className="text-xs border px-2 py-1.5 rounded bg-white min-w-[160px]"
+                />
+              </div>
+              {filteredLxd.map((c) => (
                 <div key={c.name} className="bm-card p-3 flex justify-between items-center">
                   <div><div className="font-medium">{c.name}</div><div className="text-xs text-slate-500">{c.image} · {c.ipv4 || '—'} · {c.status}</div></div>
                   {c.status === 'Running' ? (
@@ -300,8 +335,17 @@ export default function BaremetalSimulator({
 
           {tab === 'kvm' && (
             <div className="space-y-3">
-              <h2 className="text-lg font-semibold">KVM Virtual Machines</h2>
-              {(st.kvm?.vms || []).map((v) => (
+              <div className="flex justify-between items-center gap-3 flex-wrap">
+                <h2 className="text-lg font-semibold">KVM Virtual Machines</h2>
+                <input
+                  type="search"
+                  value={listQ}
+                  onChange={(e) => setListQ(e.target.value)}
+                  placeholder="Filter VMs…"
+                  className="text-xs border px-2 py-1.5 rounded bg-white min-w-[160px]"
+                />
+              </div>
+              {filteredKvm.map((v) => (
                 <div key={v.name} className="bm-card p-3 flex justify-between items-center">
                   <div><div className="font-medium">{v.name}</div><div className="text-xs text-slate-500">{v.vcpu} vCPU · {v.ram_gb} GB · {v.ip || '—'} · {v.state}</div></div>
                   {v.state === 'running' ? (

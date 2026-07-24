@@ -38,8 +38,7 @@ export function renderGcpV2Page({
                 </button>
               ),
             },
-          ]}
-          rows={services}
+          ]} searchKeys={['name', 'region', 'url', 'cpu', 'memory']} rows={services}
           searchKeys={['name']}
           expandRow={(r) => (
             <div className="gcp-detail-panel text-sm p-3 space-y-2">
@@ -48,7 +47,7 @@ export function renderGcpV2Page({
                 { key: 'name', label: 'Revision' },
                 { key: 'traffic_pct', label: 'Traffic %' },
                 { key: 'active', label: 'Active', render: (x) => (x.active ? 'Yes' : 'No') },
-              ]} rows={r.revisions || []} />
+              ]} searchKeys={['name', 'traffic_pct', 'active']} rows={r.revisions || []} />
             </div>
           )}
         />
@@ -96,8 +95,7 @@ export function renderGcpV2Page({
                 </div>
               ),
             },
-          ]}
-          rows={topics}
+          ]} searchKeys={['name', 'message_retention', 'subscriptions']} rows={topics}
           searchKeys={['name']}
           expandRow={(r) => (
             <SimDataTable columns={[
@@ -105,7 +103,7 @@ export function renderGcpV2Page({
               { key: 'type', label: 'Type' },
               { key: 'ack_deadline_s', label: 'Ack deadline (s)' },
               { key: 'undelivered', label: 'Undelivered' },
-            ]} rows={r.subscriptions || []} />
+            ]} searchKeys={['name', 'type', 'ack_deadline_s', 'undelivered']} rows={r.subscriptions || []} />
           )}
         />
         <SimModal open={createTopicOpen} onClose={() => setCreateTopicOpen(false)} title="Create topic"
@@ -142,8 +140,7 @@ export function renderGcpV2Page({
             { key: 'version', label: 'Version' },
             { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
             { key: 'endpoint', label: 'Endpoint' },
-          ]}
-          rows={clusters}
+          ]} searchKeys={['name', 'location', 'mode', 'version', 'status', 'endpoint']} rows={clusters}
           searchKeys={['name']}
           expandRow={(r) => (
             <div className="gcp-detail-panel text-sm p-3 space-y-2">
@@ -163,8 +160,7 @@ export function renderGcpV2Page({
                       </div>
                     ),
                   },
-                ]}
-                rows={r.node_pools || []}
+                ]} searchKeys={['name', 'machine_type', 'node_count']} rows={r.node_pools || []}
               />
             </div>
           )}
@@ -202,7 +198,7 @@ export function renderGcpV2Page({
           { key: 'trigger', label: 'Trigger' },
           { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
           { key: 'invocations_24h', label: 'Invocations (24h)' },
-        ]} rows={fns} searchKeys={['name']} />
+        ]} searchKeys={['name', 'gen', 'runtime', 'trigger', 'status', 'invocations_24h']} rows={fns} searchKeys={['name']} />
         <SimModal open={createFnOpen} onClose={() => setCreateFnOpen(false)} title="Create function"
           footer={<>
             <button type="button" className="text-sm px-3" onClick={() => setCreateFnOpen(false)}>Cancel</button>
@@ -236,8 +232,7 @@ export function renderGcpV2Page({
             { key: 'tier', label: 'Tier' },
             { key: 'state', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.state} /> },
             { key: 'ip', label: 'Public IP' },
-          ]}
-          rows={instances}
+          ]} searchKeys={['name', 'database_version', 'tier', 'state', 'ip']} rows={instances}
           searchKeys={['name']}
           expandRow={(r) => (
             <div className="gcp-detail-panel text-sm p-3 space-y-2">
@@ -251,7 +246,7 @@ export function renderGcpV2Page({
               <SimDataTable columns={[
                 { key: 'name', label: 'Name' },
                 { key: 'charset', label: 'Charset' },
-              ]} rows={r.databases || []} />
+              ]} searchKeys={['name', 'charset']} rows={r.databases || []} />
             </div>
           )}
         />
@@ -294,15 +289,14 @@ export function renderGcpV2Page({
                 </button>
               ),
             },
-          ]}
-          rows={secrets}
+          ]} searchKeys={['name', 'versions']} rows={secrets}
           searchKeys={['name']}
           expandRow={(r) => (
             <SimDataTable columns={[
               { key: 'version', label: 'Version' },
               { key: 'state', label: 'State' },
               { key: 'created', label: 'Created' },
-            ]} rows={r.versions || []} />
+            ]} searchKeys={['version', 'state', 'created']} rows={r.versions || []} />
           )}
         />
         <SimModal open={createSecOpen} onClose={() => setCreateSecOpen(false)} title="Create secret"
@@ -336,8 +330,7 @@ export function renderGcpV2Page({
           columns={[
             { key: 'name', label: 'Policy', sortable: true },
             { key: 'rules', label: 'Rules', render: (r) => (r.rules || []).length },
-          ]}
-          rows={policies}
+          ]} searchKeys={['name', 'rules']} rows={policies}
           expandRow={(r) => (
             <div className="gcp-detail-panel text-sm p-3 space-y-2">
               <button type="button" className="gcp-btn-sm" disabled={busy}
@@ -351,7 +344,7 @@ export function renderGcpV2Page({
                 { key: 'action', label: 'Action' },
                 { key: 'match', label: 'Match' },
                 { key: 'description', label: 'Description' },
-              ]} rows={r.rules || []} />
+              ]} searchKeys={['priority', 'match', 'description']} rows={r.rules || []} />
             </div>
           )}
         />
@@ -377,8 +370,7 @@ export function renderGcpV2Page({
             { key: 'processing_units', label: 'Processing units' },
             { key: 'state', label: 'State', render: (r) => <SimStatusBadge status="success" label={r.state} /> },
             { key: 'databases', label: 'Databases', render: (r) => (r.databases || []).length },
-          ]}
-          rows={instances}
+          ]} searchKeys={['name', 'config', 'processing_units', 'state', 'databases']} rows={instances}
           expandRow={(r) => (
             <div className="space-y-2 p-2">
               <div className="flex justify-end">
@@ -391,7 +383,7 @@ export function renderGcpV2Page({
                 { key: 'name', label: 'Database' },
                 { key: 'tables', label: 'Tables' },
                 { key: 'size_gb', label: 'Size (GB)' },
-              ]} rows={r.databases || []} />
+              ]} searchKeys={['name', 'tables', 'size_gb']} rows={r.databases || []} />
             </div>
           )}
         />
@@ -422,8 +414,7 @@ export function renderGcpV2Page({
             { key: 'dataset_id', label: 'Dataset', sortable: true },
             { key: 'location', label: 'Location' },
             { key: 'tables', label: 'Tables', render: (r) => (r.tables || []).length },
-          ]}
-          rows={datasets}
+          ]} searchKeys={['dataset_id', 'location', 'tables']} rows={datasets}
           searchKeys={['dataset_id']}
           expandRow={(r) => (
             <div className="gcp-detail-panel text-sm p-3 space-y-2">
@@ -436,7 +427,7 @@ export function renderGcpV2Page({
                 { key: 'type', label: 'Type' },
                 { key: 'rows', label: 'Rows' },
                 { key: 'size_gb', label: 'Size (GB)' },
-              ]} rows={r.tables || []} />
+              ]} searchKeys={['name', 'type', 'rows', 'size_gb']} rows={r.tables || []} />
             </div>
           )}
         />
@@ -449,7 +440,7 @@ export function renderGcpV2Page({
               { key: 'rows_returned', label: 'Rows' },
               { key: 'bytes_processed', label: 'Bytes' },
               { key: 'sql', label: 'SQL' },
-            ]} rows={jobs} />
+            ]} searchKeys={['id', 'state', 'rows_returned', 'bytes_processed', 'sql']} rows={jobs} />
           </>
         )}
       </div>
@@ -479,8 +470,7 @@ export function renderGcpV2Page({
               { key: 'port', label: 'Port' },
               { key: 'backend_service', label: 'Backend service' },
               { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
-            ]}
-            rows={lbs}
+            ]} searchKeys={['name', 'protocol', 'ip', 'port', 'backend_service', 'status']} rows={lbs}
             searchKeys={['name']}
             expandRow={(r) => (
               <div className="gcp-detail-panel text-sm p-3 space-y-1">
@@ -489,7 +479,7 @@ export function renderGcpV2Page({
                   { key: 'instance_group', label: 'Backend' },
                   { key: 'zone', label: 'Zone' },
                   { key: 'capacity', label: 'Capacity %' },
-                ]} rows={r.backends || []} />
+                ]} searchKeys={['instance_group', 'zone', 'capacity']} rows={r.backends || []} />
               </div>
             )}
           />
@@ -524,8 +514,7 @@ export function renderGcpV2Page({
                   </button>
                 ),
               },
-            ]}
-            rows={igs}
+            ]} searchKeys={['name', 'zone', 'network', 'size', 'template']} rows={igs}
             searchKeys={['name']}
           />
         </div>

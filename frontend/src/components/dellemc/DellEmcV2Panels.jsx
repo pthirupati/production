@@ -21,7 +21,7 @@ export function renderDellEmcV2Page({ nav, st, sessionId, busy, run }) {
             { key: 'rpo', label: 'RPO' },
             { key: 'state', label: 'State', render: (r) => <SimStatusBadge status="success" label={r.state} /> },
             { key: 'witness', label: 'Witness' },
-          ]} rows={st.powerstore_metro || []} />
+          ]} searchKeys={['name', 'local', 'remote', 'rpo', 'state', 'witness']} rows={st.powerstore_metro || []} />
         </div>
         <div>
           <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
@@ -38,7 +38,7 @@ export function renderDellEmcV2Page({ nav, st, sessionId, busy, run }) {
             { key: 'vasa', label: 'VASA' },
             { key: 'vms', label: 'VMs' },
             { key: 'policy', label: 'Policy' },
-          ]} rows={st.vvols || []} />
+          ]} searchKeys={['name', 'vasa', 'vms', 'policy']} rows={st.vvols || []} />
         </div>
       </div>
     )
@@ -59,7 +59,7 @@ export function renderDellEmcV2Page({ nav, st, sessionId, busy, run }) {
             { key: 'mode', label: 'Mode' },
             { key: 'min_days', label: 'Min days' },
             { key: 'locked_files', label: 'Locked files' },
-          ]} rows={st.dd_retention_locks || []} />
+          ]} searchKeys={['mtree', 'mode', 'min_days', 'locked_files']} rows={st.dd_retention_locks || []} />
         </div>
         <div>
           <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
@@ -75,7 +75,7 @@ export function renderDellEmcV2Page({ nav, st, sessionId, busy, run }) {
             { key: 'used_tb', label: 'Used (TB)' },
             { key: 'logical_tb', label: 'Logical (TB)' },
             { key: 'dsp', label: 'DSP', render: (r) => (r.dsp ? 'On' : 'Off') },
-          ]} rows={st.ddboost_storage_units || []} />
+          ]} searchKeys={['name', 'user', 'used_tb', 'logical_tb', 'dsp']} rows={st.ddboost_storage_units || []} />
         </div>
       </div>
     )
@@ -103,8 +103,7 @@ export function renderDellEmcV2Page({ nav, st, sessionId, busy, run }) {
                 </button>
               ),
             },
-          ]}
-          rows={st.vxrail_clusters || []}
+          ]} searchKeys={['name', 'nodes', 'version', 'health', 'lcm']} rows={st.vxrail_clusters || []}
           expandRow={(r) => (
             <div className="text-sm p-2">Pre-upgrade checks: {r.lcm?.checks_passed}/{r.lcm?.checks_total} · Bundle {r.lcm?.bundle}</div>
           )}
@@ -134,8 +133,7 @@ export function renderDellEmcV2Page({ nav, st, sessionId, busy, run }) {
                 </button>
               ),
             },
-          ]}
-          rows={st.idrac_blades || []}
+          ]} searchKeys={['host', 'service_tag', 'health', 'power', 'cpu_temp_c', 'inlet_c']} rows={st.idrac_blades || []}
           expandRow={(r) => (
             <div className="space-y-2 text-sm p-2">
               <div>Fans: {(r.fans_rpm || []).join(' / ')} RPM</div>
@@ -143,7 +141,7 @@ export function renderDellEmcV2Page({ nav, st, sessionId, busy, run }) {
                 { key: 'sev', label: 'Severity' },
                 { key: 'msg', label: 'Message' },
                 { key: 'time', label: 'Time' },
-              ]} rows={r.sel || []} />
+              ]} searchKeys={['sev', 'msg', 'time']} rows={r.sel || []} />
             </div>
           )}
         />

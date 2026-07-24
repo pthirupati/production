@@ -26,7 +26,7 @@ export function renderCommvaultV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'severity', label: 'Severity' },
           { key: 'detail', label: 'Detail' },
           { key: 'time', label: 'Time' },
-        ]} rows={rw.anomaly_events || []} />
+        ]} searchKeys={['id', 'client', 'severity', 'detail', 'time']} rows={rw.anomaly_events || []} />
       </div>
     )
   }
@@ -47,7 +47,7 @@ export function renderCommvaultV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'plan', label: 'Plan' },
           { key: 'pvcs', label: 'PVCs' },
           { key: 'last_backup', label: 'Last backup', render: (r) => <SimStatusBadge status={r.last_backup === 'Success' ? 'success' : 'pending'} label={r.last_backup} /> },
-        ]} rows={st.k8s_apps || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'distribution', 'namespaces', 'plan', 'pvcs', 'last_backup']} rows={st.k8s_apps || []} searchKeys={['name']} />
       </div>
     )
   }
@@ -67,7 +67,7 @@ export function renderCommvaultV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'workloads', label: 'Workloads', render: (r) => (r.workloads || []).join(', ') },
           { key: 'users', label: 'Users' },
           { key: 'last_backup', label: 'Last backup' },
-        ]} rows={st.saas_apps || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'type', 'workloads', 'users', 'last_backup']} rows={st.saas_apps || []} searchKeys={['name']} />
       </div>
     )
   }
@@ -89,7 +89,7 @@ export function renderCommvaultV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'encryption', label: 'Encryption' },
           { key: 'secondary_copy', label: 'Secondary', render: (r) => (r.secondary_copy ? 'Yes' : 'No') },
           { key: 'workloads', label: 'Workloads' },
-        ]} rows={st.plans || []} searchKeys={['name']} />
+        ]} searchKeys={['name', 'type', 'rpo_hours', 'retention_days', 'encryption', 'secondary_copy']} rows={st.plans || []} searchKeys={['name']} />
       </div>
     )
   }
@@ -108,7 +108,7 @@ export function renderCommvaultV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'source', label: 'Source' },
           { key: 'rows', label: 'Rows' },
           { key: 'last_run', label: 'Last run' },
-        ]} rows={st.report_defs || []} />
+        ]} searchKeys={['name', 'source', 'rows', 'last_run']} rows={st.report_defs || []} />
       </div>
     )
   }
