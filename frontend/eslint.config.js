@@ -35,7 +35,12 @@ export default [
   },
   {
     // R3F / drei use non-DOM props (args, attach, intensity, …)
-    files: ['src/**/*Twin3D*.jsx', 'src/**/*Scene3D*.jsx', 'src/**/r3f/**/*.{js,jsx}'],
+    files: [
+      'src/**/*Twin3D*.jsx',
+      'src/**/*Scene3D*.jsx',
+      'src/**/r3f/**/*.{js,jsx}',
+      'src/components/datacenter/DcCableSystem.jsx',
+    ],
     rules: {
       'react/no-unknown-property': 'off',
     },

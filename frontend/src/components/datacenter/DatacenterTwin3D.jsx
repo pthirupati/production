@@ -7,9 +7,10 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import {
   OrbitControls, Html, Environment, ContactShadows, RoundedBox, Float, Bvh,
 } from '@react-three/drei'
-import { Physics, RigidBody, BallCollider } from '@react-three/rapier'
+import { Physics, RigidBody } from '@react-three/rapier'
 import { motion } from 'framer-motion'
 import * as THREE from 'three'
+import { StatusLed, InteractiveCable, CablePhysicsBits } from './DcCableSystem'
 
 const RACK_W = 0.6
 const RACK_D = 1.05
@@ -250,23 +251,38 @@ function CracUnits({ cooling = [] }) {
   )
 }
 
-function FanSpinner({ position, powered, rpmScale = 1 }) {
-  const hub = useRef()
+function FanSpinner({ position, powered, rpmScale = 1, fault = false }) {
   const blades = useRef()
-  useFrame((_, dt) => {
-    if (!blades.current || !powered) return
-    blades.current.rotation.z += dt * (14 + rpmScale * 10)
+  const led = useRef()
+  useFrame(({ clock }, dt) => {
+    if (blades.current && powered && !fault) {
+      // ~RPM-proportional spin (rpmScale 1 ≈ 9000 RPM visual)
+      blades.current.rotation.z += dt * (18 + rpmScale * 22)
+    } else if (blades.current && fault) {
+      blades.current.rotation.z += dt * 1.2
+    }
+    if (led.current?.material) {
+      if (fault) {
+        led.current.material.emissiveIntensity = 0.4 + (Math.sin(clock.elapsedTime * 9) > 0 ? 0.6 : 0)
+        led.current.material.emissive.set('#ef4444')
+      } else if (powered) {
+        led.current.material.emissiveIntensity = 0.5
+        led.current.material.emissive.set('#34d399')
+      } else {
+        led.current.material.emissiveIntensity = 0
+      }
+    }
   })
   return (
     <group position={position}>
-      <mesh ref={hub}>
+      <mesh>
         <cylinderGeometry args={[0.018, 0.018, 0.008, 10]} />
         <meshStandardMaterial color="#0f172a" metalness={0.7} />
       </mesh>
       <group ref={blades}>
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <mesh key={i} rotation={[0, 0, (i / 6) * Math.PI * 2]} position={[0, 0, 0.001]}>
-            <boxGeometry args={[0.055, 0.012, 0.003]} />
+        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+          <mesh key={i} rotation={[0, 0, (i / 7) * Math.PI * 2]} position={[0, 0, 0.001]}>
+            <boxGeometry args={[0.058, 0.011, 0.003]} />
             <meshStandardMaterial color="#94a3b8" metalness={0.55} roughness={0.35} />
           </mesh>
         ))}
@@ -274,6 +290,10 @@ function FanSpinner({ position, powered, rpmScale = 1 }) {
       <mesh position={[0, 0, 0.006]}>
         <ringGeometry args={[0.05, 0.056, 16]} />
         <meshStandardMaterial color="#334155" metalness={0.6} />
+      </mesh>
+      <mesh ref={led} position={[0.04, 0.04, 0.01]}>
+        <sphereGeometry args={[0.006, 8, 8]} />
+        <meshStandardMaterial color="#34d399" emissive="#34d399" toneMapped={false} />
       </mesh>
     </group>
   )
@@ -323,32 +343,6 @@ function PduStrips({ racks = [], pdus = [], onSelectPdu }) {
         )
       })}
     </group>
-  )
-}
-
-function StatusLed({ position, failed, powered }) {
-  const mat = useRef()
-  useFrame(({ clock }) => {
-    if (!mat.current) return
-    if (failed) {
-      mat.current.emissiveIntensity = 0.6 + Math.sin(clock.elapsedTime * 8) * 0.4
-      mat.current.color.set('#ef4444')
-      mat.current.emissive.set('#ef4444')
-    } else if (powered) {
-      mat.current.emissiveIntensity = 0.45 + Math.sin(clock.elapsedTime * 3) * 0.25
-      mat.current.color.set('#34d399')
-      mat.current.emissive.set('#34d399')
-    } else {
-      mat.current.emissiveIntensity = 0.05
-      mat.current.color.set('#64748b')
-      mat.current.emissive.set('#000000')
-    }
-  })
-  return (
-    <mesh position={position}>
-      <sphereGeometry args={[0.018, 8, 8]} />
-      <meshStandardMaterial ref={mat} color="#34d399" emissive="#34d399" emissiveIntensity={0.5} />
-    </mesh>
   )
 }
 
@@ -449,16 +443,21 @@ function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
             {/* Dual PSU status LEDs */}
             <StatusLed position={[RACK_W * 0.38, -0.025, RACK_D * 0.38]} failed={false} powered={powered} />
             <StatusLed position={[RACK_W * 0.32, -0.025, RACK_D * 0.38]} failed={(s.components || {}).power === 'failed'} powered={powered} />
-            {/* Drive bay activity row */}
+            {/* Drive bay activity row — blinking activity LEDs */}
             {[0, 1, 2, 3].map((di) => (
-              <mesh key={di} position={[-RACK_W * 0.28 + di * 0.08, 0.01, RACK_D * 0.37]}>
-                <boxGeometry args={[0.05, 0.035, 0.02]} />
-                <meshStandardMaterial
-                  color="#0f172a"
-                  emissive={diskFail && di === 0 ? '#ef4444' : powered ? '#22c55e' : '#000'}
-                  emissiveIntensity={diskFail && di === 0 ? 0.8 : powered ? 0.25 + (di % 2) * 0.15 : 0}
+              <group key={di} position={[-RACK_W * 0.28 + di * 0.08, 0.01, RACK_D * 0.37]}>
+                <mesh>
+                  <boxGeometry args={[0.05, 0.035, 0.02]} />
+                  <meshStandardMaterial color="#0f172a" metalness={0.5} />
+                </mesh>
+                <StatusLed
+                  position={[0.015, 0.012, 0.012]}
+                  failed={diskFail && di === 0}
+                  powered={powered && !diskFail}
+                  warning={diskFail && di === 1}
+                  size={0.005}
                 />
-              </mesh>
+              </group>
             ))}
             {/* NIC RJ45 / SFP cages */}
             {[0, 1].map((ni) => (
@@ -471,107 +470,24 @@ function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
                 />
               </mesh>
             ))}
-            <FanSpinner position={[-RACK_W * 0.32, 0, RACK_D * 0.38]} powered={powered && !failed && animBoost > 0} rpmScale={failed ? 0.4 : 1} />
-            <FanSpinner position={[-RACK_W * 0.22, 0, RACK_D * 0.38]} powered={powered && animBoost > 0} rpmScale={0.85} />
+            <FanSpinner
+              position={[-RACK_W * 0.32, 0, RACK_D * 0.38]}
+              powered={powered && animBoost > 0}
+              rpmScale={failed ? 0.35 : 1}
+              fault={(s.components || {}).fan === 'failed' || failed}
+            />
+            <FanSpinner
+              position={[-RACK_W * 0.22, 0, RACK_D * 0.38]}
+              powered={powered && animBoost > 0}
+              rpmScale={0.85}
+              fault={(s.components || {}).fan === 'failed'}
+            />
             <Html distanceFactor={10} position={[0, U_H * 0.35, RACK_D * 0.4]} style={{ pointerEvents: 'none' }}>
               <div className="dc-3d-chip dc-3d-chip-sm">{s.hostname || s.id}</div>
             </Html>
           </group>
         )
       })}
-    </group>
-  )
-}
-
-function CableStrand({ from, to, color = '#94a3b8', loose = false, traffic = true, onUnplug }) {
-  const groupRef = useRef()
-  const packetRef = useRef()
-  const drag = useRef(null)
-  const curve = useMemo(() => {
-    const mid = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5)
-    mid.y -= loose ? 0.38 : 0.14
-    mid.x += loose ? 0.18 : 0.04
-    return new THREE.CatmullRomCurve3([from.clone(), mid, to.clone()])
-  }, [from, to, loose])
-  const tube = useMemo(() => new THREE.TubeGeometry(curve, 20, 0.012, 6, false), [curve])
-
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime
-    if (groupRef.current && loose) {
-      groupRef.current.rotation.z = Math.sin(t * 2.2) * 0.04
-      groupRef.current.position.y = Math.sin(t * 1.7) * 0.03
-    }
-    if (packetRef.current && traffic && !loose) {
-      const u = (t * 0.35) % 1
-      packetRef.current.position.copy(curve.getPointAt(u))
-      packetRef.current.visible = true
-    } else if (packetRef.current) {
-      packetRef.current.visible = false
-    }
-  })
-
-  return (
-    <group ref={groupRef}>
-      <mesh
-        geometry={tube}
-        onPointerDown={(e) => {
-          e.stopPropagation()
-          drag.current = { x: e.clientX, y: e.clientY }
-          e.target.setPointerCapture?.(e.pointerId)
-        }}
-        onPointerUp={(e) => {
-          e.stopPropagation()
-          if (!drag.current) return
-          const dx = e.clientX - drag.current.x
-          const dy = e.clientY - drag.current.y
-          drag.current = null
-          if (Math.hypot(dx, dy) > 28) onUnplug?.()
-        }}
-        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'grab' }}
-        onPointerOut={() => { document.body.style.cursor = 'default' }}
-      >
-        <meshStandardMaterial
-          color={color}
-          emissive={loose ? '#f59e0b' : color}
-          emissiveIntensity={loose ? 0.45 : 0.2}
-          metalness={0.3}
-          roughness={0.55}
-        />
-      </mesh>
-      {/* Port terminations */}
-      <mesh position={from}>
-        <sphereGeometry args={[0.022, 8, 8]} />
-        <meshStandardMaterial color="#f8fafc" emissive={color} emissiveIntensity={0.5} />
-      </mesh>
-      <mesh position={to}>
-        <sphereGeometry args={[0.022, 8, 8]} />
-        <meshStandardMaterial color="#f8fafc" emissive={color} emissiveIntensity={0.5} />
-      </mesh>
-      <mesh ref={packetRef}>
-        <sphereGeometry args={[0.028, 8, 8]} />
-        <meshStandardMaterial color="#fff" emissive="#38bdf8" emissiveIntensity={1.2} />
-      </mesh>
-      {loose && (
-        <Html position={curve.getPointAt(0.5)} distanceFactor={10} style={{ pointerEvents: 'none' }}>
-          <div className="dc-3d-chip">Drag to unplug</div>
-        </Html>
-      )}
-    </group>
-  )
-}
-
-function CablePhysicsBits({ anchors }) {
-  return (
-    <group>
-      {anchors.map((a, i) => (
-        <RigidBody key={i} position={a} colliders={false} restitution={0.15} linearDamping={1.5} angularDamping={1.5}>
-          <BallCollider args={[0.045]} />
-          <mesh>
-            <sphereGeometry args={[0.038, 8, 8]} />
-            <meshStandardMaterial color="#64748b" metalness={0.65} />
-          </mesh>
-        </RigidBody>
-      ))}
     </group>
   )
 }
@@ -781,7 +697,7 @@ function CableTray() {
 
 function SceneContent({
   racks, serversByRack, network, cooling, pdus, selectedId, expandedRack,
-  onSelectServer, onSelectRack, onOpenBmc, onUnplugCable, physicsEnabled, onFps, animBoost, intro,
+  onSelectServer, onSelectRack, onOpenBmc, onUnplugCable, onPlugCable, physicsEnabled, onFps, animBoost, intro,
 }) {
   const thermalStress = useMemo(() => {
     const units = cooling || []
@@ -797,35 +713,64 @@ function SceneContent({
   const cables = useMemo(() => {
     const links = []
     racks.forEach((rack, i) => {
-      // Always draw plant cabling — not only when switch inventory is seeded.
-      if (switchCount === 0 && i > 8) return
       const { x: sx, z: sz } = rackPosition(i)
       const srvList = serversByRack[rack.id] || []
-      const srv = srvList[0]
-      const loose = (srv?.hardware?.cables || []).some((c) => c.status === 'loose' || c.status === 'damaged')
       const tray = new THREE.Vector3(sx, 2.45, -1.6)
-      links.push({
-        id: `${rack.id}-to-tray`,
-        from: new THREE.Vector3(sx, 1.65, sz + RACK_D / 2),
-        to: tray,
-        loose,
-        color: loose ? '#f59e0b' : '#22d3ee',
-      })
-      links.push({
-        id: `${rack.id}-tray-mdf`,
-        from: tray,
-        to: mdfPos.clone(),
-        loose: false,
-        color: '#38bdf8',
-      })
-      srvList.slice(0, 2).forEach((s, si) => {
-        const uy = ((s.u_slot || (si + 1)) - 1) * U_H - RACK_H / 2 + U_H / 2
+
+      // Plant backbone: rack → tray → MDF (always visible wiring)
+      if (switchCount > 0 || i <= 8) {
         links.push({
-          id: `${s.id}-nic0`,
-          from: new THREE.Vector3(sx + RACK_W * 0.2, uy + RACK_H / 2, sz + RACK_D / 2),
-          to: new THREE.Vector3(sx, 1.55, sz + RACK_D / 2 + 0.08),
-          loose: (s.hardware?.cables || []).some((c) => c.status === 'loose'),
-          color: '#a78bfa',
+          id: `${rack.id}-backbone`,
+          serverId: srvList[0]?.id,
+          cableId: `${rack.id}-uplink`,
+          cableType: 'Fiber-LC',
+          from: new THREE.Vector3(sx, 1.65, sz + RACK_D / 2),
+          to: tray.clone(),
+          loose: false,
+          interactive: false,
+        })
+        links.push({
+          id: `${rack.id}-mdf`,
+          cableType: 'Fiber-LC',
+          from: tray.clone(),
+          to: mdfPos.clone(),
+          loose: false,
+          interactive: false,
+        })
+      }
+
+      // Real NIC cables from hardware inventory — interactive plug/unplug
+      srvList.forEach((s, si) => {
+        const uy = ((s.u_slot || (si + 1)) - 1) * U_H - RACK_H / 2 + U_H / 2 + RACK_H / 2
+        const port = new THREE.Vector3(sx + RACK_W * 0.22, uy, sz + RACK_D / 2)
+        const hwCables = s.hardware?.cables || []
+        if (!hwCables.length) {
+          links.push({
+            id: `${s.id}-nic0`,
+            serverId: s.id,
+            cableId: 'NIC0-front',
+            cableType: 'DAC',
+            from: port,
+            to: new THREE.Vector3(sx, 1.55, sz + RACK_D / 2 + 0.08),
+            loose: (s.components || {}).nic === 'failed',
+            interactive: true,
+            label: `${s.hostname || s.id} · NIC0`,
+          })
+          return
+        }
+        hwCables.slice(0, 3).forEach((c, ci) => {
+          const loose = ['loose', 'damaged', 'unseated'].includes(c.status)
+          links.push({
+            id: `${s.id}-${c.id}`,
+            serverId: s.id,
+            cableId: c.id,
+            cableType: c.type || c.catalog_type || 'Cat6A',
+            from: port.clone().add(new THREE.Vector3(ci * 0.04, 0, 0)),
+            to: new THREE.Vector3(sx + ci * 0.05, 1.5 + ci * 0.05, sz + RACK_D / 2 + 0.1),
+            loose,
+            interactive: true,
+            label: c.label || c.id,
+          })
         })
       })
     })
@@ -888,14 +833,18 @@ function SceneContent({
       </Bvh>
 
       {cables.map((c) => (
-        <CableStrand
+        <InteractiveCable
           key={c.id}
           from={c.from}
           to={c.to}
-          color={c.color}
           loose={c.loose}
-          traffic={animBoost > 0}
-          onUnplug={c.loose ? () => onUnplugCable?.(c.id) : undefined}
+          traffic={animBoost > 0 && !c.loose}
+          cableId={c.cableId || c.id}
+          serverId={c.serverId}
+          cableType={c.cableType || 'Cat6A'}
+          label={c.label}
+          onUnplug={c.interactive ? (payload) => onUnplugCable?.(payload) : undefined}
+          onPlug={c.interactive ? (payload) => onPlugCable?.(payload) : undefined}
         />
       ))}
 
@@ -936,6 +885,7 @@ export default function DatacenterTwin3D({
   onSelectRack,
   onOpenBmc,
   onUnplugCable,
+  onPlugCable,
 }) {
   const [physicsEnabled, setPhysicsEnabled] = useState(true)
   const [animBoost, setAnimBoost] = useState(1)
@@ -977,7 +927,7 @@ export default function DatacenterTwin3D({
           Replay intro
         </button>
         <span className="dc-muted">
-          ~{fps || '—'} FPS · drag loose cables to unplug · double-click chassis → BMC
+          ~{fps || '—'} FPS · drag NIC connectors to unplug · drag loose ends onto ports to plug · double-click chassis → BMC
         </span>
       </div>
       <div className="dc-3d-canvas-wrap">
@@ -1001,6 +951,7 @@ export default function DatacenterTwin3D({
                 onSelectRack={onSelectRack}
                 onOpenBmc={onOpenBmc}
                 onUnplugCable={onUnplugCable}
+                onPlugCable={onPlugCable}
                 physicsEnabled={physicsEnabled}
                 onFps={setFps}
                 animBoost={animBoost}
