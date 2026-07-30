@@ -686,11 +686,47 @@ export function CampusRoomView({ room, campus, busy = false, onOp }) {
       </div>
     )
   }
+  if (room.id === 'spares') {
+    const spares = c.spares || {}
+    return (
+      <div className="dc-campus-grid">
+        <CampusCard
+          title="Stockroom"
+          body={`Issued today ${spares.issued_today ?? 0} · Quarantine ${(spares.quarantine || []).length}`}
+        />
+        {(spares.bins || []).map((b) => {
+          const low = intOr(b.qty, 0) <= intOr(b.min_qty, 0)
+          return (
+            <CampusCard
+              key={b.id}
+              title={`${b.id}${low ? ' · LOW' : ''}`}
+              body={`${b.label} · ${b.sku} · qty ${b.qty} (min ${b.min_qty}) · bin ${b.location}`}
+              actions={onOp && (
+                <>
+                  <button type="button" className="dc-btn-sm" disabled={busy || intOr(b.qty, 0) <= 0} onClick={() => act('issue_spare', { bin_id: b.id })}>Issue</button>
+                  <button type="button" className="dc-btn-sm" disabled={busy} onClick={() => act('restock_spare', { bin_id: b.id })}>Restock</button>
+                  <button type="button" className="dc-btn-sm" disabled={busy || intOr(b.qty, 0) <= 0} onClick={() => act('quarantine_spare', { bin_id: b.id })}>Quarantine</button>
+                </>
+              )}
+            />
+          )
+        })}
+        {(spares.kits_staged || []).slice(0, 4).map((k) => (
+          <CampusCard key={k.id} title={k.id} body={`${k.sku} → ${k.for_asset} · ${k.status}`} />
+        ))}
+      </div>
+    )
+  }
   return (
     <div className="dc-campus-empty">
       <BuildingHint room={room} />
     </div>
   )
+}
+
+function intOr(v, d) {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : d
 }
 
 function CampusCard({ title, body, actions = null }) {

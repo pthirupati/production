@@ -711,6 +711,8 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         state["environmental"] = build_environmental(state.get("servers") or [])
     if not state.get("optical"):
         state["optical"] = build_optical()
+    elif not (state.get("optical") or {}).get("idf"):
+        state["optical"]["idf"] = build_optical()["idf"]
     state["capacity"] = build_capacity_snapshot(state)
     state["predictive"] = build_predictive_maintenance(state)
     # Phase 11: DR, access, automation, reports

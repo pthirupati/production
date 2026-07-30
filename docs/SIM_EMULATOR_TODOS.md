@@ -110,7 +110,7 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 ## G. 3D Datacenter Digital Twin
 
 71. [~] Campus: parking, generator yard, chillers, substation, loading dock (live plant ops)
-72. [ ] Rooms: NOC, SOC, MDF, IDF, MMR, staging, burn-in, spares, battery
+72. [~] Rooms: NOC, SOC, MDF, IDF, MMR, staging, burn-in, spares, battery (IDF + spares live)
 73. [~] Raised floor, hot/cold aisle, CRAC/CRAH, DLC, CDU, UPS, busway
 74. [~] 20+ racks with cage nuts, rails, PDUs, blanking, cable managers
 75. [ ] Server manufacturers: Dell/HPE/Lenovo/Cisco/Supermicro/OCP/…
