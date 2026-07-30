@@ -184,7 +184,7 @@ Docker labs are perfect for most Linux troubleshooting scenarios. When a user cl
 - Reproducible — Docker images guarantee identical environments
 
 **Cons:**
-- Can't simulate multi-host networking
+- Can't model multi-host networking
 - Limited to Linux (no Windows labs)
 - No real cloud provider interaction
 
@@ -366,7 +366,7 @@ Practice these commands daily on FixitLab scenarios and they'll become second na
 
 FixitLab needs to:
 1. Provision isolated, broken Linux environments in seconds
-2. Give users a real terminal (not a simulation)
+2. Give users a real terminal (not a fake shell)
 3. Automatically validate whether the user fixed the problem
 4. Handle 1,000+ concurrent labs safely
 5. Keep costs under control
@@ -415,7 +415,7 @@ When a user starts a lab:
 3. Backend runs \`docker exec -it {container} /bin/bash\` and pipes stdin/stdout over the WebSocket
 4. User types commands in xterm.js → backend sends to container → output streams back
 
-This gives users a **real** terminal, not a simulation. They can run any command, install packages, edit files with vim.
+This gives users a **real** terminal, not a fake shell. They can run any command, install packages, edit files with vim.
 
 ## Scenario Validation
 

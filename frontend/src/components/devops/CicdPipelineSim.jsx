@@ -928,7 +928,7 @@ export default function CicdPipelineSim({
                             const n = { ...e }; delete n[env]; return n
                           })
                         }}
-                        title="Simulate a rollback (removes the deployed revision)"
+                        title="Roll back deployment (removes the deployed revision)"
                       >
                         <ArrowUpCircle size={12} /> Rollback
                       </button>

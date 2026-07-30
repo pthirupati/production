@@ -450,8 +450,8 @@ function runCommand(service, command, rest, flags, region, store) {
       if (!name) return '\nAn error occurred (MissingParameter) when calling the CreateKeyPair operation: The request must contain the parameter KeyName'
       const kp = store.createKeyPair({ name, type: flags['key-type'] || 'rsa' })
       const pem = ['-----BEGIN RSA PRIVATE KEY-----',
-        'MIIEowIBAAKCAQEArandomsimulatedkeymaterialforfixitlabdemoonly000000',
-        'ThisIsASimulatedKeyPairAndContainsNoRealCryptographicMaterialAtAll00',
+        'MIIEowIBAAKCAQEArandomlabkeymaterialforfixitlabtrainingonly00000000',
+        'ThisIsALabKeyPairAndContainsNoRealCryptographicMaterialAtAll0000000',
         '-----END RSA PRIVATE KEY-----'].join('\n')
       return j({ KeyName: kp.name, KeyPairId: kp.id, KeyFingerprint: kp.fingerprint, KeyMaterial: pem })
     }

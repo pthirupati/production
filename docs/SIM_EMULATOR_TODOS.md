@@ -9,7 +9,7 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## A. Platform foundations (cross-cutting)
 
-1. [ ] Strip all learner-visible "simulation/simulator/demo/mock/sandbox" copy platform-wide
+1. [x] Strip all learner-visible "simulation/simulator/demo/mock/sandbox" copy platform-wide
 2. [ ] Entitlement gate: lab console buttons only for subscribed tech of that scenario
 3. [ ] Scenario-scoped lab servers (no global shared server across techs)
 4. [ ] Cross-tech sync bus: disk/NIC/CPU/RAM changes reflect in terminal + consoles
