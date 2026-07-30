@@ -43,6 +43,13 @@
 .gcp-btn-sm:disabled { opacity: 0.45; cursor: not-allowed; }
 .gcp-btn-sm.gcp-btn-outline { background: transparent; color: #1a73e8; border: 1px solid #1a73e8; }
 .gcp-btn-sm.gcp-btn-outline:hover { background: rgba(26, 115, 232, 0.08); }
+.gcp-btn-outline {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  background: #fff; color: #1a73e8; border: 1px solid #1a73e8;
+  border-radius: 4px; padding: 0.4rem 0.75rem; font-size: 0.8rem; font-weight: 600;
+}
+.gcp-btn-outline:hover { background: rgba(26, 115, 232, 0.08); }
+.gcp-btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .gcp-detail-panel {
   background: #f8f9fa; border: 1px solid #e8eaed; border-radius: 8px; color: #202124;

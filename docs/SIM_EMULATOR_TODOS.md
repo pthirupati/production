@@ -10,7 +10,7 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 ## A. Platform foundations (cross-cutting)
 
 1. [x] Strip all learner-visible "simulation/simulator/demo/mock/sandbox" copy platform-wide
-2. [ ] Entitlement gate: lab console buttons only for subscribed tech of that scenario
+2. [x] Entitlement gate: lab console buttons only for subscribed tech of that scenario
 3. [ ] Scenario-scoped lab servers (no global shared server across techs)
 4. [ ] Cross-tech sync bus: disk/NIC/CPU/RAM changes reflect in terminal + consoles
 5. [ ] Lab Terminal always binds to the scenario's Lab Server OS
@@ -111,15 +111,15 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 71. [ ] Campus: parking, generator yard, chillers, substation, loading dock
 72. [ ] Rooms: NOC, SOC, MDF, IDF, MMR, staging, burn-in, spares, battery
-73. [ ] Raised floor, hot/cold aisle, CRAC/CRAH, DLC, CDU, UPS, busway
-74. [ ] 20+ racks with cage nuts, rails, PDUs, blanking, cable managers
+73. [~] Raised floor, hot/cold aisle, CRAC/CRAH, DLC, CDU, UPS, busway
+74. [~] 20+ racks with cage nuts, rails, PDUs, blanking, cable managers
 75. [ ] Server manufacturers: Dell/HPE/Lenovo/Cisco/Supermicro/OCP/…
 76. [ ] Motherboard: VRM/DIMM/PCIe/BMC/BIOS chips interactive
-77. [ ] Plug/unplug cables with physics bend (Rapier)
-78. [ ] Port LEDs, fan RPM animation, thermal/power view modes
-79. [ ] Console: attach KVM/monitor → BIOS/UEFI/iDRAC/iLO/IPMI/Redfish
+77. [~] Plug/unplug cables with physics bend (Rapier)
+78. [~] Port LEDs, fan RPM animation, thermal/power view modes
+79. [~] Console: attach KVM/monitor → BIOS/UEFI/iDRAC/iLO/IPMI/Redfish
 80. [ ] RAID config (PERC/Smart Array/MegaRAID) + rebuild viz
-81. [ ] Hardware replace workflows + RMA tickets (Dell/HPE/Cisco/NVIDIA)
+81. [~] Hardware replace workflows + RMA tickets (Dell/HPE/Cisco/NVIDIA)
 82. [ ] Failure injection + troubleshooting training scenarios
 83. [ ] DCIM: PUE, capacity, inventory, warranty, predictive maintenance
 84. [ ] LOD/instancing/BVH for 60 FPS
@@ -187,7 +187,7 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 116. [ ] Audit private endpoints; JWT on all lab/sim APIs
 117. [ ] Rate-limit Cloud Shell / CLI mock endpoints
 118. [ ] No placeholder pages; dead-link crawl CI
-119. [ ] Visual contrast pass (Azure/GCP/storage light portals)
+119. [x] Visual contrast pass (Azure/GCP/storage light portals)
 120. [ ] Competitor parity review notes → backlog grooming
 
 ---
