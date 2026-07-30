@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { azureApi } from '../../api/azure'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
@@ -8,7 +8,10 @@ import {
   Flame, Globe2, ShieldAlert, IdCard,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
-import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import {
+  SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession,
+  GlobalSearch, indexAzureState,
+} from '../sim/shared'
 import CloudShellPanel from '../lab/CloudShellPanel'
 import { renderAzureV2Page } from './AzureV2Panels'
 import '../../styles/sim-products.css'
@@ -127,6 +130,11 @@ export default function AzureConsole({
   const keyVaults = st.key_vaults || []
   const roleAssignments = st.role_assignments || []
   const loadBalancers = st.load_balancers || []
+  const searchServices = useMemo(
+    () => SIDEBAR.map((s) => ({ key: s.key, label: s.label, keywords: s.key })),
+    [],
+  )
+  const searchResources = useMemo(() => indexAzureState(st), [st])
   const publicIps = st.public_ips || []
   const activityLog = st.activity_log || st.events || []
   const snapshots = st.snapshots || []
@@ -570,6 +578,12 @@ export default function AzureConsole({
     <div className={simPanelRoot(embedded, 'az-shell sim-product')}>
       <LabChromeBar title="Microsoft Azure" subtitle={scenario?.title || slug} accent={ACCENT}
         className="lab-chrome-bar !bg-[#0078d4]" {...chromeProps}>
+        <GlobalSearch
+          services={searchServices}
+          resources={searchResources}
+          placeholder="Search resources, services… (/)"
+          onSelect={(hit) => { if (hit.navKey) setNav(hit.navKey) }}
+        />
         <button type="button" className="lab-chrome-btn flex items-center gap-1" onClick={() => setCloudShellOpen((o) => !o)}>
           <Terminal size={13} /> {cloudShellOpen ? 'Hide Cloud Shell' : 'Cloud Shell'}
         </button>

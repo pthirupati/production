@@ -645,3 +645,98 @@ body:has(.de-shell) .sim-modal-footer button.text-sm:hover { color: #201f1e; }
   display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.68rem; color: var(--cicd-text);
   background: #0d1117; border: 1px solid var(--cicd-border); border-radius: 5px; padding: 0.15rem 0.45rem;
 }
+
+/* ── Shared GlobalSearch omnibox (LabChromeBar) ── */
+.sim-global-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 11rem;
+  max-width: 18rem;
+  flex: 1 1 12rem;
+}
+.sim-global-search-icon {
+  position: absolute;
+  left: 0.55rem;
+  color: #94a3b8;
+  pointer-events: none;
+}
+.sim-global-search-input {
+  width: 100%;
+  padding: 0.35rem 0.55rem 0.35rem 1.85rem;
+  font-size: 0.72rem;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.55);
+  color: #e2e8f0;
+  outline: none;
+}
+.sim-global-search-input::placeholder { color: #94a3b8; }
+.sim-global-search-input:focus {
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
+}
+.sim-global-search-panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  min-width: 16rem;
+  max-height: 20rem;
+  overflow: auto;
+  z-index: 80;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+.sim-global-search-section { padding: 0.35rem 0; }
+.sim-global-search-heading {
+  padding: 0.25rem 0.7rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.sim-global-search-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.7rem;
+  border: none;
+  background: transparent;
+  color: #e2e8f0;
+  cursor: pointer;
+}
+.sim-global-search-item:hover,
+.sim-global-search-item.is-active { background: #1e293b; }
+.sim-global-search-label { font-size: 0.75rem; font-weight: 600; }
+.sim-global-search-sub { font-size: 0.65rem; color: #94a3b8; }
+.sim-global-search-empty {
+  padding: 0.75rem 0.85rem;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+.sim-global-search-light .sim-global-search-input {
+  background: #fff;
+  border-color: #d2d0ce;
+  color: #323130;
+}
+.sim-global-search-light .sim-global-search-input::placeholder { color: #8a8886; }
+.sim-global-search-light .sim-global-search-icon { color: #605e5c; }
+.sim-global-search-light .sim-global-search-panel {
+  background: #fff;
+  border-color: #e1dfdd;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.sim-global-search-light .sim-global-search-item { color: #323130; }
+.sim-global-search-light .sim-global-search-item:hover,
+.sim-global-search-light .sim-global-search-item.is-active { background: #f3f2f1; }
+.sim-global-search-light .sim-global-search-sub { color: #605e5c; }
+@media (max-width: 720px) {
+  .sim-global-search { display: none; }
+}
