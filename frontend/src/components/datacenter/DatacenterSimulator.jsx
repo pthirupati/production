@@ -8,7 +8,7 @@ import {
   RefreshCw, MonitorCog, Database, Boxes, Ticket, Monitor, Box,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
-import { useSimSession } from '../sim/shared'
+import { useSimSession, GlobalSearch, indexDatacenterState } from '../sim/shared'
 import { lazyWithRetry } from '../../utils/lazyWithRetry'
 import {
   MotherboardPanel, RaidPanel, BiosPanel, BmcPanel, CampusRoomView,
@@ -170,6 +170,12 @@ export default function DatacenterSimulator({
   )
 
   const selectedServer = selectedServerId ? servers.find((s) => s.id === selectedServerId) : null
+  const searchServices = useMemo(() => ([
+    { key: 'floor', label: 'Data hall floor', keywords: 'rack server 3d' },
+    { key: 'rooms', label: 'Campus rooms', keywords: 'mdf noc mechanical electrical' },
+    { key: 'tickets', label: 'Ops tickets', keywords: 'rma work order' },
+  ]), [])
+  const searchResources = useMemo(() => indexDatacenterState(st), [st])
 
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
@@ -269,6 +275,30 @@ export default function DatacenterSimulator({
     <div className={simPanelRoot(embedded, 'dc-shell sim-product')}>
       <LabChromeBar title="Data Center Console" subtitle={scenario?.title || slug}
         accent={ACCENT} className="lab-chrome-bar !bg-[#1a1d2b]" {...chromeProps}>
+        <GlobalSearch
+          services={searchServices}
+          resources={searchResources}
+          placeholder="Search racks, servers, rooms… (/)"
+          onSelect={(hit) => {
+            if (hit.navKey === 'rooms' || hit.meta?.type) {
+              const room = rooms.find((r) => r.id === hit.id) || hit.meta
+              if (room?.id) enterRoom(room)
+              return
+            }
+            if (hit.meta?.hostname || hit.navKey === 'floor') {
+              const srv = servers.find((s) => s.id === hit.id) || hit.meta
+              if (srv?.rack || srv?.rack_id) {
+                const rack = racks.find((r) => r.id === (srv.rack || srv.rack_id))
+                const room = rooms.find((r) => (r.racks || []).includes(rack?.id))
+                if (room) enterRoom(room)
+              }
+              if (srv?.id) {
+                setSelectedServerId(srv.id)
+                setDrawerTab('overview')
+              }
+            }
+          }}
+        />
         {onToggleTerminal && (
           <button type="button" className="lab-chrome-btn flex items-center gap-1" onClick={onToggleTerminal}>
             <Terminal size={13} /> {simTerminalOpen ? 'Hide terminal' : 'Terminal'}

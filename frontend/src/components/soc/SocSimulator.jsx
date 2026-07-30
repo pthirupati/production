@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { socApi } from '../../api/soc'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
@@ -7,7 +7,10 @@ import {
   KeyRound, Bug, BrickWall, Activity, Scale,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
-import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, useSimSession } from '../sim/shared'
+import {
+  SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, useSimSession,
+  GlobalSearch, indexSocState,
+} from '../sim/shared'
 import { renderSocV2Page } from './SocV2Panels'
 import '../../styles/sim-products.css'
 import './soc.css'
@@ -63,6 +66,11 @@ export default function SocSimulator({
   const alerts = [...(st.alerts || [])].sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9))
   const selectedAlert = selectedAlertId ? alerts.find((a) => a.id === selectedAlertId) : null
   const relatedIncident = selectedAlert ? (st.incidents || []).find((i) => i.alert_id === selectedAlert.id) : null
+  const searchServices = useMemo(
+    () => SIDEBAR.map((s) => ({ key: s.key, label: s.label, keywords: s.key })),
+    [],
+  )
+  const searchResources = useMemo(() => indexSocState(st), [st])
 
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
@@ -377,6 +385,15 @@ export default function SocSimulator({
     <div className={simPanelRoot(embedded, 'soc-shell sim-product')}>
       <LabChromeBar title="SOC Console" subtitle={scenario?.title || slug}
         accent={ACCENT} className="lab-chrome-bar !bg-[#1a1015]" {...chromeProps}>
+        <GlobalSearch
+          services={searchServices}
+          resources={searchResources}
+          placeholder="Search alerts, assets… (/)"
+          onSelect={(hit) => {
+            if (hit.navKey) setNav(hit.navKey)
+            if (hit.navKey === 'alerts' && hit.id) setSelectedAlertId(hit.id)
+          }}
+        />
         {onToggleTerminal && (
           <button type="button" className="lab-chrome-btn flex items-center gap-1" onClick={onToggleTerminal}>
             <Terminal size={13} /> {simTerminalOpen ? 'Hide terminal' : 'Terminal'}
