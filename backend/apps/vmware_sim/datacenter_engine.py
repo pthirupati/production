@@ -665,6 +665,9 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         state["rooms"] = rooms
     if not state.get("campus"):
         state["campus"] = campus_assets()
+    else:
+        from apps.vmware_sim.datacenter_facility_ops import ensure_campus_plant
+        state["campus"] = ensure_campus_plant(state["campus"], state.get("power_chain"))
     for srv in state.get("servers", []):
         enrich_server(srv)
         mb = srv.get("motherboard")
@@ -2421,6 +2424,22 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"DR: {msg}", "danger" if op in ("utility_fail", "site_failover") else "info")
         _save(session_id, entry)
         return {"ok": True, "message": msg, "dr": dr, "power_chain": pc}
+
+    if action == "campus_plant_ops":
+        from apps.vmware_sim.datacenter_facility_ops import campus_plant_op, ensure_campus_plant
+        campus = ensure_campus_plant(state.setdefault("campus", {}), state.get("power_chain"))
+        pc = state.get("power_chain") or {}
+        op = payload.get("op") or ""
+        ok, msg, campus = campus_plant_op(
+            campus, pc, op, **{k: v for k, v in payload.items() if k != "op"}
+        )
+        state["campus"] = campus
+        if not ok:
+            return {"ok": False, "error": msg}
+        _twin_journal(state, "campus_plant_ops", {"op": op})
+        _event(state, f"Campus plant: {msg}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "campus": campus}
 
     if action == "access_ops":
         from apps.vmware_sim.datacenter_ops_platform import build_access_control, access_op

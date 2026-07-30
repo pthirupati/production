@@ -555,20 +555,35 @@ export function FailureInjectBar({ presets, busy, onInject, assetId }) {
   )
 }
 
-/** Campus / plant room overview cards */
-export function CampusRoomView({ room, campus }) {
+/** Campus / plant room overview cards with light live ops */
+export function CampusRoomView({ room, campus, busy = false, onOp }) {
   if (!room) return null
   const c = campus || {}
+  const act = (op, extra = {}) => onOp?.(op, extra)
+
   if (room.type === 'campus' || room.id === 'campus') {
     return (
       <div className="dc-campus-grid">
-        <CampusCard title="Parking" body={`${c.parking?.occupied ?? 0} / ${c.parking?.spaces ?? 0} occupied`} />
+        <CampusCard
+          title="Parking"
+          body={`${c.parking?.occupied ?? 0} / ${c.parking?.spaces ?? 0} occupied`}
+          actions={onOp && (
+            <>
+              <button type="button" className="dc-btn-sm" disabled={busy} onClick={() => act('parking_in')}>Badge in</button>
+              <button type="button" className="dc-btn-sm" disabled={busy} onClick={() => act('parking_out')}>Exit</button>
+            </>
+          )}
+        />
         <CampusCard title="Access" body={`Gate ${c.access?.gate} · Biometrics ${c.access?.biometrics} · ${c.access?.cameras} cameras`} />
         <CampusCard title="Generators" body={(c.generators || []).map((g) => `${g.id} ${g.status} ${g.fuel_pct}% fuel`).join(' · ')} />
         <CampusCard title="Diesel" body={(c.diesel_tanks || []).map((t) => `${t.id} ${t.level_pct}%`).join(' · ')} />
         <CampusCard title="Cooling towers" body={(c.cooling_towers || []).map((t) => `${t.id} ${t.status}`).join(' · ')} />
         <CampusCard title="Chillers" body={(c.chillers || []).map((t) => `${t.id} ${t.status}`).join(' · ')} />
         <CampusCard title="Transformers" body={(c.transformers || []).map((t) => `${t.id} ${t.load_pct}%`).join(' · ')} />
+        <CampusCard
+          title="Loading dock"
+          body={`${c.loading_dock?.occupied_bays ?? 0}/${c.loading_dock?.bays ?? 0} bays · ${c.loading_dock?.received_today ?? 0} received today`}
+        />
       </div>
     )
   }
@@ -584,11 +599,22 @@ export function CampusRoomView({ room, campus }) {
       </div>
     )
   }
-  if (room.id === 'chillers' || (room.type === 'mechanical' && room.id !== 'mechanical')) {
+  if (room.id === 'chillers') {
     return (
       <div className="dc-campus-grid">
         {(c.chillers || []).map((ch) => (
-          <CampusCard key={ch.id} title={ch.id} body={`${ch.tons} tons · ${ch.status}${ch.cop ? ` · COP ${ch.cop}` : ''}`} />
+          <CampusCard
+            key={ch.id}
+            title={ch.id}
+            body={`${ch.tons} tons · ${ch.status}${ch.cop ? ` · COP ${ch.cop}` : ''}`}
+            actions={onOp && (
+              ch.status === 'running' ? (
+                <button type="button" className="dc-btn-sm" disabled={busy} onClick={() => act('stop_chiller', { chiller_id: ch.id })}>Stop</button>
+              ) : (
+                <button type="button" className="dc-btn-sm" disabled={busy} onClick={() => act('start_chiller', { chiller_id: ch.id })}>Start</button>
+              )
+            )}
+          />
         ))}
         {(c.cooling_towers || []).map((t) => (
           <CampusCard key={t.id} title={t.id} body={`${t.status} · approach ${t.approach_c}°C`} />
@@ -596,13 +622,67 @@ export function CampusRoomView({ room, campus }) {
       </div>
     )
   }
-  if (room.id === 'substation' || room.id === 'battery') {
+  if (room.id === 'substation') {
     return (
       <div className="dc-campus-grid">
         {(c.transformers || []).map((x) => (
-          <CampusCard key={x.id} title={x.id} body={`${x.kva} kVA · ${x.status} · load ${x.load_pct}%`} />
+          <CampusCard
+            key={x.id}
+            title={x.id}
+            body={`${x.kva} kVA · ${x.status} · load ${x.load_pct}%`}
+            actions={onOp && (
+              <button type="button" className="dc-btn-sm" disabled={busy} onClick={() => act('note_xfmr_load', { transformer_id: x.id })}>
+                Take load reading
+              </button>
+            )}
+          />
         ))}
-        {room.id === 'battery' && <CampusCard title="VRLA strings" body="Battery room online · float charge nominal" />}
+      </div>
+    )
+  }
+  if (room.id === 'battery') {
+    return (
+      <div className="dc-campus-grid">
+        {(c.battery_strings || []).map((s) => (
+          <CampusCard
+            key={s.id}
+            title={s.id}
+            body={`${s.chemistry} · ${s.cells} cells · SoC ${s.soc_pct}% · ${s.status} · ${s.temp_c}°C`}
+          />
+        ))}
+        <CampusCard
+          title="String sync"
+          body="Pull SoC from UPS telemetry (float vs discharge)"
+          actions={onOp && (
+            <button type="button" className="dc-btn-sm" disabled={busy} onClick={() => act('sync_battery')}>Sync from UPS</button>
+          )}
+        />
+      </div>
+    )
+  }
+  if (room.id === 'loading-dock') {
+    const dock = c.loading_dock || {}
+    return (
+      <div className="dc-campus-grid">
+        <CampusCard
+          title="Dock status"
+          body={`${dock.occupied_bays ?? 0}/${dock.bays ?? 0} bays occupied · ${dock.received_today ?? 0} received today`}
+          actions={onOp && (
+            <button type="button" className="dc-btn-sm" disabled={busy} onClick={() => act('arrive_dock')}>Truck arrive</button>
+          )}
+        />
+        {(dock.queue || []).map((q) => (
+          <CampusCard
+            key={q.id}
+            title={q.id}
+            body={`${q.carrier} · ${q.contents} · ${q.status}`}
+            actions={onOp && q.status !== 'received' && (
+              <button type="button" className="dc-btn-sm" disabled={busy} onClick={() => act('receive_dock', { asn_id: q.id })}>
+                Receive FRU
+              </button>
+            )}
+          />
+        ))}
       </div>
     )
   }
@@ -613,11 +693,12 @@ export function CampusRoomView({ room, campus }) {
   )
 }
 
-function CampusCard({ title, body }) {
+function CampusCard({ title, body, actions = null }) {
   return (
     <div className="dc-crac-card">
       <div className="dc-crac-id">{title}</div>
       <div className="dc-crac-zone">{body}</div>
+      {actions ? <div className="dc-campus-card-actions" style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>{actions}</div> : null}
     </div>
   )
 }
