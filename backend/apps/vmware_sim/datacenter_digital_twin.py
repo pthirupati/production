@@ -509,6 +509,20 @@ def campus_assets() -> dict:
             {"id": "XFMR-A", "kva": 2500, "status": "online", "load_pct": 54},
             {"id": "XFMR-B", "kva": 2500, "status": "online", "load_pct": 51},
         ],
+        "battery_strings": [
+            {"id": "STR-A", "chemistry": "VRLA", "cells": 40, "soc_pct": 100, "temp_c": 22.0, "status": "float"},
+            {"id": "STR-B", "chemistry": "VRLA", "cells": 40, "soc_pct": 100, "temp_c": 21.8, "status": "float"},
+        ],
+        "loading_dock": {
+            "bays": 2,
+            "occupied_bays": 1,
+            "queue": [
+                {"id": "ASN-1042", "carrier": "Dell Logistics", "contents": "2× R760 PSU FRU", "status": "at_bay"},
+                {"id": "ASN-1048", "carrier": "HPE", "contents": "DIMM kit 128GB", "status": "inbound"},
+            ],
+            "received_today": 3,
+        },
         "parking": {"spaces": 48, "occupied": 12},
         "access": {"gate": "secured", "biometrics": "online", "cameras": 24},
+        "events": [{"time": _now(), "message": "Campus plant telemetry online"}],
     }

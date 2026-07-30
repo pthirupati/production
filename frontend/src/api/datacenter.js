@@ -256,6 +256,9 @@ export const datacenterApi = {
   drOps(sessionId, op, extra = {}) {
     return datacenterApi.action(sessionId, 'dr_ops', { op, ...extra })
   },
+  campusPlantOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'campus_plant_ops', { op, ...extra })
+  },
   accessOps(sessionId, op, extra = {}) {
     return datacenterApi.action(sessionId, 'access_ops', { op, ...extra })
   },

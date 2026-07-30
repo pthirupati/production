@@ -433,3 +433,146 @@ def build_predictive_maintenance(state: dict) -> dict:
         "high_risk_count": sum(1 for i in items if i.get("risk") == "high"),
         "medium_risk_count": sum(1 for i in items if i.get("risk") == "medium"),
     }
+
+
+# ── Campus exterior plant (dock / chillers / substation / battery / parking) ─
+
+def ensure_campus_plant(campus: dict, power_chain: dict | None = None) -> dict:
+    """Backfill plant fields on older sessions without resetting live values."""
+    c = campus if isinstance(campus, dict) else {}
+    if not c.get("battery_strings"):
+        ups_list = (power_chain or {}).get("ups") or []
+        soc = 100
+        if ups_list:
+            soc = int(ups_list[0].get("battery_pct") or 100)
+        c["battery_strings"] = [
+            {"id": "STR-A", "chemistry": "VRLA", "cells": 40, "soc_pct": soc, "temp_c": 22.0, "status": "float"},
+            {"id": "STR-B", "chemistry": "VRLA", "cells": 40, "soc_pct": soc, "temp_c": 21.8, "status": "float"},
+        ]
+    dock = c.setdefault("loading_dock", {})
+    dock.setdefault("bays", 2)
+    dock.setdefault("occupied_bays", 1)
+    dock.setdefault("received_today", 0)
+    dock.setdefault("queue", [
+        {"id": "ASN-1042", "carrier": "Dell Logistics", "contents": "2× R760 PSU FRU", "status": "at_bay"},
+        {"id": "ASN-1048", "carrier": "HPE", "contents": "DIMM kit 128GB", "status": "inbound"},
+    ])
+    c.setdefault("parking", {"spaces": 48, "occupied": 12})
+    c.setdefault("events", [])
+    return c
+
+
+def campus_plant_op(campus: dict, power_chain: dict | None, op: str, **kwargs) -> tuple[bool, str, dict]:
+    """Mutate exterior plant rooms: dock receive, chiller start/stop, XFMR note, battery sync, parking."""
+    c = ensure_campus_plant(campus or {}, power_chain)
+    pc = power_chain or {}
+    op = (op or "").strip()
+
+    def _log(msg: str) -> None:
+        c.setdefault("events", []).insert(0, {"time": _now(), "message": msg})
+        c["events"] = c["events"][:40]
+
+    if op == "receive_dock":
+        asn = kwargs.get("asn_id") or kwargs.get("id")
+        dock = c["loading_dock"]
+        queue = dock.get("queue") or []
+        item = next((q for q in queue if q.get("id") == asn), None) if asn else next(
+            (q for q in queue if q.get("status") in ("at_bay", "inbound")), None
+        )
+        if not item:
+            return False, "No inbound shipment to receive", c
+        item["status"] = "received"
+        dock["received_today"] = int(dock.get("received_today") or 0) + 1
+        dock["occupied_bays"] = max(0, int(dock.get("occupied_bays") or 1) - 1)
+        _log(f"Dock received {item['id']} · {item.get('contents')}")
+        return True, f"Received {item['id']}", c
+
+    if op == "arrive_dock":
+        dock = c["loading_dock"]
+        queue = dock.setdefault("queue", [])
+        inbound = next((q for q in queue if q.get("status") == "inbound"), None)
+        if not inbound:
+            nid = f"ASN-{1040 + len(queue) + 1}"
+            inbound = {
+                "id": nid,
+                "carrier": kwargs.get("carrier") or "Freight",
+                "contents": kwargs.get("contents") or "Misc FRU",
+                "status": "inbound",
+            }
+            queue.append(inbound)
+        inbound["status"] = "at_bay"
+        dock["occupied_bays"] = min(int(dock.get("bays") or 2), int(dock.get("occupied_bays") or 0) + 1)
+        _log(f"Truck at bay · {inbound['id']}")
+        return True, f"{inbound['id']} at bay", c
+
+    if op in ("start_chiller", "stop_chiller"):
+        cid = kwargs.get("chiller_id") or kwargs.get("id")
+        chillers = c.get("chillers") or []
+        ch = next((x for x in chillers if x.get("id") == cid), None) if cid else None
+        if not ch and chillers:
+            # Prefer flipping a standby for start, a running for stop
+            if op == "start_chiller":
+                ch = next((x for x in chillers if x.get("status") == "standby"), chillers[0])
+            else:
+                running = [x for x in chillers if x.get("status") == "running"]
+                ch = running[-1] if running else chillers[0]
+        if not ch:
+            return False, "No chiller found", c
+        if op == "start_chiller":
+            ch["status"] = "running"
+            ch["cop"] = ch.get("cop") or 5.6
+            _log(f"Chiller {ch['id']} started")
+            return True, f"{ch['id']} running", c
+        running = [x for x in chillers if x.get("status") == "running"]
+        if len(running) <= 1 and ch.get("status") == "running":
+            return False, "Keep at least one chiller online", c
+        ch["status"] = "standby"
+        ch["cop"] = None
+        _log(f"Chiller {ch['id']} stopped → standby")
+        return True, f"{ch['id']} standby", c
+
+    if op == "note_xfmr_load":
+        xid = kwargs.get("transformer_id") or kwargs.get("id")
+        load = kwargs.get("load_pct")
+        xfmr = next((x for x in (c.get("transformers") or []) if x.get("id") == xid), None) if xid else None
+        if not xfmr:
+            xfmr = (c.get("transformers") or [None])[0]
+        if not xfmr:
+            return False, "No transformer found", c
+        if load is None:
+            # Nudge ±2 for a live feel when operator "takes a reading"
+            cur = int(xfmr.get("load_pct") or 50)
+            load = max(5, min(95, cur + (3 if cur < 60 else -2)))
+        xfmr["load_pct"] = int(load)
+        xfmr["status"] = "online"
+        _log(f"XFMR {xfmr['id']} load reading {xfmr['load_pct']}%")
+        return True, f"{xfmr['id']} load {xfmr['load_pct']}%", c
+
+    if op == "sync_battery":
+        ups_list = pc.get("ups") or []
+        soc = int(ups_list[0].get("battery_pct") or 100) if ups_list else 100
+        on_batt = any(u.get("on_battery") for u in ups_list)
+        for s in c.get("battery_strings") or []:
+            s["soc_pct"] = soc
+            s["status"] = "discharge" if on_batt else "float"
+            s["temp_c"] = round(float(s.get("temp_c") or 22) + (0.4 if on_batt else -0.1), 1)
+        _log(f"Battery strings synced · SoC {soc}% · {'discharge' if on_batt else 'float'}")
+        return True, f"Battery SoC {soc}%", c
+
+    if op == "parking_in":
+        p = c.setdefault("parking", {"spaces": 48, "occupied": 0})
+        if int(p.get("occupied") or 0) >= int(p.get("spaces") or 48):
+            return False, "Parking full", c
+        p["occupied"] = int(p.get("occupied") or 0) + 1
+        _log(f"Vehicle badge-in · {p['occupied']}/{p['spaces']}")
+        return True, f"Parking {p['occupied']}/{p['spaces']}", c
+
+    if op == "parking_out":
+        p = c.setdefault("parking", {"spaces": 48, "occupied": 0})
+        if int(p.get("occupied") or 0) <= 0:
+            return False, "Lot empty", c
+        p["occupied"] = int(p.get("occupied") or 0) - 1
+        _log(f"Vehicle exit · {p['occupied']}/{p['spaces']}")
+        return True, f"Parking {p['occupied']}/{p['spaces']}", c
+
+    return False, f"Unknown campus plant op: {op}", c

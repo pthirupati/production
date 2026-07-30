@@ -524,7 +524,12 @@ export default function DatacenterSimulator({
 
       {currentRoom.id === 'generator-yard' && (
         <div className="dc-room-body">
-          <CampusRoomView room={currentRoom} campus={campus} />
+          <CampusRoomView
+            room={currentRoom}
+            campus={campus}
+            busy={busy}
+            onOp={(op, extra) => doAction(() => datacenterApi.campusPlantOps(sessionId, op, extra), `Campus ${op}`)}
+          />
           <div style={{ marginTop: '1rem' }}>
             <DrFailoverPanel
               dr={dr}
@@ -723,7 +728,12 @@ export default function DatacenterSimulator({
         && currentRoom.id !== 'generator-yard'
         && currentRoom.id !== 'security-gate' && (
         <div className="dc-room-body">
-          <CampusRoomView room={currentRoom} campus={campus} />
+          <CampusRoomView
+            room={currentRoom}
+            campus={campus}
+            busy={busy}
+            onOp={(op, extra) => doAction(() => datacenterApi.campusPlantOps(sessionId, op, extra), `Campus ${op}`)}
+          />
         </div>
       )}
 

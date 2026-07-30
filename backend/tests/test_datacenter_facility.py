@@ -256,3 +256,39 @@ class DatacenterFacilityTests(SimpleTestCase):
         self.assertTrue(r2["ok"], r2)
         self.assertTrue(r2["bmc"]["virtual_media"]["mounted"])
         self.assertEqual(r2["bmc"]["virtual_media"]["image"], "ubuntu-22.04.iso")
+
+
+class CampusPlantOpsTests(SimpleTestCase):
+    def setUp(self):
+        cache.clear()
+        self.session_id = str(uuid.uuid4())
+        self.addCleanup(cache.clear)
+
+    def test_campus_has_dock_battery_and_ops(self):
+        state = dc.get_state(self.session_id)["state"]
+        campus = state["campus"]
+        self.assertTrue(campus.get("loading_dock", {}).get("queue"))
+        self.assertTrue(campus.get("battery_strings"))
+        self.assertIn("chillers", campus)
+
+        r = dc.apply_action(self.session_id, "campus_plant_ops", {"op": "receive_dock"})
+        self.assertTrue(r["ok"], r)
+        dock = dc.get_state(self.session_id)["state"]["campus"]["loading_dock"]
+        self.assertGreaterEqual(int(dock.get("received_today") or 0), 1)
+        self.assertTrue(any(q.get("status") == "received" for q in dock.get("queue") or []))
+
+        r2 = dc.apply_action(self.session_id, "campus_plant_ops", {"op": "start_chiller", "chiller_id": "CH-2"})
+        self.assertTrue(r2["ok"], r2)
+        chillers = {c["id"]: c for c in dc.get_state(self.session_id)["state"]["campus"]["chillers"]}
+        self.assertEqual(chillers["CH-2"]["status"], "running")
+
+        r3 = dc.apply_action(self.session_id, "campus_plant_ops", {"op": "sync_battery"})
+        self.assertTrue(r3["ok"], r3)
+        strings = dc.get_state(self.session_id)["state"]["campus"]["battery_strings"]
+        self.assertTrue(all("soc_pct" in s for s in strings))
+
+        before = int(dc.get_state(self.session_id)["state"]["campus"]["parking"]["occupied"])
+        r4 = dc.apply_action(self.session_id, "campus_plant_ops", {"op": "parking_in"})
+        self.assertTrue(r4["ok"], r4)
+        after = int(dc.get_state(self.session_id)["state"]["campus"]["parking"]["occupied"])
+        self.assertEqual(after, before + 1)
