@@ -115,7 +115,7 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 74. [~] 20+ racks with cage nuts, rails, PDUs, blanking, cable managers
 75. [ ] Server manufacturers: Dell/HPE/Lenovo/Cisco/Supermicro/OCP/…
 76. [ ] Motherboard: VRM/DIMM/PCIe/BMC/BIOS chips interactive
-77. [~] Plug/unplug cables with physics bend (Rapier)
+77. [x] Plug/unplug cables with physics bend (Rapier) — drag connector snap-mate
 78. [~] Port LEDs, fan RPM animation, thermal/power view modes
 79. [~] Console: attach KVM/monitor → BIOS/UEFI/iDRAC/iLO/IPMI/Redfish
 80. [ ] RAID config (PERC/Smart Array/MegaRAID) + rebuild viz

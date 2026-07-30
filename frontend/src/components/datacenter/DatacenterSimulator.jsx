@@ -358,15 +358,31 @@ export default function DatacenterSimulator({
             onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}
             onSelectRack={(id) => setExpandedRack((cur) => (cur === id ? null : id))}
             onOpenBmc={(id) => { setSelectedServerId(id); setDrawerTab('bmc') }}
-            onUnplugCable={(cableId) => {
-              const srv = selectedServerId
-                ? servers.find((s) => s.id === selectedServerId)
-                : servers.find((s) => (s.hardware?.cables || []).some((c) => c.status === 'loose' || c.status === 'damaged'))
+            onUnplugCable={({ serverId, cableId } = {}) => {
+              const srv = (serverId && servers.find((s) => s.id === serverId))
+                || (selectedServerId && servers.find((s) => s.id === selectedServerId))
+                || servers.find((s) => (s.hardware?.cables || []).some((c) => ['loose', 'damaged', 'seated'].includes(c.status)))
               if (!srv) return
-              const loose = (srv.hardware?.cables || []).find((c) => c.status === 'loose' || c.status === 'damaged')
+              const targetId = cableId
+                || (srv.hardware?.cables || []).find((c) => c.status === 'seated')?.id
+                || (srv.hardware?.cables || [])[0]?.id
               doAction(
-                () => datacenterApi.reseatCable(sessionId, srv.id, loose?.id || cableId),
-                'Cable unplugged / reseated from 3D',
+                () => datacenterApi.unplugCable(sessionId, srv.id, targetId),
+                `Unplugged ${targetId || 'cable'} on ${srv.hostname || srv.id}`,
+                srv.id,
+              )
+            }}
+            onPlugCable={({ serverId, cableId } = {}) => {
+              const srv = (serverId && servers.find((s) => s.id === serverId))
+                || (selectedServerId && servers.find((s) => s.id === selectedServerId))
+                || servers.find((s) => (s.hardware?.cables || []).some((c) => ['loose', 'damaged', 'unseated'].includes(c.status)))
+              if (!srv) return
+              const targetId = cableId
+                || (srv.hardware?.cables || []).find((c) => ['loose', 'damaged', 'unseated'].includes(c.status))?.id
+                || (srv.hardware?.cables || [])[0]?.id
+              doAction(
+                () => datacenterApi.plugCable(sessionId, srv.id, targetId),
+                `Plugged ${targetId || 'cable'} on ${srv.hostname || srv.id}`,
                 srv.id,
               )
             }}
