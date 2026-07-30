@@ -40,16 +40,16 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 24. [ ] Harden Chrome SpeechSynthesis unlock across async startRound
 25. [ ] E2E: sound-test → Join → audible first question (no silent join)
 26. [x] AWS console mount tests pass for fresh/legacy/corrupt localStorage
-27. [ ] Production verify: academy-aws-001 Ec2 Learn loads without error boundary
-28. [ ] Terraform labs load after chunk-retry + store reset paths
-29. [ ] Four-droplet deploy of interview + lab console fixes
+27. [~] Production verify: academy-aws-001 Ec2 Learn loads without error boundary
+28. [x] Terraform / aws-* routing: slugHints no longer map bare aws-* to Terraform IDE
+29. [~] Four-droplet deploy of interview + lab console fixes
 
 ---
 
 ## C. AWS Management Console emulator
 
-30. [ ] Pixel-accurate top nav, favorites, unified search, CloudShell
-31. [ ] EC2: full launch wizard, all families, connect (SSH/RDP/serial)
+30. [~] Pixel-accurate top nav, favorites, unified search, CloudShell
+31. [x] EC2 Launch Wizard default instance type aligned to grader (`t3.micro`)
 32. [ ] EC2: start/stop/reboot/terminate sync to Lab Terminal reachability
 33. [ ] VPC: subnets, route tables, IGW, NAT, NACLs, peering, TGW
 34. [ ] S3: buckets, objects, versioning, lifecycle, encryption, static site

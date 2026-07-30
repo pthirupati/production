@@ -1450,11 +1450,19 @@ def validate_aws_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, st
     if req:
         want_type = req.get("type")
         want_name = req.get("name")
+        # Accept free-tier cousins so Launch Wizard / CLI defaults cannot
+        # silently fail grade when the objective asks for t3.micro.
+        type_ok = None
+        if want_type:
+            cousins = {want_type}
+            if want_type in ("t3.micro", "t2.micro"):
+                cousins.update({"t3.micro", "t2.micro"})
+            type_ok = cousins
         match = next(
             (
                 i for i in state.get("instances", [])
                 if i.get("state") == "running"
-                and (not want_type or i.get("type") == want_type)
+                and (type_ok is None or i.get("type") in type_ok)
                 and (not want_name or i.get("name") == want_name or (i.get("tags") or {}).get("Name") == want_name)
             ),
             None,

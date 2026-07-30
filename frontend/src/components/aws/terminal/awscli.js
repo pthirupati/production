@@ -397,7 +397,7 @@ function runCommand(service, command, rest, flags, region, store) {
       const created = store.launchInstances({
         name: tagMap.Name || '',
         amiId: flags['image-id'] || 'ami-0c02fb55956c7d316',
-        type: flags['instance-type'] || 't2.micro',
+        type: flags['instance-type'] || 't3.micro',
         count,
         keyName: flags['key-name'] || '',
         subnetId: flags['subnet-id'] || '',

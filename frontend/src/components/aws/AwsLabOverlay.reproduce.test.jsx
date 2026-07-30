@@ -58,7 +58,10 @@ vi.spyOn(console, 'error').mockImplementation((...args) => {
 
 const KEY = awsSimStorageKey(undefined) // anon user -> 'fixitlab-aws-sim:anon'
 
-function renderOverlay() {
+function renderOverlay(scenario = {
+  slug: 'ec2-launch-basics',
+  title: 'Launch an EC2 instance',
+}) {
   return render(
     <SimErrorBoundary
       name="aws"
@@ -69,7 +72,7 @@ function renderOverlay() {
       <AwsLabOverlay
         embedded
         sessionId="test-session"
-        scenario={{ slug: 'ec2-launch-basics', title: 'Launch an EC2 instance' }}
+        scenario={scenario}
         onExit={() => {}}
       />
     </SimErrorBoundary>,
@@ -166,6 +169,15 @@ describe('AwsLabOverlay mount (BUG A reproduction)', () => {
     }
     localStorage.setItem(KEY, JSON.stringify(blob))
     renderOverlay()
+    expectNoBoundaryError()
+  })
+
+  it('6) academy-aws-001-learn-ec2 slug — mounts Console Home without error boundary', () => {
+    renderOverlay({
+      slug: 'academy-aws-001-learn-ec2',
+      title: 'Learn EC2',
+      technology: { slug: 'aws' },
+    })
     expectNoBoundaryError()
   })
 })

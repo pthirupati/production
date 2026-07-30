@@ -1645,8 +1645,12 @@ export default function LabRunner() {
   // Locked chips: scenario needs the companion console but learner lacks the sub.
   const showVmwareSubscribeHint = explicitVmwareScenario && !isVmwareLab && techSubs && !canVmwareConsole
   const showDatacenterSubscribeHint = explicitDatacenterScenario && !isDatacenterLab && techSubs && !canDatacenterConsole
-  // Host-platform rotation is flavor text only — do not surface Open AWS/Azure/GCP.
-  const showHostedAwsLink = false
+  // Academy AWS packs grade via Lab Server FIXED-OK (terminal primary), but
+  // entitled learners should still open the AWS Console as a companion so
+  // EC2/S3/IAM practice matches the lab copy. Host-flavor rotation alone
+  // still does not surface Open AWS/Azure/GCP.
+  const canAwsConsole = userHasTechAccess(techSubs, 'aws')
+  const showHostedAwsLink = isAwsAcademyLab && canAwsConsole
   const showHostedAzureLink = false
   const showHostedGcpLink = false
   // When a dedicated console is primary, keep a visible "Lab console" chip so
