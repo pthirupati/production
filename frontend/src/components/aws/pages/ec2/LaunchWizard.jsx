@@ -56,7 +56,7 @@ export default function LaunchWizard() {
   const [amiId, setAmiId] = useState(AMI_CATALOG[0].id)
   const [family, setFamily] = useState('all')
   const [typeSearch, setTypeSearch] = useState('')
-  const [type, setType] = useState('t2.micro')
+  const [type, setType] = useState('t3.micro')
   const [keyName, setKeyName] = useState(keyPairs[0]?.name || '')
   const [subnetId, setSubnetId] = useState('')
   const [sgIds, setSgIds] = useState(securityGroups[0] ? [securityGroups[0].id] : [])

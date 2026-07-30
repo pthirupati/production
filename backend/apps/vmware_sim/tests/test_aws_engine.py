@@ -238,6 +238,35 @@ class GuiSyncContractTests(AwsEngineBaseTest):
             ok, reason = ae.validate_aws_lab(sid, slug)
         self.assertTrue(ok, reason)
 
+    def test_launch_wizard_default_t3_micro_grades_pass(self):
+        """Launch Wizard / CLI default instance type must satisfy require_launch."""
+        slug = "aws-ec2-launch-web"
+        sid = self._session(slug)
+        res = ae.apply_action(sid, "launch_instance", {
+            "name": "app-web-01",
+            "instance_type": "t3.micro",
+            "count": 1,
+            "tags": {"Name": "app-web-01"},
+        })
+        self.assertTrue(res["ok"], res)
+        with mock.patch.object(ae, "_now", return_value=ae.time.time() + ae.PENDING_SECONDS + 1):
+            ae.get_state(sid, slug)
+            ok, reason = ae.validate_aws_lab(sid, slug)
+        self.assertTrue(ok, reason)
+
+    def test_launch_free_tier_cousin_t2_micro_also_passes(self):
+        """t2.micro remains accepted as a free-tier cousin of t3.micro objectives."""
+        slug = "aws-ec2-launch-web"
+        sid = self._session(slug)
+        ae.apply_action(sid, "launch_instance", {
+            "name": "app-web-01", "instance_type": "t2.micro", "count": 1,
+            "tags": {"Name": "app-web-01"},
+        })
+        with mock.patch.object(ae, "_now", return_value=ae.time.time() + ae.PENDING_SECONDS + 1):
+            ae.get_state(sid, slug)
+            ok, reason = ae.validate_aws_lab(sid, slug)
+        self.assertTrue(ok, reason)
+
     def test_launch_wrong_type_grades_fail(self):
         # Correct name but wrong instance type must NOT satisfy the objective.
         slug = "aws-ec2-launch-web"
