@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { gcpApi } from '../../api/gcp'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
@@ -7,7 +7,10 @@ import {
   Container, Radio, Boxes, Zap, Database, KeyRound, ShieldAlert, Globe2, Table2, Scale,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
-import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import {
+  SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession,
+  GlobalSearch, indexGcpState,
+} from '../sim/shared'
 import CloudShellPanel from '../lab/CloudShellPanel'
 import { renderGcpV2Page } from './GcpV2Panels'
 import '../../styles/sim-products.css'
@@ -113,6 +116,11 @@ export default function GcpConsole({
   const routes = st.routes || []
   const forwardingRules = st.forwarding_rules || []
   const snapshots = st.snapshots || []
+  const searchServices = useMemo(
+    () => SIDEBAR.map((s) => ({ key: s.key, label: s.label, keywords: s.key })),
+    [],
+  )
+  const searchResources = useMemo(() => indexGcpState(st), [st])
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
     onBackToTerminal: embedded ? (onToggleTerminal || undefined) : onExit,
@@ -477,6 +485,12 @@ export default function GcpConsole({
     <div className={simPanelRoot(embedded, 'gcp-shell sim-product')}>
       <LabChromeBar title="Google Cloud" subtitle={scenario?.title || slug} accent={ACCENT}
         className="lab-chrome-bar !bg-[#1a73e8]" {...chromeProps}>
+        <GlobalSearch
+          services={searchServices}
+          resources={searchResources}
+          placeholder="Search resources, services… (/)"
+          onSelect={(hit) => { if (hit.navKey) setNav(hit.navKey) }}
+        />
         <button type="button" className="lab-chrome-btn flex items-center gap-1" onClick={() => setCloudShellOpen((o) => !o)}>
           <Terminal size={13} /> {cloudShellOpen ? 'Hide Cloud Shell' : 'Cloud Shell'}
         </button>

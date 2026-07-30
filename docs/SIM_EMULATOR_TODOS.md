@@ -24,7 +24,7 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 13. [ ] Jira bots as real teammates (PO/EM/SRE/security) with progressive hints
 14. [ ] Enterprise project packaging per course (epics, CRs, incidents, acceptance)
 15. [ ] CI/CD console parity with real pipeline platforms
-16. [ ] Search bars on every console table/list (missing searches restored)
+16. [x] Shared GlobalSearch omnibox on Azure/GCP/SOC/DC chrome (AWS TopNav already has unified search)
 17. [ ] Lab buttons restored on every technology detail page
 18. [ ] Digital Twin persistence + replay for hardware/cable/firmware changes
 19. [ ] Multi-user collaboration sessions on shared lab twin
