@@ -95,8 +95,8 @@ def _require_session_console_access(request, session, technology_slug: str):
 
     Critical: ``cross_technology`` alone must NOT unlock VMware (or monitoring).
     Academy “integration” stamps set ``cross_technology`` widely; only explicit
-    ``vmware_link`` / ``datacenter_link`` opt a session into those consoles without
-    a matching technology subscription (revenue protection).
+    ``vmware_link`` / ``datacenter_link`` may surface companion consoles — and
+    those still require a matching technology subscription (revenue protection).
     """
     scenario = getattr(session, "scenario", None)
     if scenario is None:
@@ -116,11 +116,12 @@ def _require_session_console_access(request, session, technology_slug: str):
         ):
             return None
 
-    # Opt-in cross-console links — allowlist by explicit link flag only.
+    # Opt-in companion consoles: scenario must declare the link AND the learner
+    # must hold a subscription for that console technology.
     if technology_slug == "vmware" and bool(getattr(scenario, "vmware_link", False)):
-        return None
+        return _require_tech_access(request, "vmware")
     if technology_slug == "datacenter" and bool(getattr(scenario, "datacenter_link", False)):
-        return None
+        return _require_tech_access(request, "datacenter")
 
     # Session belongs to another technology — require a real subscription.
     return _require_tech_access(request, technology_slug)
