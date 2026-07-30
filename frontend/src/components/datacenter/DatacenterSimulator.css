@@ -31,7 +31,7 @@
 }
 .dc-chip-ok { background: rgba(52, 211, 153, 0.12); color: #34d399; border-color: rgba(52,211,153,.3); }
 .dc-chip-bad { background: rgba(239, 68, 68, 0.14); color: #f87171; border-color: rgba(239,68,68,.35); }
-.dc-status-hint { margin-left: auto; display: flex; align-items: center; gap: 0.3rem; color: #64748b; font-style: italic; }
+.dc-status-hint { margin-left: auto; display: flex; align-items: center; gap: 0.3rem; color: #94a3b8; font-style: italic; }
 
 /* ── Floor viewport — pannable pseudo-3D scene ── */
 .dc-floor-viewport {
@@ -89,14 +89,14 @@
 .dc-rack-led { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
 .dc-led-green { background: #34d399; color: #34d399; }
 .dc-led-red { background: #f87171; color: #f87171; animation: dc-blink 1.1s ease-in-out infinite; }
-.dc-rack-pdu { font-size: 0.6rem; color: #5b6580; margin-bottom: 0.45rem; font-family: 'JetBrains Mono', monospace; }
+.dc-rack-pdu { font-size: 0.6rem; color: #94a3b8; margin-bottom: 0.45rem; font-family: 'JetBrains Mono', monospace; }
 
 .dc-rack-mini { display: flex; flex-direction: column; gap: 3px; }
 .dc-mini-slot { height: 5px; border-radius: 2px; background: #2a3142; }
 .dc-mini-on { background: #2d5f4a; }
 .dc-mini-off { background: #3a3126; }
 .dc-mini-fail { background: #5f2d2d; animation: dc-blink 1.1s ease-in-out infinite; }
-.dc-rack-empty { font-size: 0.62rem; color: #4b5468; font-style: italic; padding: 0.4rem 0; }
+.dc-rack-empty { font-size: 0.62rem; color: #94a3b8; font-style: italic; padding: 0.4rem 0; }
 
 .dc-rack-uslots { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
 .dc-server-card {
@@ -106,11 +106,11 @@
 }
 .dc-server-card:hover { border-color: #f97316; background: #262c3f; }
 .dc-server-card.dc-server-alert { border-color: rgba(239, 68, 68, 0.5); }
-.dc-server-u { font-family: 'JetBrains Mono', monospace; color: #64748b; font-size: 0.6rem; flex-shrink: 0; }
+.dc-server-u { font-family: 'JetBrains Mono', monospace; color: #94a3b8; font-size: 0.6rem; flex-shrink: 0; }
 .dc-server-host { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .dc-server-power { display: inline-flex; align-items: center; gap: 0.15rem; font-size: 0.6rem; flex-shrink: 0; }
 .dc-power-on { color: #34d399; }
-.dc-power-off { color: #64748b; }
+.dc-power-off { color: #94a3b8; }
 .dc-server-warn { color: #f87171; flex-shrink: 0; }
 
 @keyframes dc-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
@@ -142,7 +142,7 @@
 .dc-drawer-close:hover { color: #fff; background: rgba(255,255,255,0.06); }
 
 .dc-drawer-section { padding: 0.9rem 1.1rem; border-bottom: 1px solid #1c2130; }
-.dc-drawer-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700; margin-bottom: 0.55rem; }
+.dc-drawer-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; font-weight: 700; margin-bottom: 0.55rem; }
 
 .dc-component-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
 .dc-component-pill {
@@ -203,12 +203,12 @@
 }
 .dc-switch-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; color: #cbd3e3; }
 .dc-switch-name { font-weight: 700; font-size: 0.85rem; color: #f1f5f9; }
-.dc-switch-loc, .dc-switch-model { font-size: 0.68rem; color: #64748b; font-family: 'JetBrains Mono', monospace; }
+.dc-switch-loc, .dc-switch-model { font-size: 0.68rem; color: #94a3b8; font-family: 'JetBrains Mono', monospace; }
 .dc-switch-model { margin-left: auto; }
 
 .dc-port-table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
 .dc-port-table th {
-  text-align: left; color: #5b6580; font-weight: 700; text-transform: uppercase; font-size: 0.6rem;
+  text-align: left; color: #94a3b8; font-weight: 700; text-transform: uppercase; font-size: 0.6rem;
   letter-spacing: 0.04em; padding: 0.3rem 0.5rem; border-bottom: 1px solid #232838;
 }
 .dc-port-table td { padding: 0.35rem 0.5rem; border-bottom: 1px solid #1a1e2b; color: #cbd3e3; }
@@ -217,12 +217,12 @@
   font-size: 0.62rem; text-transform: uppercase;
 }
 .dc-port-up { background: rgba(52,211,153,.14); color: #34d399; }
-.dc-port-down { background: rgba(100,116,139,.16); color: #64748b; }
+.dc-port-down { background: rgba(100,116,139,.16); color: #94a3b8; }
 .dc-port-link { color: #f97316; font-weight: 600; text-decoration: underline; text-decoration-color: rgba(249,115,22,.3); }
 .dc-port-link:hover { color: #fb923c; }
 
 .dc-topology-strip { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.7rem; color: #97a2b8; }
-.dc-topology-label { font-weight: 700; color: #64748b; text-transform: uppercase; font-size: 0.62rem; }
+.dc-topology-label { font-weight: 700; color: #94a3b8; text-transform: uppercase; font-size: 0.62rem; }
 .dc-topology-chip {
   padding: 0.2rem 0.5rem; border-radius: 999px; background: #171b26; border: 1px solid #262c3d;
   font-family: 'JetBrains Mono', monospace;
@@ -242,10 +242,10 @@
 }
 .dc-ashrae-badge-ok { background: rgba(52,211,153,.14); color: #34d399; }
 .dc-ashrae-badge-bad { background: rgba(239,68,68,.16); color: #f87171; }
-.dc-crac-zone { font-size: 0.68rem; color: #64748b; margin-bottom: 0.6rem; }
+.dc-crac-zone { font-size: 0.68rem; color: #94a3b8; margin-bottom: 0.6rem; }
 .dc-crac-metrics { display: flex; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; }
 .dc-crac-metrics > div { display: flex; flex-direction: column; gap: 0.15rem; }
-.dc-crac-metric-label { font-size: 0.58rem; text-transform: uppercase; color: #5b6580; font-weight: 700; }
+.dc-crac-metric-label { font-size: 0.58rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; }
 .dc-crac-metric-val { font-size: 0.8rem; font-weight: 700; color: #dbe1ee; font-family: 'JetBrains Mono', monospace; }
 .dc-crac-status { font-size: 0.7rem; color: #97a2b8; }
 
@@ -279,22 +279,22 @@
 .dc-pdu-tripped { border-color: rgba(239,68,68,.5); }
 .dc-pdu-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.3rem; }
 .dc-pdu-id { font-weight: 700; font-size: 0.72rem; color: #f1f5f9; font-family: 'JetBrains Mono', monospace; }
-.dc-pdu-card-meta { font-size: 0.62rem; color: #64748b; }
+.dc-pdu-card-meta { font-size: 0.62rem; color: #94a3b8; }
 
 /* ── BMC remote console panel ── */
 .dc-bmc-panel { display: flex; flex-direction: column; gap: 0.55rem; }
 .dc-bmc-row { display: flex; align-items: baseline; gap: 0.5rem; font-size: 0.72rem; }
-.dc-bmc-key { color: #64748b; font-weight: 700; min-width: 70px; text-transform: uppercase; font-size: 0.6rem; letter-spacing: 0.03em; }
+.dc-bmc-key { color: #94a3b8; font-weight: 700; min-width: 70px; text-transform: uppercase; font-size: 0.6rem; letter-spacing: 0.03em; }
 .dc-bmc-val { color: #cbd3e3; }
 .dc-bmc-mono { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; word-break: break-all; }
 .dc-bmc-sensors {
-  display: flex; gap: 0.6rem; flex-wrap: wrap; font-size: 0.68rem; color: #97a2b8;
+  display: flex; gap: 0.6rem; flex-wrap: wrap; font-size: 0.68rem; color: #a8b0c2;
   font-family: 'JetBrains Mono', monospace; padding: 0.4rem 0.55rem; background: #171b26;
   border: 1px solid #262c3d; border-radius: 6px;
 }
 .dc-bmc-sel { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.3rem; }
-.dc-bmc-sel-row { font-size: 0.65rem; color: #64748b; }
-.dc-bmc-sel-time { font-family: 'JetBrains Mono', monospace; color: #4b5468; }
+.dc-bmc-sel-row { font-size: 0.65rem; color: #94a3b8; }
+.dc-bmc-sel-time { font-family: 'JetBrains Mono', monospace; color: #94a3b8; }
 .dc-bmc-login {
   display: flex; justify-content: center; padding: 1rem 0.5rem;
 }
@@ -320,11 +320,22 @@
   font-size: 0.7rem; color: #fca5a5; background: rgba(127,29,29,0.35);
   border: 1px solid rgba(248,113,113,0.35); border-radius: 6px; padding: 0.4rem 0.55rem;
 }
-.dc-3d-chip-sm { font-size: 0.55rem; opacity: 0.9; }
+.dc-3d-chip-sm { font-size: 0.55rem; opacity: 0.95; }
+.dc-3d-chip {
+  pointer-events: none;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.02em;
+  color: #f1f5f9;
+  background: rgba(15, 18, 28, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 4px; padding: 0.18rem 0.4rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
 
 /* Hardware / cables / tickets / serial */
 .dc-hw-meta { font-size: 0.7rem; color: #cbd3e3; line-height: 1.55; display: flex; flex-direction: column; gap: 0.35rem; }
-.dc-hw-k { color: #64748b; font-weight: 600; }
+.dc-hw-k { color: #94a3b8; font-weight: 600; }
 .dc-cable-list { display: flex; flex-direction: column; gap: 0.45rem; }
 .dc-cable-row {
   display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.55rem;
@@ -384,7 +395,7 @@
   background: #0d111a; border: 1px solid #232838; border-radius: 8px; padding: 0.55rem;
 }
 .dc-mb-zone { display: flex; flex-direction: column; gap: 0.35rem; }
-.dc-mb-zone-label { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; font-weight: 700; }
+.dc-mb-zone-label { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.04em; color: #94a3b8; font-weight: 700; }
 .dc-mb-chip, .dc-mb-dimm {
   text-align: left; font-size: 0.62rem; color: #cbd3e3; padding: 0.35rem 0.45rem;
   border-radius: 5px; border: 1px solid #2a3144; background: #151a26; line-height: 1.25;
@@ -400,7 +411,7 @@
 .dc-bus-name { font-weight: 700; font-family: 'JetBrains Mono', monospace; }
 .dc-bus-track { height: 6px; border-radius: 3px; background: #1c2130; overflow: hidden; }
 .dc-bus-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; }
-.dc-bus-pct { color: #64748b; font-family: 'JetBrains Mono', monospace; text-align: right; }
+.dc-bus-pct { color: #94a3b8; font-family: 'JetBrains Mono', monospace; text-align: right; }
 .dc-mb-detail {
   background: #151a26; border: 1px solid #262c3d; border-radius: 6px; padding: 0.55rem 0.65rem;
 }
@@ -466,7 +477,7 @@
 .dc-cli-line { white-space: pre-wrap; word-break: break-word; }
 .dc-led-blink { animation: dc-blink 0.9s ease-in-out infinite; }
 .dc-proto-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.45rem; }
-.dc-cable-route { display: block; color: #64748b; font-size: 0.58rem; }
+.dc-cable-route { display: block; color: #94a3b8; font-size: 0.58rem; }
 .dc-cable-ops { display: flex; flex-wrap: wrap; gap: 0.25rem; max-width: 220px; justify-content: flex-end; }
 .dc-storage-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.5rem; margin-top: 0.55rem; }
 .dc-port-led.inline { display: inline-block; vertical-align: middle; }

@@ -69,23 +69,86 @@ function CameraIntro({ enabled }) {
   return null
 }
 
+/** Raised floor: 600mm tiles + perforated cold-aisle openings. */
 function Floor() {
   const mat = useRef()
+  const tiles = useMemo(() => {
+    const list = []
+    for (let gx = -10; gx <= 10; gx++) {
+      for (let gz = -6; gz <= 4; gz++) {
+        const coldAisle = Math.abs(gz + 1) < 0.6 || Math.abs(gz + 3.2) < 0.6
+        list.push({
+          key: `${gx}-${gz}`,
+          x: gx * 0.6,
+          z: gz * 0.6,
+          perforated: coldAisle && (gx + gz) % 2 === 0,
+        })
+      }
+    }
+    return list
+  }, [])
   useFrame(({ clock }) => {
-    if (mat.current) mat.current.emissiveIntensity = 0.04 + Math.sin(clock.elapsedTime * 0.6) * 0.02
+    if (mat.current) mat.current.emissiveIntensity = 0.03 + Math.sin(clock.elapsedTime * 0.6) * 0.015
   })
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-      <planeGeometry args={[24, 16]} />
-      <meshStandardMaterial
-        ref={mat}
-        color="#1a1f2e"
-        roughness={0.92}
-        metalness={0.08}
-        emissive="#1e293b"
-        emissiveIntensity={0.05}
-      />
-    </mesh>
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
+        <planeGeometry args={[24, 16]} />
+        <meshStandardMaterial
+          ref={mat}
+          color="#12151c"
+          roughness={0.95}
+          metalness={0.05}
+          emissive="#1e293b"
+          emissiveIntensity={0.04}
+        />
+      </mesh>
+      {tiles.map((t) => (
+        <mesh key={t.key} position={[t.x, 0.01, t.z]} receiveShadow>
+          <boxGeometry args={[0.58, 0.04, 0.58]} />
+          <meshStandardMaterial
+            color={t.perforated ? '#243044' : '#1a2030'}
+            roughness={t.perforated ? 0.55 : 0.88}
+            metalness={t.perforated ? 0.35 : 0.12}
+            emissive={t.perforated ? '#0ea5e9' : '#000000'}
+            emissiveIntensity={t.perforated ? 0.06 : 0}
+          />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/** Overhead LED fixtures along cold aisles. */
+function CeilingLights() {
+  const fixtures = useMemo(() => {
+    const list = []
+    for (let x = -5; x <= 5; x += 2.5) {
+      list.push([x, 3.35, -1.6], [x, 3.35, -3.8])
+    }
+    return list
+  }, [])
+  return (
+    <group>
+      {fixtures.map(([x, y, z], i) => (
+        <group key={i} position={[x, y, z]}>
+          <mesh>
+            <boxGeometry args={[1.4, 0.06, 0.28]} />
+            <meshStandardMaterial color="#334155" metalness={0.5} roughness={0.4} />
+          </mesh>
+          <mesh position={[0, -0.04, 0]}>
+            <boxGeometry args={[1.25, 0.02, 0.18]} />
+            <meshStandardMaterial
+              color="#f8fafc"
+              emissive="#e2e8f0"
+              emissiveIntensity={0.85}
+              toneMapped={false}
+            />
+          </mesh>
+          <pointLight color="#e8f0ff" intensity={0.35} distance={8} decay={2} position={[0, -0.2, 0]} />
+        </group>
+      ))}
+    </group>
   )
 }
 
@@ -784,11 +847,13 @@ function SceneContent({
       <CameraIntro enabled={intro} />
       <color attach="background" args={['#0b0e14']} />
       <fog attach="fog" args={['#0b0e14', 12, 32]} />
-      <ambientLight intensity={0.32} />
-      <directionalLight castShadow position={[6, 10, 4]} intensity={1.1} shadow-mapSize={[1024, 1024]} />
+      <ambientLight intensity={0.28} />
+      <directionalLight castShadow position={[6, 10, 4]} intensity={0.95} shadow-mapSize={[1024, 1024]} />
+      <directionalLight position={[-4, 6, -6]} intensity={0.35} color="#94a3b8" />
       <PulsingLight />
       <Environment preset="warehouse" />
       <Floor />
+      <CeilingLights />
       <CableTray />
       <HotAisleGlow z={-1.6} />
       <HotAisleGlow z={-3.8} />

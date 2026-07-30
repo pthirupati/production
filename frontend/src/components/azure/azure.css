@@ -44,6 +44,14 @@
 .az-btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
 .az-btn-sm.az-btn-outline { background: transparent; color: #0078d4; border: 1px solid #0078d4; }
 .az-btn-sm.az-btn-outline:hover { background: rgba(0, 120, 212, 0.08); }
+/* Full-size outline (VMSS / blade actions) — was missing; text vanished on white cells */
+.az-btn-outline {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  background: #fff; color: #0078d4; border: 1px solid #0078d4;
+  border-radius: 4px; padding: 0.4rem 0.75rem; font-size: 0.8rem; font-weight: 600;
+}
+.az-btn-outline:hover { background: rgba(0, 120, 212, 0.08); }
+.az-btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .az-detail-panel {
   background: #faf9f8; border: 1px solid #edebe9; border-radius: 4px; color: #323130;

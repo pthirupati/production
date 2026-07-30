@@ -206,7 +206,7 @@
 .sim-breadcrumbs .sim-bc-link:hover { color: #fff; }
 .sim-breadcrumbs .sim-bc-current { color: #e2e8f0; }
 
-/* Modal — always dark panel with readable body text */
+/* Modal — dark by default; Fluent/Material light when opened from light portals */
 .sim-modal {
   background: #1a1d2e; border: 1px solid #475569; border-radius: 8px;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.45); color: #e2e8f0;
@@ -244,6 +244,98 @@
 }
 .sim-modal-footer button.text-sm { color: #94a3b8; }
 .sim-modal-footer button.text-sm:hover { color: #fff; }
+
+/* Light Fluent / Material dialogs when a light portal shell is on screen */
+body:has(.az-shell) .sim-modal,
+body:has(.gcp-shell) .sim-modal,
+body:has(.cv-shell) .sim-modal,
+body:has(.na-shell) .sim-modal,
+body:has(.de-shell) .sim-modal {
+  background: #ffffff; border-color: #e1dfdd; color: #323130;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.18);
+}
+body:has(.az-shell) .sim-modal-head,
+body:has(.gcp-shell) .sim-modal-head,
+body:has(.cv-shell) .sim-modal-head,
+body:has(.na-shell) .sim-modal-head,
+body:has(.de-shell) .sim-modal-head {
+  border-bottom-color: #edebe9;
+}
+body:has(.az-shell) .sim-modal-title,
+body:has(.gcp-shell) .sim-modal-title,
+body:has(.cv-shell) .sim-modal-title,
+body:has(.na-shell) .sim-modal-title,
+body:has(.de-shell) .sim-modal-title { color: #201f1e; }
+body:has(.az-shell) .sim-modal-close,
+body:has(.gcp-shell) .sim-modal-close,
+body:has(.cv-shell) .sim-modal-close,
+body:has(.na-shell) .sim-modal-close,
+body:has(.de-shell) .sim-modal-close { color: #605e5c; }
+body:has(.az-shell) .sim-modal-close:hover,
+body:has(.gcp-shell) .sim-modal-close:hover,
+body:has(.cv-shell) .sim-modal-close:hover,
+body:has(.na-shell) .sim-modal-close:hover,
+body:has(.de-shell) .sim-modal-close:hover { color: #201f1e; background: #f3f2f1; }
+body:has(.az-shell) .sim-modal-body,
+body:has(.gcp-shell) .sim-modal-body,
+body:has(.cv-shell) .sim-modal-body,
+body:has(.na-shell) .sim-modal-body,
+body:has(.de-shell) .sim-modal-body { color: #323130; }
+body:has(.az-shell) .sim-modal-body label,
+body:has(.gcp-shell) .sim-modal-body label,
+body:has(.cv-shell) .sim-modal-body label,
+body:has(.na-shell) .sim-modal-body label,
+body:has(.de-shell) .sim-modal-body label { color: #323130; }
+body:has(.az-shell) .sim-modal-body input,
+body:has(.az-shell) .sim-modal-body select,
+body:has(.az-shell) .sim-modal-body textarea,
+body:has(.gcp-shell) .sim-modal-body input,
+body:has(.gcp-shell) .sim-modal-body select,
+body:has(.gcp-shell) .sim-modal-body textarea,
+body:has(.cv-shell) .sim-modal-body input,
+body:has(.cv-shell) .sim-modal-body select,
+body:has(.cv-shell) .sim-modal-body textarea,
+body:has(.na-shell) .sim-modal-body input,
+body:has(.na-shell) .sim-modal-body select,
+body:has(.na-shell) .sim-modal-body textarea,
+body:has(.de-shell) .sim-modal-body input,
+body:has(.de-shell) .sim-modal-body select,
+body:has(.de-shell) .sim-modal-body textarea {
+  background: #fff; color: #201f1e; border-color: #8a8886;
+}
+body:has(.az-shell) .sim-modal-body p,
+body:has(.az-shell) .sim-modal-body .text-slate-600,
+body:has(.az-shell) .sim-modal-body .text-slate-400,
+body:has(.az-shell) .sim-modal-body .text-slate-300,
+body:has(.az-shell) .sim-modal-body .text-sm,
+body:has(.gcp-shell) .sim-modal-body p,
+body:has(.gcp-shell) .sim-modal-body .text-slate-600,
+body:has(.gcp-shell) .sim-modal-body .text-slate-400,
+body:has(.gcp-shell) .sim-modal-body .text-slate-300,
+body:has(.gcp-shell) .sim-modal-body .text-sm,
+body:has(.cv-shell) .sim-modal-body p,
+body:has(.cv-shell) .sim-modal-body .text-sm,
+body:has(.na-shell) .sim-modal-body p,
+body:has(.na-shell) .sim-modal-body .text-sm,
+body:has(.de-shell) .sim-modal-body p,
+body:has(.de-shell) .sim-modal-body .text-sm {
+  color: #605e5c !important;
+}
+body:has(.az-shell) .sim-modal-footer,
+body:has(.gcp-shell) .sim-modal-footer,
+body:has(.cv-shell) .sim-modal-footer,
+body:has(.na-shell) .sim-modal-footer,
+body:has(.de-shell) .sim-modal-footer { border-top-color: #edebe9; }
+body:has(.az-shell) .sim-modal-footer button.text-sm,
+body:has(.gcp-shell) .sim-modal-footer button.text-sm,
+body:has(.cv-shell) .sim-modal-footer button.text-sm,
+body:has(.na-shell) .sim-modal-footer button.text-sm,
+body:has(.de-shell) .sim-modal-footer button.text-sm { color: #605e5c; }
+body:has(.az-shell) .sim-modal-footer button.text-sm:hover,
+body:has(.gcp-shell) .sim-modal-footer button.text-sm:hover,
+body:has(.cv-shell) .sim-modal-footer button.text-sm:hover,
+body:has(.na-shell) .sim-modal-footer button.text-sm:hover,
+body:has(.de-shell) .sim-modal-footer button.text-sm:hover { color: #201f1e; }
 
 .sim-sidebar {
   width: 220px;
