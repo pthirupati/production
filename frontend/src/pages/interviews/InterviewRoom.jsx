@@ -50,7 +50,10 @@ function fmtClock(s) {
 const TURN_SILENCE_MS = 2200
 // Mic energy (0–1, same scale as the preflight meter) that counts as "speaking"
 // for barge-in. Above this while the bot is talking → interrupt the bot.
-const BARGE_IN_LEVEL = 0.18
+// Raised from 0.18 — speaker→mic bleed during TTS was cancelling the interviewer
+// immediately after Join (sound-test worked because VAD is off in preflight).
+const BARGE_IN_LEVEL = 0.32
+const BARGE_IN_FRAMES = 6
 // Mic energy that counts as the candidate actively speaking, used to glow their
 // tile as the active speaker (FIX 4). Lower than barge-in: any clear voice.
 const CANDIDATE_SPEAKING_LEVEL = 0.1
@@ -95,6 +98,9 @@ export default function InterviewRoom() {
   const observerToken = searchParams.get('observer')
   const observerTokenRef = useRef(observerToken)
   const processedHostMsgRef = useRef(new Set())
+  // True while Join bootstrap TTS is running — blocks VAD barge-in and host-sync
+  // re-speak of the same first question (was the "sound dies after join" bug).
+  const bootstrapVoiceRef = useRef(false)
   const navigate = useNavigate()
   const { confirm, ConfirmPortal } = useConfirm()
 
@@ -362,15 +368,20 @@ export default function InterviewRoom() {
         analyser.getByteFrequencyData(data)
         const avg = data.reduce((s, v) => s + v, 0) / data.length
         const level = Math.min(1, avg / 80)
-        // Barge-in: require a few consecutive loud frames to avoid a single
-        // pop/echo cancelling the bot mid-sentence.
-        if (isSpeakingRef.current && !bargedInRef.current && level > BARGE_IN_LEVEL) {
+        // Barge-in: require sustained loud frames. Skip entirely during Join
+        // bootstrap — speaker playback into the open mic was cancelling TTS.
+        if (
+          !bootstrapVoiceRef.current
+          && isSpeakingRef.current
+          && !bargedInRef.current
+          && level > BARGE_IN_LEVEL
+        ) {
           loudFrames += 1
-          if (loudFrames >= 3) {
+          if (loudFrames >= BARGE_IN_FRAMES) {
             bargedInRef.current = true
             bargeInHandlerRef.current?.()
           }
-        } else if (level <= BARGE_IN_LEVEL) {
+        } else if (level <= BARGE_IN_LEVEL || bootstrapVoiceRef.current) {
           loudFrames = 0
         }
         // Active-speaker highlight (FIX 4): glow the candidate tile while they
@@ -847,12 +858,18 @@ export default function InterviewRoom() {
     setPreflight(false)
     setPendingHearText(null)
     voiceUnavailableToastRef.current = false
+    bootstrapVoiceRef.current = true
     try {
       const data = await interviewsApi.startRound(roundId)
       setRound(data)
       const msgs = [...(data.messages || [])]
       if (data.intro) msgs.push(data.intro)
       if (data.first_question) msgs.push(data.first_question)
+      // Mark bootstrap messages BEFORE setStarted so syncHost cannot cancelSpeech
+      // on the same intro/first_question we are about to speak locally.
+      for (const m of msgs) {
+        if (m?.id) processedHostMsgRef.current.add(m.id)
+      }
       setMessages(msgs)
       setStarted(true)
       if (data.speech_profile) {
@@ -888,6 +905,7 @@ export default function InterviewRoom() {
     } catch (e) {
       toast.error(e.response?.data?.error || 'Could not start')
     } finally {
+      bootstrapVoiceRef.current = false
       releaseSpeechHold()
     }
   }
@@ -1196,6 +1214,9 @@ export default function InterviewRoom() {
           const isWelcome = meta.event === 'admin_welcome'
           const isHandoff = meta.event === 'ai_resume'
           if (!isWelcome && !isHandoff && !(isNewQuestion && m.content)) continue
+          // During Join bootstrap, do not cancel/re-speak — beginInterview owns TTS.
+          // Leave IDs unmarked so a real host question after bootstrap still fires.
+          if (bootstrapVoiceRef.current) continue
           processedHostMsgRef.current.add(m.id)
           if (isWelcome && m.content) {
             cancelSpeechRef.current()

@@ -76,10 +76,10 @@ export default class SimErrorBoundary extends Component {
           <AlertTriangle className="text-amber-400" size={36} aria-hidden />
           <div>
             <h2 className="text-base font-semibold text-white mb-1">
-              {this.props.title || 'Lab console error'}
+              {this.props.title || 'Lab environment error'}
             </h2>
             <p className="text-sm text-surface-400 max-w-md">
-              {this.props.message || 'Something went wrong loading this lab console. Try resetting or reload the page.'}
+              {this.props.message || 'Something went wrong loading this lab environment. Try resetting or reload the page.'}
             </p>
             {(this.props.name === 'aws' || this.props.name === 'terraform') && (
               <p className="text-xs text-surface-500 max-w-md mt-2">
