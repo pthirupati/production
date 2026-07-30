@@ -50,6 +50,8 @@ import {
 } from '../components/lab/labSimLoader'
 import { isTerraformLab } from '../utils/iacFlavor'
 import { resetTerraformAwsLabState } from '../utils/terraformAwsBridge'
+import { canOpenCompanionConsole, userHasTechAccess } from '../utils/techAccess'
+import { subscriptionApi } from '../api/subscriptions'
 import { SimWithTerminal } from '../components/sim/shared'
 import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
@@ -412,6 +414,8 @@ export default function LabRunner() {
   // Bumped by the sim error-boundary "Reset saved state" action to force a
   // clean remount of the primary simulator subtree after re-seeding its store.
   const [simResetNonce, setSimResetNonce] = useState(0)
+  // Companion console entitlement (VMware / Datacenter) — fetched once per lab.
+  const [techSubs, setTechSubs] = useState(null)
   const [mobileInput, setMobileInput] = useState('')
   const [showMobileInput, setShowMobileInput] = useState(false)
   const terminalRefs = useRef({})
@@ -498,6 +502,19 @@ export default function LabRunner() {
   useEffect(() => {
     setGuidedStep(0)
     setGuidedDone({})
+  }, [sessionId])
+
+  // Companion console entitlement (VMware / Datacenter) — revenue lock.
+  useEffect(() => {
+    let cancelled = false
+    subscriptionApi.getMySubscriptions()
+      .then((data) => {
+        if (!cancelled) setTechSubs(data || { subscriptions: [], complimentary_access: false })
+      })
+      .catch(() => {
+        if (!cancelled) setTechSubs({ subscriptions: [], complimentary_access: false })
+      })
+    return () => { cancelled = true }
   }, [sessionId])
 
   // Keyboard shortcuts
@@ -1614,14 +1631,20 @@ export default function LabRunner() {
   // Open VMware only with explicit vmware_link — never from host-platform
   // rotation (linux/rhel labs rotate aws|vmware|azure|gcp and were advertising
   // unpaid consoles) or loose slug matches (e.g. Commvault "vmware-discovery").
+  // Revenue lock: scenario link AND an active VMware/Datacenter subscription.
   const explicitVmwareScenario = scenario?.vmware_link === true
+  const canVmwareConsole = userHasTechAccess(techSubs, 'vmware')
+  const canDatacenterConsole = userHasTechAccess(techSubs, 'datacenter')
   const vmwareServerHref = `/vmware/${sessionId}?scenario=${scenario?.slug || ''}`
-  const showSimVmwareLink = explicitVmwareScenario && (
+  const showSimVmwareLink = canOpenCompanionConsole(techSubs, explicitVmwareScenario, 'vmware') && (
     isAwxLab || isMonitoringLab || isWindowsGuiLab || isCommvaultLab || isTerraformSimLab
   )
   // Datacenter overlay only when the scenario opts in (not host flavor alone).
   const explicitDatacenterScenario = scenario?.datacenter_link === true
-  const showDatacenterLink = !isDatacenterLab && explicitDatacenterScenario
+  const showDatacenterLink = !isDatacenterLab && canOpenCompanionConsole(techSubs, explicitDatacenterScenario, 'datacenter')
+  // Locked chips: scenario needs the companion console but learner lacks the sub.
+  const showVmwareSubscribeHint = explicitVmwareScenario && !isVmwareLab && techSubs && !canVmwareConsole
+  const showDatacenterSubscribeHint = explicitDatacenterScenario && !isDatacenterLab && techSubs && !canDatacenterConsole
   // Host-platform rotation is flavor text only — do not surface Open AWS/Azure/GCP.
   const showHostedAwsLink = false
   const showHostedAzureLink = false
@@ -1653,8 +1676,8 @@ export default function LabRunner() {
     peoplesoft: 'PeopleSoft',
     baremetal: 'Bare Metal',
   }[primarySimKind] || null
-  const showTerminalVmwareLink = !isVmwareLab && scenario?.vmware_link === true
-  const showCrossTechVmwareLink = Boolean(scenario?.vmware_link) && !isVmwareLab
+  const showTerminalVmwareLink = !isVmwareLab && canOpenCompanionConsole(techSubs, explicitVmwareScenario, 'vmware')
+  const showCrossTechVmwareLink = canOpenCompanionConsole(techSubs, Boolean(scenario?.vmware_link), 'vmware') && !isVmwareLab
   // Ansible terminal labs run playbooks from the shell, so the terminal stays
   // primary (we do NOT make them AWX-primary). Surface Open AWX only when the
   // scenario opts in (awx_link) or is clearly an AWX/controller lab.
@@ -1666,7 +1689,9 @@ export default function LabRunner() {
     )
   const vmwareWorkflowHint = showTerminalVmwareLink || showCrossTechVmwareLink
     ? 'Use vCenter for hypervisor steps, then return here and rescan/reboot.'
-    : ''
+    : showVmwareSubscribeHint
+      ? 'This lab needs VMware for hypervisor steps — subscribe to unlock Open VMware.'
+      : ''
 
   const primarySimProps = {
     sessionId,
@@ -2506,6 +2531,15 @@ export default function LabRunner() {
                   <ExternalLink size={12} /> Open VMware
                 </a>
               )}
+              {showVmwareSubscribeHint && (
+                <Link
+                  to="/technologies/vmware"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-amber-500/40 text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 font-semibold text-[11px]"
+                  title="This lab needs VMware for hypervisor steps. Subscribe to unlock Open VMware."
+                >
+                  <Lock size={12} /> Subscribe to VMware
+                </Link>
+              )}
               {showHostedAwsLink && (
                 <button
                   type="button"
@@ -2549,6 +2583,15 @@ export default function LabRunner() {
                 >
                   <ExternalLink size={12} /> Open Datacenter
                 </button>
+              )}
+              {showDatacenterSubscribeHint && (
+                <Link
+                  to="/technologies/datacenter"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-amber-500/40 text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 font-semibold text-[11px]"
+                  title="This lab needs Datacenter for rack/BMC steps. Subscribe to unlock Open Datacenter."
+                >
+                  <Lock size={12} /> Subscribe to Datacenter
+                </Link>
               )}
               {showAwxLink && (
                 <button
@@ -2701,6 +2744,15 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open VMware (same server)
             </Link>
           )}
+          {showVmwareSubscribeHint && (
+            <Link
+              to="/technologies/vmware"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-amber-500/40 text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 text-[10px] font-semibold"
+              title="Subscribe to VMware to unlock the vCenter console for this lab."
+            >
+              <Lock size={12} /> Subscribe to VMware
+            </Link>
+          )}
           {showDatacenterLink && (
             <button
               type="button"
@@ -2711,6 +2763,15 @@ export default function LabRunner() {
             >
               <ExternalLink size={12} /> Open Datacenter
             </button>
+          )}
+          {showDatacenterSubscribeHint && (
+            <Link
+              to="/technologies/datacenter"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-amber-500/40 text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 text-[10px] font-semibold"
+              title="Subscribe to Datacenter to unlock the rack / BMC floor for this lab."
+            >
+              <Lock size={12} /> Subscribe to Datacenter
+            </Link>
           )}
           {showTerminalVmwareLink && (
             <Link

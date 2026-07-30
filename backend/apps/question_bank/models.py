@@ -212,11 +212,17 @@ class Scenario(models.Model):
     )
     vmware_link = models.BooleanField(
         default=False,
-        help_text="Opt-in: surface Open VMware and allow session-scoped VMware console without a VMware sub",
+        help_text=(
+            "Opt-in: surface Open VMware for this session. Still requires an active "
+            "VMware technology subscription (Linux-only subs cannot open vCenter)."
+        ),
     )
     datacenter_link = models.BooleanField(
         default=False,
-        help_text="Opt-in: surface Open Datacenter for physical rack / BMC / PDU steps on the same server",
+        help_text=(
+            "Opt-in: surface Open Datacenter for rack / BMC / PDU steps. Still requires "
+            "an active Datacenter technology subscription."
+        ),
     )
     certification_only = models.BooleanField(
         default=False,

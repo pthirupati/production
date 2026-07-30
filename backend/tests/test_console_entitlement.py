@@ -123,7 +123,8 @@ class StandaloneConsoleEntitlementTests(TestCase):
         self.assertEqual(res.status_code, 403)
         self.assertEqual(res.data.get("code"), "SUBSCRIPTION_REQUIRED")
 
-    def test_cross_tech_linux_session_can_open_vmware_console(self):
+    def test_vmware_link_denied_without_vmware_subscription(self):
+        """Revenue lock: vmware_link alone is not enough — need a VMware sub."""
         scen, _ = Scenario.objects.get_or_create(
             slug="linux-cross-vmware-entitlement",
             defaults={
@@ -141,7 +142,7 @@ class StandaloneConsoleEntitlementTests(TestCase):
                 "max_score": 100,
             },
         )
-        if not scen.cross_technology:
+        if not scen.cross_technology or not scen.vmware_link:
             scen.cross_technology = True
             scen.vmware_link = True
             scen.save(update_fields=["cross_technology", "vmware_link"])
@@ -154,10 +155,53 @@ class StandaloneConsoleEntitlementTests(TestCase):
             duration_limit=600,
         )
         res = self.client.get(f"/api/vmware/sessions/{session.id}/")
+        self.assertEqual(res.status_code, 403)
+        self.assertEqual(res.data.get("code"), "SUBSCRIPTION_REQUIRED")
+
+    def test_vmware_link_allowed_with_vmware_subscription(self):
+        """Companion VMware console opens when scenario opts in AND user has VMware access."""
+        sub, _ = TechnologySubscription.objects.get_or_create(
+            user=self.user, technology=self.vmware,
+        )
+        activate_technology_subscription(sub)
+        scen, _ = Scenario.objects.get_or_create(
+            slug="linux-cross-vmware-entitlement-with-sub",
+            defaults={
+                "title": "Linux cross VMware with sub",
+                "technology": self.linux,
+                "lab_mode": "simulation",
+                "simulation_type": "generic",
+                "is_active": True,
+                "is_free": True,
+                "cross_technology": True,
+                "vmware_link": True,
+                "description": "CONTEXT: t\n\nENVIRONMENT: t\n\nOBJECTIVE: t",
+                "objectives": ["x"],
+                "time_limit": 600,
+                "max_score": 100,
+            },
+        )
+        if not scen.vmware_link:
+            scen.vmware_link = True
+            scen.cross_technology = True
+            scen.save(update_fields=["cross_technology", "vmware_link"])
+        session = LabSession.objects.create(
+            user=self.user,
+            scenario=scen,
+            status="RUNNING",
+            provider="simulation",
+            container_id="sim-entitlement-cross-with-sub",
+            duration_limit=600,
+        )
+        res = self.client.get(f"/api/vmware/sessions/{session.id}/")
         self.assertEqual(res.status_code, 200)
 
     def test_cross_tech_vmware_link_does_not_unlock_azure(self):
         """vmware_link must not blanket-allow every other console."""
+        sub, _ = TechnologySubscription.objects.get_or_create(
+            user=self.user, technology=self.vmware,
+        )
+        activate_technology_subscription(sub)
         scen, _ = Scenario.objects.get_or_create(
             slug="linux-cross-vmware-not-azure",
             defaults={

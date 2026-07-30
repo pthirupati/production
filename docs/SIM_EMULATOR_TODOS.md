@@ -17,8 +17,8 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 6. [ ] SSH from Lab Terminal into EC2/Azure VM/GCE/vSphere guest/OpenStack instance
 7. [ ] Terraform provider apply → resources appear in AWS/Azure/GCP consoles
 8. [ ] Private APIs: close public exposure; auth + network allowlists
-9. [ ] Soften lab chrome: per-scenario console links only (not AWS+VMware+DC always)
-10. [ ] Subscription revenue lock: cannot open unsubscribed tech via cross-link
+9. [x] Soften lab chrome: per-scenario console links only (not AWS+VMware+DC always)
+10. [x] Subscription revenue lock: cannot open unsubscribed tech via cross-link
 11. [ ] 150+ scenarios per technology (learn/build/operate/troubleshoot/production mix)
 12. [ ] Notebook-style tutorials for techs that do not need full labs yet
 13. [ ] Jira bots as real teammates (PO/EM/SRE/security) with progressive hints
