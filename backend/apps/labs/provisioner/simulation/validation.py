@@ -198,7 +198,13 @@ def resolve_simulation_validation_script(scenario_slug: str, validation_script: 
         # --- Specific technology families (checked first) ---
         (lambda s: "devops-" in s or "ci-pipeline" in s or "helm-release" in s or "helm-" in s or "gitlab" in s, CANONICAL_DEVOPS_CHECK),
         (lambda s: "networking-" in s or "bgp" in s or "ntp-drift" in s, CANONICAL_NETWORKING_CHECK),
-        (lambda s: "terraform" in s or "aws-" in s or "cloudwatch" in s or "lambda" in s or "s3-" in s or "eks" in s or "iam-" in s or "ec2-" in s or "elb" in s or "ecr" in s or "rds" in s or "vpc" in s or "kinesis" in s or "sqs" in s or "secrets-manager" in s, CANONICAL_TERRAFORM_CHECK),
+        (lambda s: (
+            ("terraform" in s or s.startswith("iac-") or "aws-" in s or "cloudwatch" in s
+             or "lambda" in s or "s3-" in s or "eks" in s or "iam-" in s or "ec2-" in s
+             or "elb" in s or "ecr" in s or "rds" in s or "vpc" in s or "kinesis" in s
+             or "sqs" in s or "secrets-manager" in s)
+            and not s.startswith("academy-aws-")
+        ), CANONICAL_TERRAFORM_CHECK),
         (lambda s: "windows" in s or "win-" in s or "iis" in s or "hyper-v" in s or "kerberos" in s or "gpo" in s or "ntfs" in s or "smb-" in s or "winrm" in s or "wmi" in s or "sql-server" in s or "dhcp-" in s or "replication-" in s or "dns-zone" in s, CANONICAL_WINDOWS_CHECK),
         (lambda s: "ldconfig" in s or "missing-library" in s, CANONICAL_LDCONFIG_CHECK),
         # --- Generic Linux/infra rules ---

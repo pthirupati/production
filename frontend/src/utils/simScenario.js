@@ -32,14 +32,17 @@ function slugHints(slug) {
   if (s.startsWith('ds-dashboard-')) return 'data-dashboard'
   if (s.includes('nmap')) return 'nmap'
   if (s.includes('wireshark')) return 'wireshark'
-  // Console-graded AWS objectives (EC2 / S3 / IAM console clicks) open the AWS
-  // Management Console, whose GUI actions are mirrored to the gradeable engine.
-  // These prefixes previously matched nothing, so this is additive.
-  if (s.startsWith('ec2-') || s.startsWith('s3-') || s.startsWith('iam-') || s.startsWith('aws-console-')) return 'aws'
-  // Legacy: bare aws-* labs stay on the Terraform IDE (terraform-graded) for
-  // backward compatibility. An explicit simulation_type='aws' (checked first in
-  // getScenarioSimInfo) overrides this to open the console instead.
-  if (s.startsWith('aws-')) return 'terraform'
+  // Console-graded AWS objectives + academy packs open the AWS Management Console.
+  // Do NOT map bare aws-* to Terraform — that stole the console from AWS labs
+  // (align with isTerraformLab in iacFlavor.js).
+  if (
+    s.startsWith('academy-aws-')
+    || s.startsWith('ec2-')
+    || s.startsWith('s3-')
+    || s.startsWith('iam-')
+    || s.startsWith('aws-console-')
+    || s.startsWith('aws-')
+  ) return 'aws'
   return null
 }
 
