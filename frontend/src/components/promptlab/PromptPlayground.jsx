@@ -424,7 +424,7 @@ export default function PromptPlayground({ sessionId, scenario, solved: solvedPr
                 <div className="space-y-2 text-sm">
                   <div className={`rounded border p-2.5 ${currentResult.passed ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}`}>
                     <div className="flex items-center gap-1.5 mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--vsc-muted)]">
-                      <Bot size={12} /> Simulated assistant
+                      <Bot size={12} /> Practice assistant
                     </div>
                     <p className="text-[var(--vsc-text)] whitespace-pre-wrap leading-relaxed">
                       {replyForExercise(current, currentResult)}
@@ -445,7 +445,7 @@ export default function PromptPlayground({ sessionId, scenario, solved: solvedPr
                   )}
                 </div>
               ) : (
-                <p className="text-xs text-[var(--vsc-muted)]">Run <strong>Test prompt</strong> to see the simulated assistant reply and checklist.</p>
+                <p className="text-xs text-[var(--vsc-muted)]">Run <strong>Test prompt</strong> to see the practice assistant reply and checklist.</p>
               ),
             }}
             rightPanel={{
