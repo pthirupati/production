@@ -292,3 +292,46 @@ class CampusPlantOpsTests(SimpleTestCase):
         self.assertTrue(r4["ok"], r4)
         after = int(dc.get_state(self.session_id)["state"]["campus"]["parking"]["occupied"])
         self.assertEqual(after, before + 1)
+
+    def test_spares_issue_restock_and_dock_restock(self):
+        state = dc.get_state(self.session_id)["state"]
+        bins = {b["id"]: b for b in state["campus"]["spares"]["bins"]}
+        self.assertIn("BIN-PSU", bins)
+        before = int(bins["BIN-PSU"]["qty"])
+
+        r = dc.apply_action(self.session_id, "campus_plant_ops", {"op": "issue_spare", "bin_id": "BIN-PSU"})
+        self.assertTrue(r["ok"], r)
+        after_issue = int(
+            next(b["qty"] for b in dc.get_state(self.session_id)["state"]["campus"]["spares"]["bins"] if b["id"] == "BIN-PSU")
+        )
+        self.assertEqual(after_issue, before - 1)
+
+        r2 = dc.apply_action(self.session_id, "campus_plant_ops", {"op": "restock_spare", "bin_id": "BIN-PSU"})
+        self.assertTrue(r2["ok"], r2)
+
+        dc.apply_action(self.session_id, "campus_plant_ops", {
+            "op": "arrive_dock", "contents": "R760 PSU FRU spare", "carrier": "Dell",
+        })
+        qty_before = int(
+            next(b["qty"] for b in dc.get_state(self.session_id)["state"]["campus"]["spares"]["bins"] if b["id"] == "BIN-PSU")
+        )
+        r3 = dc.apply_action(self.session_id, "campus_plant_ops", {"op": "receive_dock"})
+        self.assertTrue(r3["ok"], r3)
+        qty_after = int(
+            next(b["qty"] for b in dc.get_state(self.session_id)["state"]["campus"]["spares"]["bins"] if b["id"] == "BIN-PSU")
+        )
+        self.assertEqual(qty_after, qty_before + 1)
+
+    def test_idf_patch_and_uplink(self):
+        state = dc.get_state(self.session_id)["state"]
+        self.assertTrue(state.get("optical", {}).get("idf"))
+        populated = int(state["optical"]["idf"]["patch_panels"][0]["populated"])
+        r = dc.apply_action(self.session_id, "optical_ops", {"op": "idf_patch", "delta": 1})
+        self.assertTrue(r["ok"], r)
+        after = int(dc.get_state(self.session_id)["state"]["optical"]["idf"]["patch_panels"][0]["populated"])
+        self.assertEqual(after, populated + 1)
+        r2 = dc.apply_action(self.session_id, "optical_ops", {"op": "idf_uplink_toggle"})
+        self.assertTrue(r2["ok"], r2)
+        ul = dc.get_state(self.session_id)["state"]["optical"]["idf"]["uplinks"][0]
+        self.assertEqual(ul["status"], "down")
+
