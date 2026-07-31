@@ -155,6 +155,18 @@ export function RaidPanel({
   if (!raid) return <p className="dc-muted">No RAID controller.</p>
   const levels = raid.supported_levels || ['RAID0', 'RAID1', 'RAID5', 'RAID6', 'RAID10', 'RAID50', 'RAID60']
   const vdMembers = new Set((raid.virtual_disks || []).flatMap((vd) => vd.members || []))
+  const diskBadge = (status) => {
+    if (status === 'online' || status === 'hotspare') return 'dc-port-up'
+    if (status === 'rebuilding') return 'dc-port-warn'
+    if (status === 'failed') return 'dc-port-fail'
+    return 'dc-port-down'
+  }
+  const vdBadge = (status) => {
+    if (status === 'optimal') return 'dc-port-up'
+    if (status === 'rebuilding') return 'dc-port-warn'
+    if (status === 'degraded') return 'dc-port-fail'
+    return 'dc-port-down'
+  }
   return (
     <div className="dc-twin-panel">
       <div className="dc-twin-toolbar">
@@ -178,11 +190,11 @@ export function RaidPanel({
             <tr key={d.id}>
               <td>{d.id}</td><td>{d.bay}</td><td>{d.model}</td>
               <td>{d.size_gb}G</td>
-              <td><span className={`dc-port-badge ${d.status === 'online' || d.status === 'hotspare' ? 'dc-port-up' : 'dc-port-down'}`}>{d.status}</span></td>
+              <td><span className={`dc-port-badge ${diskBadge(d.status)}`}>{d.status}</span></td>
               <td>{d.smart} · {d.temp_c}°C · wear {d.wear_pct}%</td>
               <td>
                 <div className="dc-action-row">
-                  {d.status !== 'failed' && (
+                  {d.status !== 'failed' && d.status !== 'rebuilding' && (
                     <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
                       onClick={() => onFailDisk?.(d.id)}>Fail</button>
                   )}
@@ -198,18 +210,31 @@ export function RaidPanel({
       </table>
       <div className="dc-drawer-label mt-2">Virtual disks</div>
       {(raid.virtual_disks || []).map((vd) => (
-        <div key={vd.id} className="dc-vd-card">
+        <div key={vd.id} className={`dc-vd-card${vd.status === 'rebuilding' ? ' dc-vd-rebuilding' : ''}${vd.status === 'degraded' ? ' dc-vd-degraded' : ''}`}>
           <div className="dc-vd-head">
             <strong>{vd.id} · {vd.name}</strong>
-            <span>{vd.raid_level} · {vd.size_gb} GB · {vd.status}</span>
+            <span>
+              {vd.raid_level} · {vd.size_gb} GB ·{' '}
+              <span className={`dc-port-badge ${vdBadge(vd.status)}`}>{vd.status}</span>
+              {vd.status === 'rebuilding' ? ` ${vd.rebuild_pct || 0}%` : ''}
+            </span>
           </div>
           <div className="dc-muted">Members: {(vd.members || []).join(', ')} · {vd.write_policy}
             {vd.init_pct != null ? ` · init ${vd.init_pct}% (${vd.init_mode || 'fast'})` : ''}
+            {vd.rebuild_target ? ` · rebuilding onto ${vd.rebuild_target}` : ''}
           </div>
+          {vd.status === 'rebuilding' && (
+            <div className="dc-rebuild-track" role="progressbar" aria-valuenow={vd.rebuild_pct || 0} aria-valuemin={0} aria-valuemax={100} aria-label={`${vd.id} rebuild`}>
+              <div className="dc-rebuild-fill" style={{ width: `${Math.min(100, vd.rebuild_pct || 0)}%` }} />
+            </div>
+          )}
           <div className="dc-action-row mt-1" style={{ flexWrap: 'wrap' }}>
             {vd.status === 'degraded' && (
               <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs"
                 onClick={() => onRebuild?.(vd.id)}><RefreshCw size={11} /> Rebuild / promote hotspare</button>
+            )}
+            {vd.status === 'rebuilding' && (
+              <span className="dc-muted">Rebuild in progress — advances on live scrape</span>
             )}
             <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
               onClick={() => onExpandVd?.(vd.id, 500)}>Expand +500G</button>

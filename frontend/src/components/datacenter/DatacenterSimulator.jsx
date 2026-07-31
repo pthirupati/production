@@ -837,7 +837,7 @@ export default function DatacenterSimulator({
                   raid={selectedServer.raid}
                   busy={busy}
                   onFailDisk={(diskId) => doAction(() => datacenterApi.raidFailDisk(sessionId, selectedServer.id, diskId), `${diskId} failed`, selectedServer.id)}
-                  onRebuild={(vdId) => doAction(() => datacenterApi.raidRebuild(sessionId, selectedServer.id, vdId), `${vdId} rebuilt`, selectedServer.id)}
+                  onRebuild={(vdId) => doAction(() => datacenterApi.raidRebuild(sessionId, selectedServer.id, vdId), `${vdId} rebuild started`, selectedServer.id)}
                   onSetCache={(mode) => doAction(() => datacenterApi.raidSetCache(sessionId, selectedServer.id, mode), `Cache ${mode}`, selectedServer.id)}
                   onCreateVd={(payload) => doAction(() => datacenterApi.raidCreateVd(sessionId, selectedServer.id, payload), 'VD created', selectedServer.id)}
                   onDeleteVd={(vdId) => doAction(() => datacenterApi.raidDeleteVd(sessionId, selectedServer.id, vdId), `${vdId} deleted`, selectedServer.id)}

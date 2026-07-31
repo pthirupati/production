@@ -44,7 +44,64 @@ def tick_live(state: dict) -> dict:
             sensors["cpu1_c"] = round(sensors["inlet_c"] + 26 + 0.5 * math.sin(phase), 1)
         if sensors.get("cpu2_c"):
             sensors["cpu2_c"] = round(sensors["inlet_c"] + 28 + 0.5 * math.cos(phase), 1)
+
+    # Progressive RAID rebuilds (degraded → rebuilding → optimal)
+    advance_raid_rebuilds(state)
     return env
+
+
+def advance_raid_rebuilds(state: dict, only_server_id: str | None = None, step_pct: int = 18) -> list[dict]:
+    """Advance any VD with status==rebuilding. Returns list of {server, vd, pct, status}."""
+    advanced: list[dict] = []
+    broken = state.get("broken") or {}
+    for srv in state.get("servers") or []:
+        if only_server_id and srv.get("id") != only_server_id:
+            continue
+        raid = srv.get("raid") or {}
+        changed = False
+        for vd in raid.get("virtual_disks") or []:
+            if vd.get("status") != "rebuilding":
+                continue
+            pct = int(vd.get("rebuild_pct") or 0) + max(8, int(step_pct))
+            if pct >= 100:
+                pct = 100
+                vd["rebuild_pct"] = 100
+                vd["status"] = "optimal"
+                # Retire failed disks (or resurrect if no spare — same-bay rebuild)
+                target = vd.get("rebuild_target")
+                for d in raid.get("physical_disks") or []:
+                    if d.get("status") == "failed":
+                        if target:
+                            d["status"] = "offline"
+                            d["smart"] = "Replaced"
+                        else:
+                            d["status"] = "online"
+                            d["smart"] = "OK"
+                    if d.get("status") == "rebuilding" or d.get("id") == target:
+                        d["status"] = "online"
+                        d["smart"] = "OK"
+                comps = srv.setdefault("components", {})
+                if comps.get("disk") == "failed":
+                    comps["disk"] = "healthy"
+                if comps.get("raid") == "failed":
+                    comps["raid"] = "healthy"
+                if broken.get("server") == srv.get("id") and broken.get("component") in ("disk", "raid"):
+                    broken.clear()
+                    state["broken"] = {}
+                vd.pop("rebuild_source", None)
+                vd.pop("rebuild_target", None)
+                raid.setdefault("operations", []).insert(0, {
+                    "time": _now(), "op": "rebuild_complete", "detail": vd.get("id"),
+                })
+                changed = True
+                advanced.append({"server": srv.get("id"), "vd": vd.get("id"), "pct": 100, "status": "optimal"})
+            else:
+                vd["rebuild_pct"] = pct
+                changed = True
+                advanced.append({"server": srv.get("id"), "vd": vd.get("id"), "pct": pct, "status": "rebuilding"})
+        if changed:
+            raid.setdefault("operations", [])
+    return advanced
 
 
 # ── Fire & safety ──────────────────────────────────────────────────────────
