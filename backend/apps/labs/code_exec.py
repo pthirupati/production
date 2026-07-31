@@ -66,6 +66,51 @@ SUPPORTED_LANGUAGES = {"python", "javascript"}
 NEEDS_REVIEW_LANGUAGES = {"bash", "shell", "sh"}
 
 
+def compose_user_code_from_files(files: dict, entrypoint: str = "") -> str:
+    """Build gradeable source from a multi-file map.
+
+    HTML/CSS projects inject ``PAGE_HTML`` / ``PAGE_CSS`` / ``PAGE_JS`` string
+    constants so javascript tests can assert on markup without a browser DOM.
+    """
+    if not isinstance(files, dict) or not files:
+        return ""
+    parts: list[str] = []
+    html_parts: list[str] = []
+    css_parts: list[str] = []
+    browser_js: list[str] = []
+    for path, content in files.items():
+        if not isinstance(content, str):
+            continue
+        low = str(path).lower()
+        base = low.rsplit("/", 1)[-1]
+        if low.endswith((".html", ".htm")):
+            html_parts.append(content)
+        elif low.endswith(".css"):
+            css_parts.append(content)
+        elif low.endswith((".js", ".mjs", ".cjs")) and base not in {
+            "solution.js", "check.js", "test.js", "grader.js",
+        }:
+            browser_js.append(content)
+    if html_parts or css_parts:
+        parts.append(f"const PAGE_HTML = {json.dumps(''.join(html_parts))};")
+        parts.append(f"const PAGE_CSS = {json.dumps(''.join(css_parts))};")
+        parts.append(f"const PAGE_JS = {json.dumps(''.join(browser_js))};")
+    for path, content in files.items():
+        if path == entrypoint or not isinstance(content, str):
+            continue
+        low = str(path).lower()
+        if low.endswith((".html", ".htm", ".css")):
+            continue
+        parts.append(content)
+    if entrypoint and isinstance(files.get(entrypoint), str):
+        elow = str(entrypoint).lower()
+        if not elow.endswith((".html", ".htm", ".css")):
+            parts.append(files[entrypoint])
+    elif not parts and files:
+        parts = [c for c in files.values() if isinstance(c, str)]
+    return "\n\n".join(parts)
+
+
 @dataclass
 class TestOutcome:
     name: str

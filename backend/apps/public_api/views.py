@@ -1393,6 +1393,8 @@ class CodeValidateView(APIView):
     @staticmethod
     def _resolve_user_code(data, spec) -> str:
         """Build the single source string to grade from the request payload."""
+        from apps.labs.code_exec import compose_user_code_from_files
+
         code = data.get("code")
         if isinstance(code, str) and code.strip():
             return code
@@ -1400,17 +1402,7 @@ class CodeValidateView(APIView):
         files = data.get("files")
         if isinstance(files, dict) and files:
             entrypoint = data.get("entrypoint") or spec.get("entrypoint") or ""
-            parts = []
-            # Non-entry files first (so functions they define are in scope),
-            # entrypoint last.
-            for path, content in files.items():
-                if path != entrypoint and isinstance(content, str):
-                    parts.append(content)
-            if entrypoint and isinstance(files.get(entrypoint), str):
-                parts.append(files[entrypoint])
-            elif not parts and files:
-                parts = [c for c in files.values() if isinstance(c, str)]
-            return "\n\n".join(parts)
+            return compose_user_code_from_files(files, entrypoint)
         return ""
 
 

@@ -21,7 +21,7 @@ SCEN = ROOT / "scenarios"
 PRESET_OUT = ROOT / "backend/apps/labs/provisioner/simulation/academy_service_presets.py"
 E2E_OUT = ROOT / "backend/apps/labs/provisioner/simulation/academy_service_e2e_fixes.py"
 
-CODING_TECHS = ("javascript", "react")
+CODING_TECHS = ("javascript", "react", "html")
 
 # Topic → coding_spec builder. `n` is the cycle variant (1..10) for mild uniqueness.
 def _js(n: int) -> dict[str, dict]:
@@ -282,10 +282,198 @@ def _react(n: int) -> dict[str, dict]:
     }
 
 
+def _html(n: int) -> dict[str, dict]:
+    """HTML labs: edit index.html (+ CSS); graded via PAGE_HTML injected by CodeValidateView."""
+    return {
+        "semantic-html": {
+            "instructions": (
+                "Add a landmark <main> containing one <h1> with meaningful page title text. "
+                f"Variant {n}."
+            ),
+            "html": (
+                "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n"
+                "  <meta charset=\"utf-8\" />\n  <title>Lab</title>\n"
+                "  <link rel=\"stylesheet\" href=\"styles.css\" />\n</head>\n<body>\n"
+                "  <!-- TODO: add a landmark region and a top-level heading -->\n"
+                "  <p>Welcome</p>\n</body>\n</html>\n"
+            ),
+            "css": "body { font-family: system-ui, sans-serif; }\n",
+            "visible": [
+                ("main", "assert(/<main[\\s>][\\s\\S]*<\\/main>/i.test(PAGE_HTML), 'missing main landmark');"),
+                ("h1", "assert(/<h1[\\s>][\\s\\S]*<\\/h1>/i.test(PAGE_HTML), 'missing h1');"),
+            ],
+            "hidden": [
+                ("h1-text", "assert(PAGE_HTML.toLowerCase().indexOf('</h1>') >= 0);"),
+                ("lang", "assert(PAGE_HTML.indexOf('lang=') >= 0);"),
+            ],
+        },
+        "forms": {
+            "instructions": "Add a <form> with an email <input type=\"email\" required> and a submit <button>.",
+            "html": (
+                "<!DOCTYPE html>\n<html lang=\"en\"><head><meta charset=\"utf-8\" /><title>Form</title>"
+                "<link rel=\"stylesheet\" href=\"styles.css\" /></head><body>\n"
+                "  <!-- TODO: add a form with email field and submit control -->\n</body></html>\n"
+            ),
+            "css": "form { display: grid; gap: 0.5rem; max-width: 20rem; }\n",
+            "visible": [
+                ("form", "assert(/<form[\\s>][\\s\\S]*<\\/form>/i.test(PAGE_HTML), 'missing form');"),
+                ("email", "assert(/type\\s*=\\s*[\"']email[\"']/i.test(PAGE_HTML), 'missing email input');"),
+            ],
+            "hidden": [
+                ("required", "assert(/required/i.test(PAGE_HTML));"),
+                ("button", "assert(/<button[\\s>]/i.test(PAGE_HTML) || /type\\s*=\\s*[\"']submit[\"']/i.test(PAGE_HTML));"),
+            ],
+        },
+        "accessibility": {
+            "instructions": "Give the primary button an aria-label and associate a <label for> with an input id.",
+            "html": (
+                "<!DOCTYPE html>\n<html lang=\"en\"><head><meta charset=\"utf-8\" /><title>A11y</title>"
+                "<link rel=\"stylesheet\" href=\"styles.css\" /></head><body>\n"
+                "  <button>Go</button>\n"
+                "  <input id=\"name\" />\n"
+                "  <!-- TODO: accessible name on button; label associated with name field -->\n"
+                "</body></html>\n"
+            ),
+            "css": "button { padding: 0.4rem 0.8rem; }\n",
+            "visible": [
+                ("aria", "assert(/aria-label\\s*=/i.test(PAGE_HTML), 'missing aria-label');"),
+            ],
+            "hidden": [
+                ("label-for", "assert(/<label[^>]*for\\s*=\\s*[\"']name[\"']/i.test(PAGE_HTML));"),
+            ],
+        },
+        "seo": {
+            "instructions": "Set a unique <title> and a meta name=\"description\" content.",
+            "html": (
+                "<!DOCTYPE html>\n<html lang=\"en\"><head>\n"
+                "  <meta charset=\"utf-8\" />\n"
+                "  <!-- TODO: document title + meta description -->\n"
+                "  <link rel=\"stylesheet\" href=\"styles.css\" />\n"
+                "</head><body><h1>Page</h1></body></html>\n"
+            ),
+            "css": "h1 { font-size: 1.5rem; }\n",
+            "visible": [
+                ("title", "assert(/<title>\\s*[^<]+\\s*<\\/title>/i.test(PAGE_HTML), 'missing title');"),
+            ],
+            "hidden": [
+                ("desc", "assert(/meta[^>]+name\\s*=\\s*[\"']description[\"']/i.test(PAGE_HTML));"),
+            ],
+        },
+        "performance": {
+            "instructions": "Add loading=\"lazy\" on an <img> and defer on a script tag.",
+            "html": (
+                "<!DOCTYPE html>\n<html lang=\"en\"><head><meta charset=\"utf-8\" /><title>Perf</title>"
+                "<link rel=\"stylesheet\" href=\"styles.css\" /></head><body>\n"
+                "  <img src=\"hero.jpg\" alt=\"Hero\" />\n"
+                "  <script src=\"app.js\"></script>\n"
+                "  <!-- TODO: lazy-load the image; defer the script -->\n"
+                "</body></html>\n"
+            ),
+            "css": "img { max-width: 100%; }\n",
+            "visible": [
+                ("lazy", "assert(/loading\\s*=\\s*[\"']lazy[\"']/i.test(PAGE_HTML), 'missing loading=lazy');"),
+            ],
+            "hidden": [
+                ("defer", "assert(/<script[^>]*\\sdefer\\b/i.test(PAGE_HTML));"),
+            ],
+        },
+        "responsive": {
+            "instructions": "Add a viewport meta tag and a CSS media query for max-width 600px.",
+            "html": (
+                "<!DOCTYPE html>\n<html lang=\"en\"><head>\n"
+                "  <meta charset=\"utf-8\" />\n"
+                "  <!-- TODO: viewport meta -->\n"
+                "  <link rel=\"stylesheet\" href=\"styles.css\" />\n"
+                "  <title>Responsive</title>\n"
+                "</head><body><main class=\"wrap\">Hi</main></body></html>\n"
+            ),
+            "css": ".wrap { padding: 1rem; }\n/* TODO: add a narrow-viewport media query for .wrap */\n",
+            "visible": [
+                ("viewport", "assert(/name\\s*=\\s*[\"']viewport[\"']/i.test(PAGE_HTML), 'missing viewport');"),
+            ],
+            "hidden": [
+                ("media", "assert(/@media/i.test(PAGE_CSS));"),
+                ("600", "assert(/600px/i.test(PAGE_CSS));"),
+            ],
+        },
+        "media": {
+            "instructions": "Add a <figure> with <img alt> and a <figcaption>.",
+            "html": (
+                "<!DOCTYPE html>\n<html lang=\"en\"><head><meta charset=\"utf-8\" /><title>Media</title>"
+                "<link rel=\"stylesheet\" href=\"styles.css\" /></head><body>\n"
+                "  <!-- TODO: figure with alt text image and caption -->\n"
+                "</body></html>\n"
+            ),
+            "css": "figure { margin: 0; }\n",
+            "visible": [
+                ("figure", "assert(/<figure[\\s>][\\s\\S]*<\\/figure>/i.test(PAGE_HTML), 'missing figure');"),
+                ("alt", "assert(/<img[^>]+alt\\s*=/i.test(PAGE_HTML), 'missing img alt');"),
+            ],
+            "hidden": [
+                ("caption", "assert(/<figcaption[\\s>][\\s\\S]*<\\/figcaption>/i.test(PAGE_HTML));"),
+            ],
+        },
+        "tables": {
+            "instructions": "Build a <table> with <thead>/<th> and at least one <tbody> <tr>.",
+            "html": (
+                "<!DOCTYPE html>\n<html lang=\"en\"><head><meta charset=\"utf-8\" /><title>Table</title>"
+                "<link rel=\"stylesheet\" href=\"styles.css\" /></head><body>\n"
+                "  <!-- TODO: semantic table with header and body rows -->\n"
+                "</body></html>\n"
+            ),
+            "css": "table { border-collapse: collapse; width: 100%; }\nth, td { border: 1px solid #ccc; padding: 0.35rem; }\n",
+            "visible": [
+                ("table", "assert(/<table[\\s>][\\s\\S]*<\\/table>/i.test(PAGE_HTML), 'missing table');"),
+                ("th", "assert(/<th[\\s>][\\s\\S]*<\\/th>/i.test(PAGE_HTML), 'missing th');"),
+            ],
+            "hidden": [
+                ("thead", "assert(/<thead[\\s>][\\s\\S]*<\\/thead>/i.test(PAGE_HTML));"),
+                ("tbody", "assert(/<tbody[\\s>][\\s\\S]*<\\/tbody>/i.test(PAGE_HTML));"),
+            ],
+        },
+        "security": {
+            "instructions": "Add a Content-Security-Policy meta http-equiv that includes default-src 'self'.",
+            "html": (
+                "<!DOCTYPE html>\n<html lang=\"en\"><head>\n"
+                "  <meta charset=\"utf-8\" />\n"
+                "  <!-- TODO: CSP meta http-equiv -->\n"
+                "  <title>Secure</title>\n"
+                "  <link rel=\"stylesheet\" href=\"styles.css\" />\n"
+                "</head><body><p>Ok</p></body></html>\n"
+            ),
+            "css": "p { color: #222; }\n",
+            "visible": [
+                ("csp", "assert(/Content-Security-Policy/i.test(PAGE_HTML), 'missing CSP');"),
+            ],
+            "hidden": [
+                ("default-src", "assert(/default-src/i.test(PAGE_HTML));"),
+            ],
+        },
+        "metadata": {
+            "instructions": f"Add Open Graph og:title meta and a canonical link. Variant {n}.",
+            "html": (
+                "<!DOCTYPE html>\n<html lang=\"en\"><head>\n"
+                "  <meta charset=\"utf-8\" />\n"
+                "  <title>Meta</title>\n"
+                "  <!-- TODO: open graph title + canonical link -->\n"
+                "  <link rel=\"stylesheet\" href=\"styles.css\" />\n"
+                "</head><body><h1>Meta</h1></body></html>\n"
+            ),
+            "css": "h1 { margin: 0; }\n",
+            "visible": [
+                ("og", "assert(/property\\s*=\\s*[\"']og:title[\"']/i.test(PAGE_HTML), 'missing og:title');"),
+            ],
+            "hidden": [
+                ("canonical", "assert(/rel\\s*=\\s*[\"']canonical[\"']/i.test(PAGE_HTML));"),
+            ],
+        },
+    }
+
+
 def parse_slug(slug: str) -> tuple[str, int, str, str, int] | None:
     """academy-{tech}-{seq:03d}-{kind}-{topic}[-cycle] → tech, seq, kind, topic, cycle."""
     m = re.match(
-        r"^academy-(javascript|react)-(\d{3})-(learn|build|operate|troubleshoot|production|"
+        r"^academy-(javascript|react|html)-(\d{3})-(learn|build|operate|troubleshoot|production|"
         r"security|automation|observability|backup|integration)-(.+)$",
         slug,
     )
@@ -302,14 +490,40 @@ def parse_slug(slug: str) -> tuple[str, int, str, str, int] | None:
 
 
 def build_coding_spec(tech: str, topic: str, cycle: int) -> dict | None:
-    catalog = _js(cycle) if tech == "javascript" else _react(cycle)
-    # normalize topic aliases
-    key = topic
-    if key not in catalog:
-        key = topic.replace("_", "-")
+    if tech == "javascript":
+        catalog = _js(cycle)
+    elif tech == "react":
+        catalog = _react(cycle)
+    elif tech == "html":
+        catalog = _html(cycle)
+    else:
+        return None
+    key = topic.replace("_", "-")
     if key not in catalog:
         return None
     t = catalog[key]
+    if tech == "html":
+        return {
+            "language": "javascript",
+            "entrypoint": "solution.js",
+            "kind": "impl",
+            "instructions": t["instructions"] + "\nEdit index.html / styles.css, use Preview, then Check Solution.\n",
+            "files": [
+                {"path": "index.html", "content": t["html"], "readonly": False},
+                {"path": "styles.css", "content": t["css"], "readonly": False},
+                {
+                    "path": "solution.js",
+                    "content": (
+                        "// Grader harness — PAGE_HTML / PAGE_CSS are injected server-side from your files.\n"
+                        "// Keep this file; edit index.html and styles.css instead.\n"
+                    ),
+                    "readonly": True,
+                },
+            ],
+            "visible_tests": [{"name": name, "code": code} for name, code in t["visible"]],
+            "hidden_tests": [{"name": name, "code": code} for name, code in t["hidden"]],
+            "timeout": 8,
+        }
     return {
         "language": "javascript",
         "entrypoint": "solution.js",
@@ -343,17 +557,25 @@ def patch_yaml(path: Path, tech: str, topic: str, cycle: int, *, dry_run: bool) 
     ]
     data["initial_state"] = (
         f"Coding challenge: {topic_label}. "
-        "The stub in solution.js is incomplete so tests fail until you implement it."
+        + (
+            "Edit index.html / styles.css — Preview shows the page; Check Solution grades markup."
+            if tech == "html"
+            else "The stub in solution.js is incomplete so tests fail until you implement it."
+        )
     )
     # Rewrite ticket description verify language away from systemd
     desc = str(data.get("description") or "")
-    if "systemctl" in desc or "node-app" in desc:
+    if "systemctl" in desc or "node-app" in desc or "nginx" in desc or "httpd" in desc:
+        env = (
+            "FixitLab HTML practice IDE — edit index.html / styles.css, open Preview, then Check Solution."
+            if tech == "html"
+            else "FixitLab JavaScript/React practice IDE — edit solution.js, Run visible tests, then Check Solution."
+        )
         data["description"] = (
             f"CONTEXT: Complete the {topic_label} coding exercise in the browser IDE.\n\n"
-            f"ENVIRONMENT: FixitLab JavaScript/React practice IDE — edit solution.js, "
-            f"Run visible tests, then Check Solution.\n\n"
+            f"ENVIRONMENT: {env}\n\n"
             f"SYMPTOM / STARTING STATE: {data['initial_state']}\n\n"
-            f"OBJECTIVE: Implement the required function so all visible and hidden tests pass.\n\n"
+            f"OBJECTIVE: Implement the required changes so all visible and hidden tests pass.\n\n"
             f"VERIFY: Check Solution passes all hidden tests.\n"
         )
     if "tasks" in data and isinstance(data["tasks"], list) and data["tasks"]:
@@ -441,7 +663,7 @@ def strip_generated_maps(slugs: set[str], *, dry_run: bool) -> None:
         for line in lines:
             if any(f"'{slug}'" in line or f'"{slug}"' in line for slug in slugs):
                 # Keep frozenset/dict structural lines; drop entry lines for our slugs
-                if line.strip().startswith(("'", '"')) or "academy-javascript-" in line or "academy-react-" in line:
+                if line.strip().startswith(("'", '"')) or "academy-javascript-" in line or "academy-react-" in line or "academy-html-" in line:
                     if any(s in line for s in slugs):
                         removed += 1
                         continue
@@ -454,7 +676,7 @@ def strip_generated_maps(slugs: set[str], *, dry_run: bool) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--technology", default="", help="javascript or react")
+    parser.add_argument("--technology", default="", help="javascript, react, or html")
     args = parser.parse_args()
     techs = [args.technology] if args.technology else list(CODING_TECHS)
     migrated: set[str] = set()

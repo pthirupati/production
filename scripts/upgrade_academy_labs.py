@@ -108,7 +108,7 @@ TECH_SERVICE_POOLS: dict[str, list[str]] = {
     "security": ["sshd", "auditd", "firewalld"],
     "shell-script": ["crond", "rsyslog"],
     "simulation": ["nginx", "crond"],
-    "html": ["nginx", "httpd"],
+    # html academy packs are Coding IDE labs — do not systemd-break them
     "database": ["postgresql", "mysqld", "redis"],
     "mysql": ["mysqld"],
     "postgresql": ["postgresql"],
@@ -184,7 +184,9 @@ def classify_mode(tech: str, sim_type: str, slug: str) -> str:
         return "skip"
     low = (slug or "").lower()
     # Coding IDE academy packs — never re-upgrade to systemd drills
-    if tech in ("javascript", "react") or low.startswith(("academy-javascript-", "academy-react-")):
+    if tech in ("javascript", "react", "html") or low.startswith(
+        ("academy-javascript-", "academy-react-", "academy-html-")
+    ):
         return "skip"
     # Cloud academies: grade via is-failed + planted sentinel (same contract as AWS).
     if low.startswith(CLOUD_ACADEMY_PREFIXES) or (

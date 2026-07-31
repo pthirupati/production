@@ -52,6 +52,28 @@ class AcademyCodingIdeTests(SimpleTestCase):
         )
         for slug in ACADEMY_SERVICE_PRESETS:
             self.assertFalse(
-                slug.startswith("academy-javascript-") or slug.startswith("academy-react-"),
+                slug.startswith(("academy-javascript-", "academy-react-", "academy-html-")),
                 msg=slug,
             )
+
+    def test_html_academy_semantic_grades_via_page_html(self):
+        from apps.labs.code_exec import compose_user_code_from_files, grade_submission
+
+        path = ROOT / "scenarios/html/academy-html-001-learn-semantic-html/scenario.yaml"
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        self.assertTrue(data.get("coding_mode"))
+        spec = data["coding_spec"]
+        files = {f["path"]: f["content"] for f in spec["files"]}
+        tests = [{**t, "hidden": False} for t in spec["visible_tests"]] + [
+            {**t, "hidden": True} for t in spec["hidden_tests"]
+        ]
+        stub_code = compose_user_code_from_files(files, "solution.js")
+        stub = grade_submission("javascript", stub_code, tests, timeout=8)
+        self.assertFalse(stub.all_passed)
+        files["index.html"] = (
+            "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"/>"
+            "<title>Lab</title></head><body><main><h1>Welcome</h1></main></body></html>"
+        )
+        fixed_code = compose_user_code_from_files(files, "solution.js")
+        ok = grade_submission("javascript", fixed_code, tests, timeout=8)
+        self.assertTrue(ok.all_passed, ok.error or ok.outcomes)

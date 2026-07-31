@@ -79,7 +79,7 @@ SIM_BY_TECH = {
 }
 
 # Techs whose academy packs are Coding IDE labs (not systemd service drills).
-CODING_ACADEMY_TECHS = frozenset({"javascript", "react"})
+CODING_ACADEMY_TECHS = frozenset({"javascript", "react", "html"})
 
 GENERIC_TOPICS = [
     ("learn", "Fundamentals Lab", "Understand core commands, objects, files, and the daily workflow."),
