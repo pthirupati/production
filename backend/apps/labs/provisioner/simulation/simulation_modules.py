@@ -185,9 +185,19 @@ def register_modules(engine: "UnifiedSimulationEngine", shell: RHELShell | None 
     """Register command handlers — generic gets ALL modules; others get RHEL + their tech."""
     sh = shell or engine.shell
     sim_type = engine.simulation_type
+    slug = (getattr(engine, "scenario_slug", "") or "").lower()
 
     # Every simulation includes full RHEL; generic enables all tech stacks
     modules = _modules_for_type(sim_type)
+    # AI Infra labs span MAAS/LXD/Packer/VyOS (baremetal) + GPU CLI + AWX — pull
+    # the complementary modules in so commission/build/GPU commands all work on
+    # the same Lab Terminal regardless of primary simulation_type.
+    if "ai-infra" in slug or slug.startswith("academy-ai-infra"):
+        modules |= {"baremetal", "gpu"}
+        if "awx" in slug or "ansible" in slug:
+            modules.add("ansible")
+    elif any(k in slug for k in ("maas", "lxd", "packer", "vyos", "pxe", "bmc")):
+        modules.add("baremetal")
     if "gpu" in modules:
         _register_gpu(engine, sh)
     if "kubernetes" in modules:
@@ -1624,30 +1634,73 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
     slug = (engine.scenario_slug or "").lower()
     if slug in ("sim-baremetal-ipmi", "sim-rhel-baremetal-ipmi", "maas-ipmi-bmc-unreachable"):
         engine._power_state = "off"
+    # MAAS machine inventory for AI Infra / baremetal commission labs.
+    if not hasattr(engine, "_maas_machines") or not engine._maas_machines:
+        engine._maas_machines = [
+            {"name": "gpu-node-01", "status": "Ready", "power": "on", "arch": "amd64/generic",
+             "zone": "default", "pool": "default", "ip": "10.64.12.11"},
+            {"name": "gpu-node-02", "status": "Deployed", "power": "on", "arch": "amd64/generic",
+             "zone": "default", "pool": "default", "ip": "10.64.12.12"},
+            {"name": "gpu-node-03", "status": "Failed commissioning", "power": "on",
+             "arch": "amd64/generic", "zone": "default", "pool": "default", "ip": "10.64.12.13"},
+            {"name": "gpu-node-04", "status": "New", "power": "off", "arch": "amd64/generic",
+             "zone": "default", "pool": "default", "ip": "-"},
+        ]
+    if not hasattr(engine, "_lxd_instances"):
+        engine._lxd_instances = {
+            "gpu-worker-1": {"state": "RUNNING", "type": "container", "ipv4": "10.150.1.10"},
+            "k8s-node-2": {"state": "STOPPED", "type": "virtual-machine", "ipv4": ""},
+            "burn-in-h100": {"state": "RUNNING", "type": "container", "ipv4": "10.150.1.20"},
+        }
 
     def handler(parts, line):
         low = line.strip().lower()
-        if not (low.startswith("ipmitool") or low.startswith("dmidecode") or low.startswith("esxcli")):
+        bare_tools = (
+            "ipmitool", "dmidecode", "esxcli", "maas", "lxc", "lxd", "virsh",
+            "packer", "vyos", "vyatta",
+        )
+        if not any(low.startswith(t) for t in bare_tools):
             return None
-        if "power status" in low:
-            return f"Chassis Power is {engine._power_state}"
-        if "power cycle" in low or "power reset" in low:
-            return "Chassis Power Control: Reset"
-        if "power off" in low:
-            engine._power_state = "off"
-            return "Chassis Power Control: Down/Off"
-        if "power on" in low:
-            engine._power_state = "on"
-            return "Chassis Power Control: Up/On"
-        if "sensor" in low:
-            return "CPU Temp        | 42 degrees C      | ok"
-        if "fru" in low:
-            return " Board Product         : ProLiant DL380 Gen10"
+        if low.startswith("ipmitool"):
+            if "power status" in low:
+                return f"Chassis Power is {engine._power_state}"
+            if "power cycle" in low or "power reset" in low:
+                return "Chassis Power Control: Reset"
+            if "power off" in low:
+                engine._power_state = "off"
+                return "Chassis Power Control: Down/Off"
+            if "power on" in low:
+                engine._power_state = "on"
+                return "Chassis Power Control: Up/On"
+            if "sensor" in low:
+                return (
+                    "CPU1 Temp       | 42.000     | degrees C  | ok\n"
+                    "Inlet Temp      | 23.000     | degrees C  | ok\n"
+                    "Pwr Consumption | 812.000    | Watts      | ok\n"
+                    "Fan1A RPM       | 7200.000   | RPM        | ok"
+                )
+            if "fru" in low:
+                return (
+                    " Board Mfg Date        : Mon Jan 15 12:00:00 2024\n"
+                    " Board Mfg             : Dell Inc.\n"
+                    " Board Product         : PowerEdge XE9680\n"
+                    " Board Serial          : CN7293672A008A\n"
+                    " Product Name          : PowerEdge XE9680"
+                )
+            if "lan print" in low or "lan print 1" in low:
+                return (
+                    "IP Address Source       : Static Address\n"
+                    "IP Address              : 10.64.90.11\n"
+                    "Subnet Mask             : 255.255.255.0\n"
+                    "MAC Address             : a4:bb:6d:12:34:56\n"
+                    "Default Gateway IP      : 10.64.90.1"
+                )
+            return f"ipmitool: executed ({' '.join(parts[1:]) or 'ok'})"
         if "dmidecode" in low:
             # Persona-aware DMI: AWS Nitro / Azure / GCE / VMware / HPE bare metal.
             # Generic labs used to always answer HPE even on EC2 guests.
-            mfr = getattr(shell.state, "dmi_manufacturer", None) or "HPE"
-            prod = getattr(shell.state, "dmi_product", None) or "ProLiant DL380 Gen10"
+            mfr = getattr(shell.state, "dmi_manufacturer", None) or "Dell Inc."
+            prod = getattr(shell.state, "dmi_product", None) or "PowerEdge XE9680"
             platform = getattr(shell.state, "host_platform", "") or ""
             # Only claim HPE ProLiant when this Lab Server is actually bare metal /
             # datacenter — otherwise prefer the hosting persona already applied.
@@ -1658,23 +1711,212 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
         if "esxcli" in low:
             return "Host CPU: Intel Xeon Gold 6248R\nMemory: 256 GB"
         if low.startswith("maas"):
-            if "list" in low and "machines" in low:
-                return "Machine 1: ready (node-01)\nMachine 2: deployed (node-02)\nMachine 3: failed commissioning"
+            machines = engine._maas_machines
+            # `maas admin machines read` / `maas login` / commission / deploy
+            if "login" in low:
+                return "Logged into MAAS at http://10.64.1.2:5240/MAAS/ (user: admin)"
+            if "machines" in low and ("read" in low or "list" in low):
+                rows = [
+                    "hostname       status                 power  arch            zone     pool     ip",
+                    "-------------  ---------------------  -----  --------------  -------  -------  ------------",
+                ]
+                for m in machines:
+                    rows.append(
+                        f"{m['name']:<14} {m['status']:<22} {m['power']:<6} "
+                        f"{m['arch']:<15} {m['zone']:<8} {m['pool']:<8} {m['ip']}"
+                    )
+                return "\n".join(rows)
             if "commission" in low:
-                return "Commissioning started for node-03"
+                target = None
+                for tok in parts:
+                    if tok.startswith("gpu-node") or tok.startswith("node-"):
+                        target = tok
+                        break
+                for m in machines:
+                    if target and m["name"] != target:
+                        continue
+                    if m["status"] in ("New", "Failed commissioning", "Ready"):
+                        m["status"] = "Commissioning"
+                        m["power"] = "on"
+                        name = m["name"]
+                        # Simulate quick transition for lab UX
+                        m["status"] = "Ready"
+                        return (
+                            f"Commissioning started for {name}.\n"
+                            f"Scripts: 00-maas-03-install-lldpd, 20-maas-01-bmc, "
+                            f"50-maas-01-commissioning … done.\n"
+                            f"Status → Ready (commissioning passed)."
+                        )
+                return "No matching machine available to commission."
             if "deploy" in low:
-                return "Deploying Ubuntu 22.04 to node-02"
-            return "MAAS: OK"
+                for m in machines:
+                    if m["status"] == "Ready":
+                        m["status"] = "Deployed"
+                        m["ip"] = m["ip"] if m["ip"] != "-" else "10.64.12.40"
+                        return (
+                            f"Deploying Ubuntu 22.04 LTS to {m['name']} "
+                            f"(osystem=ubuntu, distro_series=jammy).\n"
+                            f"PXE boot → cloud-init → Deployed. IP {m['ip']}"
+                        )
+                return "No Ready machine available to deploy (commission first)."
+            if "release" in low:
+                for m in machines:
+                    if m["status"] == "Deployed":
+                        m["status"] = "Ready"
+                        return f"Released {m['name']} → Ready"
+                return "No Deployed machine to release."
+            if "power" in low:
+                action = "on" if "on" in low else "off" if "off" in low else "status"
+                for m in machines:
+                    if action == "status":
+                        return "\n".join(f"{x['name']}: power {x['power']}" for x in machines)
+                    m["power"] = action
+                return f"Power {action} requested for matching machines."
+            if "boot-resources" in low or "boot" in low:
+                return (
+                    "id  name              architecture  type\n"
+                    "1   ubuntu/jammy      amd64/generic  Synced\n"
+                    "2   ubuntu/noble      amd64/generic  Synced\n"
+                    "3   custom/h100-jammy amd64/generic  Uploaded"
+                )
+            return (
+                "usage: maas <profile> machines read|commission|deploy|release\n"
+                "       maas <profile> boot-resources read\n"
+                "       maas login <profile> <url> <api-key>"
+            )
         if low.startswith("lxc") or low.startswith("lxd"):
+            inst = engine._lxd_instances
             if "list" in low:
-                return "gpu-worker-1 (RUNNING)\nk8s-node-2 (STOPPED)"
+                rows = [
+                    "+---------------+---------+----------------------+------+-----------+-----------+",
+                    "| NAME          | STATE   | IPV4                 | TYPE | PROCESSES | LOCATION  |",
+                    "+---------------+---------+----------------------+------+-----------+-----------+",
+                ]
+                for name, meta in inst.items():
+                    rows.append(
+                        f"| {name:<13} | {meta['state']:<7} | {meta.get('ipv4') or '-':<20} "
+                        f"| {meta['type']:<4} | 42        | none      |"
+                    )
+                rows.append("+---------------+---------+----------------------+------+-----------+-----------+")
+                return "\n".join(rows)
             if "start" in low:
-                return "Instance started"
-            return "LXD: OK"
+                for name, meta in inst.items():
+                    if name in low or (len(parts) > 2 and parts[-1] == name):
+                        meta["state"] = "RUNNING"
+                        if not meta.get("ipv4"):
+                            meta["ipv4"] = "10.150.1.99"
+                        return f"Instance {name} started"
+                # start last stopped
+                for name, meta in inst.items():
+                    if meta["state"] != "RUNNING":
+                        meta["state"] = "RUNNING"
+                        meta["ipv4"] = meta.get("ipv4") or "10.150.1.99"
+                        return f"Instance {name} started"
+                return "All instances already running"
+            if "stop" in low:
+                for name, meta in inst.items():
+                    if name in low:
+                        meta["state"] = "STOPPED"
+                        return f"Instance {name} stopped"
+                return "Specify instance name"
+            if "profile" in low:
+                return (
+                    "name: gpu-passthrough\n"
+                    "config:\n"
+                    "  nvidia.runtime: \"true\"\n"
+                    "devices:\n"
+                    "  gpu0:\n"
+                    "    type: gpu\n"
+                    "    gputype: physical\n"
+                    "    pci: \"0000:19:00.0\""
+                )
+            if "launch" in low or "init" in low:
+                name = parts[-1] if len(parts) > 2 else "lab-container"
+                inst[name] = {"state": "RUNNING", "type": "container", "ipv4": "10.150.1.50"}
+                return f"Creating {name}\nStarting {name}\n{name} is ready"
+            return "LXD: OK — try `lxc list`, `lxc start <name>`, `lxc profile show gpu-passthrough`"
         if low.startswith("virsh"):
             if "list" in low:
                 return " Id   Name         State\n------------------------\n 1    vm-k8s-node  running"
             return "virsh: OK"
+        if low.startswith("packer"):
+            if "version" in low or "-v" in parts:
+                return "Packer v1.11.2"
+            if "fmt" in low:
+                return ""
+            if "validate" in low:
+                return "The configuration is valid."
+            if "init" in low:
+                return (
+                    "Installed plugin github.com/hashicorp/amazon v1.3.2\n"
+                    "Installed plugin github.com/hashicorp/qemu v1.1.0"
+                )
+            if "build" in low:
+                sku = "h100"
+                for key in ("b300", "h200", "h100", "a100", "mi300"):
+                    if key in low or key in slug:
+                        sku = key
+                        break
+                from .shell import StreamedCommandResult
+                lines = [
+                    f"qemu.gpu-{sku}: output will be in this color.",
+                    f"qemu.gpu-{sku}: Retrieving Ubuntu jammy cloud image…",
+                    f"qemu.gpu-{sku}: Starting HTTP server on port 8701",
+                    f"qemu.gpu-{sku}: Creating local QEMU disk image…",
+                    f"qemu.gpu-{sku}: Booting VM for provisioning (NVIDIA driver + DCGM)…",
+                    f"qemu.gpu-{sku}: Provisioning with shell script scripts/install-gpu-{sku}.sh",
+                    f"qemu.gpu-{sku}: Running CVE scan gate (trivy image)… PASS",
+                    f"qemu.gpu-{sku}: Publishing artifact to maas boot-resource custom/{sku}-jammy",
+                    "==> Wait completed after 4 minutes 12 seconds",
+                    f"==> Builds finished. The artifacts of successful builds are:",
+                    f"--> qemu.gpu-{sku}: VM files in directory: output-gpu-{sku}/",
+                ]
+                return StreamedCommandResult(lines=lines, delay_s=0.45)
+            return (
+                "Usage: packer [--version] [--help] <command> [<args>]\n\n"
+                "Common commands:\n"
+                "    build           build image(s) from template\n"
+                "    init            install missing plugins\n"
+                "    validate        check template validity\n"
+                "    fmt             reformat HCL2 config"
+            )
+        if low.startswith("vyos") or low.startswith("vyatta") or low.startswith("show ") and "vyos" in slug:
+            # Minimal VyOS-ish networking for PXE underlay labs
+            if "show interfaces" in low or "interfaces" in low:
+                return (
+                    "Codes: S - State, L - Link, u - Up, D - Down, A - Admin Down\n"
+                    "Interface        IP Address                        S/L  Description\n"
+                    "eth0             10.64.1.1/24                      u/u  management\n"
+                    "eth1             10.64.12.1/24                     u/u  pxe-provision\n"
+                    "eth1.100         10.64.100.1/24                    u/u  gpu-fabric\n"
+                    "lo               127.0.0.1/8                       u/u"
+                )
+            if "show dhcp" in low or "dhcp" in low:
+                return (
+                    "IP address    Hardware address    Lease expiration     Pool      Client Name\n"
+                    "10.64.12.11   a4:bb:6d:aa:01:01   2026/08/01 12:00:00  pxe-pool  gpu-node-01\n"
+                    "10.64.12.12   a4:bb:6d:aa:01:02   2026/08/01 12:00:00  pxe-pool  gpu-node-02"
+                )
+            if "show conf" in low or "configuration" in low:
+                return (
+                    "interfaces {\n"
+                    "    ethernet eth1 {\n"
+                    "        address 10.64.12.1/24\n"
+                    "        description pxe-provision\n"
+                    "    }\n"
+                    "}\nservice {\n"
+                    "    dhcp-server {\n"
+                    "        shared-network-name pxe {\n"
+                    "            subnet 10.64.12.0/24 {\n"
+                    "                default-router 10.64.12.1\n"
+                    "                bootfile-name undionly.kpxe\n"
+                    "                bootfile-server 10.64.1.2\n"
+                    "            }\n"
+                    "        }\n"
+                    "    }\n"
+                    "}"
+                )
+            return "VyOS OK — try: show interfaces / show dhcp server leases / show configuration"
         return f"{line}: OK"
     shell.register_handler(handler)
 
