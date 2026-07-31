@@ -114,7 +114,7 @@ export default function DatacenterSimulator({
   onToggleTerminal, simTerminalOpen = false, vmwareHref = null,
 }) {
   const slug = scenario?.slug || ''
-  const { state, setState, loading, busy, run } = useSimSession(sessionId, slug, datacenterApi)
+  const { state, setState, loading, busy, error, run, refresh } = useSimSession(sessionId, slug, datacenterApi)
   const [loginUser, setLoginUser] = useState('')
   const [loginPass, setLoginPass] = useState('')
   const [loginError, setLoginError] = useState('')
@@ -237,7 +237,39 @@ export default function DatacenterSimulator({
     run(() => datacenterApi.enterRoom(sessionId, room.id), `Entered ${room.name}`)
   }
 
-  if (!loading && state && !loggedIn) {
+  if (loading) {
+    return (
+      <div className={simPanelRoot(embedded, 'bg-[#0b0e14]')}>
+        <LabChromeBar title="Data Center Console" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
+        <div className="flex-1 flex items-center justify-center p-6 text-sm text-slate-400">
+          Loading datacenter floor…
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !state) {
+    return (
+      <div className={simPanelRoot(embedded, 'bg-[#0b0e14]')}>
+        <LabChromeBar title="Data Center Console" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
+          <AlertTriangle className="text-amber-400" size={32} aria-hidden />
+          <p className="text-sm text-slate-300 max-w-md">
+            {error || 'Could not load datacenter state. Check that the lab session is running, then retry.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => refresh()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-orange-500/40 text-orange-300 text-sm hover:bg-orange-500/10"
+          >
+            <RefreshCw size={14} /> Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!loggedIn) {
     const submitLogin = (e) => {
       e.preventDefault()
       if (busy) return

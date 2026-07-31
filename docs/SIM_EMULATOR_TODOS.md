@@ -1,7 +1,8 @@
-# FixitLab Technology Emulator Roadmap — 120+ Todos
+# FixitLab Technology Emulator Roadmap — Enterprise Digital Twin
 
-Internal tracking for production-grade, pixel-accurate technology consoles.
-User-facing UI must never show: Simulation, Simulator, Demo, Mock, Sandbox, Practice Environment.
+Internal tracking for production-grade, pixel-accurate technology consoles
+that share one enterprise state (Digital Twin). User-facing UI must never show:
+Simulation, Simulator, Demo, Mock, Sandbox, Practice Environment.
 
 Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -333,14 +334,63 @@ Suggested order: P2.1 → P2.3 → P2.R1 → P2.R6 → P2.R2 → P2.2 → P2.R4 
 
 ---
 
+## S. Enterprise Infrastructure Digital Twin (north-star architecture)
+
+Vision: one living organization — identity, DC, cloud, network, virt, automation,
+monitoring, security, storage, AI infra, and software share **one backend state**.
+Learner-facing UI never says simulation/demo/mock.
+
+### S1 — Unified enterprise state bus
+210. [ ] Single asset/resource registry (hostname, serial, asset tag, rack/U, CPU/RAM/disk/RAID, firmware, BIOS, BMC, NICs, VLANs, GPUs, power/thermal, OS, deploy status, owner)
+211. [ ] Write-once identity: MAAS commission → appears in CMDB, DC twin, monitoring, Terraform import targets, AWX inventory
+212. [ ] Terraform apply → create/update/delete mirrors into AWS/Azure/GCP/VMware/MAAS/LXD consoles
+213. [ ] Hardware failure events fan out to Grafana alerts, SOC tickets, DCIM LEDs, and lab terminal `dmesg`
+214. [ ] Cross-console sync: disk/NIC/CPU/RAM edits in VMware/DC update guest `lsblk`/`ip`/`nvidia-smi`
+215. [ ] Persistent twin replay (undo/timeline) for cable/firmware/part swaps
+
+### S2 — Org login & living enterprise chrome
+216. [ ] Enterprise login → org home (not isolated “pick a lab” only)
+217. [ ] Shared nav: tickets, CMDB, monitoring, clouds, DC floor, Git, AWX
+218. [ ] RBAC personas (DC tech Dell/HPE badge, cloud eng, SRE, SOC analyst, interviewer)
+
+### S3 — Datacenter Steam-class immersion
+219. [ ] Reception → security → staging → repair bay → warehouse → dock → halls (walkable)
+220. [ ] Per-rack realism: servers, GPUs, ToR, storage, PDUs, UPS, CRAC, fiber/copper, LEDs, fan audio
+221. [ ] Full FRU RMA: locate → diagnose → order part → dock receive → swap → burn-in → close
+222. [ ] Ambient audio + blink patterns + thermal aisle effects (extend Q 180–185)
+
+### S4 — MAAS / PXE / VyOS / LXD / AWX integration spine
+223. [~] MAAS machines read/commission/deploy/release with **paced PXE stream** (DHCP→TFTP→scripts)
+224. [ ] MAAS UI pixel surface (or deepen BaremetalSimulator MAAS panes): region/rack, images, scripts
+225. [ ] Full PXE animation in DC twin (boot menu + Curtin + cloud-init)
+226. [~] VyOS CLI interfaces/DHCP/PXE helper; add commit/rollback + BGP/firewall UI
+227. [~] LXD list/start/stop + GPU passthrough; add clustering/projects/migration
+228. [~] AWX job templates (driver/DCGM/repave) streamed; inventory sync from MAAS
+229. [ ] Packer+GH Actions image factory publishes to MAAS boot-resources
+
+### S5 — Cloud / Terraform / GitOps / Dev / Security depth
+230. [ ] AWS/Azure/GCP full page matrices (extend C/D/E + P 160–162)
+231. [ ] Terraform multi-provider bridge + console dropdown links after apply
+232. [ ] GitOps: Git IDE + PR + Flux/Argo sync health end-to-end
+233. [ ] Coding IDEs for all language techs + HTML preview (finish 176)
+234. [ ] PeopleSoft app-server host persona (not generic EC2) (finish 175)
+235. [ ] SOC/SIEM events tied to twin assets (finish 172)
+236. [ ] Environment resolver CI: every scenario opens correct primary console + companions
+
+### S6 — Interview realism (see §R)
+237. [ ] Ship P2.R1–R7 before paid STT; keep 100% free constraint
+
+---
+
 ## Execution order (updated)
 
 1. **Ship** lab-surfaces PR (121–129) — hosting, links, ping stream, DC 3D fallback
 2. Consoles schema + academy coding_mode reseed (130–133)
 3. Terraform↔cloud bridge + AWS/DC load hardening (134–136)
 4. Jira mentions + contrast (137–138)
-5. **Merge PR #127** AI Infra Engineering (140–159) — ticket copy lint fixed
-6. AI Infra depth wave: 75×75 matrices, SKUs, VyOS, Packer, MAAS E2E (186–196)
+5. **Merge PR #127** AI Infra Engineering (140–159) — ticket copy lint fixed *(needs `gh auth refresh` if token expired)*
+6. AI Infra depth wave: 75×75 matrices, SKUs, VyOS, Packer, MAAS E2E (186–196, 223–229)
 7. Interview realism P2.R* (197–209) in parallel with coding IDE leftovers
-8. Per-tech 20-packs in priority waves (AWS/DC/GitOps/AI-ML first)
-9. Steam-class DC immersion (180–185)
+8. Unified state bus foundation (210–215) — unlocks true digital twin
+9. Per-tech 20-packs in priority waves (AWS/DC/GitOps/AI-ML first)
+10. Steam-class DC immersion (180–185, 219–222)

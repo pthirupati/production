@@ -18,8 +18,10 @@ class AiInfraMaasLxdPackerTests(SimpleTestCase):
         out = str(engine.shell.run("maas admin machine commission gpu-node-03"))
         self.assertIn("Commissioning", out)
         self.assertIn("Ready", out)
+        self.assertIn("PXE", out)
         deploy = str(engine.shell.run("maas admin machine deploy"))
         self.assertIn("Deploy", deploy)
+        self.assertIn("Curtin", deploy)
 
     def test_lxc_list_and_start(self):
         engine = UnifiedSimulationEngine(
@@ -54,6 +56,16 @@ class AiInfraMaasLxdPackerTests(SimpleTestCase):
         out = str(engine.shell.run("vyos show interfaces"))
         self.assertIn("eth1", out)
         self.assertIn("pxe", out.lower())
+
+    def test_maas_commission_streams_pxe_steps(self):
+        engine = UnifiedSimulationEngine(
+            scenario_slug="ai-infra-maas-commission-h100",
+            simulation_type="baremetal",
+        )
+        out = engine.shell.run("maas admin machine commission gpu-node-04")
+        self.assertIsInstance(out, StreamedCommandResult)
+        self.assertGreaterEqual(len(out.lines), 5)
+        self.assertTrue(any("TFTP" in ln or "DHCP" in ln for ln in out.lines))
 
     def test_maas_was_unreachable_before_filter_fix(self):
         """Regression: maas used to return None because only ipmitool matched."""

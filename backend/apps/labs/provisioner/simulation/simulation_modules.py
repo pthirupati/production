@@ -1794,11 +1794,20 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                         name = m["name"]
                         # Simulate quick transition for lab UX
                         m["status"] = "Ready"
-                        return (
-                            f"Commissioning started for {name}.\n"
-                            f"Scripts: 00-maas-03-install-lldpd, 20-maas-01-bmc, "
-                            f"50-maas-01-commissioning … done.\n"
-                            f"Status → Ready (commissioning passed)."
+                        from .shell import StreamedCommandResult
+                        return StreamedCommandResult(
+                            lines=[
+                                f"Commissioning started for {name}…",
+                                "BMC power on → PXE (undionly.kpxe)",
+                                "DHCP ACK 10.64.12.x from region controller",
+                                "TFTP: downloading kernel + initrd (ephemeral)",
+                                "Running 00-maas-03-install-lldpd … ok",
+                                "Running 20-maas-01-bmc … ok",
+                                "Running 50-maas-01-commissioning … ok",
+                                "Hardware inventory synced (CPU/RAM/NIC/GPU)",
+                                f"Status → Ready (commissioning passed for {name}).",
+                            ],
+                            delay_s=0.45,
                         )
                 return "No matching machine available to commission."
             if "deploy" in low:
@@ -1806,10 +1815,19 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                     if m["status"] == "Ready":
                         m["status"] = "Deployed"
                         m["ip"] = m["ip"] if m["ip"] != "-" else "10.64.12.40"
-                        return (
-                            f"Deploying Ubuntu 22.04 LTS to {m['name']} "
-                            f"(osystem=ubuntu, distro_series=jammy).\n"
-                            f"PXE boot → cloud-init → Deployed. IP {m['ip']}"
+                        from .shell import StreamedCommandResult
+                        return StreamedCommandResult(
+                            lines=[
+                                f"Deploying Ubuntu 22.04 LTS to {m['name']} "
+                                f"(osystem=ubuntu, distro_series=jammy)…",
+                                "PXE: DHCP discover → offer → request → ack",
+                                "TFTP: bootx64.efi / grubx64.efi / vmlinuz / initrd",
+                                "Curtin: partitioning + installing rootfs",
+                                "cloud-init: datasource MAAS, applying netplan + users",
+                                "Reboot → cloud-init final → sshd listening",
+                                f"Deployed. IP {m['ip']}  Status → Deployed",
+                            ],
+                            delay_s=0.5,
                         )
                 return "No Ready machine available to deploy (commission first)."
             if "release" in low:
