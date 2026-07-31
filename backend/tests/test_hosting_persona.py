@@ -31,6 +31,24 @@ class HostingPersonaTests(SimpleTestCase):
         platform = resolve_host_platform("generic", "disk-full", tech_slug="linux")
         self.assertIn(platform, ("vmware", "aws", "azure", "gcp", "baremetal"))
 
+    def test_vmware_link_forces_vmware_guest(self):
+        platform = resolve_host_platform(
+            "generic", "linux-nic-add-vmware-rescan", tech_slug="linux",
+        )
+        self.assertEqual(platform, "vmware")
+
+    def test_peoplesoft_does_not_rotate_to_cloud(self):
+        platform = resolve_host_platform(
+            "generic", "ps-role-missing", tech_slug="peoplesoft",
+        )
+        self.assertEqual(platform, "linux")
+
+    def test_javascript_academy_does_not_rotate_to_cloud(self):
+        platform = resolve_host_platform(
+            "python", "academy-javascript-001-learn-arrays", tech_slug="javascript",
+        )
+        self.assertEqual(platform, "linux")
+
     def test_disk_full_shows_pressure(self):
         engine = UnifiedSimulationEngine(scenario_slug="disk-full", simulation_type="generic")
         df = engine.shell.run("df -h")

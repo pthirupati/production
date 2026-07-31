@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import queue
 import threading
+import time
 import uuid
+from dataclasses import dataclass, field
 from typing import Callable
 
 from .terminal_input import TerminalLineEditor
@@ -21,6 +23,21 @@ def _to_crlf(text: str) -> str:
     if not text:
         return text
     return text.replace("\r\n", "\n").replace("\n", "\r\n")
+
+
+@dataclass
+class StreamedCommandResult:
+    """Line-by-line paced output for ping/traceroute-style commands.
+
+    ``run()`` / unit tests still stringify this to a single blob; the WebSocket
+    stream holder emits each line with ``delay_s`` between them.
+    """
+
+    lines: list[str] = field(default_factory=list)
+    delay_s: float = 0.35
+
+    def __str__(self) -> str:
+        return "\n".join(self.lines)
 
 
 class SimulationStreamHolder:
@@ -176,19 +193,26 @@ class SimulationStreamHolder:
                             self._emit("\x1b[2J\x1b[H")
                             self._emit(session.render())
                         continue
-                    if out:
+                    if isinstance(out, StreamedCommandResult):
+                        for i, line in enumerate(out.lines):
+                            body = _to_crlf(line)
+                            self._emit(body if body.endswith("\r\n") else body + "\r\n")
+                            if i < len(out.lines) - 1 and out.delay_s > 0:
+                                time.sleep(out.delay_s)
+                    elif out:
                         # Command handlers build output with bare "\n" line
                         # endings. A raw terminal (no line discipline) needs
                         # CRLF, otherwise each line starts where the previous one
                         # ended — the "staircase"/out-of-order output users saw.
                         # Normalize to CRLF and guarantee a trailing newline.
-                        body = _to_crlf(out)
+                        body = _to_crlf(str(out))
                         self._emit(body if body.endswith("\r\n") else body + "\r\n")
-                    if out and "login:" in out.lower():
+                    text_for_prompt = str(out) if out else ""
+                    if text_for_prompt and "login:" in text_for_prompt.lower():
                         self.set_prompt("")
-                    elif out and "grub rescue" in out.lower():
+                    elif text_for_prompt and "grub rescue" in text_for_prompt.lower():
                         self.set_prompt("grub rescue> ")
-                    elif out and "grub>" in out.lower() and "GNU GRUB" in out:
+                    elif text_for_prompt and "grub>" in text_for_prompt.lower() and "GNU GRUB" in text_for_prompt:
                         self.set_prompt("grub> ")
                 self._emit_prompt()
 

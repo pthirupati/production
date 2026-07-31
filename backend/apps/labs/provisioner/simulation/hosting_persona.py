@@ -80,38 +80,44 @@ def _slug_hash_pick(slug: str, choices: tuple[str, ...]) -> str:
     return choices[int(digest[:8], 16) % len(choices)]
 
 
-def load_scenario_hosted_as(slug: str) -> str | None:
-    """Read optional ``hosted_as`` / ``hosting_platform`` from scenario.yaml."""
+def _load_scenario_yaml(slug: str) -> dict:
+    """Load scenario.yaml for ``slug`` (empty dict if missing)."""
     if not slug:
-        return None
+        return {}
     try:
         from pathlib import Path
         import yaml
 
         root = Path(__file__).resolve().parents[5] / "scenarios"
         if not root.is_dir():
-            return None
+            return {}
         for candidate in root.rglob("scenario.yaml"):
             if candidate.parent.name != slug:
                 continue
             data = yaml.safe_load(candidate.read_text(encoding="utf-8")) or {}
-            raw = data.get("hosted_as") or data.get("hosting_platform")
-            if isinstance(raw, str) and raw.strip():
-                return raw.strip().lower()
-            # lab_servers[0].hosted_as / persona when primary is cloud guest
-            for decl in data.get("lab_servers") or []:
-                if not isinstance(decl, dict):
-                    continue
-                if str(decl.get("role") or "") == "primary" or True:
-                    h = decl.get("hosted_as") or decl.get("hosting_platform")
-                    if isinstance(h, str) and h.strip():
-                        return h.strip().lower()
-                    persona = str(decl.get("persona") or "").lower()
-                    if persona in HOST_PLATFORMS and persona not in ("linux",):
-                        return persona
-            break
+            return data if isinstance(data, dict) else {}
     except Exception:
+        return {}
+    return {}
+
+
+def load_scenario_hosted_as(slug: str) -> str | None:
+    """Read optional ``hosted_as`` / ``hosting_platform`` from scenario.yaml."""
+    data = _load_scenario_yaml(slug)
+    if not data:
         return None
+    raw = data.get("hosted_as") or data.get("hosting_platform")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip().lower()
+    for decl in data.get("lab_servers") or []:
+        if not isinstance(decl, dict):
+            continue
+        h = decl.get("hosted_as") or decl.get("hosting_platform")
+        if isinstance(h, str) and h.strip():
+            return h.strip().lower()
+        persona = str(decl.get("persona") or "").lower()
+        if persona in HOST_PLATFORMS and persona not in ("linux",):
+            return persona
     return None
 
 
@@ -126,6 +132,9 @@ def resolve_host_platform(
     st = (sim_type or "").strip().lower()
     tech = (tech_slug or "").strip().lower()
     low = (slug or "").lower()
+    meta = _load_scenario_yaml(slug) if slug else {}
+    if not tech:
+        tech = str(meta.get("technology") or "").strip().lower()
     explicit = (hosted_as or "").strip().lower() or load_scenario_hosted_as(slug)
 
     if explicit in HOST_PLATFORMS:
@@ -138,6 +147,10 @@ def resolve_host_platform(
         return "vmware"
     if explicit in ("physical", "ipmi", "maas"):
         return "baremetal"
+
+    # Explicit VMware companion / NIC-disk cross-tech labs are VMware guests.
+    if meta.get("vmware_link") is True or low.startswith(("linux-nic-add-vmware", "linux-disk-add-vmware")):
+        return "vmware"
 
     if st in ("aws", "azure", "gcp", "vmware", "openstack", "baremetal", "datacenter"):
         return st
@@ -159,14 +172,28 @@ def resolve_host_platform(
     if low.startswith(("academy-datacenter", "datacenter-", "dc-")) or tech == "datacenter":
         return "datacenter"
 
-    # Pure Linux / RHEL / generic practice labs AND other terminal-first techs:
-    # rotate hosting so learners see real Hosted-as + matching DMI (and Amazon
-    # Linux when hosted on AWS). Cloud-native sim types keep their own platform.
+    # App / coding / automation techs must not rotate onto fake cloud DMI
+    # (PeopleSoft looking like EC2, JS academy looking like Azure, etc.).
+    _NO_ROTATE = (
+        "peoplesoft", "javascript", "react", "java", "html", "shell-script", "nodejs",
+        "python", "ansible", "ansible-awx", "gitops", "ai-ml", "data-science",
+        "prompt-engineering",
+    )
+    if (
+        tech in _NO_ROTATE
+        or st in _NO_ROTATE
+        or low.startswith((
+            "ps-", "peoplesoft-", "academy-peoplesoft",
+            "academy-javascript", "academy-react", "academy-java", "academy-html",
+            "academy-shell", "js-", "react-", "java-", "html-", "shell-",
+        ))
+    ):
+        return "linux"
+
+    # Pure Linux / RHEL / generic practice labs: rotate hosting for realism.
     _ROTATE_TYPES = (
         "generic", "rhel", "linux", "", "devops", "docker", "networking",
-        "grafana", "prometheus", "ansible", "database", "python", "java",
-        "security", "gitops", "shell-script", "html", "javascript", "nodejs",
-        "react", "ai-ml", "data-science", "simulation",
+        "grafana", "prometheus", "database", "security", "simulation",
     )
     if st in _ROTATE_TYPES or tech in _ROTATE_TYPES or tech in ("linux", "rhel", ""):
         return _slug_hash_pick(low or tech or "linux", _LINUX_HOST_ROTATION)

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, Suspense } from 'react'
+import { Component, useCallback, useMemo, useRef, useState, Suspense } from 'react'
 import { datacenterApi } from '../../api/datacenter'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
@@ -28,6 +28,28 @@ import '../../styles/sim-products.css'
 import './DatacenterSimulator.css'
 
 const LazyDatacenterTwin3D = lazyWithRetry(() => import('./DatacenterTwin3D'))
+
+/** If WebGL/R3F throws, drop to 2D floor instead of the whole-lab error banner. */
+class Twin3DSafe extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { failed: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  componentDidCatch(error, info) {
+    console.error('Datacenter 3D twin failed — falling back to 2D floor', error, info)
+    try { this.props.onFallback?.() } catch { /* ignore */ }
+  }
+
+  render() {
+    if (this.state.failed) return null
+    return this.props.children
+  }
+}
 
 const DC_LAB_USER = 'lab_datacenter'
 const DC_LAB_PASS = 'lab_datacenter@123'
@@ -376,48 +398,50 @@ export default function DatacenterSimulator({
       </div>
 
       {currentRoom.type === 'data_hall' && floorView === '3d' && (
-        <Suspense fallback={<div className="dc-3d-loading">Loading 3D twin…</div>}>
-          <LazyDatacenterTwin3D
-            racks={roomRacks}
-            serversByRack={serversByRack}
-            network={network}
-            cooling={cooling}
-            pdus={pdus.length ? pdus : (powerChain.rack_pdus || [])}
-            selectedServerId={selectedServerId}
-            expandedRack={expandedRack}
-            onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}
-            onSelectRack={(id) => setExpandedRack((cur) => (cur === id ? null : id))}
-            onOpenBmc={(id) => { setSelectedServerId(id); setDrawerTab('bmc') }}
-            onUnplugCable={({ serverId, cableId } = {}) => {
-              const srv = (serverId && servers.find((s) => s.id === serverId))
-                || (selectedServerId && servers.find((s) => s.id === selectedServerId))
-                || servers.find((s) => (s.hardware?.cables || []).some((c) => ['loose', 'damaged', 'seated'].includes(c.status)))
-              if (!srv) return
-              const targetId = cableId
-                || (srv.hardware?.cables || []).find((c) => c.status === 'seated')?.id
-                || (srv.hardware?.cables || [])[0]?.id
-              doAction(
-                () => datacenterApi.unplugCable(sessionId, srv.id, targetId),
-                `Unplugged ${targetId || 'cable'} on ${srv.hostname || srv.id}`,
-                srv.id,
-              )
-            }}
-            onPlugCable={({ serverId, cableId } = {}) => {
-              const srv = (serverId && servers.find((s) => s.id === serverId))
-                || (selectedServerId && servers.find((s) => s.id === selectedServerId))
-                || servers.find((s) => (s.hardware?.cables || []).some((c) => ['loose', 'damaged', 'unseated'].includes(c.status)))
-              if (!srv) return
-              const targetId = cableId
-                || (srv.hardware?.cables || []).find((c) => ['loose', 'damaged', 'unseated'].includes(c.status))?.id
-                || (srv.hardware?.cables || [])[0]?.id
-              doAction(
-                () => datacenterApi.plugCable(sessionId, srv.id, targetId),
-                `Plugged ${targetId || 'cable'} on ${srv.hostname || srv.id}`,
-                srv.id,
-              )
-            }}
-          />
-        </Suspense>
+        <Twin3DSafe onFallback={() => setFloorView('2d')}>
+          <Suspense fallback={<div className="dc-3d-loading">Loading 3D twin…</div>}>
+            <LazyDatacenterTwin3D
+              racks={roomRacks}
+              serversByRack={serversByRack}
+              network={network}
+              cooling={cooling}
+              pdus={pdus.length ? pdus : (powerChain.rack_pdus || [])}
+              selectedServerId={selectedServerId}
+              expandedRack={expandedRack}
+              onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}
+              onSelectRack={(id) => setExpandedRack((cur) => (cur === id ? null : id))}
+              onOpenBmc={(id) => { setSelectedServerId(id); setDrawerTab('bmc') }}
+              onUnplugCable={({ serverId, cableId } = {}) => {
+                const srv = (serverId && servers.find((s) => s.id === serverId))
+                  || (selectedServerId && servers.find((s) => s.id === selectedServerId))
+                  || servers.find((s) => (s.hardware?.cables || []).some((c) => ['loose', 'damaged', 'seated'].includes(c.status)))
+                if (!srv) return
+                const targetId = cableId
+                  || (srv.hardware?.cables || []).find((c) => c.status === 'seated')?.id
+                  || (srv.hardware?.cables || [])[0]?.id
+                doAction(
+                  () => datacenterApi.unplugCable(sessionId, srv.id, targetId),
+                  `Unplugged ${targetId || 'cable'} on ${srv.hostname || srv.id}`,
+                  srv.id,
+                )
+              }}
+              onPlugCable={({ serverId, cableId } = {}) => {
+                const srv = (serverId && servers.find((s) => s.id === serverId))
+                  || (selectedServerId && servers.find((s) => s.id === selectedServerId))
+                  || servers.find((s) => (s.hardware?.cables || []).some((c) => ['loose', 'damaged', 'unseated'].includes(c.status)))
+                if (!srv) return
+                const targetId = cableId
+                  || (srv.hardware?.cables || []).find((c) => ['loose', 'damaged', 'unseated'].includes(c.status))?.id
+                  || (srv.hardware?.cables || [])[0]?.id
+                doAction(
+                  () => datacenterApi.plugCable(sessionId, srv.id, targetId),
+                  `Plugged ${targetId || 'cable'} on ${srv.hostname || srv.id}`,
+                  srv.id,
+                )
+              }}
+            />
+          </Suspense>
+        </Twin3DSafe>
       )}
 
       {currentRoom.type === 'data_hall' && floorView === '2d' && (
