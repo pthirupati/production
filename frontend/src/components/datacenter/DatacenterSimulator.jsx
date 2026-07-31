@@ -609,9 +609,24 @@ export default function DatacenterSimulator({
           <TrainingPanel
             training={training}
             busy={busy}
+            broken={broken}
             onStart={(id) => doAction(() => datacenterApi.trainingStart(sessionId, id), `Training ${id}`)}
             onStep={(step) => doAction(() => datacenterApi.trainingStep(sessionId, step), `Step: ${step}`)}
+            onClearFault={() => doAction(() => datacenterApi.clearFailure(sessionId), 'Fault cleared')}
           />
+          <div style={{ marginTop: '1rem' }}>
+            <FailureInjectBar
+              presets={hardwareCatalog.failure_presets}
+              busy={busy}
+              broken={broken}
+              assetId={selectedServerId}
+              onInject={(preset, assetId) => doAction(
+                () => datacenterApi.injectFailure(sessionId, preset, assetId),
+                `Injected ${preset}`,
+              )}
+              onClear={() => doAction(() => datacenterApi.clearFailure(sessionId), 'Fault cleared')}
+            />
+          </div>
           <div style={{ marginTop: '1rem' }}>
             <CapacityPdmPanel
               capacity={capacity}
@@ -899,12 +914,14 @@ export default function DatacenterSimulator({
                 <FailureInjectBar
                   presets={hardwareCatalog.failure_presets}
                   busy={busy}
+                  broken={broken}
                   assetId={selectedServer.id}
                   onInject={(preset, assetId) => doAction(
                     () => datacenterApi.injectFailure(sessionId, preset, assetId),
                     `Injected ${preset}`,
                     assetId,
                   )}
+                  onClear={() => doAction(() => datacenterApi.clearFailure(sessionId), 'Fault cleared')}
                 />
                 {(hardwareCatalog.server_oems || []).length > 0 && (
                   <div className="dc-muted mt-2">

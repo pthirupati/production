@@ -335,3 +335,34 @@ class CampusPlantOpsTests(SimpleTestCase):
         ul = dc.get_state(self.session_id)["state"]["optical"]["idf"]["uplinks"][0]
         self.assertEqual(ul["status"], "down")
 
+
+class FailureTrainingTests(SimpleTestCase):
+    def setUp(self):
+        cache.clear()
+        self.session_id = str(uuid.uuid4())
+        self.addCleanup(cache.clear)
+
+    def test_training_inject_and_clear_failure(self):
+        dc.get_state(self.session_id)
+        r = dc.apply_action(self.session_id, "training_start", {"scenario_id": "ts-psu"})
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(r.get("injected"), "psu")
+        state = dc.get_state(self.session_id)["state"]
+        self.assertEqual(state.get("broken", {}).get("component"), "power")
+        self.assertEqual(state.get("training", {}).get("active"), "ts-psu")
+
+        r2 = dc.apply_action(self.session_id, "clear_failure", {})
+        self.assertTrue(r2["ok"], r2)
+        state = dc.get_state(self.session_id)["state"]
+        self.assertFalse(state.get("broken"))
+        self.assertIn("Clear fault", state.get("training", {}).get("progress") or [])
+
+    def test_inject_cooling_and_clear(self):
+        dc.get_state(self.session_id)
+        r = dc.apply_action(self.session_id, "inject_failure", {"preset": "cooling"})
+        self.assertTrue(r["ok"], r)
+        state = dc.get_state(self.session_id)["state"]
+        self.assertEqual(state["broken"]["component"], "cooling")
+        r2 = dc.apply_action(self.session_id, "clear_failure", {})
+        self.assertTrue(r2["ok"], r2)
+        self.assertFalse(dc.get_state(self.session_id)["state"].get("broken"))

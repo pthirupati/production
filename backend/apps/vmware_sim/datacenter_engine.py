@@ -1674,6 +1674,85 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": f"Failure injected: {preset['label']}", "broken": state.get("broken")}
 
+    if action == "clear_failure":
+        broken = state.get("broken") or {}
+        if not broken:
+            return {"ok": True, "message": "No open fault", "broken": {}}
+        # Light remediations so Clear fault is usable after inject without a full FRU path
+        comp = broken.get("component")
+        srv = _find_server(state, broken.get("server") or "") if broken.get("server") else None
+        if srv and comp in (srv.get("components") or {}):
+            srv["components"][comp] = "ok"
+        if srv and comp == "fan":
+            for f in (srv.get("hardware") or {}).get("fans") or []:
+                if f.get("status") == "failed":
+                    f["status"] = "healthy"
+                    f["rpm"] = f.get("rpm") or 7200
+        if srv and comp == "dimm":
+            for slot in (srv.get("motherboard") or {}).get("dimm_slots") or []:
+                if slot.get("status") == "failed":
+                    slot["status"] = "ok"
+                    slot["ecc_corrections_24h"] = 0
+        if srv and comp == "raid":
+            raid = srv.get("raid") or {}
+            for d in raid.get("physical_disks") or []:
+                if d.get("status") == "failed":
+                    d["status"] = "online"
+                    d["smart"] = "OK"
+            for vd in raid.get("virtual_disks") or []:
+                if vd.get("status") == "degraded":
+                    vd["status"] = "optimal"
+        if srv and comp == "cable":
+            for c in (srv.get("hardware") or {}).get("cables") or []:
+                if c.get("status") in ("damaged", "loose"):
+                    c["status"] = "ok"
+        if srv and comp == "firmware":
+            if srv.get("firmware_version") == "CORRUPT":
+                srv["firmware_version"] = "2.0.0"
+        if srv and comp == "pxe":
+            bios = srv.setdefault("bios", {})
+            bios.setdefault("settings", {})["PXEBoot"] = "Enabled"
+        if comp == "cooling":
+            for u in state.get("cooling") or []:
+                if u.get("status") == "failed":
+                    u["status"] = "running"
+                    u["ashrae_ok"] = True
+                    u["temp_c"] = 22.0
+            _recompute_facility(state)
+        if comp == "ups":
+            ups = (state.get("power_chain") or {}).get("ups")
+            if isinstance(ups, dict):
+                ups["status"] = "online"
+                ups["on_battery"] = False
+            elif isinstance(ups, list):
+                for u in ups:
+                    u["status"] = "online"
+                    u["on_battery"] = False
+        if comp == "cable" or (broken.get("detail") == "fiber"):
+            from apps.vmware_sim.datacenter_facility_ops import build_optical, optical_op
+            opt = state.get("optical") or build_optical()
+            for tr in opt.get("trunks") or []:
+                if tr.get("status") == "cut":
+                    _, _, opt = optical_op(opt, "repair_fiber", trunk_id=tr["id"])
+            state["optical"] = opt
+        if comp in ("leak", "fire"):
+            fac = state.setdefault("facility", {})
+            if fac.get("alarm") in ("leak", "fire"):
+                fac["alarm"] = None
+        broken.clear()
+        state["broken"] = {}
+        state["goal"] = {"title": "Facility clear", "objective": "No open injected faults."}
+        training = state.get("training") or {}
+        if training.get("active"):
+            prog = training.setdefault("progress", [])
+            if "Clear fault" not in prog:
+                prog.append("Clear fault")
+            training["feedback"] = "Fault cleared. Training step recorded."
+        _twin_journal(state, "clear_failure", {"component": comp})
+        _event(state, f"Cleared fault ({comp or 'unknown'})", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Fault cleared", "broken": {}, "training": training}
+
     if action == "service_mode_action":
         asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
         op = payload.get("op") or ""
@@ -2653,16 +2732,41 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     if action == "training_start":
         from apps.vmware_sim.datacenter_physics_ops import build_training_scenarios
         training = state.setdefault("training", {"scenarios": build_training_scenarios(), "active": None, "progress": []})
-        if not training.get("scenarios"):
-            training["scenarios"] = build_training_scenarios()
+        # Refresh scenario list so new troubleshoot drills appear on older sessions
+        training["scenarios"] = build_training_scenarios()
         sid = payload.get("scenario_id") or "dc-tech"
         scen = next((s for s in training["scenarios"] if s["id"] == sid), training["scenarios"][0])
         training["active"] = scen["id"]
         training["progress"] = []
         training["feedback"] = f"Started: {scen['role']}. Complete steps in order."
+        inject = scen.get("inject")
+        injected = None
+        if inject:
+            # Auto-inject linked failure so the drill starts with a live fault
+            inj = apply_action(session_id, "inject_failure", {
+                "preset": inject,
+                "asset_id": payload.get("asset_id") or state.get("selected_asset") or "",
+            })
+            # Reload entry after nested apply_action persisted
+            entry = _ensure(session_id)
+            state = entry["state"]
+            training = state.setdefault("training", training)
+            training["active"] = scen["id"]
+            training["progress"] = []
+            if inj.get("ok"):
+                training["feedback"] = f"Started: {scen['role']}. Fault injected ({inject}). Remediate, then Clear fault."
+                injected = inject
+            else:
+                training["feedback"] = f"Started: {scen['role']}. Inject failed: {inj.get('error')}"
         _event(state, f"Training started: {scen['role']}", "info")
         _save(session_id, entry)
-        return {"ok": True, "message": f"Training {scen['id']}", "training": training}
+        return {
+            "ok": True,
+            "message": f"Training {scen['id']}",
+            "training": training,
+            "injected": injected,
+            "broken": state.get("broken"),
+        }
 
     if action == "training_complete_step":
         training = state.setdefault("training", {})
