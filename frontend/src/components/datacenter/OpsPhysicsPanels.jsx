@@ -568,10 +568,37 @@ export function EnvironmentalPanel({ environmental, busy, onOp }) {
 /** FEF / MMR / MPO optical plant */
 export function OpticalPanel({ optical, busy, onOp }) {
   const opt = optical || {}
-  if (!opt.fef) return <p className="dc-muted">No optical plant.</p>
+  if (!opt.fef && !opt.idf) return <p className="dc-muted">No optical plant.</p>
   return (
     <div className="dc-twin-panel">
-      <div className="dc-twin-title"><Network size={13} /> Optical · FEF / MMR / MPO</div>
+      <div className="dc-twin-title"><Network size={13} /> Optical · FEF / MMR / MPO / IDF</div>
+      {opt.idf && (
+        <>
+          <div className="dc-drawer-label">IDF closet ({opt.idf.id} · floor {opt.idf.floor})</div>
+          <div className="dc-action-row">
+            <span className="dc-topology-chip">
+              {opt.idf.access_switch?.id} · {opt.idf.access_switch?.model} · {opt.idf.access_switch?.status}
+            </span>
+          </div>
+          {(opt.idf.patch_panels || []).map((p) => (
+            <div key={p.id} className="dc-action-row">
+              <span className="dc-muted">{p.id}: {p.populated}/{p.ports} {p.media}</span>
+              <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onOp?.('idf_patch', { panel_id: p.id, delta: 1 })}>+Port</button>
+              <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('idf_patch', { panel_id: p.id, delta: -1 })}>−Port</button>
+            </div>
+          ))}
+          {(opt.idf.uplinks || []).map((u) => (
+            <div key={u.id} className="dc-action-row">
+              <span className="dc-topology-chip">{u.id}: {u.from}→{u.to} · {u.media} · {u.status}</span>
+              <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('idf_uplink_toggle', { uplink_id: u.id })}>
+                {u.status === 'up' ? 'Take down' : 'Bring up'}
+              </button>
+            </div>
+          ))}
+        </>
+      )}
+      {opt.fef && (
+        <>
       <div className="dc-drawer-label">Fiber entrance (FEF)</div>
       {(opt.fef?.carriers || []).map((c) => (
         <div key={c.id} className="dc-action-row">
@@ -583,6 +610,8 @@ export function OpticalPanel({ optical, busy, onOp }) {
           )}
         </div>
       ))}
+        </>
+      )}
       <div className="dc-drawer-label mt-2">Meet-Me cross-connects</div>
       {(opt.mmr?.cross_connects || []).map((x) => (
         <div key={x.id} className="dc-action-row">

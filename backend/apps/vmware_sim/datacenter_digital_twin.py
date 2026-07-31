@@ -522,6 +522,17 @@ def campus_assets() -> dict:
             ],
             "received_today": 3,
         },
+        "spares": {
+            "bins": [
+                {"id": "BIN-PSU", "sku": "PSU-R760", "label": "R760 PSU FRU", "qty": 4, "min_qty": 2, "location": "A-1"},
+                {"id": "BIN-DIMM", "sku": "DIMM-128GB", "label": "DIMM kit 128GB", "qty": 6, "min_qty": 2, "location": "A-2"},
+                {"id": "BIN-SSD", "sku": "SSD-1.92TB", "label": "NVMe 1.92TB", "qty": 5, "min_qty": 2, "location": "B-1"},
+                {"id": "BIN-DAC", "sku": "DAC-25G", "label": "25G DAC 3m", "qty": 12, "min_qty": 4, "location": "C-1"},
+            ],
+            "issued_today": 0,
+            "quarantine": [],
+            "kits_staged": [],
+        },
         "parking": {"spaces": 48, "occupied": 12},
         "access": {"gate": "secured", "biometrics": "online", "cameras": 24},
         "events": [{"time": _now(), "message": "Campus plant telemetry online"}],

@@ -263,6 +263,17 @@ def build_optical() -> dict:
             {"id": "MDF-PP-1", "ports": 48, "media": "LC duplex", "populated": 36},
             {"id": "DH-PP-A", "ports": 24, "media": "MPO-LC harness", "populated": 18},
         ],
+        "idf": {
+            "id": "IDF-1",
+            "floor": "L2",
+            "access_switch": {"id": "IDF-ASW-1", "model": "Catalyst 9300", "status": "up"},
+            "patch_panels": [
+                {"id": "IDF-PP-1", "ports": 24, "populated": 16, "media": "Cat6A"},
+            ],
+            "uplinks": [
+                {"id": "UL-IDF-MDF", "from": "IDF-ASW-1", "to": "MDF-PP-1", "media": "SMF LC", "status": "up"},
+            ],
+        },
         "events": [{"time": _now(), "message": "Optical plant OTDR baseline within budget"}],
     }
 
@@ -321,6 +332,42 @@ def optical_op(opt: dict, op: str, **kwargs) -> tuple[bool, str, dict]:
                 c["status"] = "up"
                 return True, f"{cid} up", opt
         return False, f"Carrier {cid} not found", opt
+
+    # Ensure IDF closet exists on older sessions
+    idf = opt.setdefault("idf", {
+        "id": "IDF-1",
+        "floor": "L2",
+        "access_switch": {"id": "IDF-ASW-1", "model": "Catalyst 9300", "status": "up"},
+        "patch_panels": [{"id": "IDF-PP-1", "ports": 24, "populated": 16, "media": "Cat6A"}],
+        "uplinks": [{"id": "UL-IDF-MDF", "from": "IDF-ASW-1", "to": "MDF-PP-1", "media": "SMF LC", "status": "up"}],
+    })
+
+    if op == "idf_patch":
+        delta = int(kwargs.get("delta") or 1)
+        panels = idf.get("patch_panels") or []
+        pp = next((p for p in panels if p.get("id") == kwargs.get("panel_id")), None) if kwargs.get("panel_id") else (panels[0] if panels else None)
+        if not pp:
+            return False, "IDF patch panel not found", opt
+        ports = int(pp.get("ports") or 24)
+        populated = max(0, min(ports, int(pp.get("populated") or 0) + delta))
+        pp["populated"] = populated
+        opt.setdefault("events", []).insert(0, {"time": _now(), "message": f"IDF patch {pp['id']} → {populated}/{ports}"})
+        return True, f"{pp['id']} {populated}/{ports}", opt
+
+    if op == "idf_uplink_toggle":
+        uid = kwargs.get("uplink_id") or "UL-IDF-MDF"
+        ul = next((u for u in (idf.get("uplinks") or []) if u.get("id") == uid), None)
+        if not ul:
+            return False, f"Uplink {uid} not found", opt
+        ul["status"] = "down" if ul.get("status") == "up" else "up"
+        sw = idf.get("access_switch") or {}
+        if ul["status"] == "down":
+            sw["status"] = "degraded"
+        else:
+            sw["status"] = "up"
+        idf["access_switch"] = sw
+        opt.setdefault("events", []).insert(0, {"time": _now(), "message": f"IDF uplink {uid} {ul['status']}"})
+        return True, f"{uid} {ul['status']}", opt
 
     return False, f"Unknown optical op: {op}", opt
 
@@ -459,11 +506,47 @@ def ensure_campus_plant(campus: dict, power_chain: dict | None = None) -> dict:
     ])
     c.setdefault("parking", {"spaces": 48, "occupied": 12})
     c.setdefault("events", [])
+    if not c.get("spares"):
+        c["spares"] = {
+            "bins": [
+                {"id": "BIN-PSU", "sku": "PSU-R760", "label": "R760 PSU FRU", "qty": 4, "min_qty": 2, "location": "A-1"},
+                {"id": "BIN-DIMM", "sku": "DIMM-128GB", "label": "DIMM kit 128GB", "qty": 6, "min_qty": 2, "location": "A-2"},
+                {"id": "BIN-SSD", "sku": "SSD-1.92TB", "label": "NVMe 1.92TB", "qty": 5, "min_qty": 2, "location": "B-1"},
+                {"id": "BIN-DAC", "sku": "DAC-25G", "label": "25G DAC 3m", "qty": 12, "min_qty": 4, "location": "C-1"},
+            ],
+            "issued_today": 0,
+            "quarantine": [],
+            "kits_staged": [],
+        }
+    else:
+        sp = c["spares"]
+        sp.setdefault("bins", [])
+        sp.setdefault("issued_today", 0)
+        sp.setdefault("quarantine", [])
+        sp.setdefault("kits_staged", [])
     return c
 
 
+def _restock_from_contents(spares: dict, contents: str) -> str | None:
+    """Match dock ASN contents to a spare bin sku/label; bump qty by 1."""
+    hay = (contents or "").lower()
+    if not hay:
+        return None
+    for bin_row in spares.get("bins") or []:
+        keys = [bin_row.get("sku") or "", bin_row.get("label") or "", bin_row.get("id") or ""]
+        if any(k and k.lower() in hay for k in keys):
+            bin_row["qty"] = int(bin_row.get("qty") or 0) + 1
+            return bin_row.get("id")
+        # partial token match (e.g. "PSU" in "R760 PSU FRU")
+        for token in ("psu", "dimm", "ssd", "nvme", "dac"):
+            if token in hay and token in (bin_row.get("label") or "").lower():
+                bin_row["qty"] = int(bin_row.get("qty") or 0) + 1
+                return bin_row.get("id")
+    return None
+
+
 def campus_plant_op(campus: dict, power_chain: dict | None, op: str, **kwargs) -> tuple[bool, str, dict]:
-    """Mutate exterior plant rooms: dock receive, chiller start/stop, XFMR note, battery sync, parking."""
+    """Mutate exterior plant rooms: dock receive, chiller start/stop, XFMR note, battery sync, parking, spares."""
     c = ensure_campus_plant(campus or {}, power_chain)
     pc = power_chain or {}
     op = (op or "").strip()
@@ -484,8 +567,10 @@ def campus_plant_op(campus: dict, power_chain: dict | None, op: str, **kwargs) -
         item["status"] = "received"
         dock["received_today"] = int(dock.get("received_today") or 0) + 1
         dock["occupied_bays"] = max(0, int(dock.get("occupied_bays") or 1) - 1)
-        _log(f"Dock received {item['id']} · {item.get('contents')}")
-        return True, f"Received {item['id']}", c
+        restocked = _restock_from_contents(c["spares"], item.get("contents") or "")
+        extra = f" · restocked {restocked}" if restocked else ""
+        _log(f"Dock received {item['id']} · {item.get('contents')}{extra}")
+        return True, f"Received {item['id']}{extra}", c
 
     if op == "arrive_dock":
         dock = c["loading_dock"]
@@ -504,6 +589,60 @@ def campus_plant_op(campus: dict, power_chain: dict | None, op: str, **kwargs) -
         dock["occupied_bays"] = min(int(dock.get("bays") or 2), int(dock.get("occupied_bays") or 0) + 1)
         _log(f"Truck at bay · {inbound['id']}")
         return True, f"{inbound['id']} at bay", c
+
+    if op == "issue_spare":
+        spares = c["spares"]
+        bid = kwargs.get("bin_id") or kwargs.get("id")
+        bin_row = next((b for b in (spares.get("bins") or []) if b.get("id") == bid), None)
+        if not bin_row:
+            return False, "Spare bin not found", c
+        if int(bin_row.get("qty") or 0) <= 0:
+            return False, f"{bid} empty", c
+        bin_row["qty"] = int(bin_row["qty"]) - 1
+        spares["issued_today"] = int(spares.get("issued_today") or 0) + 1
+        asset = kwargs.get("asset_id")
+        if asset:
+            spares.setdefault("kits_staged", []).insert(0, {
+                "id": f"KIT-{spares['issued_today']}",
+                "sku": bin_row.get("sku"),
+                "bin_id": bid,
+                "for_asset": asset,
+                "status": "staged",
+            })
+            spares["kits_staged"] = spares["kits_staged"][:20]
+        _log(f"Issued {bin_row.get('sku')} from {bid} · qty {bin_row['qty']}")
+        return True, f"Issued {bin_row.get('sku')}", c
+
+    if op == "restock_spare":
+        spares = c["spares"]
+        bid = kwargs.get("bin_id") or kwargs.get("id")
+        bin_row = next((b for b in (spares.get("bins") or []) if b.get("id") == bid), None)
+        if not bin_row:
+            return False, "Spare bin not found", c
+        delta = max(1, int(kwargs.get("qty") or 1))
+        bin_row["qty"] = int(bin_row.get("qty") or 0) + delta
+        _log(f"Restocked {bid} +{delta} → {bin_row['qty']}")
+        return True, f"{bid} qty {bin_row['qty']}", c
+
+    if op == "quarantine_spare":
+        spares = c["spares"]
+        bid = kwargs.get("bin_id") or kwargs.get("id")
+        bin_row = next((b for b in (spares.get("bins") or []) if b.get("id") == bid), None)
+        if not bin_row:
+            return False, "Spare bin not found", c
+        if int(bin_row.get("qty") or 0) <= 0:
+            return False, f"{bid} empty", c
+        bin_row["qty"] = int(bin_row["qty"]) - 1
+        spares.setdefault("quarantine", []).insert(0, {
+            "id": f"Q-{bid}-{int(bin_row['qty'])}",
+            "bin_id": bid,
+            "sku": bin_row.get("sku"),
+            "reason": kwargs.get("reason") or "failed_burnin",
+            "time": _now(),
+        })
+        spares["quarantine"] = spares["quarantine"][:30]
+        _log(f"Quarantined 1× {bin_row.get('sku')} from {bid}")
+        return True, f"Quarantined {bin_row.get('sku')}", c
 
     if op in ("start_chiller", "stop_chiller"):
         cid = kwargs.get("chiller_id") or kwargs.get("id")

@@ -688,7 +688,7 @@ export default function DatacenterSimulator({
         </div>
       )}
 
-      {(currentRoom.id === 'fef' || currentRoom.id === 'mmr' || currentRoom.id === 'cable-room') && (
+      {(currentRoom.id === 'fef' || currentRoom.id === 'mmr' || currentRoom.id === 'cable-room' || currentRoom.id === 'idf') && (
         <div className="dc-room-body">
           <OpticalPanel
             optical={optical}
@@ -755,6 +755,7 @@ export default function DatacenterSimulator({
         && currentRoom.id !== 'fef'
         && currentRoom.id !== 'mmr'
         && currentRoom.id !== 'cable-room'
+        && currentRoom.id !== 'idf'
         && currentRoom.id !== 'generator-yard'
         && currentRoom.id !== 'security-gate' && (
         <div className="dc-room-body">
