@@ -11,10 +11,49 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: GPU usage or memory is unexpected. You are on call
-  for AI Infrastructure Engineering and must troubleshoot nvidia-smi monitoring methodically
-  — triage symptoms, isolate root cause, apply the smallest safe fix, and confirm
-  recovery.'
+description: 'CONTEXT: A team operating AI infrastructure engineering has raised a ticket for `Nvidia-Smi
+  Monitoring — Troubleshoot`. A customer-facing workflow is degraded and the on-call engineer (you) must
+  diagnose and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GPU bare-metal lab (MAAS + node + Datacenter twin
+  + AWX). The architecture is a single lab-primary node exposing MAAS commissioning, LXD, PXE/BMC, nvidia-smi/DCGM/rocm-smi,
+  AWX jobs, and Datacenter twin; treat it as the production host for this incident. All tools run locally
+  — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The lab environment is degraded. Gpu usage or memory is unexpected. Recent
+  changes may exist around nvidia-smi monitoring, but do not restart blindly — gather evidence first.
+  Production alert: GPU usage or memory is unexpected. You are on call for AI Infrastructure Engineering
+  and must troubleshoot nvidia-smi monitoring methodically — triage symptoms, isolate root cause, apply
+  the smallest safe fix, and confirm recovery.
+
+
+  OBJECTIVE: The incident symptom is clear: GPU usage or memory is unexpected; Root cause is isolated
+  with evidence, not guesswork; Service behavior returns to normal after the fix. Acceptance criteria:
+  the change is minimal and reversible, and success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant MAAS commissioning, LXD, PXE/BMC, nvidia-smi/DCGM/rocm-smi, AWX jobs, and Datacenter
+  twin), changing one thing at a time. Check your work continuously against the objective — success means
+  `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
+  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - 'The incident symptom is clear: GPU usage or memory is unexpected'
 - Root cause is isolated with evidence, not guesswork
@@ -25,37 +64,45 @@ initial_state: The lab environment is degraded. Gpu usage or memory is unexpecte
 hints:
 - order: 1
   cost: 0
-  content: 'Orient yourself before changing anything:
+  content: 'ORIENT — what to observe and why:
 
-    1. Inspect the current state — `nvidia-smi` and `nvidia-smi dmon`.
-
-    2. Write down what looks normal versus wrong or missing for nvidia-smi monitoring.
-
-    3. Review the architecture diagram and objectives. Form one hypothesis before
-    you act.'
+    Do not touch anything yet. First observe the symptom: GPU usage or memory is unexpected. This lab
+    is about nvidia-smi monitoring — utilization, memory, and processes. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Plan your approach (still no spoilers):
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Confirm the exact gap between current and desired state for nvidia-smi monitoring.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    Work from evidence, not guesses. For nvidia-smi monitoring problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
+    the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Re-check the current state — `nvidia-smi` and `nvidia-smi dmon`.
+    Run `nvidia-smi` and `dmesg | grep -i nvidia` for driver visibility.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Fix the underlying misconfiguration you identified (not just the noisy log
-    line), changing one thing at a time.
+    1. Check if the GPU appears in `lspci | grep -i nvidia`.
 
-    3. Verify the result — GPU metrics reflect the running workload.
+    2. Verify the correct driver module is loaded (`lsmod | grep nvidia`).
 
-    4. Click Check Solution once the objective is met (graded on real state, not a
-    marker file).'
+    3. Look for Xid errors or fallen-off-bus messages in dmesg.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Reload driver, rebind PCI, or fix persistence mode per the scenario.
+
+    2. Re-run `nvidia-smi`.
+
+    3. Confirm GPU name and memory report without errors.
+
+
+    WHY: workloads need the driver to see the device.'
 consoles:
 - terminal
 hosted_as: baremetal

@@ -239,26 +239,37 @@ Update this file as items complete. Keep internal code names (`*Simulator`, `sim
 New tech slug: `ai-infra` (MAAS · VyOS · LXD · AWX · GPU DC · DCGM · Packer images).
 **Does not invent parallel UIs** — scenarios set `simulation_type` + `consoles` to open Bare Metal, Datacenter, AWX, or GPU terminal.
 
-140. [~] Technology seed + catalog page + subscription product (`ai-infra`)
-141. [~] Lab surfaces: reuse MAAS/baremetal + DC twin + AWX + GPU terminal
-142. [~] Scenario pack (150): academy 145 + heroes (DCOPS thermal, MAAS commission, ESC dcgm-exporter, AWX driver, SXM tray)
+140. [x] Technology seed + catalog page + subscription product (`ai-infra`) — PR #127
+141. [x] Lab surfaces: reuse MAAS/baremetal + DC twin + AWX + GPU terminal
+142. [x] Scenario pack (150): academy 145 + heroes (DCOPS thermal, MAAS commission, ESC dcgm-exporter, AWX driver, SXM tray)
 143. [~] NVIDIA: `nvidia-smi dmon` / `pmon` / `-l` paced streaming (continue full 75-flag matrix)
 144. [~] AMD: `rocm-smi --show*` + streamed `amd-smi monitor` (continue full matrix)
 145. [ ] Ops runbooks: scp diag scripts MAAS↔node, PSBCheck, fieldiag, dcgmprofrunner, gpu-admin-tools PPCIe/CC
-146. [~] DCOps tickets: thermal / tray / commission heroes from wiki+Jira patterns
+146. [x] DCOps tickets: thermal / tray / commission heroes from wiki+Jira patterns
 147. [ ] Image factory: Packer + Terraform + Python + shell + upstream base + vuln fix (no manual)
 148. [ ] Pixel parity: NVIDIA green / AMD red telemetry consoles; MAAS commission timeline
 149. [ ] Cross-link: Datacenter twin GPU trays ↔ ai-infra scenarios
-150. [~] Baremetal/imgdev wiki import → outlines (PSINFRA, ESC, DCOPS, GM1 escalation)
+150. [x] Baremetal/imgdev wiki import → outlines (PSINFRA, ESC, DCOPS, GM1 escalation)
 151. [ ] NCCL/RCCL stress + DCGM exporter scrape in monitoring companion
 152. [ ] Dell/HPE engineer badge + access control for rack entry (DC twin)
 153. [ ] Soundscape + LED blink realism (Steam-like immersion target for DC)
-154. [~] 150 learn/build/operate/troubleshoot/production scenarios authored
+154. [x] 150 learn/build/operate/troubleshoot/production scenarios authored + ticket-format lint
 155. [ ] CI lint: ai-infra scenarios never host as wrong cloud without `hosted_as`
-156. [~] Docs: learner path AI Infra Engineer career track (catalog entry)
+156. [x] Docs: learner path AI Infra Engineer career track (catalog entry)
 157. [ ] GPU MIG / vGPU partitions in twin + terminal
 158. [ ] Multi-node NVLink fabric view in DC + `nvidia-smi nvlink`
 159. [ ] End-to-end commission → burn-in → production handoff project
+186. [ ] Full NVIDIA 75-command matrix (query/dmon/pmon/topo/lock clocks/ECC/accounting)
+187. [ ] Full AMD 75-command matrix (rocm-smi + amd-smi + sysfs/debugfs)
+188. [ ] GPU SKU matrix: H100 / H200 / B300 / A100 / L40S / MI300X with correct PCIe/SXM topology
+189. [ ] VyOS UI + CLI: VLANs, BGP, firewall, DHCP helper for PXE; sync with DC switch fabric
+190. [ ] MAAS E2E: enlist → commission → deploy → release; scripts + PXE boot menu
+191. [ ] LXD GPU passthrough profiles + nested lab containers for burn-in
+192. [ ] AWX job templates for driver install, DCGM exporter, image repave (inventory from MAAS)
+193. [ ] DCOps RMA deep flow: FRU → parts availability → dock → install → burn-in → close
+194. [ ] Packer image factory CI: GitHub Actions + Packer + Terraform + CVE gate + publish
+195. [ ] `dcgm-exporter` + Prometheus/Grafana companion scrape in ai-infra observability labs
+196. [ ] Integrated stack demo: MAAS node + VyOS underlay + LXD + AWX + DC twin + GPU CLI as one project
 
 ---
 
@@ -300,12 +311,36 @@ Track as waves; mark `[~]`/`[x]` when a 20-pack lands. Each tech needs: brand co
 
 ---
 
+## R. Interview Bot — "Feels Like a Real Call" (P2 realism, 100% free)
+
+Rule-based only (`interview_ai.py` + `services/conversation/` + new `services/realism/`). No paid LLM/STT/TTS.
+
+197. [ ] **P2.R1** Response-timing model (`realism/timing.py`) — think-time + jitter + "persona is typing"
+198. [ ] **P2.R2** Backchannel layer (`realism/backchannel.py`) — live mm-hmm/okay off interim STT
+199. [ ] **P2.R3** Lab narration — real-time reactions to streamed commands (needs P2.4)
+200. [ ] **P2.R4** Wrong-answer probing state machine (narrow → hint → graceful move-on)
+201. [ ] **P2.R5** Callback memory → phrasing (in-round + cross-round from prior report)
+202. [ ] **P2.R6** Small-talk framing beats (2–3 turn open/close)
+203. [ ] **P2.R7** Phrasing variety / disfluency guard
+204. [ ] **P2.1** Fix browser voice loop + in-room voice switcher
+205. [ ] **P2.2** Barge-in + skip-on-silence
+206. [ ] **P2.3** Human follow-ups (quote-the-candidate, de-dupe)
+207. [ ] **P2.4** Inline practical validation + checker stream
+208. [ ] **P2.5** Resume score + tips
+209. [ ] **P2.6–P2.R8** Vosk STT + WS streaming + server-side backchannel (later)
+
+Suggested order: P2.1 → P2.3 → P2.R1 → P2.R6 → P2.R2 → P2.2 → P2.R4 → P2.R7 → P2.R5 → P2.4 → P2.R3 → …
+
+---
+
 ## Execution order (updated)
 
 1. **Ship** lab-surfaces PR (121–129) — hosting, links, ping stream, DC 3D fallback
 2. Consoles schema + academy coding_mode reseed (130–133)
 3. Terraform↔cloud bridge + AWS/DC load hardening (134–136)
 4. Jira mentions + contrast (137–138)
-5. AI Infra Engineering tech bootstrap (140–159)
-6. Per-tech 20-packs in priority waves (AWS/DC/GitOps/AI-ML first)
-7. Steam-class DC immersion (180–185)
+5. **Merge PR #127** AI Infra Engineering (140–159) — ticket copy lint fixed
+6. AI Infra depth wave: 75×75 matrices, SKUs, VyOS, Packer, MAAS E2E (186–196)
+7. Interview realism P2.R* (197–209) in parallel with coding IDE leftovers
+8. Per-tech 20-packs in priority waves (AWS/DC/GitOps/AI-ML first)
+9. Steam-class DC immersion (180–185)

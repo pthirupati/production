@@ -11,18 +11,51 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: High
-description: 'CONTEXT: Ticket DCOPS-style thermal violation on Dell XE9680 8xH100
-  — Targeted Stress fails GPU 4 only.
+description: 'CONTEXT: A team operating AI infrastructure engineering has raised a ticket for `DCOPS:
+  H100 GPU4 Thermal Violation`. A customer-facing workflow is degraded and the on-call engineer (you)
+  must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
+  underlying state is repaired.
 
 
-  ENVIRONMENT: Datacenter twin + GPU Lab Server (Hosted as physical). Use nvidia-smi
-  dmon / dcgmi diag.
+  ENVIRONMENT: You are working in FixitLab''s offline GPU bare-metal lab (MAAS + node + Datacenter twin
+  + AWX). The architecture is a single lab-primary node exposing MAAS commissioning, LXD, PXE/BMC, nvidia-smi/DCGM/rocm-smi,
+  AWX jobs, and Datacenter twin; treat it as the production host for this incident. All tools run locally
+  — no paid APIs or external cloud calls are required.
 
 
-  OBJECTIVE: Identify the hot GPU, collect diagnostics, open the rack tray context,
-  mark FIXED-OK after remediation notes.
+  SYMPTOM / STARTING STATE: gpu-node-01 reports thermal stress fail on GPU index 4; other GPUs pass. Ticket
+  DCOPS-style thermal violation on Dell XE9680 8xH100 — Targeted Stress fails GPU 4 only.
 
-  '
+  Datacenter twin + GPU Lab Server (Hosted as physical). Use nvidia-smi dmon / dcgmi diag.
+
+  Identify the hot GPU, collect diagnostics, open the rack tray context, mark FIXED-OK after remediation
+  notes.
+
+
+  OBJECTIVE: Confirm GPU 4 thermal anomaly with nvidia-smi / dmon; Run dcgmi diag scoped checks; Document
+  Dell SR-style findings in the ticket notes. Acceptance criteria: the change is minimal and reversible,
+  and success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant MAAS commissioning, LXD, PXE/BMC, nvidia-smi/DCGM/rocm-smi, AWX jobs, and Datacenter
+  twin), changing one thing at a time. Check your work continuously against the objective — success means
+  `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
+  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm GPU 4 thermal anomaly with nvidia-smi / dmon
 - Run dcgmi diag scoped checks
@@ -31,16 +64,47 @@ initial_state: gpu-node-01 reports thermal stress fail on GPU index 4; other GPU
   pass.
 hints:
 - order: 1
-  cost: 10
-  content: Open the primary console declared for this lab (MAAS, AWX, Datacenter,
-    or Terminal).
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: DCOPS is not behaving as the scenario objectives
+    require. This lab is about DCOPS — how DCOPS behaves in a AI infrastructure engineering environment.
+    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
+    you form any theory.'
 - order: 2
-  cost: 20
-  content: Use nvidia-smi / dcgmi / MAAS or AWX UI as appropriate — do not invent
-    a parallel tool.
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For DCOPS problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
+    the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 30
-  content: Leave the FIXED-OK marker after verification.
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `nvidia-smi` and `dmesg | grep -i nvidia` for driver visibility.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. Check if the GPU appears in `lspci | grep -i nvidia`.
+
+    2. Verify the correct driver module is loaded (`lsmod | grep nvidia`).
+
+    3. Look for Xid errors or fallen-off-bus messages in dmesg.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Reload driver, rebind PCI, or fix persistence mode per the scenario.
+
+    2. Re-run `nvidia-smi`.
+
+    3. Confirm GPU name and memory report without errors.
+
+
+    WHY: workloads need the driver to see the device.'
 consoles:
 - datacenter
 - terminal
