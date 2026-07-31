@@ -202,3 +202,109 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 6. Scenario volume to 150+/tech + tutorials
 
 Update this file as items complete. Keep internal code names (`*Simulator`, `simulation_type`) if needed — never expose them in UI.
+
+---
+
+## N. Platform surfaces — root-cause backlog (2026-07-31 audit)
+
+### Diagnosed (shipping / shipped in fix/lab-surfaces-hosting-streaming)
+
+121. [~] Paced terminal output: `ping` / `traceroute` emit line-by-line (1s / ~0.45s), not dump-all
+122. [~] Hosting persona: `vmware_link` / NIC-disk VMware labs force `hosted_as=vmware` (not baremetal hash)
+123. [~] Hosting persona: PeopleSoft / JS / React / Java / HTML / shell / Ansible do **not** rotate to fake AWS/Azure DMI
+124. [~] LabRunner: Open AWS for academy-aws + aws-hosted guests (subscription-gated)
+125. [~] LabRunner: Open Azure / Open GCP when host_platform matches (was hardcoded `false`)
+126. [~] LabRunner: Open AWX for Ansible tech labs (not only `awx|tower` slug)
+127. [~] LabRunner: single Open VMware chip (dedupe "same server" + "VMware Server")
+128. [~] LabRunner: coding IDE when `coding_mode` **or** coding tech + `coding_spec.files`
+129. [~] Datacenter: local 3D twin ErrorBoundary falls back to 2D (stops whole-lab "Lab environment error")
+
+### Still broken / next PRs
+
+130. [ ] Promote YAML `consoles` + `lab_servers` to first-class API fields; LabRunner stops using slug heuristics
+131. [ ] Seed/`normalize_sim_type`: keep `peoplesoft`, `nmap`, `wireshark`, `windows-server`, coding types (stop collapse → `generic`)
+132. [ ] Academy generator: JS/React/Java/HTML/shell → `coding_mode: true` + real `coding_spec` (not `simulation_type: python`)
+133. [ ] HTML/Web labs: live iframe preview pane in CodingIDE
+134. [ ] Terraform apply → mutate AWS/Azure/GCP console inventory + Open Cloud links in dropdown
+135. [ ] AWS/Datacenter "Lab environment error": prod Cache-Control on `index.html`; Terraform AWS overlay same Zustand reset as primary
+136. [ ] Surface `useSimSession.error` in Datacenter/AWS shells (403/API fail ≠ silent empty)
+137. [ ] Jira @team mentions: verify `JIRA_SIMULATION_MODE` in prod; coach reply when mention parse fails; E2E mention → bot → disk appears
+138. [ ] Theme/contrast pass: Windows + light portals — no white-on-white; brand-accurate colors per tech
+139. [ ] Lint: `vmware_link` ⇒ `hosted_as=vmware`; coding techs must set `coding_mode`; forbid unknown sim types after normalize
+
+---
+
+## O. AI Infra Engineering (new technology) — 20 scenarios + emulator
+
+New tech slug: `ai-infra` (MAAS · VyOS · LXD · AWX · GPU DC · DCGM · Packer images).
+
+140. [ ] Technology seed + catalog page + subscription product
+141. [ ] Lab surfaces: MAAS UI + node SSH + DC twin + nvidia-smi/rocm-smi terminal matrix
+142. [ ] Scenario pack (20): commission H100/H200/B300 node; missing GPU 1x/8x; DCGM r1–r4; thermal/fan; chassis swap; BMC/PXE; VyOS uplink; LXD GPU; AWX playbook; Packer+GH Actions image build
+143. [ ] NVIDIA command matrix (75): `nvidia-smi` variants, dmon/pmon, query CSV, lock clocks, ECC, topo, bug-report
+144. [ ] AMD command matrix (75): `rocm-smi` / `amd-smi` / radeontop / rocminfo / sysfs clocks
+145. [ ] Ops runbooks: scp diag scripts MAAS↔node, PSBCheck, fieldiag, dcgmprofrunner, gpu-admin-tools PPCIe/CC
+146. [ ] DCOps tickets: part order/availability, RMA, repave, firmware, iDRAC TSR (`racadm`)
+147. [ ] Image factory: Packer + Terraform + Python + shell + upstream base + vuln fix (no manual)
+148. [ ] Pixel parity: NVIDIA green / AMD red telemetry consoles; MAAS commission timeline
+149. [ ] Cross-link: Datacenter twin GPU trays ↔ ai-infra scenarios
+150. [ ] Baremetal/imgdev wiki task import → scenario outlines
+151. [ ] NCCL/RCCL stress + DCGM exporter scrape in monitoring companion
+152. [ ] Dell/HPE engineer badge + access control for rack entry (DC twin)
+153. [ ] Soundscape + LED blink realism (Steam-like immersion target for DC)
+154. [ ] 20 learn/build/operate/troubleshoot/production scenarios authored + graded
+155. [ ] CI lint: ai-infra scenarios never host as wrong cloud without `hosted_as`
+156. [ ] Docs: learner path AI Infra Engineer career track
+157. [ ] GPU MIG / vGPU partitions in twin + terminal
+158. [ ] Multi-node NVLink fabric view in DC + `nvidia-smi nvlink`
+159. [ ] End-to-end commission → burn-in → production handoff project
+
+---
+
+## P. Per-technology depth — 20 items each (pixel + E2E realism)
+
+Track as waves; mark `[~]`/`[x]` when a 20-pack lands. Each tech needs: brand colors, all primary pages/buttons, CLI↔GUI sync, companion links, 20 graded scenarios.
+
+160. [ ] AWS ×20 (VPC/IAM/RDS/Lambda/EKS/… full console + CLI sync)
+161. [ ] Azure ×20 (Fluent blades + `az` Cloud Shell)
+162. [ ] GCP ×20 (Material console + `gcloud`)
+163. [ ] VMware ×20 (hardware edit → guest `ip`/`lsblk`)
+164. [ ] Datacenter ×20 (Steam-grade twin: entry, parts, cables, sound, 3D/8D)
+165. [ ] Kubernetes/OpenShift ×20
+166. [ ] Docker ×20
+167. [ ] Ansible/AWX ×20
+168. [ ] Terraform ×20 (+ multi-cloud apply bridge)
+169. [ ] GitOps (Argo/Flux/GitHub) ×20 + real IDE/terminal/PR approvals
+170. [ ] DevOps/CI ×20 + deploy preview
+171. [ ] Monitoring (Grafana/Prom) ×20
+172. [ ] SOC/Cyber ×20
+173. [ ] Commvault / NetApp / DellEMC ×20 each
+174. [ ] Windows Server ×20 (contrast fix first)
+175. [ ] PeopleSoft ×20 (app server host, not fake EC2)
+176. [ ] Coding (JS/Java/HTML/React/Shell) ×20 IDE+preview
+177. [ ] AI/ML/LLM Agents ×20 (custom LLM + agents that actually run)
+178. [ ] OpenStack / Baremetal / Networking ×20 each
+179. [ ] Collaboration: Jira bots + Teams mentions reliable E2E
+
+---
+
+## Q. Immersion / DC Steam-class target
+
+180. [ ] First-person / avatar entry with badge (Dell/HPE engineer roles)
+181. [ ] Ambient DC audio (CRAC, PDU hum) + alert tones
+182. [ ] Part warehouse inventory ↔ RMA ↔ dock receive (already started) → full chain
+183. [ ] Cable bend physics + port LED + blink patterns (partial) → all media types
+184. [ ] Thermal volume rendering / aisle smoke for incidents
+185. [ ] Competitor study notes from PC building / DC games → backlog grooming
+
+---
+
+## Execution order (updated)
+
+1. **Ship** lab-surfaces PR (121–129) — hosting, links, ping stream, DC 3D fallback
+2. Consoles schema + academy coding_mode reseed (130–133)
+3. Terraform↔cloud bridge + AWS/DC load hardening (134–136)
+4. Jira mentions + contrast (137–138)
+5. AI Infra Engineering tech bootstrap (140–159)
+6. Per-tech 20-packs in priority waves (AWS/DC/GitOps/AI-ML first)
+7. Steam-class DC immersion (180–185)

@@ -1077,7 +1077,23 @@ class RHELShell:
 
     def create_stream_handler(self):
         shell = self
-        return lambda line: shell.run(line)
+
+        def handler(line: str):
+            out = shell.run(line)
+            if not out:
+                return out
+            cmd = (line or "").strip().split()[:1]
+            name = (cmd[0] if cmd else "").rsplit("/", 1)[-1]
+            if name in ("ping", "ping6"):
+                from .shell import StreamedCommandResult
+                # Real ping defaults to 1s between ICMP replies.
+                return StreamedCommandResult(lines=str(out).split("\n"), delay_s=1.0)
+            if name in ("traceroute", "tracepath"):
+                from .shell import StreamedCommandResult
+                return StreamedCommandResult(lines=str(out).split("\n"), delay_s=0.45)
+            return out
+
+        return handler
 
     # ── Commands ─────────────────────────────────────────────────────
 

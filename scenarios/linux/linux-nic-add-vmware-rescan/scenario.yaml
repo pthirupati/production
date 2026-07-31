@@ -58,6 +58,7 @@ objectives:
 - Verify the interface is up and addressed with ip addr
 lab_mode: simulation
 simulation_type: generic
+hosted_as: vmware
 cross_technology: true
 vmware_link: true
 time_limit: 900

@@ -1611,12 +1611,21 @@ export default function LabRunner() {
   // coding_mode scenarios open a browser surface instead of a terminal. Prompt
   // Engineering lessons reuse coding_mode with coding_kind/coding_spec.kind ===
   // 'prompt' to open the PromptPlayground; everything else opens the code IDE.
-  // Mirrors the vmware detection above.
+  // Hero packs set coding_mode; also open IDE when coding_spec.files exist for
+  // coding technologies (JS/React/Java/HTML/shell) so mis-seeded rows still work.
   const promptKind = scenario?.coding_kind === 'prompt'
     || scenario?.coding_spec?.kind === 'prompt'
     || scenario?.technology?.slug === 'prompt-engineering'
   const isPromptLab = Boolean(scenario?.coding_mode) && promptKind
-  const isCodingLab = Boolean(scenario?.coding_mode) && !isPromptLab
+  const codingTechSlugs = new Set([
+    'javascript', 'react', 'java', 'html', 'shell-script', 'nodejs', 'typescript', 'python',
+  ])
+  const hasCodingSpecFiles = Array.isArray(scenario?.coding_spec?.files)
+    && scenario.coding_spec.files.length > 0
+  const isCodingLab = !isPromptLab && (
+    Boolean(scenario?.coding_mode)
+    || (codingTechSlugs.has(techSlugLc) && hasCodingSpecFiles)
+  )
 
   // Hosted-as comes from the Lab Server persona (terminal banner + lab_hosts).
   // When Linux is hosted on VMware/AWS/Azure/GCP, surface Open <Console> so the
@@ -1647,12 +1656,21 @@ export default function LabRunner() {
   const showDatacenterSubscribeHint = explicitDatacenterScenario && !isDatacenterLab && techSubs && !canDatacenterConsole
   // Academy AWS packs grade via Lab Server FIXED-OK (terminal primary), but
   // entitled learners should still open the AWS Console as a companion so
-  // EC2/S3/IAM practice matches the lab copy. Host-flavor rotation alone
-  // still does not surface Open AWS/Azure/GCP.
+  // EC2/S3/IAM practice matches the lab copy. Also surface when the Lab Server
+  // is hosted on AWS (or Azure/GCP) so "Hosted as" matches a real Open link.
   const canAwsConsole = userHasTechAccess(techSubs, 'aws')
-  const showHostedAwsLink = isAwsAcademyLab && canAwsConsole
-  const showHostedAzureLink = false
-  const showHostedGcpLink = false
+  const canAzureConsole = userHasTechAccess(techSubs, 'azure')
+  const canGcpConsole = userHasTechAccess(techSubs, 'gcp')
+  const canAwxConsole = userHasTechAccess(techSubs, 'ansible') || userHasTechAccess(techSubs, 'ansible-awx')
+  const showHostedAwsLink = !isAwsLab && canAwsConsole && (
+    isAwsAcademyLab || hostPlatform === 'aws' || techSlugLc === 'aws'
+  )
+  const showHostedAzureLink = !isAzureLab && canAzureConsole && (
+    hostPlatform === 'azure' || techSlugLc === 'azure'
+  )
+  const showHostedGcpLink = !isGcpLab && canGcpConsole && (
+    hostPlatform === 'gcp' || techSlugLc === 'gcp'
+  )
   // When a dedicated console is primary, keep a visible "Lab console" chip so
   // learners never wonder where the GUI went (VMware-parity affordance).
   const primaryConsoleLabel = {
@@ -1680,18 +1698,19 @@ export default function LabRunner() {
     peoplesoft: 'PeopleSoft',
     baremetal: 'Bare Metal',
   }[primarySimKind] || null
-  const showTerminalVmwareLink = !isVmwareLab && canOpenCompanionConsole(techSubs, explicitVmwareScenario, 'vmware')
-  const showCrossTechVmwareLink = canOpenCompanionConsole(techSubs, Boolean(scenario?.vmware_link), 'vmware') && !isVmwareLab
+  const showVmwareCompanionLink = !isVmwareLab && canOpenCompanionConsole(techSubs, explicitVmwareScenario, 'vmware')
   // Ansible terminal labs run playbooks from the shell, so the terminal stays
-  // primary (we do NOT make them AWX-primary). Surface Open AWX only when the
-  // scenario opts in (awx_link) or is clearly an AWX/controller lab.
-  const showAwxLink = !isCrossTech && !isAwxLab
+  // primary (we do NOT make them AWX-primary). Surface Open AWX for Ansible tech
+  // labs (and explicit AWX/controller slugs) when the learner has ansible access.
+  const showAwxLink = !isCrossTech && !isAwxLab && canAwxConsole
     && (
       scenario?.awx_link === true
+      || scenario?.simulation_type === 'ansible'
       || scenario?.simulation_type === 'ansible-awx'
+      || techSlugLc === 'ansible'
       || /(?:^|-)(awx|tower)(?:-|$)/i.test(scenarioSlug)
     )
-  const vmwareWorkflowHint = showTerminalVmwareLink || showCrossTechVmwareLink
+  const vmwareWorkflowHint = showVmwareCompanionLink
     ? 'Use vCenter for hypervisor steps, then return here and rescan/reboot.'
     : showVmwareSubscribeHint
       ? 'This lab needs VMware for hypervisor steps — subscribe to unlock Open VMware.'
@@ -2683,7 +2702,7 @@ export default function LabRunner() {
               vCenter/Monitoring/AWX chips, which duplicated those buttons (a
               VMware button appeared on every VM-backed lab). It now shows just
               the Terminal indicator + workflow hint so there are no duplicates. */}
-          {(showTerminalVmwareLink || showCrossTechVmwareLink || isVmwareLab || isMonitoringLab || isAwxLab || showAwxLink) && (
+          {(showVmwareCompanionLink || isVmwareLab || isMonitoringLab || isAwxLab || showAwxLink) && (
             <LabJourneyStrip
               sessionId={sessionId}
               scenarioSlug={scenario?.slug}
@@ -2736,7 +2755,7 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open GCP
             </button>
           )}
-          {showCrossTechVmwareLink && (
+          {showVmwareCompanionLink && (
             <Link
               to={`/vmware/${sessionId}?scenario=${scenario?.slug || ''}`}
               target="_blank"
@@ -2745,7 +2764,7 @@ export default function LabRunner() {
               title="This server also lives in VMware. Open vCenter to perform the hypervisor-side step (e.g. add a disk), then return here and rescan/reboot."
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-[#4fa7e8]/50 text-[#4fa7e8] bg-[#4fa7e8]/10 hover:bg-[#4fa7e8]/20 text-[10px] font-semibold"
             >
-              <ExternalLink size={12} /> Open VMware (same server)
+              <ExternalLink size={12} /> Open VMware
             </Link>
           )}
           {showVmwareSubscribeHint && (
@@ -2775,18 +2794,6 @@ export default function LabRunner() {
               title="Subscribe to Datacenter to unlock the rack / BMC floor for this lab."
             >
               <Lock size={12} /> Subscribe to Datacenter
-            </Link>
-          )}
-          {showTerminalVmwareLink && (
-            <Link
-              to={vmwareServerHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => toast('After changing VMware hardware, return to the terminal and rescan or reboot so the guest sees it.', { icon: 'i', duration: 7000, ...TOAST })}
-              title="This server is hosted in VMware. Open vCenter to perform hypervisor-side steps (add a disk, snapshot, reboot), then return here and rescan."
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-[#4fa7e8]/40 text-[#4fa7e8] bg-[#4fa7e8]/10 hover:bg-[#4fa7e8]/20 text-[10px] font-medium"
-            >
-              <ExternalLink size={12} /> VMware Server
             </Link>
           )}
           {isCrossTechMonitoring && !isCrossTechMonitoringSplit && (
