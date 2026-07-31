@@ -11,94 +11,61 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating JavaScript has raised a ticket for `The Dom — Production Lab`.
-  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
-  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
+description: 'CONTEXT: Complete the dom coding exercise in the browser IDE.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project. The architecture is
-  a single lab-primary node exposing modules, browser console, and Node tooling; treat it as the production
-  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: FixitLab JavaScript/React practice IDE — edit solution.js, Run visible
+  tests, then Check Solution.
 
 
-  SYMPTOM / STARTING STATE: A feature fix works in dev, but the DOM is not production ready — missing
-  guardrails, runbooks, or capacity checks.
+  SYMPTOM / STARTING STATE: Coding challenge: dom. The stub in solution.js is incomplete
+  so tests fail until you implement it.
 
 
-  OBJECTIVE: Day-2 the DOM work completes safely in this environment; Changes are verified with before/after
-  checks; The system remains stable for dependent teams. Acceptance criteria: the change is minimal and
-  reversible, and success means `systemctl is-active node-app`` returns active.
+  OBJECTIVE: Implement the required function so all visible and hidden tests pass.
 
 
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant modules, browser console, and Node tooling), changing one thing at a time. Check
-  your work continuously against the objective — success means `systemctl is-active node-app`` returns
-  active.
+  VERIFY: Check Solution passes all hidden tests.
 
-
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active node-app` returns active.
-  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
-  on a repeat check, not just once.
-
-
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
-
-
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  '
 objectives:
-- Day-2 the DOM work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but the DOM is not production ready — missing guardrails, runbooks,
-  or capacity checks.
+- Implement the required function in solution.js
+- Pass visible tests with Run
+- Pass Check Solution (hidden tests)
+initial_state: 'Coding challenge: dom. The stub in solution.js is incomplete so tests
+  fail until you implement it.'
 hints:
 - order: 1
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: UI does not update or events do not fire. This
-    lab is about the DOM — selection, events, and updates. Read the objectives and the current state,
-    and note precisely what looks wrong versus healthy before you form any theory.'
+    Do not touch anything yet. First observe the symptom: UI does not update or events
+    do not fire. This lab is about the DOM — selection, events, and updates. Read
+    the objectives and the current state, and note precisely what looks wrong versus
+    healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For the DOM problems the reliable method is: (1) reproduce/observe
-    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
-    change exactly one thing, (4) re-check. Apply production standards for the DOM: resource limits, monitoring,
-    access controls, and a written rollback step.'
+    Work from evidence, not guesses. For the DOM problems the reliable method is:
+    (1) reproduce/observe the failure, (2) narrow from the whole system down to the
+    one component that owns the symptom, (3) change exactly one thing, (4) re-check.
+    Apply production standards for the DOM: resource limits, monitoring, access controls,
+    and a written rollback step.'
 - order: 3
   cost: 25
-  content: 'WHICH TOOL — the diagnostic command(s):
-
-    Start with `systemctl status node-app` and `journalctl -u node-app -n 50 --no-pager` before changing
-    anything.'
+  content: WHICH TOOL — use the IDE Run button on visible tests first; read the failing
+    assertion message carefully.
 - order: 4
   cost: 40
-  content: 'NARROW DOWN — isolate the subsystem:
-
-    1. Run `systemctl status node-app` — note Active/Failed and the last log lines.
-
-    2. Read `journalctl -u node-app -n 50` for the root error.
-
-    3. Form a hypothesis about the smallest config or permission fix.'
+  content: NARROW DOWN — implement the smallest change that satisfies one failing
+    test, then re-run.
 - order: 5
   cost: 60
-  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
-
-    1. Apply the minimal fix (config, unit override, or missing directory).
-
-    2. Run `systemctl daemon-reload` if you edited a unit file.
-
-    3. Run `systemctl restart node-app` and confirm `systemctl is-active node-app` succeeds.
-
-
-    WHY: the grader checks real service state, not marker files.'
-summary: Complete the the dom — production lab javascript lab and verify success with the checker
+  content: NEAR-SOLUTION — finish the function so all visible tests pass, then Check
+    Solution.
+summary: Complete the the dom — production lab javascript lab and verify success with
+  the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -131,20 +98,18 @@ environment:
 tasks:
 - id: task_1
   title: The Dom — Production Lab
-  description: Restore healthy behavior for The Dom — Production Lab by investigating the failure, applying
-    the smallest safe fix, and validating the outcome.
-  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Implement the dom exercise in the browser IDE and pass all tests.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
-    type: service_active
-    command: systemctl is-active nginx
-    expected_status: active
-    error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
-      -u nginx -n 50`.
+    type: script
+    script: hidden_tests
+    error_message: Hidden tests still failing — keep iterating in the IDE.
 solution:
-  summary: The root cause is an unhealthy `nginx` service; repair it and verify active state.
-  files_changed: []
-  commands_run:
-  - systemctl is-active nginx
+  summary: Implement the function so visible and hidden tests pass in the coding IDE.
+  files_changed:
+  - solution.js
+  commands_run: []
   reference_docs: javascript-fundamentals
 guided_mode:
   enabled: true
@@ -170,3 +135,27 @@ guided_mode:
     expected_output: '`systemctl is-active nginx`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success
+coding_mode: true
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: 'Implement buildButtonLabel(count) → `Click (N)` string for a button
+    label (DOM-less).
+
+    Click Run to try it, then Check Solution to grade.
+
+    '
+  files:
+  - path: solution.js
+    content: "function buildButtonLabel(count) {\n  // TODO\n}\n"
+    readonly: false
+  visible_tests:
+  - name: zero
+    code: assert(buildButtonLabel(0) === 'Click (0)');
+  hidden_tests:
+  - name: n
+    code: assert(buildButtonLabel(6) === 'Click (6)');
+  - name: ten
+    code: assert(buildButtonLabel(10) === 'Click (10)');
+  timeout: 8
