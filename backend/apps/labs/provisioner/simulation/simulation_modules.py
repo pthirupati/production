@@ -228,22 +228,126 @@ def _modules_for_type(sim_type: str) -> set[str]:
     return {sim_type, "docker"} if sim_type == "rhel" else {sim_type}
 
 
-# Datacenter GPU box the sim models: an 8x NVIDIA H100 80GB HBM3 SXM node
-# (driver 550.90.07 / CUDA 12.4). Kept consistent across nvidia-smi, nvidia-smi
-# -q, and dcgmi so a learner never sees the model/count/driver disagree.
+# Datacenter GPU profiles. Default is 8× H100 SXM; scenario slug can select
+# H200 / B300 / A100 / MI300X so labs match the ticket hardware.
 _SMI_DRIVER = "550.90.07"
 _SMI_CUDA = "12.4"
 _SMI_GPU_NAME = "NVIDIA H100 80GB HBM3"
 _SMI_GPU_COUNT = 8
 _SMI_MEM_TOTAL_MIB = 81559  # H100 80GB reports 81559 MiB in nvidia-smi
+_SMI_ARCH = "Hopper"
+_SMI_PCI_ID = "GH100"
+_SMI_PWR_CAP = 700
+
+_GPU_SKUS: dict[str, dict] = {
+    "h100": {
+        "name": "NVIDIA H100 80GB HBM3",
+        "count": 8,
+        "mem_mib": 81559,
+        "arch": "Hopper",
+        "pci": "GH100",
+        "pwr_cap": 700,
+        "driver": "550.90.07",
+        "cuda": "12.4",
+        "vendor": "nvidia",
+    },
+    "h200": {
+        "name": "NVIDIA H200 141GB HBM3e",
+        "count": 8,
+        "mem_mib": 143771,
+        "arch": "Hopper",
+        "pci": "GH100",
+        "pwr_cap": 700,
+        "driver": "550.90.07",
+        "cuda": "12.4",
+        "vendor": "nvidia",
+    },
+    "b300": {
+        "name": "NVIDIA B300",
+        "count": 8,
+        "mem_mib": 196608,
+        "arch": "Blackwell",
+        "pci": "GB300",
+        "pwr_cap": 1200,
+        "driver": "570.86.15",
+        "cuda": "12.8",
+        "vendor": "nvidia",
+    },
+    "a100": {
+        "name": "NVIDIA A100-SXM4-80GB",
+        "count": 8,
+        "mem_mib": 81920,
+        "arch": "Ampere",
+        "pci": "GA100",
+        "pwr_cap": 400,
+        "driver": "535.161.08",
+        "cuda": "12.2",
+        "vendor": "nvidia",
+    },
+    "l40s": {
+        "name": "NVIDIA L40S",
+        "count": 4,
+        "mem_mib": 46068,
+        "arch": "Ada",
+        "pci": "AD102",
+        "pwr_cap": 350,
+        "driver": "550.90.07",
+        "cuda": "12.4",
+        "vendor": "nvidia",
+    },
+    "mi300x": {
+        "name": "AMD Instinct MI300X",
+        "count": 8,
+        "mem_mib": 196592,
+        "arch": "CDNA3",
+        "pci": "gfx942",
+        "pwr_cap": 750,
+        "driver": "6.2.0",
+        "cuda": "",
+        "vendor": "amd",
+    },
+}
+
+
+def _resolve_gpu_sku(scenario_slug: str) -> dict:
+    """Pick GPU SKU from scenario slug keywords; default H100 SXM8."""
+    low = (scenario_slug or "").lower().replace("_", "-")
+    if "b300" in low:
+        return dict(_GPU_SKUS["b300"])
+    if "h200" in low:
+        return dict(_GPU_SKUS["h200"])
+    if "l40s" in low or "l40" in low:
+        return dict(_GPU_SKUS["l40s"])
+    if "a100" in low:
+        return dict(_GPU_SKUS["a100"])
+    if "mi300" in low or "rocm" in low or ("amd" in low and "nvidia" not in low):
+        return dict(_GPU_SKUS["mi300x"])
+    if "h100" in low:
+        return dict(_GPU_SKUS["h100"])
+    return dict(_GPU_SKUS["h100"])
+
+
+def _apply_gpu_sku_globals(sku: dict) -> None:
+    """Bind module-level nvidia-smi constants for render helpers (per-handler)."""
+    global _SMI_GPU_NAME, _SMI_GPU_COUNT, _SMI_MEM_TOTAL_MIB, _SMI_ARCH
+    global _SMI_PCI_ID, _SMI_PWR_CAP, _SMI_DRIVER, _SMI_CUDA
+    _SMI_GPU_NAME = sku["name"]
+    _SMI_GPU_COUNT = int(sku["count"])
+    _SMI_MEM_TOTAL_MIB = int(sku["mem_mib"])
+    _SMI_ARCH = sku["arch"]
+    _SMI_PCI_ID = sku["pci"]
+    _SMI_PWR_CAP = int(sku["pwr_cap"])
+    _SMI_DRIVER = sku.get("driver") or _SMI_DRIVER
+    if sku.get("cuda"):
+        _SMI_CUDA = sku["cuda"]
 
 
 def _render_nvidia_smi_table() -> str:
-    """Render the modern (driver 5xx) nvidia-smi summary table for the full 8x
-    H100 node plus a realistic compute-process table. Values wiggle per call so
-    successive runs look live, but the topology (count/model/driver/mem) is fixed
-    so it agrees with `nvidia-smi -q` and `dcgmi discovery -l`."""
+    """Render the modern (driver 5xx) nvidia-smi summary table for the full node
+    plus a realistic compute-process table. Values wiggle per call so successive
+    runs look live, but topology (count/model/driver/mem) is fixed for the SKU."""
     now = time.strftime("%a %b %d %H:%M:%S %Y")
+    pwr_cap = _SMI_PWR_CAP
     lines = [
         now,
         "+-----------------------------------------------------------------------------------------+",
@@ -258,16 +362,18 @@ def _render_nvidia_smi_table() -> str:
     for i in range(_SMI_GPU_COUNT):
         active = random.random() < 0.6
         util = random.randint(70, 100) if active else random.randint(0, 4)
-        mem_used = random.randint(40000, 78000) if active else random.randint(3, 12)
+        mem_hi = max(12, int(_SMI_MEM_TOTAL_MIB * 0.95))
+        mem_lo = max(3, int(_SMI_MEM_TOTAL_MIB * 0.5))
+        mem_used = random.randint(mem_lo, mem_hi) if active else random.randint(3, 12)
         temp = random.randint(58, 74) if active else random.randint(28, 36)
-        pwr = random.randint(420, 690) if active else random.randint(68, 92)
+        pwr = random.randint(int(pwr_cap * 0.55), pwr_cap - 10) if active else random.randint(68, 92)
         perf = "P0"
         bus = f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0"
         # Fixed-width cells matching the separator (41 / 24 / 22 chars).
         c1a = f"  {i}  {_SMI_GPU_NAME}"
         c2a = f" {bus} Off"
         lines.append(f"|{c1a:<33}   On  |{c2a:<24}|                    0 |")
-        c1b = f" N/A   {temp:2d}C    {perf}             {pwr:3d}W / 700W"
+        c1b = f" N/A   {temp:2d}C    {perf}             {pwr:3d}W / {pwr_cap}W"
         c2b = f"  {mem_used:6d}MiB / {_SMI_MEM_TOTAL_MIB}MiB "
         c3b = f"    {util:3d}%      Default"
         lines.append(f"|{c1b:<41}|{c2b:<24}|{c3b:<22}|")
@@ -351,9 +457,12 @@ def _render_query_gpu(line: str) -> str:
 
 def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
     is_gpu_focus = engine.simulation_type == "gpu" or "gpu" in engine.scenario_slug or "nvidia" in engine.scenario_slug
+    sku = _resolve_gpu_sku(getattr(engine, "scenario_slug", "") or "")
 
     def handler(parts, line):
         low = line.strip().lower()
+        # Bind SKU for this invocation so table/query helpers match the scenario.
+        _apply_gpu_sku_globals(sku)
         # GPU-specific tools always handled here. Generic kernel tools
         # (modprobe/lspci/lsmod/modinfo) are only intercepted when they
         # reference the NVIDIA driver, or when this is a GPU-focused sim — so
@@ -364,12 +473,42 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         kernel_tools = ("modprobe", "rmmod", "lspci", "lsmod", "modinfo")
         if any(low.startswith(c) for c in gpu_tools):
             pass
-        elif any(low.startswith(c) for c in kernel_tools) and ("nvidia" in low or is_gpu_focus):
+        elif any(low.startswith(c) for c in kernel_tools) and (
+            "nvidia" in low or "amd" in low or "3d" in low or "vga" in low or is_gpu_focus
+        ):
             pass
         else:
             return None
         healthy = engine.shell.state.gpu_healthy
         if low.startswith("nvidia-smi"):
+            if sku.get("vendor") == "amd":
+                return (
+                    "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. "
+                    "This node is configured with AMD Instinct GPUs — use rocm-smi / amd-smi."
+                )
+            if "-h" in parts or "--help" in low:
+                return (
+                    "NVIDIA System Management Interface -- NVIDIA Management Library (NVML)\n\n"
+                    "Usage: nvidia-smi [OPTION1] [OPTION2] ...\n\n"
+                    "    -L, --list-gpus                  Display a list of GPUs connected\n"
+                    "    -q, --query                      Display GPU/unit info\n"
+                    "    -d TYPE, --display=TYPE          Display only selected information\n"
+                    "    dmon                            Device monitoring (scrolling)\n"
+                    "    pmon                            Process monitoring (scrolling)\n"
+                    "    topo -m                         Topology matrix\n"
+                    "    nvlink --status                 NVLink status\n"
+                    "    --query-gpu=FIELD               CSV field query\n"
+                    "    -l SEC, --loop=SEC              Loop with delay\n"
+                    "    -pm, -pl, -c, -e, -am            Admin mode toggles\n"
+                )
+            if "-L" in parts or "--list-gpus" in low:
+                if not healthy:
+                    return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
+                rows = []
+                for i in range(_SMI_GPU_COUNT):
+                    uuid = f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"
+                    rows.append(f"GPU {i}: {_SMI_GPU_NAME} (UUID: {uuid})")
+                return "\n".join(rows)
             if "-l" in parts or "--loop" in low:
                 pass  # streaming flag — single snapshot is fine for the sim
             if "--query-gpu" in low:
@@ -381,7 +520,23 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
             # renders a clean view; the unhealthy path mirrors a fallen-off driver.
             if not healthy and any(k in low for k in ("topo", "nvlink", "mig", "-q")):
                 return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
-            if "topo" in low and "-m" in low:
+            if "topo" in low and ("-m" in parts or "-p" in parts or "-c" in parts):
+                if "-p" in parts:
+                    return (
+                        "GPU0\t GPU1\t GPU2\t GPU3\n"
+                        "GPU0\t X   \t PIX \t NODE\t SYS\n"
+                        "GPU1\t PIX \t X   \t NODE\t SYS\n"
+                        "GPU2\t NODE\t NODE\t X   \t PIX\n"
+                        "GPU3\t SYS \t SYS \t PIX \t X"
+                    )
+                if "-c" in parts:
+                    return (
+                        "GPU0\t CPU Affinity\t NUMA Affinity\n"
+                        "GPU0\t 0-31       \t 0\n"
+                        "GPU1\t 0-31       \t 0\n"
+                        "GPU2\t 32-63      \t 1\n"
+                        "GPU3\t 32-63      \t 1"
+                    )
                 return (
                     "\t GPU0\t GPU1\t GPU2\t GPU3\t CPU Affinity\t NUMA Affinity\n"
                     "GPU0\t X   \t NV18\t NV18\t NV18\t 0-31       \t 0\n"
@@ -391,12 +546,12 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                     "Legend: X = Self, NV# = NVLink connection (# links), "
                     "SYS = across PCIe+SMP interconnect, PIX = single PCIe bridge")
             if "nvlink" in low:
-                if "-e" in parts:
-                    return ("GPU 0: NVIDIA H100 80GB HBM3\n"
+                if "-e" in parts or "capabilities" in low:
+                    return ("GPU 0: " + _SMI_GPU_NAME + "\n"
                             "\t Link 0: Replay Errors: 0\n"
                             "\t Link 0: Recovery Errors: 0\n"
                             "\t Link 0: CRC Errors: 0")
-                return ("GPU 0: NVIDIA H100 80GB HBM3\n"
+                return ("GPU 0: " + _SMI_GPU_NAME + "\n"
                         "\t Link 0: 26.562 GB/s\n"
                         "\t Link 1: 26.562 GB/s\n"
                         "\t Link 2: 26.562 GB/s\n"
@@ -459,11 +614,50 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 if "power" in low:
                     return ("==============NVSMI LOG==============\n"
                             "Power Readings\n"
-                            "\t Power Draw                     : 118.42 W\n"
-                            "\t Current Power Limit            : 700.00 W\n"
-                            "\t Default Power Limit            : 700.00 W\n"
-                            "\t Enforced Power Limit           : 700.00 W\n"
-                            "\t Max Power Limit                : 700.00 W")
+                            f"\t Power Draw                     : {random.randint(90, _SMI_PWR_CAP - 20)}.42 W\n"
+                            f"\t Current Power Limit            : {_SMI_PWR_CAP}.00 W\n"
+                            f"\t Default Power Limit            : {_SMI_PWR_CAP}.00 W\n"
+                            f"\t Enforced Power Limit           : {_SMI_PWR_CAP}.00 W\n"
+                            f"\t Max Power Limit                : {_SMI_PWR_CAP}.00 W")
+                if "utilization" in low:
+                    return ("==============NVSMI LOG==============\n"
+                            "Utilization\n"
+                            f"\t Gpu                            : {random.randint(0, 99)} %\n"
+                            f"\t Memory                         : {random.randint(0, 90)} %\n"
+                            f"\t Encoder                        : {random.randint(0, 5)} %\n"
+                            f"\t Decoder                        : {random.randint(0, 5)} %")
+                if "memory" in low:
+                    used = random.randint(3, max(12, _SMI_MEM_TOTAL_MIB // 2))
+                    return ("==============NVSMI LOG==============\n"
+                            "FB Memory Usage\n"
+                            f"\t Total                          : {_SMI_MEM_TOTAL_MIB} MiB\n"
+                            f"\t Reserved                       : 455 MiB\n"
+                            f"\t Used                           : {used} MiB\n"
+                            f"\t Free                           : {_SMI_MEM_TOTAL_MIB - used} MiB")
+                if "compute" in low:
+                    return ("==============NVSMI LOG==============\n"
+                            "Compute Mode\n"
+                            "\t Current                       : Default")
+                if "pids" in low:
+                    return ("==============NVSMI LOG==============\n"
+                            "Processes\n"
+                            f"\t Process ID                    : {random.randint(20000, 65000)}\n"
+                            "\t   Type                         : C\n"
+                            "\t   Name                         : python\n"
+                            f"\t   Used GPU Memory              : {random.randint(1000, 40000)} MiB")
+                if "supported_clocks" in low:
+                    return ("==============NVSMI LOG==============\n"
+                            "Supported Clocks\n"
+                            "\t Memory                         : 2619 MHz\n"
+                            "\t\t Graphics                   : 1980 MHz\n"
+                            "\t\t Graphics                   : 1410 MHz\n"
+                            "\t Memory                         : 1593 MHz\n"
+                            "\t\t Graphics                   : 1410 MHz")
+                if "accounting" in low:
+                    return ("==============NVSMI LOG==============\n"
+                            "Accounting Mode\n"
+                            "\t Current                       : Disabled\n"
+                            "\t Buffer Size                   : 4000")
                 if "performance" in low or "clock" in low:
                     return ("==============NVSMI LOG==============\n"
                             "Clocks Throttle Reasons\n"
@@ -480,21 +674,27 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 blocks = []
                 for i in range(_SMI_GPU_COUNT):
                     bus = f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0"
+                    used = random.randint(3, 512)
                     blocks.append(
                         f"GPU {bus}\n"
                         f"\t Product Name                  : {_SMI_GPU_NAME}\n"
-                        f"\t Product Architecture          : Hopper\n"
+                        f"\t Product Architecture          : {_SMI_ARCH}\n"
                         f"\t Persistence Mode              : Enabled\n"
                         f"\t MIG Mode\n"
                         f"\t\t Current                   : Disabled\n"
                         f"\t\t Pending                   : Disabled\n"
                         f"\t FB Memory Usage\n"
                         f"\t\t Total                     : {_SMI_MEM_TOTAL_MIB} MiB\n"
-                        f"\t\t Used                      : {random.randint(3, 512)} MiB\n"
-                        f"\t\t Free                      : {_SMI_MEM_TOTAL_MIB - random.randint(3, 512)} MiB")
+                        f"\t\t Used                      : {used} MiB\n"
+                        f"\t\t Free                      : {_SMI_MEM_TOTAL_MIB - used} MiB")
                 return head + "\n" + "\n".join(blocks)
-            if "-pm" in parts or "-pl" in parts or low.startswith("nvidia-smi -r"):
-                # persistence-mode / power-limit set, or GPU reset — acknowledge.
+            if any(x in parts for x in ("-pm", "-pl", "-e", "-am", "-ac", "-rac")) or \
+               "--lock-gpu-clocks" in low or "--reset-gpu-clocks" in low or \
+               "--gpu-reset" in low or "--clear-accounting" in low or \
+               low.startswith("nvidia-smi -r") or \
+               (re.search(r"nvidia-smi\s+-c\b", low) and "dmon" not in low and "pmon" not in low) or \
+               (re.search(r"nvidia-smi\s+-p\b", low) and "dmon" not in low and "pmon" not in low):
+                # persistence-mode / power-limit / compute mode / ECC / clocks — acknowledge.
                 return "All done."
             # Live monitors — paced like real dmon/pmon (and -l loop snapshots).
             if "dmon" in low or "pmon" in low or "-l" in parts or "--loop" in low:
@@ -528,7 +728,7 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                     lines.append("# Idx     W     C      C      %      %      %      %   MHz   MHz")
                     for _tick in range(samples):
                         for gi in range(min(8, _SMI_GPU_COUNT)):
-                            pwr = random.randint(80, 420)
+                            pwr = random.randint(80, max(120, _SMI_PWR_CAP - 50))
                             gt = random.randint(32, 78)
                             mt = gt + random.randint(4, 12)
                             sm = random.randint(0, 99)
@@ -557,9 +757,25 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 _sync_gpu_identity(engine, healthy=False)
             return ""
         if low.startswith("lspci"):
-            out = "01:00.0 3D controller: NVIDIA Corporation GA100 [A100 SXM4 40GB] (rev a1)"
-            return out
+            if "amd" in low or sku.get("vendor") == "amd":
+                rows = []
+                for i in range(_SMI_GPU_COUNT):
+                    bus = f"{(i + 1) * 0x10 + 1:02x}:00.0"
+                    rows.append(f"{bus} Processing accelerators: Advanced Micro Devices, Inc. [AMD/ATI] Instinct MI300X")
+                return "\n".join(rows)
+            # Default / nvidia filter — match SKU product string.
+            rows = []
+            for i in range(_SMI_GPU_COUNT):
+                bus = f"{(i + 1) * 0x10 + 1:02x}:00.0"
+                rows.append(f"{bus} 3D controller: NVIDIA Corporation {_SMI_PCI_ID} [{_SMI_GPU_NAME}] (rev a1)")
+            return "\n".join(rows)
         if low.startswith("lsmod"):
+            if sku.get("vendor") == "amd":
+                if not healthy:
+                    return "Module                  Size  Used by"
+                return ("Module                  Size  Used by\n"
+                        "amdgpu             15728640  32\n"
+                        "amdkfd               1048576  8 amdgpu")
             if not healthy:
                 return "Module                  Size  Used by"
             return ("Module                  Size  Used by\n"
@@ -567,6 +783,11 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                     "nvidia_uvm           1048576  2 nvidia\n"
                     "nvidia_drm             69632  0")
         if low.startswith("modinfo"):
+            if "amdgpu" in low or (sku.get("vendor") == "amd" and "nvidia" not in low):
+                return ("filename:       /lib/modules/5.14.0/updates/dkms/amdgpu.ko\n"
+                        "version:        6.2.0\n"
+                        "license:        GPL and additional rights\n"
+                        "description:    AMDGPU")
             if not healthy:
                 return "modinfo: ERROR: Module nvidia not found."
             return ("filename:       /lib/modules/5.14.0/kernel/drivers/video/nvidia.ko\n"
@@ -669,7 +890,7 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 for i in range(_SMI_GPU_COUNT):
                     rows.append(
                         f"   GPU {i}   {random.randint(0, 100):3d}    {random.randint(0, 90):3d}"
-                        f"     {random.randint(30, 72):3d}     {random.randint(70, 690):3d}       0")
+                        f"     {random.randint(30, 72):3d}     {random.randint(70, max(120, _SMI_PWR_CAP - 10)):3d}       0")
                 return "\n".join(rows)
             return ("+----+-----------+----------------------------------------------------------+\n"
                     "| GPU| Health    | Details                                                  |\n"
@@ -684,7 +905,7 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
             for i in range(_SMI_GPU_COUNT):
                 temp = random.randint(30, 72)
                 util = random.randint(0, 100)
-                mem = random.randint(3, 78000)
+                mem = random.randint(3, max(12, _SMI_MEM_TOTAL_MIB - 100))
                 rows.append(
                     f"[{i}] {_SMI_GPU_NAME} | {temp}'C, {util:3d} % | "
                     f"{mem:5d} / {_SMI_MEM_TOTAL_MIB} MB")
@@ -708,6 +929,26 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                         "    KFD_ID: 63274\n    NODE_ID: 2\n    Market Name: AMD Instinct MI300X\n"
                         "GPU: 1\n    BDF: 0000:26:00.0\n    Market Name: AMD Instinct MI300X\n"
                         "... (8 accelerators)")
+            if low.startswith("amd-smi") and ("firmware" in low or "static" in low):
+                return ("GPU: 0\n  MARKET_NAME: AMD Instinct MI300X\n  VENDOR_ID: 0x1002\n"
+                        "  DEVICE_ID: 0x74a1\n  GFX: gfx942\n"
+                        "  VBIOS: 022.171.00.009.000001\n  FW_VERSION: 22.40\n"
+                        "GPU: 1\n  MARKET_NAME: AMD Instinct MI300X\n  ...")
+            if low.startswith("amd-smi") and "process" in low:
+                return ("GPU  PID   NAME      MEM_USAGE\n"
+                        f"0    {random.randint(20000, 65000)}  python    {random.randint(1000, 80000)} MB\n"
+                        f"1    {random.randint(20000, 65000)}  python    {random.randint(1000, 80000)} MB")
+            if low.startswith("amd-smi") and ("bad-pages" in low or "ras" in low):
+                return ("GPU  RETIRED_PAGES  PENDING  UNCORRECTABLE\n"
+                        "0    0               0        0\n"
+                        "1    0               0        0")
+            if low.startswith("amd-smi") and "xgmi" in low:
+                return ("XGMI LINK STATUS\n"
+                        "GPU0 <-> GPU1: UP  64 GT/s\n"
+                        "GPU0 <-> GPU2: UP  64 GT/s\n"
+                        "GPU1 <-> GPU3: UP  64 GT/s")
+            if low.startswith("amd-smi") and ("reset" in low or "set" in low):
+                return "Successfully applied AMD SMI command."
             if "static" in low or "rocminfo" in low:
                 return ("Agent 2\n  Name:                    gfx942\n  Marketing Name:          AMD Instinct MI300X\n"
                         "  Device Type:             GPU\n  Wavefront Size:          64(0x40)")
@@ -725,7 +966,9 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                     return StreamedCommandResult(lines=rows, delay_s=0.6)
             if any(f"--show{x}" in low or f"show{x}" in low.replace("-", "") for x in (
                 "temp", "power", "use", "clocks", "meminfo", "id", "bus", "pid", "pcie",
-            )) or "--showtemp" in low or "--showpower" in low or "--showuse" in low:
+                "perflevel", "overdrive", "profile", "ras", "ecc", "vbios", "serial",
+                "uniqueid", "pagesinfo", "all",
+            )) or "--showtemp" in low or "--showpower" in low or "--showuse" in low or "--showall" in low:
                 # Legacy rocm-smi flag family used in AMD Support One-Pager diagnostics.
                 rows = ["======================= ROCm System Management Interface ======================="]
                 for i in range(8):
@@ -737,6 +980,11 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                     )
                 rows.append("==================================================================================")
                 return "\n".join(rows)
+            if low.startswith("rocm-smi") and (
+                "--setpoweroverdrive" in low or "--setperflevel" in low or "--setprofile" in low
+                or "--setfan" in low or "--reset" in low
+            ):
+                return "Successfully set."
             # amd-smi has its own layout (monitor / metric); it is NOT rocm-smi.
             if low.startswith("amd-smi"):
                 if "version" in low:
@@ -744,7 +992,7 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                             "AMDSMI Library version: 24.6.2 | ROCm version: 6.2.0")
                 # bare `amd-smi` prints usage
                 return ("usage: amd-smi [-h] {version,list,static,firmware,bad-pages,"
-                        "metric,process,event,topology,set,reset,monitor,xgmi} ...\n"
+                        "metric,process,event,topology,set,reset,monitor,xgmi,ras} ...\n"
                         "AMD System Management Interface | Version: 24.6.2 | ROCm version: 6.2.0")
             # rocm-smi concise info across the full 8x MI300X node.
             rows = ["========================= ROCm System Management Interface =========================",
