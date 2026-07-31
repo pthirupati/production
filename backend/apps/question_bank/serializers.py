@@ -41,7 +41,8 @@ class ScenarioListSerializer(serializers.ModelSerializer):
             "is_free", "attempts_count", "completions_count", "completion_rate",
             "is_bookmarked", "blocked_commands", "learn",
             "lab_mode", "simulation_type", "dual_terminal", "requires_companion_hosts",
-            "interview_mode", "coding_mode", "cross_technology", "vmware_link", "datacenter_link", "created_at",
+            "interview_mode", "coding_mode", "cross_technology", "vmware_link", "datacenter_link",
+            "consoles", "lab_servers", "created_at",
         ]
 
     def get_learn(self, scenario):
@@ -68,6 +69,7 @@ class ScenarioDetailSerializer(serializers.ModelSerializer):
             "blocked_commands", "infrastructure_type",
             "lab_mode", "simulation_type", "dual_terminal", "requires_companion_hosts",
             "interview_mode", "coding_mode", "cross_technology", "vmware_link", "datacenter_link",
+            "consoles", "lab_servers",
             "created_at", "updated_at",
         ]
 
@@ -99,6 +101,7 @@ class ScenarioAdminSerializer(serializers.ModelSerializer):
             "requires_companion_hosts", "dual_terminal", "lab_mode", "simulation_type",
             "docker_privileged", "coding_mode", "coding_spec",
             "cross_technology", "vmware_link", "datacenter_link", "certification_only",
+            "consoles", "lab_servers",
             "time_limit", "max_score",
             "definition_path", "is_free", "is_active", "interview_mode",
             "attempts_count", "completions_count", "avg_completion_time",

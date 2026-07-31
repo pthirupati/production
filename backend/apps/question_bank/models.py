@@ -240,6 +240,26 @@ class Scenario(models.Model):
             "an active Datacenter technology subscription."
         ),
     )
+    # Ordered console surfaces for this scenario (from YAML ``consoles``).
+    # Empty list → LabRunner keeps slug/simulation_type heuristics.
+    consoles = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Ordered lab console keys from scenario YAML (e.g. ['azure','terminal']). "
+            "Empty means LabRunner falls back to slug / simulation_type heuristics."
+        ),
+    )
+    # Scenario-scoped Lab Server declarations (from YAML ``lab_servers``).
+    lab_servers = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Lab Server declarations from scenario YAML "
+            "[{id, role, hostname, persona, appears_in, ...}]. "
+            "Empty falls back to on-disk YAML or persona defaults at provision time."
+        ),
+    )
     certification_only = models.BooleanField(
         default=False,
         help_text="Show only under certification tracks — excluded from normal technology scenario lists",
