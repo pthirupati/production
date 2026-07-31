@@ -599,7 +599,14 @@ def ensure_sim_session(lab_session) -> dict | None:
         _seed_gpu_identity_if_needed(engine, session_id, slug, sim_type)
         try:
             from .simulation.server_identity import seed_scenario_lab_servers
-            seed_scenario_lab_servers(session_id, sim_type=sim_type, slug=slug, engine=engine)
+            decls = getattr(scenario, "lab_servers", None) or None
+            seed_scenario_lab_servers(
+                session_id,
+                sim_type=sim_type,
+                slug=slug,
+                engine=engine,
+                lab_servers=decls if isinstance(decls, list) and decls else None,
+            )
         except Exception:
             logger.exception("LabServer seed skipped for session %s", session_id)
     else:
@@ -754,11 +761,13 @@ class SimulationProvisioner:
         # Scenario-scoped LabServer: terminal OS identity for this session only.
         try:
             from .simulation.server_identity import seed_scenario_lab_servers
+            decls = getattr(scenario, "lab_servers", None) or None
             seed_scenario_lab_servers(
                 str(lab_session.id),
                 sim_type=sim_type,
                 slug=slug,
                 engine=engine,
+                lab_servers=decls if isinstance(decls, list) and decls else None,
             )
         except Exception:
             logger.exception("LabServer seed skipped for session %s", lab_session.id)

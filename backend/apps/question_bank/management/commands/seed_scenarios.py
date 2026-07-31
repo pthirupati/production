@@ -253,11 +253,22 @@ class Command(BaseCommand):
                 )
 
                 slug = data.get("slug", scenario_dir)
+                consoles = data.get("consoles") or data.get("lab_consoles") or []
+                if not isinstance(consoles, list):
+                    consoles = []
+                lab_servers = data.get("lab_servers") or []
+                if not isinstance(lab_servers, list):
+                    lab_servers = []
                 if merge_only and Scenario.objects.filter(slug=slug).exists():
                     Scenario.objects.filter(slug=slug).update(
                         lab_mode=lab_mode,
                         simulation_type=sim_type,
                         infrastructure_type=infra,
+                        consoles=consoles,
+                        lab_servers=lab_servers,
+                        vmware_link=data.get("vmware_link", False),
+                        datacenter_link=data.get("datacenter_link", False),
+                        coding_mode=data.get("coding_mode", False),
                     )
                     self.stdout.write(f"  Synced lab metadata: {slug} ({lab_mode}/{sim_type})")
                     continue
@@ -296,6 +307,8 @@ class Command(BaseCommand):
                         "cross_technology": data.get("cross_technology", False),
                         "vmware_link": data.get("vmware_link", False),
                         "datacenter_link": data.get("datacenter_link", False),
+                        "consoles": consoles,
+                        "lab_servers": lab_servers,
                         "certification_only": data.get("certification_only", False),
                         # ITSM (ServiceNow-style) ticket flow.
                         "itsm_enabled": data.get("itsm_enabled", False),

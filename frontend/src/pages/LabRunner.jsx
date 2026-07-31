@@ -26,6 +26,10 @@ import PrimaryLabSim from '../components/lab/PrimaryLabSim'
 import LazySimPanel from '../components/lab/LazySimPanel'
 import SimErrorBoundary from '../components/SimErrorBoundary'
 import {
+  resolvePrimarySimFromConsoles,
+  consolesInclude,
+} from '../utils/scenarioConsoles'
+import {
   LazyAwsLabOverlay,
   LazyTerraformSimulator,
   LazyAwxSimulator,
@@ -1375,36 +1379,53 @@ export default function LabRunner() {
   // terminal but expose an "Open VMware" link so the hypervisor-side step can be
   // performed in the SAME lab session.
   const isCrossTech = Boolean(scenario?.cross_technology)
+  // Prefer YAML/API consoles when present; empty → keep slug heuristics below.
+  const consolesKind = !isCrossTech ? resolvePrimarySimFromConsoles(scenario?.consoles) : null
   const isVmwareLab = !isCrossTech && (
-    scenario?.technology?.slug === 'vmware'
-    || scenario?.simulation_type === 'vmware'
+    consolesKind === 'vmware'
+    || (!consolesKind && (
+      scenario?.technology?.slug === 'vmware'
+      || scenario?.simulation_type === 'vmware'
+    ))
   )
   // Monitoring labs (Grafana + Prometheus) open the in-app observability
   // simulator inline (login gate → dashboards/panels/alerts + PromQL), the same
   // way prompt/coding labs open their own surface. No dedicated route needed.
   const monitoringSimType = ['grafana', 'prometheus', 'monitoring', 'opentelemetry'].includes(scenario?.simulation_type)
   const monitoringTech = ['grafana', 'prometheus', 'opentelemetry'].includes(scenario?.technology?.slug)
-  const isMonitoringLab = !isCrossTech && (monitoringSimType || monitoringTech)
+  const isMonitoringLab = !isCrossTech && (
+    consolesKind === 'monitoring'
+    || (!consolesKind && (monitoringSimType || monitoringTech))
+  )
   const monitoringFlavor = (scenario?.simulation_type === 'prometheus' || scenario?.technology?.slug === 'prometheus')
     ? 'prometheus' : 'grafana'
   // Nmap + Wireshark labs open their own in-app simulator inline (target/flags
   // scan builder, packet capture/display filters + follow-stream) — mirroring the
   // Monitoring sim. Keyed on simulation_type or technology slug. No new route.
   const isNmapLab = !isCrossTech && (
-    scenario?.simulation_type === 'nmap' || scenario?.technology?.slug === 'nmap'
+    consolesKind === 'nmap'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'nmap' || scenario?.technology?.slug === 'nmap'
+    ))
   )
   const isWiresharkLab = !isCrossTech && (
-    scenario?.simulation_type === 'wireshark' || scenario?.technology?.slug === 'wireshark'
+    consolesKind === 'wireshark'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'wireshark' || scenario?.technology?.slug === 'wireshark'
+    ))
   )
   // Data Science DASHBOARD labs open the in-app dashboard builder inline (dataset
   // preview + dimension/measure/aggregation/filter/chart pickers + a rendered
   // chart). Keyed ONLY on simulation_type 'data-dashboard' — NOT the technology
   // slug, because data-science also hosts coding_mode labs that must keep opening
   // the code IDE.
-  // NB: seed_scenarios normalizes unknown simulation_type -> 'generic' in the DB,
-  // so we ALSO match the reliable slug prefix (the raw type survives only in YAML).
+  // NB: seed_scenarios historically normalized unknown simulation_type -> 'generic';
+  // slug prefix remains a fallback until specialty types are reseeded.
   const isDataDashboardLab = !isCrossTech && (
-    scenario?.simulation_type === 'data-dashboard' || (scenario?.slug || '').startsWith('ds-dashboard-')
+    consolesKind === 'datadashboard'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'data-dashboard' || (scenario?.slug || '').startsWith('ds-dashboard-')
+    ))
   )
   // AI Agent / Workflow labs open the in-app n8n-style node-graph builder inline
   // (palette → canvas → config panel → Run → execution trace + final output).
@@ -1412,25 +1433,34 @@ export default function LabRunner() {
   // the ai-ml technology also hosts coding_mode labs that must keep opening the
   // code IDE. Mirrors the data-dashboard detection above.
   const isAgentLab = !isCrossTech && (
-    scenario?.simulation_type === 'ai-agent' || (scenario?.slug || '').startsWith('agent-')
+    consolesKind === 'agent'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'ai-agent' || (scenario?.slug || '').startsWith('agent-')
+    ))
   )
   // Windows Server GUI labs open the in-app Server Manager / Active Directory /
   // Windows Update / Services simulator inline. Match simulation_type, technology
   // slug, and win-* scenario slugs so every Windows lab opens the GUI mock.
   const isWindowsGuiLab = !isCrossTech && (
-    scenario?.simulation_type === 'windows-server'
-    || scenario?.simulation_type === 'windows'
-    || scenario?.technology?.slug === 'windows'
-    || (scenario?.slug || '').startsWith('win-gui-')
-    || (scenario?.slug || '').startsWith('win-')
+    consolesKind === 'windows'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'windows-server'
+      || scenario?.simulation_type === 'windows'
+      || scenario?.technology?.slug === 'windows'
+      || (scenario?.slug || '').startsWith('win-gui-')
+      || (scenario?.slug || '').startsWith('win-')
+    ))
   )
   // PeopleSoft labs open the PIA simulator inline. peoplesoft is a dedicated
   // technology with no coding labs, so the slug prefix, sim type, or tech slug
   // all reliably identify it (sim type normalizes to 'generic' in the DB).
   const isPeopleSoftLab = !isCrossTech && (
-    scenario?.simulation_type === 'peoplesoft'
-    || scenario?.technology?.slug === 'peoplesoft'
-    || (scenario?.slug || '').startsWith('ps-')
+    consolesKind === 'peoplesoft'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'peoplesoft'
+      || scenario?.technology?.slug === 'peoplesoft'
+      || (scenario?.slug || '').startsWith('ps-')
+    ))
   )
   // AWX/Tower detection — match the sim type, slug, title, or tags so EVERY
   // AWX-themed lab opens the AWX simulator, not just the ones slugged "awx".
@@ -1438,121 +1468,165 @@ export default function LabRunner() {
   // from generic cross-tech copy that merely mentions AWX in passing.
   const _awxHay = scenarioTagHaystack(scenario)
   const isAwxLab = !isCrossTech && (
-    scenario?.simulation_type === 'ansible-awx'
-    || /\bawx\b/.test(_awxHay)
-    || /\btower\b/.test(_awxHay)
-    || _awxHay.includes('automation controller')
+    consolesKind === 'awx'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'ansible-awx'
+      || /\bawx\b/.test(_awxHay)
+      || /\btower\b/.test(_awxHay)
+      || _awxHay.includes('automation controller')
+    ))
   )
-  const isTerraformSimLab = !isCrossTech && isTerraformLab(scenario)
+  const isTerraformSimLab = !isCrossTech && (
+    consolesKind === 'terraform' || (!consolesKind && isTerraformLab(scenario))
+  )
   // AWS console heroes (aws-/ec2-/…) use the AWS Console as primary UI.
   // Academy packs (academy-aws-*) grade via the Lab Server terminal FIXED-OK
   // path — keep the terminal primary so learners are not stuck in a console
   // that never satisfies Check Solution.
   const isAwsAcademyLab = (scenario?.slug || '').startsWith('academy-aws-')
   const isAwsLab = !isCrossTech && !isTerraformSimLab && !isAwsAcademyLab && (
-    scenario?.simulation_type === 'aws'
-    || scenario?.technology?.slug === 'aws'
-    || (scenario?.slug || '').startsWith('aws-')
-    || (scenario?.slug || '').startsWith('ec2-')
-    || (scenario?.slug || '').startsWith('s3-')
-    || (scenario?.slug || '').startsWith('iam-')
+    consolesKind === 'aws'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'aws'
+      || scenario?.technology?.slug === 'aws'
+      || (scenario?.slug || '').startsWith('aws-')
+      || (scenario?.slug || '').startsWith('ec2-')
+      || (scenario?.slug || '').startsWith('s3-')
+      || (scenario?.slug || '').startsWith('iam-')
+    ))
   )
   const techSlugLc = (scenario?.technology?.slug || '').toLowerCase()
   const isBaremetalGuiLab = !isCrossTech && (
-    scenario?.simulation_type === 'baremetal'
-    || techSlugLc === 'baremetal'
-    || (scenario?.slug || '').startsWith('academy-baremetal-')
-    || (scenario?.slug || '').startsWith('baremetal-')
-    || /maas|lxd|lxc|kvm|virsh|ipmi|pxe/.test((scenario?.slug || '').toLowerCase())
+    consolesKind === 'baremetal'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'baremetal'
+      || techSlugLc === 'baremetal'
+      || (scenario?.slug || '').startsWith('academy-baremetal-')
+      || (scenario?.slug || '').startsWith('baremetal-')
+      || /maas|lxd|lxc|kvm|virsh|ipmi|pxe/.test((scenario?.slug || '').toLowerCase())
+    ))
   )
   // Enterprise storage / DC / SOC simulators — each is a dedicated technology
   // (see scenarios/<tech>/technology.yaml) with a matching backend engine under
   // apps/vmware_sim/. Gate on simulation_type OR technology slug OR slug prefix,
   // mirroring every other dedicated-tech sim detection above.
   const isCommvaultLab = !isCrossTech && (
-    scenario?.simulation_type === 'commvault'
-    || scenario?.technology?.slug === 'commvault'
-    || (scenario?.slug || '').startsWith('cv-')
-    || (scenario?.slug || '').startsWith('commvault-')
-    || (scenario?.slug || '').startsWith('academy-commvault-')
+    consolesKind === 'commvault'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'commvault'
+      || scenario?.technology?.slug === 'commvault'
+      || (scenario?.slug || '').startsWith('cv-')
+      || (scenario?.slug || '').startsWith('commvault-')
+      || (scenario?.slug || '').startsWith('academy-commvault-')
+    ))
   )
   const isNetappLab = !isCrossTech && (
-    scenario?.simulation_type === 'netapp'
-    || scenario?.technology?.slug === 'netapp'
-    || (scenario?.slug || '').startsWith('netapp-')
-    || (scenario?.slug || '').startsWith('ontap-')
-    || (scenario?.slug || '').startsWith('academy-netapp-')
+    consolesKind === 'netapp'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'netapp'
+      || scenario?.technology?.slug === 'netapp'
+      || (scenario?.slug || '').startsWith('netapp-')
+      || (scenario?.slug || '').startsWith('ontap-')
+      || (scenario?.slug || '').startsWith('academy-netapp-')
+    ))
   )
   const isDellemcLab = !isCrossTech && (
-    scenario?.simulation_type === 'dellemc'
-    || scenario?.technology?.slug === 'dellemc'
-    || (scenario?.slug || '').startsWith('dellemc-')
-    || (scenario?.slug || '').startsWith('powermax-')
-    || (scenario?.slug || '').startsWith('academy-dellemc-')
+    consolesKind === 'dellemc'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'dellemc'
+      || scenario?.technology?.slug === 'dellemc'
+      || (scenario?.slug || '').startsWith('dellemc-')
+      || (scenario?.slug || '').startsWith('powermax-')
+      || (scenario?.slug || '').startsWith('academy-dellemc-')
+    ))
   )
   const isDatacenterLab = !isCrossTech && (
-    scenario?.simulation_type === 'datacenter'
-    || scenario?.technology?.slug === 'datacenter'
-    || (scenario?.slug || '').startsWith('datacenter-')
-    || (scenario?.slug || '').startsWith('dc-')
-    || (scenario?.slug || '').startsWith('academy-datacenter-')
+    consolesKind === 'datacenter'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'datacenter'
+      || scenario?.technology?.slug === 'datacenter'
+      || (scenario?.slug || '').startsWith('datacenter-')
+      || (scenario?.slug || '').startsWith('dc-')
+      || (scenario?.slug || '').startsWith('academy-datacenter-')
+    ))
   )
   const isSocLab = !isCrossTech && (
-    scenario?.simulation_type === 'soc'
-    || scenario?.technology?.slug === 'soc'
-    || (scenario?.slug || '').startsWith('soc-')
-    || (scenario?.slug || '').startsWith('academy-soc-')
+    consolesKind === 'soc'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'soc'
+      || scenario?.technology?.slug === 'soc'
+      || (scenario?.slug || '').startsWith('soc-')
+      || (scenario?.slug || '').startsWith('academy-soc-')
+    ))
   )
   const isAzureLab = !isCrossTech && (
-    scenario?.simulation_type === 'azure'
-    || scenario?.technology?.slug === 'azure'
-    || (scenario?.slug || '').startsWith('azure-')
-    || (scenario?.slug || '').startsWith('academy-azure-')
+    consolesKind === 'azure'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'azure'
+      || scenario?.technology?.slug === 'azure'
+      || (scenario?.slug || '').startsWith('azure-')
+      || (scenario?.slug || '').startsWith('academy-azure-')
+    ))
   )
   const isGcpLab = !isCrossTech && (
-    scenario?.simulation_type === 'gcp'
-    || scenario?.technology?.slug === 'gcp'
-    || (scenario?.slug || '').startsWith('gcp-')
-    || (scenario?.slug || '').startsWith('academy-gcp-')
+    consolesKind === 'gcp'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'gcp'
+      || scenario?.technology?.slug === 'gcp'
+      || (scenario?.slug || '').startsWith('gcp-')
+      || (scenario?.slug || '').startsWith('academy-gcp-')
+    ))
   )
   const isOpenStackLab = !isCrossTech && (
-    scenario?.simulation_type === 'openstack'
-    || scenario?.technology?.slug === 'openstack'
-    || (scenario?.slug || '').startsWith('openstack-')
-    || (scenario?.slug || '').startsWith('academy-openstack-')
+    consolesKind === 'openstack'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'openstack'
+      || scenario?.technology?.slug === 'openstack'
+      || (scenario?.slug || '').startsWith('openstack-')
+      || (scenario?.slug || '').startsWith('academy-openstack-')
+    ))
   )
   const isK8sLab = !isCrossTech && (
-    scenario?.simulation_type === 'kubernetes'
-    || scenario?.simulation_type === 'k8s'
-    || scenario?.technology?.slug === 'kubernetes'
-    || scenario?.technology?.slug === 'k8s'
-    || scenario?.technology?.slug === 'openshift'
-    || scenario?.technology?.slug === 'service-mesh'
-    || (scenario?.slug || '').startsWith('kubernetes-')
-    || (scenario?.slug || '').startsWith('k8s-')
-    || (scenario?.slug || '').startsWith('openshift-')
-    || (scenario?.slug || '').startsWith('academy-kubernetes-')
-    || (scenario?.slug || '').startsWith('academy-k8s-')
-    || (scenario?.slug || '').startsWith('academy-openshift-')
-    || (scenario?.slug || '').startsWith('service-mesh-')
-    || (scenario?.slug || '').startsWith('academy-service-mesh-')
-    || (scenario?.slug || '').startsWith('istio-')
-    || (scenario?.slug || '').startsWith('linkerd-')
+    consolesKind === 'k8s'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'kubernetes'
+      || scenario?.simulation_type === 'k8s'
+      || scenario?.technology?.slug === 'kubernetes'
+      || scenario?.technology?.slug === 'k8s'
+      || scenario?.technology?.slug === 'openshift'
+      || scenario?.technology?.slug === 'service-mesh'
+      || (scenario?.slug || '').startsWith('kubernetes-')
+      || (scenario?.slug || '').startsWith('k8s-')
+      || (scenario?.slug || '').startsWith('openshift-')
+      || (scenario?.slug || '').startsWith('academy-kubernetes-')
+      || (scenario?.slug || '').startsWith('academy-k8s-')
+      || (scenario?.slug || '').startsWith('academy-openshift-')
+      || (scenario?.slug || '').startsWith('service-mesh-')
+      || (scenario?.slug || '').startsWith('academy-service-mesh-')
+      || (scenario?.slug || '').startsWith('istio-')
+      || (scenario?.slug || '').startsWith('linkerd-')
+    ))
   )
   // CI/CD / GitOps / GitHub Actions — after k8s so kubernetes-* slugs under devops
   // folder do not open the wrong console.
   const isDevOpsPipelineLab = !isCrossTech && !isK8sLab && (
-    ['devops', 'gitops', 'github', 'cicd', 'devsecops-supplychain'].includes(techSlugLc)
-    || scenario?.simulation_type === 'devops'
-    || /jenkins|gitlab|pipeline|argocd|flux|helm|sonar|ci-pipeline|cicd|gitops|github|gh-actions|academy-gitops|academy-devops|devsecops|supplychain|cosign|sbom/.test(
-      (scenario?.slug || '').toLowerCase(),
-    )
+    consolesKind === 'cicd'
+    || (!consolesKind && (
+      ['devops', 'gitops', 'github', 'cicd', 'devsecops-supplychain'].includes(techSlugLc)
+      || scenario?.simulation_type === 'devops'
+      || /jenkins|gitlab|pipeline|argocd|flux|helm|sonar|ci-pipeline|cicd|gitops|github|gh-actions|academy-gitops|academy-devops|devsecops|supplychain|cosign|sbom/.test(
+        (scenario?.slug || '').toLowerCase(),
+      )
+    ))
   )
   const isDockerLab = !isCrossTech && !isK8sLab && (
-    scenario?.simulation_type === 'docker'
-    || scenario?.technology?.slug === 'docker'
-    || (scenario?.slug || '').startsWith('docker-')
-    || (scenario?.slug || '').startsWith('academy-docker-')
+    consolesKind === 'docker'
+    || (!consolesKind && (
+      scenario?.simulation_type === 'docker'
+      || scenario?.technology?.slug === 'docker'
+      || (scenario?.slug || '').startsWith('docker-')
+      || (scenario?.slug || '').startsWith('academy-docker-')
+    ))
   )
   const isSimPrimaryLab = !isCrossTech && (
     isAwsLab || isDevOpsPipelineLab || isTerraformSimLab || isAwxLab || isMonitoringLab || isWindowsGuiLab
@@ -1642,6 +1716,7 @@ export default function LabRunner() {
   // unpaid consoles) or loose slug matches (e.g. Commvault "vmware-discovery").
   // Revenue lock: scenario link AND an active VMware/Datacenter subscription.
   const explicitVmwareScenario = scenario?.vmware_link === true
+    || consolesInclude(scenario?.consoles, 'vmware')
   const canVmwareConsole = userHasTechAccess(techSubs, 'vmware')
   const canDatacenterConsole = userHasTechAccess(techSubs, 'datacenter')
   const vmwareServerHref = `/vmware/${sessionId}?scenario=${scenario?.slug || ''}`
@@ -1650,6 +1725,8 @@ export default function LabRunner() {
   )
   // Datacenter overlay only when the scenario opts in (not host flavor alone).
   const explicitDatacenterScenario = scenario?.datacenter_link === true
+    || consolesInclude(scenario?.consoles, 'datacenter')
+    || consolesInclude(scenario?.consoles, 'bmc')
   const showDatacenterLink = !isDatacenterLab && canOpenCompanionConsole(techSubs, explicitDatacenterScenario, 'datacenter')
   // Locked chips: scenario needs the companion console but learner lacks the sub.
   const showVmwareSubscribeHint = explicitVmwareScenario && !isVmwareLab && techSubs && !canVmwareConsole
