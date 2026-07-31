@@ -6,7 +6,9 @@ import {
   useInterviewVoice,
   unlockSpeech,
   holdSpeechUnlock,
+  pauseSpeechHoldPrimes,
   releaseSpeechHold,
+  reassertSpeechUnlockAfterAwait,
   resumeSpeechSynthesis,
   detectSpeechCapabilities,
 } from '../../hooks/useInterviewVoice'
@@ -861,6 +863,8 @@ export default function InterviewRoom() {
     bootstrapVoiceRef.current = true
     try {
       const data = await interviewsApi.startRound(roundId)
+      // startRound left the user-gesture stack — reassert unlock before we speak.
+      reassertSpeechUnlockAfterAwait()
       setRound(data)
       const msgs = [...(data.messages || [])]
       if (data.intro) msgs.push(data.intro)
@@ -892,6 +896,8 @@ export default function InterviewRoom() {
       // Keep the speech hold ACTIVE across bootstrap — releasing here was the
       // main post-Join silence bug (Chrome drops the gesture grant after await).
       await gestureWarm
+      pauseSpeechHoldPrimes()
+      reassertSpeechUnlockAfterAwait()
       unlockSpeech({ soft: true })
       resumeSpeechSynthesis()
       const bootstrap = [introText, firstQ?.content].filter(Boolean).join(' ')

@@ -37,7 +37,7 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 21. [x] Fix Join TTS cancelled by host sync (mark bootstrap message IDs)
 22. [x] Disable VAD barge-in during Join bootstrap; raise barge threshold
 23. [x] Stop 1Hz React re-render from interview clock (DOM-only paint)
-24. [ ] Harden Chrome SpeechSynthesis unlock across async startRound
+24. [x] Harden Chrome SpeechSynthesis unlock across async startRound
 25. [ ] E2E: sound-test → Join → audible first question (no silent join)
 26. [x] AWS console mount tests pass for fresh/legacy/corrupt localStorage
 27. [~] Production verify: academy-aws-001 Ec2 Learn loads without error boundary
