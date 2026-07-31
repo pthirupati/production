@@ -1564,11 +1564,51 @@ def _handle_kubectl(c, parts: list[str], line: str, shell: RHELShell) -> str:
 
 
 def _register_ansible(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
+    slug = (getattr(engine, "scenario_slug", "") or "").lower()
+
     def handler(parts, line):
         low = line.strip().lower()
         if low.startswith("ssh-copy-id"):
             engine._ssh_key_fixed = True
             return "Number of key(s) added: 1"
+        # AWX / Tower CLI used in AI Infra driver-install & repave labs
+        if low.startswith("awx ") or low.startswith("tower-cli"):
+            if "login" in low or "--conf.host" in low:
+                return "ok"
+            if "job_templates" in low and ("list" in low or "get" in low):
+                return (
+                    "id  name                              inventory\n"
+                    "12  GPU Driver Install (H100)         maas-gpu-nodes\n"
+                    "18  DCGM Exporter Deploy              maas-gpu-nodes\n"
+                    "24  Image Repave (jammy-h100)         maas-gpu-nodes\n"
+                    "31  NVIDIA Persistence Mode           maas-gpu-nodes"
+                )
+            if "inventory" in low and "list" in low:
+                return (
+                    "id  name\n"
+                    "3   maas-gpu-nodes\n"
+                    "4   lxd-burn-in"
+                )
+            if "job_templates launch" in low or "jobs launch" in low or "launch" in low:
+                jid = random.randint(4000, 9000)
+                from .shell import StreamedCommandResult
+                lines = [
+                    f"Job {jid} launched (pending)",
+                    f"Job {jid} → running  (0%) waiting for capacity",
+                    f"Job {jid} → running (35%) installing nvidia-driver-565",
+                    f"Job {jid} → running (70%) enabling nvidia-persistenced",
+                    f"Job {jid} → successful",
+                    "PLAY RECAP *********************************************************************",
+                    "gpu-node-01 : ok=6  changed=3  unreachable=0  failed=0",
+                ]
+                return StreamedCommandResult(lines=lines, delay_s=0.5)
+            if "jobs get" in low or "jobs stdout" in low:
+                return "status: successful\nelapsed: 00:04:12"
+            return (
+                "usage: awx job_templates list|launch\n"
+                "       awx inventory list\n"
+                "       awx jobs get <id>"
+            )
         if not (low.startswith("ansible ") or low.startswith("ansible-playbook") or low.startswith("ansible-inventory")):
             return None
         if low in ("ansible --version", "ansible-playbook --version"):
@@ -1576,16 +1616,29 @@ def _register_ansible(engine: "UnifiedSimulationEngine", shell: RHELShell) -> No
         if "ping" in low:
             if engine._ssh_key_fixed:
                 return "web1 | SUCCESS => {\"ping\": \"pong\"}\nweb2 | SUCCESS => {\"ping\": \"pong\"}"
+            # AI Infra MAAS inventory nodes (when scenario mentions gpu/maas)
+            if "ai-infra" in slug or "gpu" in slug or "maas" in slug:
+                return (
+                    "gpu-node-01 | SUCCESS => {\"ping\": \"pong\"}\n"
+                    "gpu-node-02 | SUCCESS => {\"ping\": \"pong\"}"
+                )
             return (
                 "web1 | SUCCESS => {\"ping\": \"pong\"}\n"
                 "web2 | UNREACHABLE! => {\"msg\": \"Permission denied (publickey).\"}"
             )
         if "ansible-playbook" in low:
-            if engine._ssh_key_fixed:
+            if engine._ssh_key_fixed or "ai-infra" in slug or "nvidia" in low or "dcgm" in low:
                 engine._ansible_playbook_ok = True
-                return "PLAY RECAP *****\nweb1 : ok=2 changed=1\nweb2 : ok=2 changed=1"
+                hosts = "gpu-node-01\ngpu-node-02" if ("ai-infra" in slug or "gpu" in slug) else "web1\nweb2"
+                recap = "\n".join(
+                    f"{h} : ok=3 changed=2 unreachable=0 failed=0"
+                    for h in hosts.splitlines()
+                )
+                return f"PLAY RECAP *****\n{recap}"
             return "fatal: [web2]: FAILED! => Unable to start service nginx"
         if "ansible-inventory" in low:
+            if "ai-infra" in slug or "gpu" in slug:
+                return '{"gpu_nodes": {"hosts": ["gpu-node-01", "gpu-node-02", "gpu-node-03"]}}'
             return '{"webservers": {"hosts": ["web1", "web2"]}}'
         return f"{line}: OK"
     shell.register_handler(handler)
