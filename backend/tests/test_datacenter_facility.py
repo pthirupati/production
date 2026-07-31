@@ -242,7 +242,30 @@ class DatacenterFacilityTests(SimpleTestCase):
         state = dc.get_state(self.session_id)["state"]
         web = next(s for s in state["servers"] if s["id"] == "srv-r01-u12")
         vd0 = next(v for v in web["raid"]["virtual_disks"] if v["id"] == "VD0")
+        self.assertEqual(vd0["status"], "rebuilding")
+        self.assertGreater(int(vd0.get("rebuild_pct") or 0), 0)
+        self.assertLess(int(vd0.get("rebuild_pct") or 0), 100)
+
+        # Progressive advance via live tick / explicit advance
+        pct_before = int(vd0["rebuild_pct"])
+        r3 = dc.apply_action(self.session_id, "raid_advance_rebuild", {"asset_id": "srv-r01-u12"})
+        self.assertTrue(r3["ok"], r3)
+        state = dc.get_state(self.session_id)["state"]
+        web = next(s for s in state["servers"] if s["id"] == "srv-r01-u12")
+        vd0 = next(v for v in web["raid"]["virtual_disks"] if v["id"] == "VD0")
+        self.assertGreaterEqual(int(vd0["rebuild_pct"]), pct_before)
+        self.assertIn(vd0["status"], ("rebuilding", "optimal"))
+
+        # Drive to completion
+        for _ in range(12):
+            dc.apply_action(self.session_id, "raid_advance_rebuild", {"asset_id": "srv-r01-u12"})
+            state = dc.get_state(self.session_id)["state"]
+            web = next(s for s in state["servers"] if s["id"] == "srv-r01-u12")
+            vd0 = next(v for v in web["raid"]["virtual_disks"] if v["id"] == "VD0")
+            if vd0["status"] == "optimal":
+                break
         self.assertEqual(vd0["status"], "optimal")
+        self.assertEqual(int(vd0.get("rebuild_pct") or 0), 100)
 
     def test_bios_setup_and_bmc_virtual_media(self):
         dc.get_state(self.session_id)

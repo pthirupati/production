@@ -218,6 +218,8 @@
 }
 .dc-port-up { background: rgba(52,211,153,.14); color: #34d399; }
 .dc-port-down { background: rgba(100,116,139,.16); color: #94a3b8; }
+.dc-port-warn { background: rgba(251,191,36,.16); color: #fbbf24; }
+.dc-port-fail { background: rgba(248,113,113,.16); color: #f87171; }
 .dc-port-link { color: #f97316; font-weight: 600; text-decoration: underline; text-decoration-color: rgba(249,115,22,.3); }
 .dc-port-link:hover { color: #fb923c; }
 
@@ -425,7 +427,18 @@
   padding: 0.5rem 0.6rem; border-radius: 6px; border: 1px solid #262c3d;
   background: #171b26; margin-bottom: 0.4rem;
 }
+.dc-vd-degraded { border-color: rgba(248,113,113,.45); }
+.dc-vd-rebuilding { border-color: rgba(251,191,36,.5); }
 .dc-vd-head { display: flex; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; font-size: 0.72rem; color: #e2e8f0; }
+.dc-rebuild-track {
+  margin-top: 0.4rem; height: 6px; border-radius: 999px; background: #0d111a;
+  border: 1px solid #2a3144; overflow: hidden;
+}
+.dc-rebuild-fill {
+  height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  transition: width 0.45s ease;
+}
 .dc-input {
   background: #0d111a; border: 1px solid #2a3144; border-radius: 5px; color: #e2e8f0;
   font-size: 0.7rem; padding: 0.3rem 0.45rem; min-width: 0;

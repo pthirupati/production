@@ -1387,27 +1387,40 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vd = next((v for v in raid.get("virtual_disks", []) if v.get("id") == vd_id), None)
         if not vd:
             return {"ok": False, "error": f"VD {vd_id} not found"}
-        # Promote hotspare if available
+        if vd.get("status") == "rebuilding":
+            return {"ok": True, "message": f"{vd_id} already rebuilding ({vd.get('rebuild_pct') or 0}%)", "raid": raid}
+        if vd.get("status") not in ("degraded", "rebuilding"):
+            return {"ok": False, "error": f"{vd_id} is {vd.get('status')} — only degraded volumes can rebuild"}
+        # Promote hotspare into the array if available (failed member stays failed until complete)
         spare = next((d for d in raid.get("physical_disks", []) if d.get("status") == "hotspare"), None)
         failed = next((d for d in raid.get("physical_disks", []) if d.get("status") == "failed"), None)
         if spare:
-            spare["status"] = "online"
+            spare["status"] = "rebuilding"
             if failed and failed["id"] in (vd.get("members") or []):
                 vd["members"] = [spare["id"] if m == failed["id"] else m for m in vd["members"]]
+                vd["rebuild_source"] = failed["id"]
+                vd["rebuild_target"] = spare["id"]
         vd["status"] = "rebuilding"
-        vd["rebuild_pct"] = 100
-        vd["status"] = "optimal"
-        for d in raid.get("physical_disks", []):
-            if d.get("status") == "failed":
-                d["status"] = "online"
-                d["smart"] = "OK"
-        srv["components"]["disk"] = "healthy"
-        if broken.get("server") == srv["id"] and broken.get("component") == "disk":
-            broken.clear()
-        raid.setdefault("operations", []).insert(0, {"time": _now_iso(), "op": "rebuild", "detail": vd_id})
-        _event(state, f"RAID rebuild completed for {vd_id} on {srv['id']}", "success")
+        vd["rebuild_pct"] = max(5, int(vd.get("rebuild_pct") or 0) or 8)
+        raid.setdefault("operations", []).insert(0, {
+            "time": _now_iso(), "op": "rebuild_start", "detail": f"{vd_id} @ {vd['rebuild_pct']}%",
+        })
+        _event(state, f"RAID rebuild started for {vd_id} on {srv['id']} ({vd['rebuild_pct']}%)", "warning")
         _save(session_id, entry)
-        return {"ok": True, "message": f"{vd_id} rebuild complete", "raid": raid}
+        return {"ok": True, "message": f"{vd_id} rebuilding ({vd['rebuild_pct']}%)", "raid": raid}
+
+    if action == "raid_advance_rebuild":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        srv = _find_server(state, asset_id) if asset_id else None
+        from apps.vmware_sim.datacenter_facility_ops import advance_raid_rebuilds
+        advanced = advance_raid_rebuilds(state, only_server_id=(srv or {}).get("id"))
+        _save(session_id, entry)
+        return {
+            "ok": True,
+            "message": f"Advanced {len(advanced)} rebuild(s)",
+            "advanced": advanced,
+            "raid": (srv or {}).get("raid") if srv else None,
+        }
 
     if action == "raid_set_cache":
         asset_id = payload.get("asset_id") or state.get("selected_asset") or ""

@@ -118,7 +118,7 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 77. [x] Plug/unplug cables with physics bend (Rapier) — drag connector snap-mate
 78. [~] Port LEDs, fan RPM animation, thermal/power view modes
 79. [~] Console: attach KVM/monitor → BIOS/UEFI/iDRAC/iLO/IPMI/Redfish
-80. [ ] RAID config (PERC/Smart Array/MegaRAID) + rebuild viz
+80. [~] RAID config (PERC/Smart Array/MegaRAID) + rebuild viz
 81. [~] Hardware replace workflows + RMA tickets (Dell/HPE/Cisco/NVIDIA)
 82. [ ] Failure injection + troubleshooting training scenarios
 83. [ ] DCIM: PUE, capacity, inventory, warranty, predictive maintenance
