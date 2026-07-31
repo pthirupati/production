@@ -545,7 +545,12 @@ def patch_yaml(path: Path, tech: str, topic: str, cycle: int, *, dry_run: bool) 
         print(f"  SKIP unknown topic {topic} in {path.parent.name}")
         return False
     data["coding_mode"] = True
-    data["simulation_type"] = "python"
+    # Keep specialty coding personas (do not collapse to python/generic on seed).
+    data["simulation_type"] = {
+        "javascript": "javascript",
+        "react": "react",
+        "html": "html",
+    }.get(tech, "python")
     data["coding_spec"] = spec
     # Grading is hidden_tests — rewrite task validation language lightly
     fn = spec["files"][0]["path"]

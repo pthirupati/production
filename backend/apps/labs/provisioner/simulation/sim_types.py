@@ -15,9 +15,16 @@ UNIFIED_SIM_TYPES = {
     "ansible-awx": "Ansible AWX / Tower Lab",
     "python": "Python Development Lab",
     "java": "Java Development Lab",
+    "javascript": "JavaScript Coding Lab",
+    "react": "React Coding Lab",
+    "html": "HTML / CSS Coding Lab",
+    "shell_script": "Shell Scripting Lab",
+    "shell-script": "Shell Scripting Lab",
     "terraform": "Terraform / AWS IaC Lab",
     "windows": "Windows Server Lab",
+    "windows-server": "Windows Server Lab",
     "devops": "DevOps / CI-CD Lab",
+    "docker": "Docker Host Lab",
     "networking": "Networking / BGP Lab",
     "grafana": "Grafana Observability Lab",
     "prometheus": "Prometheus Monitoring Lab",
@@ -30,6 +37,11 @@ UNIFIED_SIM_TYPES = {
     "gcp": "Google Cloud Console Lab",
     "openstack": "OpenStack Horizon Lab",
     "aws": "AWS Management Console Lab",
+    "peoplesoft": "PeopleSoft Application Server Lab",
+    "nmap": "Nmap Network Scan Lab",
+    "wireshark": "Wireshark Packet Analysis Lab",
+    "data-dashboard": "Data Dashboard / Chart Lab",
+    "ai-agent": "AI Agent Lab",
 }
 
 _LEGACY_MAP = {
@@ -37,14 +49,13 @@ _LEGACY_MAP = {
     "normal": "generic",
     "boot": "rhel",
     "patching": "rhel",
-    "html": "rhel",
-    "shell_script": "rhel",
-    "docker": "generic",
     "k8s": "kubernetes",
     "monitoring": "grafana",
     "loki": "grafana",
     "alertmanager": "prometheus",
     "promql": "prometheus",
+    # Coding YAML sometimes uses hyphenated shell tech slug as simulation_type
+    "shell": "shell_script",
 }
 
 
@@ -92,6 +103,32 @@ def infer_sim_type(
         return "devops"
     if tech == "baremetal" or low.startswith(("academy-baremetal", "baremetal-")):
         return "baremetal"
+    if tech == "peoplesoft" or low.startswith(("academy-peoplesoft", "ps-", "peoplesoft-")):
+        return "peoplesoft"
+    if tech == "nmap" or low.startswith(("academy-nmap", "nmap-")):
+        return "nmap"
+    if tech == "wireshark" or low.startswith(("academy-wireshark", "wireshark-")):
+        return "wireshark"
+    if tech == "docker" or low.startswith(("academy-docker", "docker-")):
+        return "docker"
+    if tech in ("windows", "windows-server") or low.startswith(
+        ("academy-windows", "windows-", "win-")
+    ):
+        return "windows"
+    if tech == "javascript" or low.startswith(("academy-javascript", "js-")):
+        return "javascript"
+    if tech == "react" or low.startswith(("academy-react", "react-")):
+        return "react"
+    if tech == "html" or low.startswith(("academy-html", "html-")):
+        return "html"
+    if tech in ("shell", "shell-script", "shell_script") or low.startswith(
+        ("academy-shell", "shell-")
+    ):
+        return "shell_script"
+    if low.startswith("ds-dashboard-") or tech == "data-dashboard":
+        return "data-dashboard"
+    if low.startswith("agent-") or tech == "ai-agent":
+        return "ai-agent"
     return st
 
 
@@ -122,6 +159,18 @@ def lab_server_banner(sim_type: str, slug: str = "") -> str:
         "grafana": "Observability Host — RHEL 9",
         "prometheus": "Observability Host — RHEL 9",
         "devops": "GitOps / CI Lab Server — RHEL 9",
+        "peoplesoft": "PeopleSoft Application Server — RHEL 9",
+        "nmap": "Nmap Lab Workstation — RHEL 9",
+        "wireshark": "Wireshark Lab Workstation — RHEL 9",
+        "javascript": "JavaScript Coding Lab Host — RHEL 9",
+        "react": "React Coding Lab Host — RHEL 9",
+        "html": "HTML Coding Lab Host — RHEL 9",
+        "shell_script": "Shell Scripting Lab Host — RHEL 9",
+        "shell-script": "Shell Scripting Lab Host — RHEL 9",
+        "java": "Java Development Lab Host — RHEL 9",
+        "python": "Python Development Lab Host — RHEL 9",
+        "data-dashboard": "Data Dashboard Lab Host — RHEL 9",
+        "ai-agent": "AI Agent Lab Host — RHEL 9",
         "rhel": "Linux Lab Server — RHEL 9",
         "generic": "Linux Lab Server — RHEL 9",
     }
@@ -217,8 +266,11 @@ def boot_console_for(scenario_slug: str, sim_type: str) -> bool:
     """
     s = (scenario_slug or "").lower()
     if sim_type in (
-        "windows", "terraform", "devops", "networking",
+        "windows", "windows-server", "terraform", "devops", "networking",
         "commvault", "netapp", "dellemc", "datacenter", "soc", "azure", "gcp",
+        "peoplesoft", "nmap", "wireshark", "data-dashboard", "ai-agent",
+        "javascript", "react", "html", "shell_script", "shell-script",
+        "java", "python",
     ):
         # These personas have their own surfaces and never use the RHEL boot flow.
         return False

@@ -222,7 +222,7 @@ Update this file as items complete. Keep internal code names (`*Simulator`, `sim
 ### Still broken / next PRs
 
 130. [ ] Promote YAML `consoles` + `lab_servers` to first-class API fields; LabRunner stops using slug heuristics
-131. [ ] Seed/`normalize_sim_type`: keep `peoplesoft`, `nmap`, `wireshark`, `windows-server`, coding types (stop collapse → `generic`)
+131. [x] Seed/`normalize_sim_type`: keep `peoplesoft`, `nmap`, `wireshark`, `windows-server`, coding types (stop collapse → `generic`)
 132. [x] Academy generator: JS/React/HTML → `coding_mode: true` + real `coding_spec` (Java/shell deferred)
 133. [x] HTML/Web labs: live iframe preview pane in CodingIDE + academy HTML → coding_mode
 134. [ ] Terraform apply → mutate AWS/Azure/GCP console inventory + Open Cloud links in dropdown
