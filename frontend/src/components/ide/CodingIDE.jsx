@@ -2,21 +2,24 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Play, CheckCircle2, XCircle, FileCode, Loader2, Terminal as TerminalIcon,
   ListChecks, FileText, Lightbulb, Lock, EyeOff, AlertTriangle, Trophy,
-  Sparkles, Search, Sun, Moon, ZoomIn, ZoomOut, Bug, ScrollText, Save,
+  Sparkles, Search, Sun, Moon, ZoomIn, ZoomOut, Bug, ScrollText, Save, Eye,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CodeEditor from './CodeEditor'
 import MentorPanel from './MentorPanel'
+import HtmlPreviewPane from './HtmlPreviewPane'
 import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab } from './VsCodeWorkbench'
 import '../../styles/vscode-workbench.css'
 import { runPython, runPythonTests } from '../../utils/ide/pyodideRunner'
 import { runJavaScript, runJavaScriptTests } from '../../utils/ide/jsRunner'
+import { hasHtmlPreview, editorLanguageForPath, listHtmlPaths } from '../../utils/ide/composeHtmlPreview'
 import { labApi } from '../../api/labs'
 import { useThemeStore } from '../../store/themeStore'
 
 const LANG_LABEL = {
   python: 'Python', javascript: 'JavaScript', js: 'JavaScript', node: 'Node.js',
   bash: 'Bash', typescript: 'TypeScript', json: 'JSON', yaml: 'YAML', markdown: 'Markdown',
+  html: 'HTML', css: 'CSS',
 }
 
 function fileName(path) {
@@ -160,8 +163,9 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   const hydratedRef = useRef(false)
   const dirtyRef = useRef(false)
 
-  // Right panel: 'instructions' | 'mentor'
+  // Right panel: 'instructions' | 'mentor' | 'preview'
   const [rightTab, setRightTab] = useState('instructions')
+  const [previewKey, setPreviewKey] = useState(0)
   const [mentor, setMentor] = useState(null)
   const [mentorLoading, setMentorLoading] = useState(false)
   // Latest run/grade context the mentor analyzes.
@@ -180,6 +184,19 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   useEffect(() => { if (solvedProp) setSolved(true) }, [solvedProp])
 
   const language = spec?.language || 'python'
+  const showHtmlPreview = hasHtmlPreview(files, language)
+  const editorLanguage = editorLanguageForPath(activePath, language)
+  const htmlPaths = listHtmlPaths(files)
+
+  // Prefer opening the HTML document when a previewable project loads.
+  useEffect(() => {
+    if (!showHtmlPreview || !htmlPaths.length) return
+    if (activePath && /\.html?$/i.test(activePath)) return
+    const preferred = htmlPaths.find((p) => /index\.html?$/i.test(p)) || htmlPaths[0]
+    if (preferred) setActivePath(preferred)
+    setRightTab((tab) => (tab === 'instructions' ? 'preview' : tab))
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only on first html detection / file set change
+  }, [showHtmlPreview, htmlPaths.join('|')])
 
   const appendTerminal = useCallback((line) => {
     setTerminalText((prev) => (prev ? prev + '\n' : '') + tsLine(line))
@@ -570,6 +587,16 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           <button onClick={() => setFontSize((f) => Math.min(22, f + 1))} className="vsc-btn" title="Zoom in"><ZoomIn size={13} /></button>
           <button onClick={toggleTheme} className="vsc-btn" title="Toggle theme">{isDark ? <Sun size={13} /> : <Moon size={13} />}</button>
           <button onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }} className="vsc-btn"><Sparkles size={13} /> Mentor</button>
+          {showHtmlPreview && (
+            <button
+              type="button"
+              onClick={() => { setRightTab('preview'); setPreviewKey((k) => k + 1) }}
+              className={`vsc-btn ${rightTab === 'preview' ? 'vsc-btn-primary' : ''}`}
+              title="Live HTML preview"
+            >
+              <Eye size={13} /> Preview
+            </button>
+          )}
           {savedAt && !solved && <span className="text-[10px] text-emerald-400 flex items-center gap-1"><Save size={11} /> Saved</span>}
           <span className="text-[10px] text-[var(--vsc-muted)] hidden lg:inline flex items-center gap-1"><EyeOff size={10} /> {hiddenCount} hidden</span>
         </>
@@ -589,7 +616,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       ))}
       editor={activePath ? (
         <CodeEditor ref={editorRef} key={activePath} value={files[activePath] ?? ''} onChange={handleEditorChange}
-          language={language} readOnly={solved || readonlyPaths.has(activePath)} onRun={handleRun}
+          language={editorLanguage} readOnly={solved || readonlyPaths.has(activePath)} onRun={handleRun}
           fontSize={fontSize} vimMode={vimMode} formatOnSave={formatOnSave} />
       ) : (
         <div className="h-full flex items-center justify-center text-[var(--vsc-muted)] text-sm">No file open</div>
@@ -659,12 +686,17 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         ),
       }}
       rightPanel={{
-        width: 320,
+        width: rightTab === 'preview' ? 420 : 320,
         header: (
           <>
             <button onClick={() => setRightTab('instructions')} className={`vsc-right-tab ${rightTab === 'instructions' ? 'active' : ''}`}>
               <FileText size={12} className="inline mr-1" /> Instructions
             </button>
+            {showHtmlPreview && (
+              <button onClick={() => setRightTab('preview')} className={`vsc-right-tab ${rightTab === 'preview' ? 'active' : ''}`}>
+                <Eye size={12} className="inline mr-1" /> Preview
+              </button>
+            )}
             <button onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }} className={`vsc-right-tab ${rightTab === 'mentor' ? 'active' : ''}`}>
               <Sparkles size={12} className="inline mr-1" /> Mentor
             </button>
@@ -672,6 +704,13 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         ),
         content: rightTab === 'mentor' ? (
           <MentorPanel report={mentor} loading={mentorLoading} onAsk={(req) => askMentor(req)} onUnlock={handleUnlockReference} disabled={mentorDisabled} />
+        ) : rightTab === 'preview' && showHtmlPreview ? (
+          <HtmlPreviewPane
+            key={previewKey}
+            files={files}
+            htmlPath={/\.html?$/i.test(activePath || '') ? activePath : undefined}
+            onRefresh={() => setPreviewKey((k) => k + 1)}
+          />
         ) : (
           <div className="p-4 space-y-4 text-sm">
             <div>
@@ -693,6 +732,9 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
                   <li key={i} className="flex items-center gap-2 text-xs text-[var(--vsc-muted)]"><ListChecks size={11} /><span className="truncate">{t.name}</span></li>
                 ))}</ul>
               </div>
+            )}
+            {showHtmlPreview && (
+              <p className="text-[11px] text-cyan-400 flex gap-1.5"><Eye size={12} className="shrink-0 mt-0.5" /> Open the Preview tab to see your HTML/CSS/JS live.</p>
             )}
             {!canRunInBrowser && (
               <p className="text-[11px] text-amber-400 flex gap-1.5"><Lightbulb size={12} className="shrink-0 mt-0.5" /> Use Check Solution for {langLabel} — server grades your code.</p>

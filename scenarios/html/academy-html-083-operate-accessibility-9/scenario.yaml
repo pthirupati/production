@@ -5,101 +5,69 @@ category: Build
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
-simulation_type: generic
+simulation_type: python
 time_limit: 1200
 max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating HTML and web delivery has raised a ticket for `Accessibility —
-  Operate Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and
-  resolve it. Business impact: reduced service reliability and blocked users until the underlying state
-  is repaired.
+description: 'CONTEXT: Complete the accessibility coding exercise in the browser IDE.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline web server lab. The architecture is a single lab-primary
-  node exposing HTML pages, nginx/apache config, and browser devtools; treat it as the production host
-  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: FixitLab HTML practice IDE — edit index.html / styles.css, open Preview,
+  then Check Solution.
 
 
-  SYMPTOM / STARTING STATE: The web server lab is healthy enough for scheduled work on accessibility.
-  Complete the maintenance task without unnecessary downtime.
+  SYMPTOM / STARTING STATE: Coding challenge: accessibility. Edit index.html / styles.css
+  — Preview shows the page; Check Solution grades markup.
 
 
-  OBJECTIVE: Day-2 accessibility work completes safely in this environment; Changes are verified with
-  before/after checks; The system remains stable for dependent teams. Acceptance criteria: the change
-  is minimal and reversible, and success means `systemctl is-active nginx`` returns active.
+  OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
 
 
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant HTML pages, nginx/apache config, and browser devtools), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active nginx`` returns
-  active.
+  VERIFY: Check Solution passes all hidden tests.
 
-
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active nginx` returns active.
-  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
-  on a repeat check, not just once.
-
-
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
-
-
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  '
 objectives:
-- Day-2 accessibility work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: The web server lab is healthy enough for scheduled work on accessibility. Complete the
-  maintenance task without unnecessary downtime.
+- Implement the required function in index.html
+- Pass visible tests with Run
+- Pass Check Solution (hidden tests)
+initial_state: 'Coding challenge: accessibility. Edit index.html / styles.css — Preview
+  shows the page; Check Solution grades markup.'
 hints:
 - order: 1
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: screen readers or keyboard users are blocked.
-    This lab is about accessibility — semantic markup, ARIA, and keyboard nav. Read the objectives and
-    the current state, and note precisely what looks wrong versus healthy before you form any theory.'
+    Do not touch anything yet. First observe the symptom: screen readers or keyboard
+    users are blocked. This lab is about accessibility — semantic markup, ARIA, and
+    keyboard nav. Read the objectives and the current state, and note precisely what
+    looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For accessibility problems the reliable method is: (1) reproduce/observe
-    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
-    change exactly one thing, (4) re-check. Execute the maintenance in small, reversible steps, taking
-    a snapshot or backup first if the change is risky.'
+    Work from evidence, not guesses. For accessibility problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check.
+    Execute the maintenance in small, reversible steps, taking a snapshot or backup
+    first if the change is risky.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Test the config to get the exact file and line: `nginx -t`. It prints the offending directive (e.g.
-    unknown directive "listn").'
+    Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 4
   cost: 40
-  content: 'NARROW DOWN — isolate the subsystem:
-
-    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
-
-    2. Open the cited file under `/etc/nginx/`.
-
-    3. Compare listen/upstream/proxy directives to the scenario objectives.'
+  content: NARROW DOWN — implement the smallest change that satisfies one failing
+    test, then re-run.
 - order: 5
   cost: 60
-  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
-
-    1. Correct the typo on the reported line and save the file.
-
-    2. Re-run `nginx -t` until it reports syntax is ok.
-
-    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
-
-
-    WHY: systemd will not start nginx until `nginx -t` passes.'
-summary: Complete the accessibility — operate lab html lab and verify success with the checker
+  content: NEAR-SOLUTION — finish the function so all visible tests pass, then Check
+    Solution.
+summary: Complete the accessibility — operate lab html lab and verify success with
+  the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -132,20 +100,19 @@ environment:
 tasks:
 - id: task_1
   title: Accessibility — Operate Lab
-  description: Restore healthy behavior for Accessibility — Operate Lab by investigating the failure,
-    applying the smallest safe fix, and validating the outcome.
-  background: 'This html lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Implement the accessibility exercise in the browser IDE and pass all
+    tests.
+  background: 'This html lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
-    type: service_active
-    command: systemctl is-active nginx
-    expected_status: active
-    error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
-      -u nginx -n 50`.
+    type: script
+    script: hidden_tests
+    error_message: Hidden tests still failing — keep iterating in the IDE.
 solution:
-  summary: The root cause is an unhealthy `nginx` service; repair it and verify active state.
-  files_changed: []
-  commands_run:
-  - systemctl is-active nginx
+  summary: Implement the function so visible and hidden tests pass in the coding IDE.
+  files_changed:
+  - solution.js
+  commands_run: []
   reference_docs: html-fundamentals
 guided_mode:
   enabled: true
@@ -171,3 +138,41 @@ guided_mode:
     expected_output: '`systemctl is-active nginx`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success
+coding_mode: true
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: 'Give the primary button an aria-label and associate a <label for>
+    with an input id.
+
+    Edit index.html / styles.css, use Preview, then Check Solution.
+
+    '
+  files:
+  - path: index.html
+    content: "<!DOCTYPE html>\n<html lang=\"en\"><head><meta charset=\"utf-8\" /><title>A11y</title><link\
+      \ rel=\"stylesheet\" href=\"styles.css\" /></head><body>\n  <button>Go</button>\n\
+      \  <input id=\"name\" />\n  <!-- TODO: accessible name on button; label associated\
+      \ with name field -->\n</body></html>\n"
+    readonly: false
+  - path: styles.css
+    content: 'button { padding: 0.4rem 0.8rem; }
+
+      '
+    readonly: false
+  - path: solution.js
+    content: '// Grader harness — PAGE_HTML / PAGE_CSS are injected server-side from
+      your files.
+
+      // Keep this file; edit index.html and styles.css instead.
+
+      '
+    readonly: true
+  visible_tests:
+  - name: aria
+    code: assert(/aria-label\s*=/i.test(PAGE_HTML), 'missing aria-label');
+  hidden_tests:
+  - name: label-for
+    code: assert(/<label[^>]*for\s*=\s*["']name["']/i.test(PAGE_HTML));
+  timeout: 8
