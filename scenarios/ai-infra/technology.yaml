@@ -1,0 +1,8 @@
+description: "AI Infrastructure Engineering — GPU bare metal ops (MAAS, DCGM, AWX, DC twin). Reuses Bare Metal, Datacenter, AWX, and GPU Lab Server surfaces."
+icon: cpu
+name: AI Infrastructure Engineering
+order: 13
+price: 499
+slug: ai-infra
+coming_soon: false
+is_active: true

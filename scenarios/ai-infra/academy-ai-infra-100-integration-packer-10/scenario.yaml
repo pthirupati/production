@@ -1,0 +1,67 @@
+title: 'AI Infrastructure Engineering: Packer — Integration Lab'
+slug: academy-ai-infra-100-integration-packer-10
+technology: AI Infrastructure Engineering
+category: Cross-Technology
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Integration lab: connect Packer with an adjacent platform in the AI
+  Infrastructure Engineering stack. Validate authentication, data handoff, and failure
+  behavior for how packer fits into ai infra.'
+objectives:
+- Packer is connected to the adjacent system successfully
+- Handoff points are authenticated and observable
+- End-to-end workflow completes without manual intervention
+initial_state: Two systems are deployed but not fully wired together for Packer. Downstream
+  consumers are waiting on this integration path.
+hints:
+- order: 1
+  cost: 0
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — the relevant CLI and configuration for packer.
+
+    2. Write down what looks normal versus wrong or missing for Packer.
+
+    3. Review the architecture diagram and objectives. Form one hypothesis before
+    you act.'
+- order: 2
+  cost: 25
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for Packer.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Re-check the current state — the relevant CLI and configuration for packer.
+
+    2. Configure credentials and networking, then drive one happy-path transaction
+    end to end across both systems.
+
+    3. Verify the result — Packer behaves correctly under normal and failure checks.
+
+    4. Click Check Solution once the objective is met (graded on real state, not a
+    marker file).'
+cross_technology: true
+consoles:
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: linux
+  appears_in:
+  - terminal

@@ -1,0 +1,65 @@
+title: 'AI Infrastructure Engineering: Rocm — Production Readiness'
+slug: academy-ai-infra-025-production-rocm-3
+technology: AI Infrastructure Engineering
+category: Production
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Production readiness for Rocm. Harden, document, and validate how rocm
+  fits into ai infra so the change is safe to run during a maintenance window.
+objectives:
+- Day-2 Rocm work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but Rocm is not production ready — missing
+  guardrails, runbooks, or capacity checks.
+hints:
+- order: 1
+  cost: 0
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — the relevant CLI and configuration for rocm.
+
+    2. Write down what looks normal versus wrong or missing for Rocm.
+
+    3. Review the architecture diagram and objectives. Form one hypothesis before
+    you act.'
+- order: 2
+  cost: 25
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for Rocm.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Re-check the current state — the relevant CLI and configuration for rocm.
+
+    2. Apply production standards for Rocm: resource limits, monitoring, access controls,
+    and a written rollback step.
+
+    3. Verify the result — Rocm behaves correctly under normal and failure checks.
+
+    4. Click Check Solution once the objective is met (graded on real state, not a
+    marker file).'
+consoles:
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: linux
+  appears_in:
+  - terminal

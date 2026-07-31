@@ -1,0 +1,51 @@
+title: 'AWX: Roll NVIDIA Driver Playbook Fleet-Wide'
+slug: ai-infra-awx-nvidia-driver-rollout
+technology: AI Infrastructure Engineering
+category: Automation
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: ansible-awx
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: Bare-metal GPU fleet needs a controlled NVIDIA driver roll
+  via AWX / Automation Controller.
+
+
+  ENVIRONMENT: AWX console + Lab Terminal on a canary node.
+
+
+  OBJECTIVE: Launch the driver playbook job, verify nvidia-smi on canary, mark FIXED-OK.
+
+  '
+objectives:
+- Open AWX and select the GPU driver job template
+- Run against canary inventory
+- Verify driver with nvidia-smi on the Lab Server
+initial_state: Driver job template exists; canary node still on previous driver.
+hints:
+- order: 1
+  cost: 10
+  content: Open the primary console declared for this lab (MAAS, AWX, Datacenter,
+    or Terminal).
+- order: 2
+  cost: 20
+  content: Use nvidia-smi / dcgmi / MAAS or AWX UI as appropriate — do not invent
+    a parallel tool.
+- order: 3
+  cost: 30
+  content: Leave the FIXED-OK marker after verification.
+consoles:
+- awx
+- terminal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - awx
+  - terminal

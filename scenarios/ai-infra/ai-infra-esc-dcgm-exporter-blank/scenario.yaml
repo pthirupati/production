@@ -1,0 +1,51 @@
+title: 'ESC: Blank GPU Insights — dcgm-exporter Metrics'
+slug: ai-infra-esc-dcgm-exporter-blank
+technology: AI Infrastructure Engineering
+category: Troubleshoot
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: ESC Images/Kernels runbook — GPU Insights occupancy graphs
+  blank; DCGM_FI_PROF_* missing on old exporter.
+
+
+  ENVIRONMENT: GPU Lab Server terminal.
+
+
+  OBJECTIVE: Inspect dcgm-exporter, confirm metrics path, upgrade/restart exporter
+  narrative, leave FIXED-OK.
+
+  '
+objectives:
+- Check dcgm-exporter version/status
+- Validate /metrics scrape sample
+- Remediate exporter so profiling metrics appear
+initial_state: dcgm-exporter running but Insights occupancy is blank.
+hints:
+- order: 1
+  cost: 10
+  content: Open the primary console declared for this lab (MAAS, AWX, Datacenter,
+    or Terminal).
+- order: 2
+  cost: 20
+  content: Use nvidia-smi / dcgmi / MAAS or AWX UI as appropriate — do not invent
+    a parallel tool.
+- order: 3
+  cost: 30
+  content: Leave the FIXED-OK marker after verification.
+consoles:
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: linux
+  appears_in:
+  - terminal

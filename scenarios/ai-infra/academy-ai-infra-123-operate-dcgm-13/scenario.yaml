@@ -1,0 +1,66 @@
+title: 'AI Infrastructure Engineering: Dcgm — Daily Operations'
+slug: academy-ai-infra-123-operate-dcgm-13
+technology: AI Infrastructure Engineering
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Day-2 operations: perform a routine DCGM task safely in AI Infrastructure
+  Engineering. Follow change control — inspect, change, verify — while working with
+  GPU health and telemetry.'
+objectives:
+- Day-2 DCGM work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The lab environment is healthy enough for scheduled work on DCGM. Complete
+  the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 0
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `dcgmi discovery` and health checks.
+
+    2. Write down what looks normal versus wrong or missing for DCGM.
+
+    3. Review the architecture diagram and objectives. Form one hypothesis before
+    you act.'
+- order: 2
+  cost: 25
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for DCGM.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Re-check the current state — `dcgmi discovery` and health checks.
+
+    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup
+    first if the change is risky.
+
+    3. Verify the result — DCGM reports healthy GPUs.
+
+    4. Click Check Solution once the objective is met (graded on real state, not a
+    marker file).'
+consoles:
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: linux
+  appears_in:
+  - terminal

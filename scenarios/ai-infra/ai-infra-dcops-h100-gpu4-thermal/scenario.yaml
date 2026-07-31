@@ -1,0 +1,56 @@
+title: 'DCOPS: H100 GPU4 Thermal Violation'
+slug: ai-infra-dcops-h100-gpu4-thermal
+technology: AI Infrastructure Engineering
+category: Troubleshoot
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: datacenter
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: Ticket DCOPS-style thermal violation on Dell XE9680 8xH100
+  — Targeted Stress fails GPU 4 only.
+
+
+  ENVIRONMENT: Datacenter twin + GPU Lab Server (Hosted as physical). Use nvidia-smi
+  dmon / dcgmi diag.
+
+
+  OBJECTIVE: Identify the hot GPU, collect diagnostics, open the rack tray context,
+  mark FIXED-OK after remediation notes.
+
+  '
+objectives:
+- Confirm GPU 4 thermal anomaly with nvidia-smi / dmon
+- Run dcgmi diag scoped checks
+- Document Dell SR-style findings in the ticket notes
+initial_state: gpu-node-01 reports thermal stress fail on GPU index 4; other GPUs
+  pass.
+hints:
+- order: 1
+  cost: 10
+  content: Open the primary console declared for this lab (MAAS, AWX, Datacenter,
+    or Terminal).
+- order: 2
+  cost: 20
+  content: Use nvidia-smi / dcgmi / MAAS or AWX UI as appropriate — do not invent
+    a parallel tool.
+- order: 3
+  cost: 30
+  content: Leave the FIXED-OK marker after verification.
+consoles:
+- datacenter
+- terminal
+datacenter_link: true
+hosted_as: datacenter
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - datacenter
+  - terminal

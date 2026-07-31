@@ -496,6 +496,51 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
             if "-pm" in parts or "-pl" in parts or low.startswith("nvidia-smi -r"):
                 # persistence-mode / power-limit set, or GPU reset — acknowledge.
                 return "All done."
+            # Live monitors — paced like real dmon/pmon (and -l loop snapshots).
+            if "dmon" in low or "pmon" in low or "-l" in parts or "--loop" in low:
+                from .shell import StreamedCommandResult
+                if not healthy:
+                    return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
+                samples = 5
+                for tok in parts:
+                    if tok.startswith("-c") and tok[2:].isdigit():
+                        samples = min(30, max(1, int(tok[2:])))
+                    if tok == "-c" and parts.index(tok) + 1 < len(parts):
+                        try:
+                            samples = min(30, max(1, int(parts[parts.index(tok) + 1])))
+                        except ValueError:
+                            pass
+                lines: list[str] = []
+                if "pmon" in low:
+                    lines.append("# gpu        pid  type    sm   mem   enc   dec   command")
+                    for tick in range(samples):
+                        for gi in range(min(4, _SMI_GPU_COUNT)):
+                            pid = 12000 + gi * 10 + tick
+                            sm = random.randint(0, 98)
+                            mem = random.randint(0, 80)
+                            lines.append(
+                                f"    {gi}    {pid}     C    {sm:3d}   {mem:3d}     0     0   python"
+                            )
+                    delay = 0.55
+                else:
+                    # dmon header + samples (power / util / clocks — matches nvidia-smi dmon -s puc)
+                    lines.append("# gpu   pwr  gtemp  mtemp     sm    mem    enc    dec  mclk  pclk")
+                    lines.append("# Idx     W     C      C      %      %      %      %   MHz   MHz")
+                    for _tick in range(samples):
+                        for gi in range(min(8, _SMI_GPU_COUNT)):
+                            pwr = random.randint(80, 420)
+                            gt = random.randint(32, 78)
+                            mt = gt + random.randint(4, 12)
+                            sm = random.randint(0, 99)
+                            mem = random.randint(0, 85)
+                            mclk = random.choice((1593, 2619))
+                            pclk = random.choice((1410, 1980))
+                            lines.append(
+                                f"    {gi}   {pwr:3d}    {gt:2d}     {mt:2d}    "
+                                f"{sm:3d}    {mem:3d}      0      0  {mclk:4d}  {pclk:4d}"
+                            )
+                    delay = 1.0 if ("-l" in parts or "--loop" in low) else 0.55
+                return StreamedCommandResult(lines=lines, delay_s=delay)
             if healthy:
                 return _render_nvidia_smi_table()
             return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running."
@@ -666,17 +711,34 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
             if "static" in low or "rocminfo" in low:
                 return ("Agent 2\n  Name:                    gfx942\n  Marketing Name:          AMD Instinct MI300X\n"
                         "  Device Type:             GPU\n  Wavefront Size:          64(0x40)")
-            # amd-smi has its own layout (monitor / metric); it is NOT rocm-smi.
             if low.startswith("amd-smi"):
                 if "monitor" in low or "metric" in low or parts[:1] == ["amd-smi"] and len(parts) == 1:
+                    from .shell import StreamedCommandResult
                     rows = ["GPU  POWER   GPU_T  MEM_T  GFX_CLK  GFX%  MEM%  VRAM_USED  VRAM_TOTAL"]
-                    for i in range(8):
-                        rows.append(
-                            f"{i:<4} {random.randint(120, 700):3d} W  {random.randint(38, 68)}°C  "
-                            f"{random.randint(40, 70)}°C  {random.randint(1300, 2100)} MHz  "
-                            f"{random.randint(0, 100):3d}%  {random.randint(0, 95):3d}%  "
-                            f"{random.randint(1000, 190000):6d} MB  196592 MB")
-                    return "\n".join(rows)
+                    for _tick in range(4):
+                        for i in range(8):
+                            rows.append(
+                                f"{i:<4} {random.randint(120, 700):3d} W  {random.randint(38, 68)}°C  "
+                                f"{random.randint(40, 70)}°C  {random.randint(1300, 2100)} MHz  "
+                                f"{random.randint(0, 100):3d}%  {random.randint(0, 95):3d}%  "
+                                f"{random.randint(1000, 190000):6d} MB  196592 MB")
+                    return StreamedCommandResult(lines=rows, delay_s=0.6)
+            if any(f"--show{x}" in low or f"show{x}" in low.replace("-", "") for x in (
+                "temp", "power", "use", "clocks", "meminfo", "id", "bus", "pid", "pcie",
+            )) or "--showtemp" in low or "--showpower" in low or "--showuse" in low:
+                # Legacy rocm-smi flag family used in AMD Support One-Pager diagnostics.
+                rows = ["======================= ROCm System Management Interface ======================="]
+                for i in range(8):
+                    rows.append(
+                        f"GPU[{i}]\t: Temp: edge {random.randint(38, 72)}c  "
+                        f"junction {random.randint(42, 78)}c  "
+                        f"Power: {random.randint(90, 550)}W  "
+                        f"GPU use: {random.randint(0, 99)}%"
+                    )
+                rows.append("==================================================================================")
+                return "\n".join(rows)
+            # amd-smi has its own layout (monitor / metric); it is NOT rocm-smi.
+            if low.startswith("amd-smi"):
                 if "version" in low:
                     return ("AMDSMI Tool: 24.6.2+2b02a07 | "
                             "AMDSMI Library version: 24.6.2 | ROCm version: 6.2.0")

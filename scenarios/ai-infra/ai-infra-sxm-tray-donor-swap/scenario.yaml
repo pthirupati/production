@@ -1,0 +1,54 @@
+title: SXM Tray Swap — Identify Donor Chassis
+slug: ai-infra-sxm-tray-donor-swap
+technology: AI Infrastructure Engineering
+category: Operate
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: datacenter
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: Inspired by PSINFRA SXM tray donor work — identify a healthy
+  Dell XE9680 donor and plan GPU tray swap.
+
+
+  ENVIRONMENT: Datacenter twin + terminal.
+
+
+  OBJECTIVE: Locate donor rack/U, verify serial/GPU health, complete swap checklist,
+  FIXED-OK.
+
+  '
+objectives:
+- Locate donor and customer chassis in the twin
+- Verify donor GPU health before swap
+- Complete tray swap checklist
+initial_state: Customer node needs SXM board swap; donor pool must be validated.
+hints:
+- order: 1
+  cost: 10
+  content: Open the primary console declared for this lab (MAAS, AWX, Datacenter,
+    or Terminal).
+- order: 2
+  cost: 20
+  content: Use nvidia-smi / dcgmi / MAAS or AWX UI as appropriate — do not invent
+    a parallel tool.
+- order: 3
+  cost: 30
+  content: Leave the FIXED-OK marker after verification.
+consoles:
+- datacenter
+- terminal
+datacenter_link: true
+hosted_as: datacenter
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - datacenter
+  - terminal

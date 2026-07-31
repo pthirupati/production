@@ -1,0 +1,70 @@
+title: 'AI Infrastructure Engineering: Awx / Tower — Security Practice'
+slug: academy-ai-infra-116-security-awx-12
+technology: AI Infrastructure Engineering
+category: Security
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: ansible-awx
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Security review: harden AWX / Tower on this AI Infrastructure Engineering
+  system. Close unsafe defaults, enforce least privilege, and ensure job templates,
+  inventories, credentials, and projects cannot be abused — without breaking legitimate
+  use.'
+objectives:
+- Unsafe defaults related to AWX / Tower are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+initial_state: The environment is functional but overly permissive around AWX / Tower.
+  Assume an auditor or pen test is next week — tighten controls with evidence.
+hints:
+- order: 1
+  cost: 0
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — AWX job output, project sync status, and inventory
+    sources.
+
+    2. Write down what looks normal versus wrong or missing for AWX / Tower.
+
+    3. Review the architecture diagram and objectives. Form one hypothesis before
+    you act.'
+- order: 2
+  cost: 25
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for AWX / Tower.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Re-check the current state — AWX job output, project sync status, and inventory
+    sources.
+
+    2. Apply least privilege: remove the unsafe default, then grant only the explicit
+    access the workload actually needs.
+
+    3. Verify the result — the project syncs and the job template runs green.
+
+    4. Click Check Solution once the objective is met (graded on real state, not a
+    marker file).'
+consoles:
+- awx
+- terminal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - awx
+  - terminal

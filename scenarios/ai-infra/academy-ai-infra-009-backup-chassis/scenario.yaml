@@ -1,0 +1,69 @@
+title: 'AI Infrastructure Engineering: Chassis — Backup and Recovery'
+slug: academy-ai-infra-009-backup-chassis
+technology: AI Infrastructure Engineering
+category: Backup & Recovery
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: datacenter
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: Backup and recovery drill for Chassis. Ensure backups run on schedule,
+  retention is correct, and you can restore how chassis fits into ai infra within
+  the lab RTO.
+objectives:
+- Backup coverage for Chassis is complete and restorable
+- Retention and encryption meet the stated policy
+- A restore drill proves data integrity
+initial_state: Backup jobs exist but reliability is uncertain for Chassis. Leadership
+  wants proof that restore works — not just that scripts exit zero.
+hints:
+- order: 1
+  cost: 0
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — the relevant CLI and configuration for chassis.
+
+    2. Write down what looks normal versus wrong or missing for Chassis.
+
+    3. Review the architecture diagram and objectives. Form one hypothesis before
+    you act.'
+- order: 2
+  cost: 25
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for Chassis.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Re-check the current state — the relevant CLI and configuration for chassis.
+
+    2. Repair or run the backup job, then perform a controlled restore into a scratch
+    location to prove it works.
+
+    3. Verify the result — Chassis behaves correctly under normal and failure checks.
+
+    4. Click Check Solution once the objective is met (graded on real state, not a
+    marker file).'
+consoles:
+- datacenter
+- terminal
+datacenter_link: true
+hosted_as: datacenter
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - datacenter
+  - terminal

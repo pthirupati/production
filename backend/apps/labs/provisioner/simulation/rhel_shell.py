@@ -297,7 +297,13 @@ class RHELShell:
                 parts = line.split()
             result = handler(parts, line)
             if result is not None:
-                self.state.last_exit_code = 0 if not result.startswith("bash:") else 127
+                from .shell import StreamedCommandResult
+                if isinstance(result, StreamedCommandResult):
+                    self.state.last_exit_code = 0
+                    if redirect and (redirect.get("stdout") or redirect.get("stderr")):
+                        return self._apply_redirect(str(result), redirect)
+                    return result
+                self.state.last_exit_code = 0 if not str(result).startswith("bash:") else 127
                 return self._apply_redirect(result, redirect)
 
         try:
@@ -1082,14 +1088,15 @@ class RHELShell:
             out = shell.run(line)
             if not out:
                 return out
+            from .shell import StreamedCommandResult
+            if isinstance(out, StreamedCommandResult):
+                return out
             cmd = (line or "").strip().split()[:1]
             name = (cmd[0] if cmd else "").rsplit("/", 1)[-1]
             if name in ("ping", "ping6"):
-                from .shell import StreamedCommandResult
                 # Real ping defaults to 1s between ICMP replies.
                 return StreamedCommandResult(lines=str(out).split("\n"), delay_s=1.0)
             if name in ("traceroute", "tracepath"):
-                from .shell import StreamedCommandResult
                 return StreamedCommandResult(lines=str(out).split("\n"), delay_s=0.45)
             return out
 

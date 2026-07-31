@@ -234,27 +234,28 @@ Update this file as items complete. Keep internal code names (`*Simulator`, `sim
 
 ---
 
-## O. AI Infra Engineering (new technology) — 20 scenarios + emulator
+## O. AI Infra Engineering (new technology) — 150 scenarios + reuse existing surfaces
 
 New tech slug: `ai-infra` (MAAS · VyOS · LXD · AWX · GPU DC · DCGM · Packer images).
+**Does not invent parallel UIs** — scenarios set `simulation_type` + `consoles` to open Bare Metal, Datacenter, AWX, or GPU terminal.
 
-140. [ ] Technology seed + catalog page + subscription product
-141. [ ] Lab surfaces: MAAS UI + node SSH + DC twin + nvidia-smi/rocm-smi terminal matrix
-142. [ ] Scenario pack (20): commission H100/H200/B300 node; missing GPU 1x/8x; DCGM r1–r4; thermal/fan; chassis swap; BMC/PXE; VyOS uplink; LXD GPU; AWX playbook; Packer+GH Actions image build
-143. [ ] NVIDIA command matrix (75): `nvidia-smi` variants, dmon/pmon, query CSV, lock clocks, ECC, topo, bug-report
-144. [ ] AMD command matrix (75): `rocm-smi` / `amd-smi` / radeontop / rocminfo / sysfs clocks
+140. [~] Technology seed + catalog page + subscription product (`ai-infra`)
+141. [~] Lab surfaces: reuse MAAS/baremetal + DC twin + AWX + GPU terminal
+142. [~] Scenario pack (150): academy 145 + heroes (DCOPS thermal, MAAS commission, ESC dcgm-exporter, AWX driver, SXM tray)
+143. [~] NVIDIA: `nvidia-smi dmon` / `pmon` / `-l` paced streaming (continue full 75-flag matrix)
+144. [~] AMD: `rocm-smi --show*` + streamed `amd-smi monitor` (continue full matrix)
 145. [ ] Ops runbooks: scp diag scripts MAAS↔node, PSBCheck, fieldiag, dcgmprofrunner, gpu-admin-tools PPCIe/CC
-146. [ ] DCOps tickets: part order/availability, RMA, repave, firmware, iDRAC TSR (`racadm`)
+146. [~] DCOps tickets: thermal / tray / commission heroes from wiki+Jira patterns
 147. [ ] Image factory: Packer + Terraform + Python + shell + upstream base + vuln fix (no manual)
 148. [ ] Pixel parity: NVIDIA green / AMD red telemetry consoles; MAAS commission timeline
 149. [ ] Cross-link: Datacenter twin GPU trays ↔ ai-infra scenarios
-150. [ ] Baremetal/imgdev wiki task import → scenario outlines
+150. [~] Baremetal/imgdev wiki import → outlines (PSINFRA, ESC, DCOPS, GM1 escalation)
 151. [ ] NCCL/RCCL stress + DCGM exporter scrape in monitoring companion
 152. [ ] Dell/HPE engineer badge + access control for rack entry (DC twin)
 153. [ ] Soundscape + LED blink realism (Steam-like immersion target for DC)
-154. [ ] 20 learn/build/operate/troubleshoot/production scenarios authored + graded
+154. [~] 150 learn/build/operate/troubleshoot/production scenarios authored
 155. [ ] CI lint: ai-infra scenarios never host as wrong cloud without `hosted_as`
-156. [ ] Docs: learner path AI Infra Engineer career track
+156. [~] Docs: learner path AI Infra Engineer career track (catalog entry)
 157. [ ] GPU MIG / vGPU partitions in twin + terminal
 158. [ ] Multi-node NVLink fabric view in DC + `nvidia-smi nvlink`
 159. [ ] End-to-end commission → burn-in → production handoff project

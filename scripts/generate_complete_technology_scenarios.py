@@ -29,10 +29,12 @@ MIN_NEW_PER_TECH = 40
 # existing AWS labs — it never rewrites or orphans the ones already seeded.
 TECH_TARGET = {
     "aws": 420,
+    "ai-infra": 150,
 }
 
 SIM_BY_TECH = {
     "ansible": "ansible",
+    "ai-infra": "gpu",  # default; per-topic override in build_spec via ai_infra_surfaces
     "ai-ml": "python",
     "aws": "aws",
     "azure": "azure",
@@ -97,6 +99,10 @@ GENERIC_TOPICS = [
 KIND_TITLES = {kind: title for kind, title, _summary in GENERIC_TOPICS}
 
 TECH_TOPICS = {
+    "ai-infra": [
+        "maas", "lxd", "dcgm", "nvidia-smi", "rocm",
+        "awx", "pxe", "thermal", "chassis", "packer",
+    ],
     "aws": [
         # Original 10 — kept first so already-seeded academy slugs stay stable.
         "ec2", "s3", "iam", "vpc", "security-groups", "rds", "lambda", "cloudwatch", "autoscaling", "route53",
@@ -271,6 +277,9 @@ def make_spec(tech: str, seq: int, kind: str, topic: str) -> dict:
         # Academy coding techs open the browser IDE (see migrate_academy_coding_labs.py).
         spec["coding_mode"] = True
         spec["simulation_type"] = "python"
+    if tech == "ai-infra":
+        from ai_infra_surfaces import apply_ai_infra_surfaces
+        apply_ai_infra_surfaces(spec, topic)
     return spec, marker
 
 

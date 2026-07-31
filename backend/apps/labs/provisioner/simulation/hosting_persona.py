@@ -177,7 +177,7 @@ def resolve_host_platform(
     _NO_ROTATE = (
         "peoplesoft", "javascript", "react", "java", "html", "shell-script", "nodejs",
         "python", "ansible", "ansible-awx", "gitops", "ai-ml", "data-science",
-        "prompt-engineering",
+        "prompt-engineering", "ai-infra", "gpu",
     )
     if (
         tech in _NO_ROTATE
@@ -186,6 +186,7 @@ def resolve_host_platform(
             "ps-", "peoplesoft-", "academy-peoplesoft",
             "academy-javascript", "academy-react", "academy-java", "academy-html",
             "academy-shell", "js-", "react-", "java-", "html-", "shell-",
+            "academy-ai-infra", "ai-infra-", "academy-gpu", "gpu-",
         ))
     ):
         return "linux"

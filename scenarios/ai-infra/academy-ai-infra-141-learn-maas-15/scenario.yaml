@@ -1,0 +1,69 @@
+title: 'AI Infrastructure Engineering: Maas — Fundamentals Lab'
+slug: academy-ai-infra-141-learn-maas-15
+technology: AI Infrastructure Engineering
+category: Core Skills
+difficulty: easy
+scenario_type: do
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Low
+description: This beginner-friendly AI Infrastructure Engineering lab introduces Maas.
+  You will explore how maas fits into ai infra on the lab environment. Read the environment
+  first, then follow the guided steps — no prior production experience required.
+objectives:
+- Understand how Maas work in this lab environment
+- Identify the main status and configuration signals for Maas
+- Confirm you can read the current state confidently before changing anything
+initial_state: The lab environment is online with a starter Maas setup. Some pieces
+  are intentionally incomplete so you can learn how they fit together. Nothing is
+  on fire — focus on observation.
+hints:
+- order: 1
+  cost: 0
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — the relevant CLI and configuration for maas.
+
+    2. Write down what looks normal versus wrong or missing for Maas.
+
+    3. Review the architecture diagram and objectives. Form one hypothesis before
+    you act.'
+- order: 2
+  cost: 25
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for Maas.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Re-check the current state — the relevant CLI and configuration for maas.
+
+    2. Make one small, reversible change toward the objective, re-reading status after
+    each step so you understand cause and effect.
+
+    3. Verify the result — Maas behaves correctly under normal and failure checks.
+
+    4. Click Check Solution once the objective is met (graded on real state, not a
+    marker file).'
+consoles:
+- baremetal
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal

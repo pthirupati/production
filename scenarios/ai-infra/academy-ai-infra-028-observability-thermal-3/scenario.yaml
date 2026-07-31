@@ -1,0 +1,69 @@
+title: 'AI Infrastructure Engineering: Thermal Management — Observability Practice'
+slug: academy-ai-infra-028-observability-thermal-3
+technology: AI Infrastructure Engineering
+category: Observability
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: datacenter
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'Observability task: make thermal management visible in logs, metrics,
+  or traces. On-call should answer ''what is broken?'' quickly using signals from
+  temperature, throttling, and cooling.'
+objectives:
+- Day-2 thermal management work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The system runs, but thermal management lacks useful telemetry. Dashboards/alerts
+  are blank or noisy — improve signal quality.
+hints:
+- order: 1
+  cost: 0
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `nvidia-smi -q -d TEMPERATURE` / sensors.
+
+    2. Write down what looks normal versus wrong or missing for thermal management.
+
+    3. Review the architecture diagram and objectives. Form one hypothesis before
+    you act.'
+- order: 2
+  cost: 25
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for thermal management.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Re-check the current state — `nvidia-smi -q -d TEMPERATURE` / sensors.
+
+    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a
+    sensible threshold.
+
+    3. Verify the result — temperatures stay within safe limits.
+
+    4. Click Check Solution once the objective is met (graded on real state, not a
+    marker file).'
+consoles:
+- datacenter
+- terminal
+datacenter_link: true
+hosted_as: datacenter
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - datacenter
+  - terminal

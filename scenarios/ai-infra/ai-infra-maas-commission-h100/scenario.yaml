@@ -1,0 +1,52 @@
+title: MAAS Commission H100 Node for Production
+slug: ai-infra-maas-commission-h100
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: PSINFRA-style task — commission a bare-metal H100 node via
+  MAAS, validate 14-testing health, release to production.
+
+
+  ENVIRONMENT: Bare Metal / MAAS console + Lab Terminal.
+
+
+  OBJECTIVE: Commission, deploy, verify nvidia-smi sees 8 GPUs, leave FIXED-OK marker.
+
+  '
+objectives:
+- Commission the node in MAAS
+- Verify PXE/deploy completes
+- Confirm 8x H100 via nvidia-smi -L
+initial_state: Node is New in MAAS; not yet commissioned.
+hints:
+- order: 1
+  cost: 10
+  content: Open the primary console declared for this lab (MAAS, AWX, Datacenter,
+    or Terminal).
+- order: 2
+  cost: 20
+  content: Use nvidia-smi / dcgmi / MAAS or AWX UI as appropriate — do not invent
+    a parallel tool.
+- order: 3
+  cost: 30
+  content: Leave the FIXED-OK marker after verification.
+consoles:
+- baremetal
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal
