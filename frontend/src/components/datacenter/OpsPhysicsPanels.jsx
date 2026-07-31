@@ -332,22 +332,47 @@ export function OpsTicketsPanel({ tickets, busy, onCreate, onAdvance }) {
 }
 
 /** Guided training roles */
-export function TrainingPanel({ training, busy, onStart, onStep }) {
+export function TrainingPanel({ training, busy, onStart, onStep, onClearFault, broken }) {
   const t = training || {}
   const active = (t.scenarios || []).find((s) => s.id === t.active)
+  const drills = (t.scenarios || []).filter((s) => s.inject)
+  const roles = (t.scenarios || []).filter((s) => !s.inject)
   return (
     <div className="dc-ops-panel">
       <div className="dc-twin-title"><ClipboardList size={13} /> Training mode</div>
+      {drills.length > 0 && (
+        <>
+          <div className="dc-muted" style={{ fontSize: '0.68rem', marginBottom: '0.25rem' }}>Troubleshooting drills (auto-inject)</div>
+          <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+            {drills.map((s) => (
+              <button key={s.id} type="button" disabled={busy}
+                className={`dc-btn-danger dc-btn-xs ${t.active === s.id ? 'dc-service-done' : ''}`}
+                onClick={() => onStart?.(s.id)}>{s.role.replace(/^Troubleshoot — /, '')}</button>
+            ))}
+          </div>
+        </>
+      )}
+      <div className="dc-muted" style={{ fontSize: '0.68rem', margin: '0.45rem 0 0.25rem' }}>Role paths</div>
       <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
-        {(t.scenarios || []).map((s) => (
+        {roles.map((s) => (
           <button key={s.id} type="button" disabled={busy}
             className={`dc-btn-outline dc-btn-xs ${t.active === s.id ? 'dc-service-done' : ''}`}
             onClick={() => onStart?.(s.id)}>{s.role}</button>
         ))}
       </div>
+      {broken?.component && (
+        <div className="dc-alert-row" style={{ marginTop: '0.5rem' }}>
+          Active fault: {broken.component}
+          {onClearFault && (
+            <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" style={{ marginLeft: 8 }}
+              onClick={() => onClearFault?.()}>Clear fault</button>
+          )}
+        </div>
+      )}
       {active && (
         <>
           <div className="dc-muted mt-1">{t.feedback}</div>
+          {active.inject && <div className="dc-muted">Linked inject: {active.inject}</div>}
           <ol className="dc-bios-boot">
             {active.steps.map((step) => (
               <li key={step}>

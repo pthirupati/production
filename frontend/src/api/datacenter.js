@@ -131,6 +131,9 @@ export const datacenterApi = {
   injectFailure(sessionId, preset, assetId = '') {
     return datacenterApi.action(sessionId, 'inject_failure', { preset, asset_id: assetId })
   },
+  clearFailure(sessionId) {
+    return datacenterApi.action(sessionId, 'clear_failure', {})
+  },
   serviceMode(sessionId, assetId, op, extra = {}) {
     return datacenterApi.action(sessionId, 'service_mode_action', { asset_id: assetId, op, ...extra })
   },

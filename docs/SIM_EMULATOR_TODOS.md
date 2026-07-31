@@ -120,7 +120,7 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 79. [~] Console: attach KVM/monitor → BIOS/UEFI/iDRAC/iLO/IPMI/Redfish
 80. [ ] RAID config (PERC/Smart Array/MegaRAID) + rebuild viz
 81. [~] Hardware replace workflows + RMA tickets (Dell/HPE/Cisco/NVIDIA)
-82. [ ] Failure injection + troubleshooting training scenarios
+82. [~] Failure injection + troubleshooting training scenarios (NOC drills + clear_fault)
 83. [ ] DCIM: PUE, capacity, inventory, warranty, predictive maintenance
 84. [ ] LOD/instancing/BVH for 60 FPS
 

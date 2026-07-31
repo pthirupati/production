@@ -538,19 +538,48 @@ export function InventoryPanel({ inventory }) {
   )
 }
 
-/** Failure injection toolbar */
-export function FailureInjectBar({ presets, busy, onInject, assetId }) {
+/** Failure injection toolbar — grouped by target (server / facility / network) */
+export function FailureInjectBar({ presets, busy, onInject, onClear, broken, assetId }) {
   const list = presets || []
-  if (!list.length) return null
+  if (!list.length && !broken) return null
+  const groups = [
+    { key: 'server', label: 'Server' },
+    { key: 'facility', label: 'Facility' },
+    { key: 'network', label: 'Network' },
+  ]
+  const byTarget = (t) => list.filter((p) => (p.target || 'server') === t)
   return (
     <div className="dc-failure-bar">
-      <span className="dc-drawer-label" style={{ margin: 0 }}>Inject failure</span>
-      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
-        {list.slice(0, 14).map((p) => (
-          <button key={p.id} type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
-            onClick={() => onInject?.(p.id, assetId)}>{p.label}</button>
-        ))}
+      <div className="dc-action-row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <span className="dc-drawer-label" style={{ margin: 0 }}>Failure injection</span>
+        {broken?.component && (
+          <span className="dc-alert-row" style={{ margin: 0 }}>
+            Open fault: {broken.component}{broken.server ? ` · ${broken.server}` : ''}{broken.target ? ` · ${broken.target}` : ''}
+          </span>
+        )}
+        {onClear && (
+          <button type="button" disabled={busy || !broken?.component} className="dc-btn-primary dc-btn-xs" onClick={() => onClear?.()}>
+            Clear fault
+          </button>
+        )}
       </div>
+      {groups.map((g) => {
+        const items = byTarget(g.key)
+        if (!items.length) return null
+        return (
+          <div key={g.key} style={{ marginTop: '0.45rem' }}>
+            <div className="dc-muted" style={{ fontSize: '0.68rem', marginBottom: '0.25rem' }}>{g.label}</div>
+            <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+              {items.map((p) => (
+                <button key={p.id} type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
+                  onClick={() => onInject?.(p.id, assetId)} title={p.inject ? `Linked drill inject` : p.label}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

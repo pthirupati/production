@@ -364,4 +364,41 @@ def build_training_scenarios() -> list[dict]:
         {"id": "gpu-eng", "role": "GPU infrastructure engineer", "steps": ["Check DCGM", "NVLink bus", "Replace GPU FRU"]},
         {"id": "bare-metal", "role": "Bare-metal engineer", "steps": ["Service mode", "CPU paste", "Rails extend", "POST"]},
         {"id": "cloud-support", "role": "Cloud support engineer", "steps": ["Vendor ticket", "Serial lookup", "RMA ship"]},
+        # Troubleshooting drills — training_start auto-injects `inject` preset
+        {
+            "id": "ts-psu",
+            "role": "Troubleshoot — Failed PSU",
+            "inject": "psu",
+            "steps": ["Confirm power alert", "Open RMA / ticket", "Replace PSU FRU", "Verify redundant power", "Clear fault"],
+        },
+        {
+            "id": "ts-dimm",
+            "role": "Troubleshoot — DIMM / ECC",
+            "inject": "dimm",
+            "steps": ["Review BMC SEL / ECC", "Identify failed slot", "Replace DIMM", "Clear fault"],
+        },
+        {
+            "id": "ts-raid",
+            "role": "Troubleshoot — RAID degraded",
+            "inject": "raid",
+            "steps": ["Confirm predictive failure", "Fail / rebuild disk", "Validate VD optimal", "Clear fault"],
+        },
+        {
+            "id": "ts-cooling",
+            "role": "Troubleshoot — Cooling failure",
+            "inject": "cooling",
+            "steps": ["Check ASHRAE / CRAC", "Restore cooling unit", "Confirm inlet temps", "Clear fault"],
+        },
+        {
+            "id": "ts-fiber",
+            "role": "Troubleshoot — Fiber cut",
+            "inject": "fiber",
+            "steps": ["Locate trunk fault", "Splice / repair fiber", "Verify link up", "Clear fault"],
+        },
+        {
+            "id": "ts-ups",
+            "role": "Troubleshoot — UPS failure",
+            "inject": "ups",
+            "steps": ["Confirm on-battery", "Start generator / restore utility", "Sync battery strings", "Clear fault"],
+        },
     ]
