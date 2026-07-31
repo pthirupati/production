@@ -261,13 +261,13 @@ New tech slug: `ai-infra` (MAAS · VyOS · LXD · AWX · GPU DC · DCGM · Packe
 159. [ ] End-to-end commission → burn-in → production handoff project
 186. [ ] Full NVIDIA 75-command matrix (query/dmon/pmon/topo/lock clocks/ECC/accounting)
 187. [ ] Full AMD 75-command matrix (rocm-smi + amd-smi + sysfs/debugfs)
-188. [ ] GPU SKU matrix: H100 / H200 / B300 / A100 / L40S / MI300X with correct PCIe/SXM topology
-189. [ ] VyOS UI + CLI: VLANs, BGP, firewall, DHCP helper for PXE; sync with DC switch fabric
-190. [ ] MAAS E2E: enlist → commission → deploy → release; scripts + PXE boot menu
-191. [ ] LXD GPU passthrough profiles + nested lab containers for burn-in
+188. [~] GPU SKU matrix: H100 / H200 / B300 / A100 / L40S / MI300X with correct PCIe/SXM topology
+189. [~] VyOS CLI: interfaces/DHCP/PXE helper (UI + BGP depth still open)
+190. [~] MAAS E2E: machines read → commission → deploy → release (PXE menu depth open)
+191. [~] LXD list/start/stop + gpu-passthrough profile (nested burn-in depth open)
 192. [ ] AWX job templates for driver install, DCGM exporter, image repave (inventory from MAAS)
 193. [ ] DCOps RMA deep flow: FRU → parts availability → dock → install → burn-in → close
-194. [ ] Packer image factory CI: GitHub Actions + Packer + Terraform + CVE gate + publish
+194. [~] Packer build stream + CVE gate artifact (full GH Actions factory still open)
 195. [ ] `dcgm-exporter` + Prometheus/Grafana companion scrape in ai-infra observability labs
 196. [ ] Integrated stack demo: MAAS node + VyOS underlay + LXD + AWX + DC twin + GPU CLI as one project
 
