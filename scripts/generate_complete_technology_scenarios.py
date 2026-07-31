@@ -50,7 +50,7 @@ SIM_BY_TECH = {
     "grafana": "grafana",
     "html": "generic",
     "java": "java",
-    "javascript": "python",
+    "javascript": "python",  # coding_mode academy — IDE primary
     "kubernetes": "kubernetes",
     "linux": "generic",
     "mysql": "database",
@@ -65,7 +65,7 @@ SIM_BY_TECH = {
     "prometheus": "prometheus",
     "prompt-engineering": "python",
     "python": "python",
-    "react": "python",
+    "react": "python",  # coding_mode academy — IDE primary
     "rhel-linux": "rhel",
     "security": "generic",
     "service-mesh": "generic",
@@ -77,6 +77,9 @@ SIM_BY_TECH = {
     "wireshark": "wireshark",
     "windows": "windows",
 }
+
+# Techs whose academy packs are Coding IDE labs (not systemd service drills).
+CODING_ACADEMY_TECHS = frozenset({"javascript", "react"})
 
 GENERIC_TOPICS = [
     ("learn", "Fundamentals Lab", "Understand core commands, objects, files, and the daily workflow."),
@@ -264,6 +267,10 @@ def make_spec(tech: str, seq: int, kind: str, topic: str) -> dict:
         spec["cross_technology"] = True
     if tech == "vmware" or (kind == "integration" and tech in {"linux", "kubernetes", "terraform"}):
         spec["vmware_link"] = True
+    if tech in CODING_ACADEMY_TECHS:
+        # Academy coding techs open the browser IDE (see migrate_academy_coding_labs.py).
+        spec["coding_mode"] = True
+        spec["simulation_type"] = "python"
     return spec, marker
 
 
