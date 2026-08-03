@@ -598,6 +598,59 @@ def _merge_vmware_hosts(state: dict, session_id: str) -> None:
         return
 
 
+def _merge_maas_identity_hosts(state: dict, session_id: str) -> None:
+    """S1: pull Ready/Deployed MAAS assets from the unified registry into AWX."""
+    try:
+        from apps.labs.provisioner.simulation.server_identity import list_servers
+    except Exception:
+        return
+    try:
+        servers = list_servers(str(session_id))
+    except Exception:
+        return
+    hosts = state.setdefault("hosts", [])
+    existing = {str(h.get("name") or "").lower() for h in hosts}
+    inventory_name = "maas-gpu-nodes"
+    inv = next((i for i in state.setdefault("inventories", []) if i.get("name") == inventory_name), None)
+    if not inv:
+        inv = {"id": 3, "name": inventory_name, "hosts": 0, "sources": 1}
+        state["inventories"].append(inv)
+
+    added = 0
+    for s in servers:
+        sources = {str(x).lower() for x in (s.get("sources") or [])}
+        status = (s.get("install_state") or "").strip()
+        if not (sources & {"maas", "baremetal", "gpu"}):
+            continue
+        if status not in ("Ready", "Deployed", "deployed"):
+            continue
+        name = s.get("hostname") or ""
+        if not name or name.lower() in existing:
+            continue
+        hosts.append(
+            {
+                "id": f"id-{s.get('id') or name}",
+                "name": name,
+                "inventory": inventory_name,
+                "enabled": (s.get("power") or "on") == "on",
+                "status": "ok" if status in ("Deployed", "deployed", "Ready") else "failed",
+                "source": "MAAS",
+                "ip": s.get("primary_ip") or "",
+                "serial": s.get("serial") or "",
+                "asset_tag": s.get("asset_tag") or "",
+            }
+        )
+        existing.add(name.lower())
+        added += 1
+
+    if added:
+        inv["hosts"] = max(
+            int(inv.get("hosts") or 0),
+            len([h for h in hosts if h.get("inventory") == inventory_name]),
+        )
+        inv["sources"] = max(int(inv.get("sources") or 0), 1)
+
+
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure(session_id, scenario_slug)
     ensure_v2(entry["state"])
@@ -607,6 +660,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     _save(session_id, entry)
     state = copy.deepcopy(entry["state"])
     _merge_vmware_hosts(state, session_id)
+    _merge_maas_identity_hosts(state, session_id)
     try:
         from apps.labs.provisioner.simulation.server_identity import sync_awx_inventory
         sync_awx_inventory(session_id, state.get("hosts") or [])

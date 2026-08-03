@@ -64,7 +64,7 @@ def _blank(
         "nics": [{"name": "eth0", "mac": "00:50:56:a1:b2:c3", "connected": True, "ip": primary_ip}],
         "power": "on",  # on | off | reboot_pending
         "os": "rhel-9",
-        "install_state": "deployed",
+        "install_state": "deployed",  # MAAS: New|Ready|Deployed|… or generic deployed
         "tags": {},
         "sources": [source] if source else [],
         "physical_location": None,  # {room, rack, u_position}
@@ -72,6 +72,14 @@ def _blank(
         "network_port": None,  # {switch, port, vlan}
         # Virtualized GPU/accelerator facet — never backed by real silicon.
         "gpu": None,  # {present, model, driver_loaded, health, driver_version, mig_enabled}
+        # S1 CMDB / twin fields — single asset record shared across consoles.
+        "serial": None,
+        "asset_tag": None,
+        "owner": None,
+        "firmware": None,  # {bios, bmc, raid, vbios}
+        "raid": None,  # {level, controllers, virtual_disks}
+        "gpus": [],  # multi-GPU inventory; `gpu` remains primary/compat facet
+        "thermal": None,  # {inlet_c, gpu_max_c, power_w}
         "updated_at": _now_iso(),
     }
 
@@ -144,6 +152,7 @@ def upsert_server(session_id: str, patch: dict, *, source: str = "api", trace_id
     for key in (
         "hostname", "fqdn", "primary_ip", "cpu", "mem_mb", "power", "os",
         "install_state", "physical_location", "bmc", "network_port", "gpu",
+        "serial", "asset_tag", "owner", "firmware", "raid", "thermal",
     ):
         if key in patch and patch[key] is not None:
             server[key] = patch[key]
@@ -157,6 +166,8 @@ def upsert_server(session_id: str, patch: dict, *, source: str = "api", trace_id
         server["disks"] = copy.deepcopy(patch["disks"])
     if "nics" in patch and isinstance(patch["nics"], list):
         server["nics"] = copy.deepcopy(patch["nics"])
+    if "gpus" in patch and isinstance(patch["gpus"], list):
+        server["gpus"] = copy.deepcopy(patch["gpus"])
     if "tags" in patch and isinstance(patch["tags"], dict):
         server.setdefault("tags", {}).update(patch["tags"])
 
@@ -383,6 +394,15 @@ def seed_gpu_node(
     role: str = "primary",
 ) -> dict:
     """Seed a GPU training node into ServerIdentity for gpu-track labs."""
+    gpus = [
+        {
+            "index": i,
+            "model": "NVIDIA H100 80GB HBM3",
+            "uuid": f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}",
+            "pci_bus_id": f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0",
+        }
+        for i in range(8)
+    ]
     server = upsert_server(
         session_id,
         {
@@ -393,6 +413,11 @@ def seed_gpu_node(
             "mem_mb": 524288,
             "power": "on",
             "os": "rhel-9",
+            "serial": f"SN-H100-{hostname[-2:].upper()}",
+            "asset_tag": f"AT-GPU-{hostname[-2:].upper()}",
+            "owner": "ai-infra",
+            "install_state": "Deployed",
+            "firmware": {"bios": "2.14.0", "bmc": "5.10.30", "vbios": "96.00.74.00.01"},
             "tags": {"role": role, "track": "gpu"},
             "gpu": {
                 "present": True,
@@ -402,10 +427,130 @@ def seed_gpu_node(
                 "driver_version": "550.90.07",
                 "mig_enabled": False,
             },
+            "gpus": gpus,
+            "physical_location": {"room": "Hall-A", "rack": "R12", "u_position": 20},
         },
         source="gpu",
     )
     return server
+
+
+def upsert_from_maas_machine(
+    session_id: str,
+    machine: dict,
+    *,
+    source: str = "maas",
+    owner: str = "ai-infra",
+) -> dict | None:
+    """Write-once MAAS machine → unified asset registry (S1 #210–211).
+
+    Called when commission reaches Ready or deploy reaches Deployed so the
+    same hostname appears in CMDB lists, AWX maas-gpu-nodes, and DC twin.
+    """
+    if not session_id or not isinstance(machine, dict):
+        return None
+    name = (machine.get("name") or machine.get("hostname") or "").strip()
+    if not name:
+        return None
+    status = (machine.get("status") or "").strip() or "New"
+    ip = machine.get("ip") or machine.get("primary_ip") or ""
+    if ip in ("-", None):
+        ip = ""
+    power = "on" if (machine.get("power") or "on").lower() in ("on", "on.", "poweredon") else "off"
+    # Stable synthetic identity so re-commission updates the same record.
+    digit = "".join(ch for ch in name if ch.isdigit()) or "00"
+    serial = machine.get("serial") or f"CN7{digit.zfill(4)}MAAS{digit.zfill(2)}"
+    asset_tag = machine.get("asset_tag") or f"AT-{name.upper()}"
+    is_gpu = "gpu" in name.lower() or "h100" in name.lower() or "mi300" in name.lower()
+    patch: dict[str, Any] = {
+        "id": f"maas-{name}",
+        "hostname": name,
+        "primary_ip": ip,
+        "power": power,
+        "os": machine.get("os") or ("ubuntu-22.04" if status == "Deployed" else "commissioning"),
+        "install_state": status,
+        "serial": serial,
+        "asset_tag": asset_tag,
+        "owner": machine.get("owner") or owner,
+        "cpu": machine.get("cpu") or (64 if is_gpu else 32),
+        "mem_mb": machine.get("mem_mb") or (524288 if is_gpu else 131072),
+        "firmware": machine.get("firmware") or {
+            "bios": "2.14.0",
+            "bmc": "5.10.30",
+            "raid": "50.5.0-0000",
+        },
+        "physical_location": machine.get("physical_location") or {
+            "room": "Hall-A",
+            "rack": machine.get("rack") or "R12",
+            "u_position": machine.get("u_position") or (10 + int(digit or 0) % 20),
+        },
+        "bmc": machine.get("bmc") or {
+            "endpoint": f"https://bmc-{name}.dc.local",
+            "protocol": "IPMI",
+            "power": power,
+        },
+        "tags": {
+            "role": "gpu-node" if is_gpu else "baremetal",
+            "maas_status": status,
+            "arch": machine.get("arch") or "amd64/generic",
+            "zone": machine.get("zone") or "default",
+            "pool": machine.get("pool") or "default",
+            "appears_in": ["maas", "awx", "datacenter", "cmdb", "terminal"],
+        },
+    }
+    if is_gpu:
+        patch["gpu"] = {
+            "present": True,
+            "model": "NVIDIA H100 80GB HBM3",
+            "driver_loaded": status == "Deployed",
+            "health": "healthy" if status == "Deployed" else "unknown",
+            "driver_version": "550.90.07",
+            "mig_enabled": False,
+        }
+        patch["gpus"] = [
+            {
+                "index": i,
+                "model": "NVIDIA H100 80GB HBM3",
+                "uuid": f"GPU-{i:08x}-maas-{digit}-{i:02d}",
+                "pci_bus_id": f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0",
+            }
+            for i in range(8)
+        ]
+        patch["raid"] = {"level": "RAID10", "controllers": 1, "virtual_disks": 2}
+    return upsert_server(session_id, patch, source=source)
+
+
+def list_assets(session_id: str) -> list[dict[str, Any]]:
+    """CMDB-shaped projection of the unified asset registry (S1 #210)."""
+    rows: list[dict[str, Any]] = []
+    for s in list_servers(session_id):
+        loc = s.get("physical_location") or {}
+        fw = s.get("firmware") or {}
+        gpu = s.get("gpu") or {}
+        rows.append(
+            {
+                "id": s.get("id"),
+                "hostname": s.get("hostname"),
+                "serial": s.get("serial"),
+                "asset_tag": s.get("asset_tag"),
+                "owner": s.get("owner"),
+                "install_state": s.get("install_state"),
+                "power": s.get("power"),
+                "primary_ip": s.get("primary_ip"),
+                "os": s.get("os"),
+                "rack": loc.get("rack"),
+                "u_position": loc.get("u_position"),
+                "room": loc.get("room"),
+                "firmware_bios": fw.get("bios") if isinstance(fw, dict) else None,
+                "firmware_bmc": fw.get("bmc") if isinstance(fw, dict) else None,
+                "gpu_model": gpu.get("model") if isinstance(gpu, dict) else None,
+                "gpu_count": len(s.get("gpus") or []) or (1 if gpu.get("present") else 0),
+                "sources": list(s.get("sources") or []),
+                "updated_at": s.get("updated_at"),
+            }
+        )
+    rows.sort(key=lambda r: (r.get("hostname") or "", r.get("id") or ""))
+    return rows
 
 
 def seed_from_vmware_vm(session_id: str, vm: dict, *, role: str = "primary") -> dict:

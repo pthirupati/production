@@ -606,22 +606,30 @@ def _sync_identity(session_id: str, state: dict) -> None:
         return
     rooms = state.get("rooms", [])
     for srv in state.get("servers", []):
-        upsert_server(
-            session_id,
-            {
-                "id": srv["id"],
-                "hostname": srv.get("hostname"),
-                "power": srv.get("power_state"),
-                "physical_location": {
-                    "room": _room_for_rack(rooms, srv.get("rack")),
-                    "rack": srv.get("rack"),
-                    "u_position": srv.get("u_slot"),
-                },
-                "bmc": srv.get("bmc"),
-                "tags": {"role": srv.get("role")} if srv.get("role") else {},
+        inv = srv.get("inventory") if isinstance(srv.get("inventory"), dict) else {}
+        patch = {
+            "id": srv["id"],
+            "hostname": srv.get("hostname"),
+            "power": srv.get("power_state"),
+            "physical_location": {
+                "room": _room_for_rack(rooms, srv.get("rack")),
+                "rack": srv.get("rack"),
+                "u_position": srv.get("u_slot"),
             },
-            source="datacenter",
-        )
+            "bmc": srv.get("bmc"),
+            "tags": {"role": srv.get("role")} if srv.get("role") else {},
+            "serial": inv.get("serial") or srv.get("service_tag") or srv.get("serial"),
+            "asset_tag": inv.get("asset_tag") or srv.get("asset_tag"),
+            "firmware": {
+                "bios": inv.get("firmware") or srv.get("firmware_version"),
+                "bmc": (srv.get("bmc") or {}).get("firmware") if isinstance(srv.get("bmc"), dict) else None,
+            },
+            "owner": inv.get("owner") or srv.get("owner") or "dcops",
+            "install_state": srv.get("install_state") or inv.get("status") or "deployed",
+        }
+        if srv.get("raid") is not None:
+            patch["raid"] = srv.get("raid")
+        upsert_server(session_id, patch, source="datacenter")
 
 
 def _sync_power(session_id: str, server_id: str, power_state: str) -> None:

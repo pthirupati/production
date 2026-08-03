@@ -186,7 +186,7 @@ _DEPLOY_STEPS = [
 ]
 
 
-def _advance_machine(m: dict, now: float) -> None:
+def _advance_machine(m: dict, now: float, *, session_id: str = "") -> None:
     """Advance a single machine's async phase based on wall-clock elapsed time."""
     status = m.get("status")
     started = m.get("phase_started_at")
@@ -220,16 +220,24 @@ def _advance_machine(m: dict, now: float) -> None:
             m["status"] = "Deployed"
             m["power"] = "on"
             m["os"] = "Ubuntu 22.04 LTS"
+        # S1: Ready/Deployed → unified asset registry (same session as AWX/DC).
+        if session_id:
+            try:
+                from apps.labs.provisioner.simulation.server_identity import upsert_from_maas_machine
+
+                upsert_from_maas_machine(session_id, m, source="baremetal")
+            except Exception:
+                pass
 
 
-def _tick(state: dict, now: float | None = None) -> bool:
+def _tick(state: dict, now: float | None = None, *, session_id: str = "") -> bool:
     """Advance every machine's lifecycle to the current wall-clock. Returns True if
     anything changed (so callers can persist)."""
     now = _now() if now is None else now
     changed = False
     for m in state.get("maas", {}).get("machines", []):
         before = (m.get("status"), m.get("progress"), len(m.get("log", [])))
-        _advance_machine(m, now)
+        _advance_machine(m, now, session_id=session_id)
         if before != (m.get("status"), m.get("progress"), len(m.get("log", []))):
             changed = True
     return changed
@@ -257,7 +265,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     ensure_v2(entry["state"])
     # Advance the lifecycle on read so status/progress reflect wall-clock time
     # even when no action has been taken since the phase started.
-    _tick(entry["state"])
+    _tick(entry["state"], session_id=str(session_id))
     _save(session_id, entry)
     return {
         "session_id": str(session_id),

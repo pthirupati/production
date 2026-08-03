@@ -199,3 +199,21 @@ class AiInfraGpuCommandsTests(SimpleTestCase):
         self.assertIn("GPU 7:", out)
         topo = str(engine.shell.run("nvidia-smi topo -m"))
         self.assertIn("GPU7", topo)
+
+    def test_nvidia_proc_driver_sysfs(self):
+        engine = UnifiedSimulationEngine(
+            scenario_slug="ai-infra-maas-commission-h100",
+            simulation_type="gpu",
+        )
+        ver = str(engine.shell.run("cat /proc/driver/nvidia/version"))
+        self.assertIn("NVRM version", ver)
+        self.assertIn("550", ver)
+
+    def test_amd_sysfs_clock_steps(self):
+        engine = UnifiedSimulationEngine(
+            scenario_slug="academy-ai-infra-005-production-rocm",
+            simulation_type="gpu",
+        )
+        sclk = str(engine.shell.run("cat /sys/class/drm/card0/device/pp_dpm_sclk"))
+        self.assertIn("Mhz", sclk)
+        self.assertIn("*", sclk)
