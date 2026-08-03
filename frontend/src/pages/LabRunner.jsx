@@ -1821,9 +1821,14 @@ export default function LabRunner() {
         key={`${primarySimKind}:${simResetNonce}`}
         name={primarySimKind}
         title="Lab environment error"
-        resetStorageKey={isAws ? awsSimStorageKey(useAuthStore.getState().user?.id) : undefined}
+        resetStorageKey={isAws || isTerraform ? awsSimStorageKey(useAuthStore.getState().user?.id) : undefined}
         // AWS: wipe persisted blob AND re-seed the live store, then remount.
-        onResetStorage={isAws ? () => { hardResetAwsSim(); setSimResetNonce((n) => n + 1) } : undefined}
+        // Terraform: same — IDE embeds the AWS console store and can crash the same way.
+        onResetStorage={isAws || isTerraform ? () => {
+          hardResetAwsSim()
+          try { resetTerraformAwsLabState() } catch { /* ignore */ }
+          setSimResetNonce((n) => n + 1)
+        } : undefined}
         onReset={() => setSimResetNonce((n) => n + 1)}
         autoResetStorageOnError={isAws || isTerraform}
       >
