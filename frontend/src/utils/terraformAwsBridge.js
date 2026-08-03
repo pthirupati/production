@@ -35,6 +35,25 @@ export function collectHcl(files = {}) {
 }
 
 /**
+ * Detect which cloud consoles an HCL workspace should link to after apply.
+ * Matches backend terraform_engine._cloud_links_from_resources.
+ */
+export function detectCloudProvidersFromHcl(filesOrSrc = {}) {
+  const src = typeof filesOrSrc === 'string' ? filesOrSrc : collectHcl(filesOrSrc)
+  const types = new Set()
+  const re = /resource\s+"([^"]+)"\s+"([^"]+)"/g
+  let m
+  while ((m = re.exec(src)) !== null) types.add(m[1])
+  const links = {
+    aws: [...types].some((t) => t.startsWith('aws_')),
+    azure: [...types].some((t) => t.startsWith('azurerm_')),
+    gcp: [...types].some((t) => t.startsWith('google_')),
+    vmware: [...types].some((t) => t.startsWith('vsphere_')),
+  }
+  return Object.fromEntries(Object.entries(links).filter(([, v]) => v))
+}
+
+/**
  * Mirror a single parsed HCL resource into the shared AWS store. Returns the
  * created store handles (ids / names) so callers can build both a `markLabManaged`
  * ledger and progressive `terraform apply` output. Idempotent per address via the

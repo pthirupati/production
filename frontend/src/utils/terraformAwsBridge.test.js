@@ -198,3 +198,22 @@ resource "aws_key_pair" "ops" {
     expect(s.keyPairs.some((k) => k.name === 'ops-lab-key')).toBe(true)
   })
 })
+
+describe('detectCloudProvidersFromHcl', () => {
+  it('flags aws / azure / gcp from resource types', async () => {
+    const { detectCloudProvidersFromHcl } = await import('./terraformAwsBridge.js')
+    const links = detectCloudProvidersFromHcl({
+      'main.tf': `
+        resource "aws_instance" "a" {}
+        resource "azurerm_linux_virtual_machine" "b" {}
+        resource "google_compute_instance" "c" {}
+      `,
+    })
+    expect(links).toEqual({ aws: true, azure: true, gcp: true })
+  })
+
+  it('returns empty when no cloud resources', async () => {
+    const { detectCloudProvidersFromHcl } = await import('./terraformAwsBridge.js')
+    expect(detectCloudProvidersFromHcl({ 'main.tf': 'resource "null_resource" "x" {}' })).toEqual({})
+  })
+})

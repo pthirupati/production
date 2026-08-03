@@ -226,7 +226,7 @@ Update this file as items complete. Keep internal code names (`*Simulator`, `sim
 131. [x] Seed/`normalize_sim_type`: keep `peoplesoft`, `nmap`, `wireshark`, `windows-server`, coding types (stop collapse → `generic`)
 132. [x] Academy generator: JS/React/HTML → `coding_mode: true` + real `coding_spec` (Java/shell deferred)
 133. [x] HTML/Web labs: live iframe preview pane in CodingIDE + academy HTML → coding_mode
-134. [ ] Terraform apply → mutate AWS/Azure/GCP console inventory + Open Cloud links in dropdown
+134. [x] Terraform apply → mutate AWS/Azure/GCP console inventory + Open Cloud links in dropdown
 135. [ ] AWS/Datacenter "Lab environment error": prod Cache-Control on `index.html`; Terraform AWS overlay same Zustand reset as primary
 136. [ ] Surface `useSimSession.error` in Datacenter/AWS shells (403/API fail ≠ silent empty)
 137. [ ] Jira @team mentions: verify `JIRA_SIMULATION_MODE` in prod; coach reply when mention parse fails; E2E mention → bot → disk appears
@@ -343,7 +343,7 @@ Learner-facing UI never says simulation/demo/mock.
 ### S1 — Unified enterprise state bus
 210. [~] Single asset/resource registry (hostname, serial, asset tag, rack/U, CPU/RAM/disk/RAID, firmware, BIOS, BMC, NICs, VLANs, GPUs, power/thermal, OS, deploy status, owner) — *schema + list_assets on server_identity*
 211. [~] Write-once identity: MAAS commission → appears in CMDB, DC twin, monitoring, Terraform import targets, AWX inventory — *MAAS terminal/baremetal → identity → AWX maas-gpu-nodes; Terraform/monitoring still open*
-212. [ ] Terraform apply → create/update/delete mirrors into AWS/Azure/GCP/VMware/MAAS/LXD consoles
+212. [~] Terraform apply → create/update/delete mirrors into AWS/Azure/GCP/VMware/MAAS/LXD consoles — *AWS/Azure/GCP create mirror + Open Cloud links shipped; destroy + VMware/MAAS/LXD fan-out open*
 213. [ ] Hardware failure events fan out to Grafana alerts, SOC tickets, DCIM LEDs, and lab terminal `dmesg`
 214. [ ] Cross-console sync: disk/NIC/CPU/RAM edits in VMware/DC update guest `lsblk`/`ip`/`nvidia-smi`
 215. [ ] Persistent twin replay (undo/timeline) for cable/firmware/part swaps
@@ -370,7 +370,7 @@ Learner-facing UI never says simulation/demo/mock.
 
 ### S5 — Cloud / Terraform / GitOps / Dev / Security depth
 230. [ ] AWS/Azure/GCP full page matrices (extend C/D/E + P 160–162)
-231. [ ] Terraform multi-provider bridge + console dropdown links after apply
+231. [x] Terraform multi-provider bridge + console dropdown links after apply
 232. [ ] GitOps: Git IDE + PR + Flux/Argo sync health end-to-end
 233. [ ] Coding IDEs for all language techs + HTML preview (finish 176)
 234. [ ] PeopleSoft app-server host persona (not generic EC2) (finish 175)
