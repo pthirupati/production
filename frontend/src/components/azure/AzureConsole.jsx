@@ -5,7 +5,7 @@ import {
   LogIn, Cloud, Server, Network, Shield, HardDrive, Plus, AlertTriangle,
   Terminal, Play, Square, RotateCw, Maximize2, Link2, Unlink, KeyRound,
   Database, Users, Activity, Layers, Box, Boxes, AppWindow, Zap, Container,
-  Flame, Globe2, ShieldAlert, IdCard,
+  Flame, Globe2, ShieldAlert, IdCard, RefreshCw,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import {
@@ -65,7 +65,7 @@ export default function AzureConsole({
   onToggleTerminal, simTerminalOpen = false,
 }) {
   const slug = scenario?.slug || ''
-  const { state, loading, busy, run } = useSimSession(sessionId, slug, azureApi)
+  const { state, loading, busy, error, run, refresh } = useSimSession(sessionId, slug, azureApi)
   const [nav, setNav] = useState('overview')
   const [loginUser, setLoginUser] = useState('')
   const [loginPass, setLoginPass] = useState('')
@@ -148,6 +148,38 @@ export default function AzureConsole({
 
   const breadcrumbs = [{ label: st?.subscription?.name || 'Subscription', onClick: () => setNav('overview') }]
   if (nav !== 'overview') breadcrumbs.push({ label: SIDEBAR.find((s) => s.key === nav)?.label || nav })
+
+  if (loading) {
+    return (
+      <div className={simPanelRoot(embedded, 'bg-[#0a1929]')}>
+        <LabChromeBar title="Microsoft Azure" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
+        <div className="flex-1 flex items-center justify-center p-6 text-sm text-slate-400">
+          Loading Azure portal…
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !state) {
+    return (
+      <div className={simPanelRoot(embedded, 'bg-[#0a1929]')}>
+        <LabChromeBar title="Microsoft Azure" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
+          <AlertTriangle className="text-amber-400" size={32} aria-hidden />
+          <p className="text-sm text-slate-300 max-w-md">
+            {error || 'Could not load Azure portal state. Check that the lab session is running, then retry.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => refresh()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-sky-500/40 text-sky-300 text-sm hover:bg-sky-500/10"
+          >
+            <RefreshCw size={14} /> Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (!loading && state && !loggedIn) {
     const submitLogin = (e) => {

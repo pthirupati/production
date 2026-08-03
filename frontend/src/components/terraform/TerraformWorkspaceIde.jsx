@@ -55,15 +55,27 @@ export default function TerraformWorkspaceIde({
 
   useEffect(() => () => { sendCancelRef.current?.() }, [])
 
-  // Seed AWS console with private subnet / NAT / missing default route for vpc-routing labs.
+  // Match AwsLabOverlay: always re-seed the shared AWS store on mount so a
+  // returning learner never paints from a corrupt persisted blob inside the IDE.
+  useState(() => {
+    try { useAwsStore.getState().resetSimulation() } catch { /* ignore */ }
+    return true
+  })
+
   useEffect(() => {
+    try { useAwsStore.getState().resetSimulation() } catch { /* ignore */ }
     const slug = `${scenario?.slug || ''}`.toLowerCase()
-    if (!/vpc-routing|vpc_routing/.test(slug)) return
-    try {
-      useAwsStore.getState().resetSimulation()
-      useAwsStore.getState().hydrateVpcRoutingBroken()
-      if (sessionId) useAwsStore.getState().armLabSync(sessionId)
-    } catch { /* ignore */ }
+    if (/vpc-routing|vpc_routing/.test(slug)) {
+      try { useAwsStore.getState().hydrateVpcRoutingBroken() } catch { /* ignore */ }
+    }
+    if (sessionId) {
+      try { useAwsStore.getState().armLabSync(sessionId) } catch { /* ignore */ }
+      try { useAwsStore.getState().setLabSessionId(sessionId) } catch { /* ignore */ }
+    }
+    return () => {
+      try { useAwsStore.getState().disarmLabSync() } catch { /* ignore */ }
+      try { useAwsStore.getState().setLabSessionId(null) } catch { /* ignore */ }
+    }
   }, [scenario?.slug, sessionId])
 
   // Fired by <LabTerminal> once its shell is ready (backend shell_ready or the
