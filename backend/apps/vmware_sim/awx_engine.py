@@ -72,12 +72,26 @@ def _ansi(color: str, text: str) -> str:
     return f"{codes.get(color, '')}{text}\x1b[0m"
 
 
+def _is_gpu_template(name: str, playbook: str = "") -> bool:
+    blob = f"{name} {playbook}".lower()
+    return any(
+        k in blob
+        for k in (
+            "gpu", "nvidia", "dcgm", "driver", "repave", "persistenc",
+            "h100", "h200", "b300", "rocm",
+        )
+    )
+
+
 def _build_job_stdout(name: str, playbook: str, host: str, will_fail: bool) -> list[str]:
     """A realistic ansible-playbook run log for a job template launch.
 
     Returned as an ordered list; get_state reveals a growing prefix as the job
     advances so the UI streams the output line by line.
     """
+    if _is_gpu_template(name, playbook):
+        return _build_gpu_job_stdout(name, playbook, host, will_fail)
+
     lines = [
         _ansi("cyan", f"PLAY [{name}] " + "*" * max(4, 52 - len(name))),
         "",
@@ -106,6 +120,74 @@ def _build_job_stdout(name: str, playbook: str, host: str, will_fail: bool) -> l
             _ansi("green", "PLAY RECAP " + "*" * 58),
             f"{host} : {_ansi('green', 'ok=4')} {_ansi('amber', 'changed=2')} unreachable=0 failed=0",
         ]
+    return lines
+
+
+def _build_gpu_job_stdout(name: str, playbook: str, host: str, will_fail: bool) -> list[str]:
+    """Stdout narrative for AI Infra GPU driver / DCGM / repave job templates."""
+    low = f"{name} {playbook}".lower()
+    if "dcgm" in low:
+        tasks = [
+            ("Install dcgm + datacenter-gpu-manager", "changed"),
+            ("Deploy dcgm-exporter (port 9400)", "changed"),
+            ("Assert DCGM_FI_DEV_GPU_UTIL scrapeable", "ok"),
+        ]
+        ok, changed = 5, 2
+    elif "repave" in low or "image" in low:
+        tasks = [
+            ("Drain workloads / stop nvidia-persistenced", "changed"),
+            ("Trigger MAAS deploy custom/h100-jammy", "changed"),
+            ("Wait for cloud-init + nvidia-smi", "ok"),
+        ]
+        ok, changed = 5, 2
+    elif "persistenc" in low:
+        tasks = [
+            ("Enable nvidia-persistenced", "changed"),
+            ("Assert nvidia-smi -pm 1", "ok"),
+        ]
+        ok, changed = 4, 1
+    else:
+        tasks = [
+            ("Install nvidia-driver-565 (H100)", "changed"),
+            ("Enable nvidia-persistenced", "changed"),
+            ("Assert nvidia-smi lists GPUs", "ok"),
+        ]
+        ok, changed = 6, 3
+
+    lines = [
+        _ansi("cyan", f"PLAY [{name}] " + "*" * max(4, 52 - len(name))),
+        "",
+        _ansi("cyan", "TASK [Gathering Facts] " + "*" * 40),
+        _ansi("green", f"ok: [{host}]"),
+        "",
+    ]
+    for title, result in tasks:
+        lines.append(_ansi("cyan", f"TASK [{title}] " + "*" * max(4, 48 - len(title))))
+        if will_fail and result == "changed":
+            lines += [
+                _ansi("red", f"fatal: [{host}]: FAILED! => {{\"msg\": \"driver install failed\"}}"),
+                "",
+            ]
+            break
+        color = "amber" if result == "changed" else "green"
+        lines += [_ansi(color, f"{result}: [{host}]"), ""]
+
+    if will_fail:
+        lines += [
+            _ansi("red", "PLAY RECAP " + "*" * 58),
+            f"{host} : {_ansi('green', 'ok=2')} {_ansi('amber', 'changed=1')} unreachable=0 {_ansi('red', 'failed=1')}",
+        ]
+    else:
+        # Fleet-shaped recap so learners see maas-gpu inventory, not a lone web host.
+        peers = [host]
+        if host.startswith("gpu-node"):
+            peers = ["gpu-node-01", "gpu-node-02", "gpu-node-03"]
+        lines.append(_ansi("green", "PLAY RECAP " + "*" * 58))
+        for peer in peers:
+            lines.append(
+                f"{peer} : {_ansi('green', f'ok={ok}')} {_ansi('amber', f'changed={changed}')} "
+                f"unreachable=0 failed=0"
+            )
     return lines
 
 
@@ -350,8 +432,98 @@ def _base_state() -> dict:
     }
 
 
+def _is_ai_infra_awx_slug(slug: str) -> bool:
+    s = (slug or "").lower()
+    if "ai-infra" in s or s.startswith("academy-ai-infra"):
+        return True
+    return any(
+        k in s
+        for k in (
+            "nvidia-driver", "dcgm-exporter", "gpu-driver", "maas-gpu",
+            "image-repave", "packer-repave", "sxm-tray",
+        )
+    )
+
+
+def _seed_ai_infra_awx(state: dict, slug: str = "") -> None:
+    """Seed GPU fleet inventory + job templates matching the Lab Terminal awx CLI.
+
+    Hero labs (e.g. ai-infra-awx-nvidia-driver-rollout) open the AWX console —
+    without this seed the UI only shows Patch Linux / Deploy App.
+    """
+    state["inventories"] = [
+        {"id": 3, "name": "maas-gpu-nodes", "hosts": 3, "sources": 1},
+        {"id": 4, "name": "lxd-burn-in", "hosts": 2, "sources": 0},
+        {"id": 1, "name": "Production", "hosts": 12, "sources": 1},
+    ]
+    state["hosts"] = [
+        {"id": "g1", "name": "gpu-node-01", "inventory": "maas-gpu-nodes", "enabled": True, "status": "ok", "source": "MAAS", "ip": "10.64.12.11"},
+        {"id": "g2", "name": "gpu-node-02", "inventory": "maas-gpu-nodes", "enabled": True, "status": "ok", "source": "MAAS", "ip": "10.64.12.12"},
+        {"id": "g3", "name": "gpu-node-03", "inventory": "maas-gpu-nodes", "enabled": True, "status": "failed", "source": "MAAS", "ip": "10.64.12.13"},
+        {"id": "l1", "name": "gpu-worker-1", "inventory": "lxd-burn-in", "enabled": True, "status": "ok", "source": "LXD"},
+        {"id": "l2", "name": "k8s-node-2", "inventory": "lxd-burn-in", "enabled": True, "status": "ok", "source": "LXD"},
+    ]
+    state["projects"] = [
+        {"id": 1, "name": "ai-infra-playbooks", "scm_type": "git", "status": "successful"},
+        {"id": 2, "name": "gpu-image-factory", "scm_type": "git", "status": "successful"},
+    ]
+    state["job_templates"] = [
+        {"id": 12, "name": "GPU Driver Install (H100)", "playbook": "nvidia_driver_h100.yml", "inventory": "maas-gpu-nodes", "status": "never"},
+        {"id": 18, "name": "DCGM Exporter Deploy", "playbook": "dcgm_exporter.yml", "inventory": "maas-gpu-nodes", "status": "never"},
+        {"id": 24, "name": "Image Repave (jammy-h100)", "playbook": "maas_repave_h100.yml", "inventory": "maas-gpu-nodes", "status": "never"},
+        {"id": 31, "name": "NVIDIA Persistence Mode", "playbook": "nvidia_persistenced.yml", "inventory": "maas-gpu-nodes", "status": "never"},
+    ]
+    state["jobs"] = [
+        {
+            "id": 601,
+            "name": "GPU Driver Install (H100)",
+            "status": "failed",
+            "started": _now_iso(),
+            "playbook": "nvidia_driver_h100.yml",
+            "inventory": "maas-gpu-nodes",
+            "stdout": _build_job_stdout(
+                "GPU Driver Install (H100)", "nvidia_driver_h100.yml", "gpu-node-03", True
+            ),
+        },
+    ]
+    state["credentials"] = [
+        {"id": 1, "name": "MAAS GPU Machine SSH", "kind": "Machine"},
+        {"id": 2, "name": "Vault Password", "kind": "Vault"},
+    ]
+    state["schedules"] = [
+        {"id": 1, "name": "Nightly DCGM exporter", "template": "DCGM Exporter Deploy", "enabled": True, "next_run": _now_iso()},
+    ]
+    state["goal"] = {
+        "title": "Roll NVIDIA drivers",
+        "objective": (
+            "Launch GPU Driver Install (H100) against maas-gpu-nodes, "
+            "confirm PLAY RECAP success, then verify nvidia-smi on the canary."
+        ),
+    }
+    # Canary node (gpu-node-03) still on the previous driver — launch JT 12 to fix.
+    state["broken"] = {"failed_template_id": 12, "canary_driver_stale": True}
+    s = (slug or "").lower()
+    if "dcgm" in s:
+        state["goal"] = {
+            "title": "Deploy DCGM exporter",
+            "objective": "Launch DCGM Exporter Deploy and confirm :9400 metrics.",
+        }
+        state["broken"] = {"failed_template_id": 18}
+    elif "repave" in s or "packer" in s:
+        state["goal"] = {
+            "title": "Repave GPU nodes",
+            "objective": "Launch Image Repave (jammy-h100) after the Packer image lands in MAAS.",
+        }
+        state["broken"] = {"failed_template_id": 24}
+
+
 def _apply_preset(state: dict, slug: str) -> None:
     slug = (slug or "").lower()
+    # AI Infra AWX labs get GPU inventory/templates first — avoid generic
+    # "template"/"job" presets that strip JT lists down to Patch Linux.
+    if _is_ai_infra_awx_slug(slug):
+        _seed_ai_infra_awx(state, slug)
+        return
     if "install" in slug:
         state["goal"] = {"title": "Install AWX", "objective": "Complete AWX operator install and verify the web UI is reachable."}
         state["broken"] = {"awx_not_installed": True}
@@ -500,6 +672,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             if t["id"] == tid:
                 t["status"] = "successful"
         broken.pop("failed_template_id", None)
+        broken.pop("canary_driver_stale", None)
         state.setdefault("jobs", []).insert(0, job)
         state["events"].insert(0, {"time": _now_iso(), "message": f"Job {job['name']} launched (#{job['id']})", "severity": "success"})
         _activity(state, f"Launched job template {job['name']}", f"Job #{job['id']}")

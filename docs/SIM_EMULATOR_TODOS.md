@@ -247,7 +247,7 @@ New tech slug: `ai-infra` (MAAS · VyOS · LXD · AWX · GPU DC · DCGM · Packe
 144. [~] AMD: `rocm-smi --show*` + streamed `amd-smi monitor` (continue full matrix)
 145. [ ] Ops runbooks: scp diag scripts MAAS↔node, PSBCheck, fieldiag, dcgmprofrunner, gpu-admin-tools PPCIe/CC
 146. [x] DCOps tickets: thermal / tray / commission heroes from wiki+Jira patterns
-147. [ ] Image factory: Packer + Terraform + Python + shell + upstream base + vuln fix (no manual)
+147. [~] Image factory: Packer + Terraform + Python + shell + upstream base + vuln fix (no manual) — *Packer CVE gate + MAAS publish in lab terminal*
 148. [ ] Pixel parity: NVIDIA green / AMD red telemetry consoles; MAAS commission timeline
 149. [ ] Cross-link: Datacenter twin GPU trays ↔ ai-infra scenarios
 150. [x] Baremetal/imgdev wiki import → outlines (PSINFRA, ESC, DCOPS, GM1 escalation)
@@ -266,9 +266,9 @@ New tech slug: `ai-infra` (MAAS · VyOS · LXD · AWX · GPU DC · DCGM · Packe
 189. [~] VyOS CLI: interfaces/DHCP/PXE helper (UI + BGP depth still open)
 190. [~] MAAS E2E: machines read → commission → deploy → release (PXE menu depth open)
 191. [~] LXD list/start/stop + gpu-passthrough profile (nested burn-in depth open)
-192. [ ] AWX job templates for driver install, DCGM exporter, image repave (inventory from MAAS)
+192. [x] AWX job templates for driver install, DCGM exporter, image repave (inventory from MAAS)
 193. [ ] DCOps RMA deep flow: FRU → parts availability → dock → install → burn-in → close
-194. [~] Packer build stream + CVE gate artifact (full GH Actions factory still open)
+194. [x] Packer build stream + CVE gate artifact (full GH Actions factory still open)
 195. [ ] `dcgm-exporter` + Prometheus/Grafana companion scrape in ai-infra observability labs
 196. [ ] Integrated stack demo: MAAS node + VyOS underlay + LXD + AWX + DC twin + GPU CLI as one project
 
@@ -365,8 +365,8 @@ Learner-facing UI never says simulation/demo/mock.
 225. [ ] Full PXE animation in DC twin (boot menu + Curtin + cloud-init)
 226. [~] VyOS CLI interfaces/DHCP/PXE helper; add commit/rollback + BGP/firewall UI
 227. [~] LXD list/start/stop + GPU passthrough; add clustering/projects/migration
-228. [~] AWX job templates (driver/DCGM/repave) streamed; inventory sync from MAAS
-229. [ ] Packer+GH Actions image factory publishes to MAAS boot-resources
+228. [x] AWX job templates (driver/DCGM/repave) streamed; inventory sync from MAAS
+229. [~] Packer+GH Actions image factory publishes to MAAS boot-resources *(CLI CVE gate + publish done; GH Actions factory open)*
 
 ### S5 — Cloud / Terraform / GitOps / Dev / Security depth
 230. [ ] AWS/Azure/GCP full page matrices (extend C/D/E + P 160–162)
