@@ -1,0 +1,122 @@
+"""Terraform apply → AWS/Azure/GCP console mirror (S1.5 / TODO 134, 231)."""
+from django.core.cache import cache
+from django.test import TestCase
+
+from apps.vmware_sim import aws_engine as ae
+from apps.vmware_sim import azure_engine as aze
+from apps.vmware_sim import gcp_engine as gce
+from apps.vmware_sim import terraform_engine as te
+
+
+MULTI_CLOUD_MAIN = """
+provider "aws" { region = "us-east-1" }
+provider "azurerm" { features {} }
+provider "google" { project = "lab" }
+
+resource "aws_instance" "web" {
+  ami           = "ami-0c55b159cbfafe1f0"
+  instance_type = "t3.micro"
+  tags = { Name = "web-server" }
+}
+
+resource "azurerm_linux_virtual_machine" "app" {
+  name = "app-vm"
+  size = "Standard_B2s"
+}
+
+resource "google_compute_instance" "batch" {
+  name         = "batch-1"
+  machine_type = "e2-medium"
+  zone         = "us-central1-a"
+}
+"""
+
+
+class TerraformCloudBridgeTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.sid = "test-tf-cloud-bridge"
+        for drop in (te.drop_session, ae.drop_session, aze.drop_session, gce.drop_session):
+            drop(self.sid)
+
+    def tearDown(self):
+        cache.clear()
+
+    def _boot(self, main_tf: str):
+        te.get_state(self.sid, "tf-cloud-bridge")
+        te.apply_action(self.sid, "save_files", {
+            "files": {
+                "main.tf": main_tf,
+                "variables.tf": 'variable "ami_id" { default = "ami-0c55b159cbfafe1f0" }\n',
+                "outputs.tf": "",
+            },
+            "active_file": "main.tf",
+        })
+        te.apply_action(self.sid, "terraform_init", {})
+        plan = te.apply_action(self.sid, "terraform_plan", {})
+        self.assertTrue(plan.get("ok"), plan)
+        return plan
+
+    def test_parse_tf_resources(self):
+        parsed = te._parse_tf_resources(MULTI_CLOUD_MAIN)
+        types = {r["type"] for r in parsed}
+        self.assertEqual(types, {
+            "aws_instance",
+            "azurerm_linux_virtual_machine",
+            "google_compute_instance",
+        })
+        links = te._cloud_links_from_resources(parsed)
+        self.assertTrue(links["aws"])
+        self.assertTrue(links["azure"])
+        self.assertTrue(links["gcp"])
+
+    def test_apply_mirrors_into_aws_azure_gcp(self):
+        self._boot(MULTI_CLOUD_MAIN)
+        res = te.apply_action(self.sid, "terraform_apply", {})
+        self.assertTrue(res.get("ok"), res)
+        self.assertTrue(res.get("cloud_links", {}).get("aws"))
+        self.assertTrue(res.get("cloud_links", {}).get("azure"))
+        self.assertTrue(res.get("cloud_links", {}).get("gcp"))
+        self.assertIn("Cloud consoles updated", res.get("output") or "")
+
+        aws_inst = ae.get_state(self.sid)["state"].get("instances") or []
+        live = [i for i in aws_inst if (i.get("state") or "") != "terminated"]
+        self.assertTrue(any(
+            i.get("name") == "web-server" or (i.get("tags") or {}).get("Name") == "web-server"
+            for i in live
+        ), aws_inst)
+
+        azure_vms = aze.get_state(self.sid)["state"].get("vms") or []
+        self.assertTrue(any(v.get("name") == "app" for v in azure_vms), azure_vms)
+
+        gcp_inst = gce.get_state(self.sid)["state"].get("instances") or []
+        self.assertTrue(any(i.get("name") == "batch" for i in gcp_inst), gcp_inst)
+
+    def test_apply_idempotent_no_duplicate_aws(self):
+        self._boot(MULTI_CLOUD_MAIN)
+        te.apply_action(self.sid, "terraform_apply", {})
+        n1 = len([
+            i for i in (ae.get_state(self.sid)["state"].get("instances") or [])
+            if (i.get("state") or "") != "terminated"
+        ])
+        # Re-plan + re-apply (same names) must not spawn another EC2.
+        te.apply_action(self.sid, "terraform_plan", {})
+        te.apply_action(self.sid, "terraform_apply", {})
+        n2 = len([
+            i for i in (ae.get_state(self.sid)["state"].get("instances") or [])
+            if (i.get("state") or "") != "terminated"
+        ])
+        self.assertEqual(n1, n2)
+
+        azure_vms = aze.get_state(self.sid)["state"].get("vms") or []
+        self.assertEqual(sum(1 for v in azure_vms if v.get("name") == "app"), 1)
+        gcp_inst = gce.get_state(self.sid)["state"].get("instances") or []
+        self.assertEqual(sum(1 for i in gcp_inst if i.get("name") == "batch"), 1)
+
+    def test_plan_includes_cloud_links(self):
+        plan = self._boot(MULTI_CLOUD_MAIN)
+        links = (plan.get("plan") or {}).get("cloud_links") or {}
+        self.assertTrue(links.get("aws"))
+        self.assertTrue(links.get("azure"))
+        self.assertTrue(links.get("gcp"))
+        self.assertGreaterEqual((plan.get("plan") or {}).get("add", 0), 3)

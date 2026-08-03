@@ -10,7 +10,7 @@ import TerraformAwsTerminal from './TerraformAwsTerminal'
 import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab, VscActivityButton } from '../ide/VsCodeWorkbench'
 import { getIacProfile } from '../../utils/iacFlavor'
 import { LabChromeControls } from '../lab/LabChromeBar'
-import { syncTerraformApplyToAwsConsole } from '../../utils/terraformAwsBridge'
+import { syncTerraformApplyToAwsConsole, detectCloudProvidersFromHcl } from '../../utils/terraformAwsBridge'
 import { useAwsStore } from '../aws/store/awsStore'
 import {
   FileCode, FolderOpen, Play, Plus, Trash2, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History, ExternalLink, LayoutDashboard,
@@ -193,6 +193,15 @@ export default function TerraformWorkspaceIde({
   const goal = state?.state?.goal || {}
   const editorLang = 'hcl'
   const canTerminal = terminalSession?.status === 'RUNNING'
+  const cloudLinks = {
+    ...(detectCloudProvidersFromHcl(files) || {}),
+    ...(tf.cloud_links || {}),
+  }
+  const openCloud = (key) => {
+    if (key === 'aws') setBottomTab('console')
+    else if (key === 'azure') setBottomTab('azure')
+    else if (key === 'gcp') setBottomTab('gcp')
+  }
 
   const bottomContent = () => {
     if (bottomTab === 'terminal' && showTerminal && canTerminal) {
@@ -356,6 +365,26 @@ export default function TerraformWorkspaceIde({
               <Terminal size={11} /> {cmd}
             </button>
           ))}
+          {(cloudLinks.aws || cloudLinks.azure || cloudLinks.gcp) && (
+            <div className="flex items-center gap-1 ml-1">
+              <span className="text-[10px] text-[var(--vsc-muted)]">Open Cloud:</span>
+              {cloudLinks.aws && (
+                <button type="button" onClick={() => openCloud('aws')} className="vsc-btn text-[10px]" style={{ borderColor: '#ff9900', color: '#ff9900' }}>
+                  <ExternalLink size={11} /> AWS
+                </button>
+              )}
+              {cloudLinks.azure && (
+                <button type="button" onClick={() => openCloud('azure')} className="vsc-btn text-[10px]" style={{ borderColor: '#0078d4', color: '#50b0f0' }}>
+                  <ExternalLink size={11} /> Azure
+                </button>
+              )}
+              {cloudLinks.gcp && (
+                <button type="button" onClick={() => openCloud('gcp')} className="vsc-btn text-[10px]" style={{ borderColor: '#4285f4', color: '#8ab4f8' }}>
+                  <ExternalLink size={11} /> GCP
+                </button>
+              )}
+            </div>
+          )}
           {showLabControls && (onHints || onCheck || onExtend || onStop) && (
             <div className="ml-auto flex items-center gap-1.5 lab-chrome-actions">
               <LabChromeControls
@@ -384,6 +413,8 @@ export default function TerraformWorkspaceIde({
             <VscPanelTab active={bottomTab === 'events'} onClick={() => setBottomTab('events')}><History size={11} /> Events</VscPanelTab>
             <VscPanelTab active={bottomTab === 'aws'} onClick={() => setBottomTab('aws')}>AWS CLI</VscPanelTab>
             <VscPanelTab active={bottomTab === 'console'} onClick={() => setBottomTab('console')}><LayoutDashboard size={11} /> AWS Console</VscPanelTab>
+            <VscPanelTab active={bottomTab === 'azure'} onClick={() => setBottomTab('azure')}>Azure</VscPanelTab>
+            <VscPanelTab active={bottomTab === 'gcp'} onClick={() => setBottomTab('gcp')}>GCP</VscPanelTab>
             {canTerminal && showTerminal && (
               <VscPanelTab active={bottomTab === 'terminal'} onClick={() => setBottomTab('terminal')}>Terminal</VscPanelTab>
             )}

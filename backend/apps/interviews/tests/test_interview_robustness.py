@@ -131,7 +131,9 @@ class HumanRepliesTest(TestCase):
             candidate_answer=answer,
             score_hint={"quality": quality, "score": 80, "feedback": "ok"},
             profile_snapshot={"target_role": "SRE", "current_company": "Acme"},
-            conversation_tail=list(reversed(tail or [])),
+            # Engine passes oldest→newest (_recent_tail); keep the same order so
+            # consecutive-dedup (_last_interviewer_line) sees the latest reply.
+            conversation_tail=list(tail or []),
             strong_streak=streak,
         )
 

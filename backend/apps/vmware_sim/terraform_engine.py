@@ -427,6 +427,110 @@ def drop_session(session_id: str) -> None:
     cache.delete(_session_key(str(session_id)))
 
 
+def _parse_tf_resources(hcl: str) -> list[dict[str, str]]:
+    """Lightweight resource "TYPE" "NAME" extraction from HCL source."""
+    import re
+
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for m in re.finditer(r'resource\s+"([^"]+)"\s+"([^"]+)"', hcl or ""):
+        rtype, name = m.group(1), m.group(2)
+        key = f"{rtype}.{name}"
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"type": rtype, "name": name})
+    return out
+
+
+def _cloud_links_from_resources(resources: list[dict]) -> dict[str, bool]:
+    types = {str(r.get("type") or "") for r in resources}
+    return {
+        "aws": any(t.startswith("aws_") for t in types),
+        "azure": any(t.startswith("azurerm_") for t in types),
+        "gcp": any(t.startswith("google_") for t in types),
+        "vmware": any(t.startswith("vsphere_") for t in types),
+    }
+
+
+def _mirror_apply_to_clouds(session_id: str, resources: list[dict]) -> dict[str, bool]:
+    """S1.5: terraform apply → AWS/Azure/GCP console inventory + identity.
+
+    Idempotent: cloud engines return ok when the named VM/instance already exists.
+    Failures are non-fatal so pure-AWS labs still complete apply.
+    """
+    links = _cloud_links_from_resources(resources)
+    for r in resources:
+        rtype = str(r.get("type") or "")
+        name = str(r.get("name") or "web")
+        try:
+            if rtype == "aws_instance":
+                from apps.vmware_sim import aws_engine as ae
+
+                host = name if name != "web" else "web-server"
+                aws_st = ae.get_state(session_id, "terraform-apply")
+                existing = [
+                    i for i in (aws_st.get("state") or {}).get("instances") or []
+                    if (i.get("name") == host or (i.get("tags") or {}).get("Name") == host)
+                    and (i.get("state") or "") != "terminated"
+                ]
+                if not existing:
+                    ae.apply_action(
+                        session_id,
+                        "launch_instance",
+                        {
+                            "name": host,
+                            "type": "t3.micro",
+                            "count": 1,
+                            "tags": {"Name": host, "ManagedBy": "terraform"},
+                        },
+                    )
+                try:
+                    from apps.labs.provisioner.simulation.server_identity import upsert_server
+
+                    upsert_server(
+                        session_id,
+                        {
+                            "id": f"tf-aws-{name}",
+                            "hostname": host,
+                            "primary_ip": "10.0.1.10",
+                            "power": "on",
+                            "os": "amazon-linux-2023",
+                            "install_state": "deployed",
+                            "owner": "terraform",
+                            "tags": {"role": "terraform", "provider": "aws", "appears_in": ["aws", "terraform"]},
+                        },
+                        source="terraform",
+                    )
+                except Exception:
+                    pass
+            elif rtype in (
+                "azurerm_linux_virtual_machine",
+                "azurerm_windows_virtual_machine",
+                "azurerm_virtual_machine",
+            ):
+                from apps.vmware_sim import azure_engine as aze
+
+                aze.get_state(session_id, "terraform-apply")
+                aze.apply_action(
+                    session_id,
+                    "create_vm",
+                    {"name": name, "size": "Standard_B2s", "location": "eastus"},
+                )
+            elif rtype == "google_compute_instance":
+                from apps.vmware_sim import gcp_engine as gce
+
+                gce.get_state(session_id, "terraform-apply")
+                gce.apply_action(
+                    session_id,
+                    "create_instance",
+                    {"name": name, "machine_type": "e2-medium", "zone": "us-central1-a"},
+                )
+        except Exception:
+            continue
+    return {k: v for k, v in links.items() if v}
+
+
 def apply_action(session_id: str, action: str, payload: dict | None = None) -> dict:
     payload = payload or {}
     entry = _load(session_id)
@@ -503,11 +607,15 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": "Error: state lock held — run force-unlock first", "output": "Error acquiring the state lock\n\nLock ID: fixitlab-lock\n"}
         has_instance = "aws_instance" in files.get("main.tf", "")
         has_vm = "vsphere_virtual_machine" in files.get("main.tf", "")
+        blob = "\n".join(str(v) for v in files.values() if isinstance(v, str))
+        parsed = _parse_tf_resources(blob)
+        add_n = len(parsed) if parsed else (1 if (has_instance or has_vm) else 0)
         plan = {
-            "add": 1 if (has_instance or has_vm) else 0,
+            "add": add_n,
             "change": 2 if broken.get("drift") else 0,
             "destroy": 0,
-            "summary": f"Plan: {1 if (has_instance or has_vm) else 0} to add, {2 if broken.get('drift') else 0} to change, 0 to destroy.",
+            "summary": f"Plan: {add_n} to add, {2 if broken.get('drift') else 0} to change, 0 to destroy.",
+            "cloud_links": _cloud_links_from_resources(parsed),
         }
         tf["last_plan"] = plan
         broken["plan_required"] = False
@@ -524,22 +632,26 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         broken.pop("drift", None)
         broken.pop("stale_lock", None)
         main = files.get("main.tf", "")
-        resources = []
-        if "aws_instance" in main:
-            resources.append({"type": "aws_instance", "name": "web", "status": "applied"})
-            resources.append({"type": "aws_security_group", "name": "web-sg", "status": "applied"})
-        if "vsphere_virtual_machine" in main:
-            resources.append({"type": "vsphere_virtual_machine", "name": "clone", "status": "applied"})
+        hcl_blob = "\n".join(str(v) for v in files.values() if isinstance(v, str))
+        resources = _parse_tf_resources(hcl_blob or main)
         if not resources:
+            # Preserve legacy default so empty workspaces still complete labs.
             resources = [{"type": "aws_instance", "name": "web", "status": "applied"}]
+        for r in resources:
+            r["status"] = "applied"
         tf["resources"] = resources
+        cloud_links = _mirror_apply_to_clouds(str(session_id), resources)
+        tf["cloud_links"] = cloud_links
         out = _format_apply_output(tool, tf)
+        if cloud_links:
+            providers = ", ".join(sorted(k.upper() for k, v in cloud_links.items() if v))
+            out = f"{out}\n\nCloud consoles updated: {providers}\nOpen AWS / Azure / GCP from the lab toolbar to verify."
         state["events"].insert(
             0,
             {"time": _now_iso(), "message": "Apply complete! Resources provisioned.", "severity": "success"},
         )
         _save(session_id, entry)
-        return {"ok": True, "message": "Apply complete", "output": out}
+        return {"ok": True, "message": "Apply complete", "output": out, "cloud_links": cloud_links}
 
     if action == "force_unlock":
         broken.pop("stale_lock", None)

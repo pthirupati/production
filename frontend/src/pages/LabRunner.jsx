@@ -2992,8 +2992,30 @@ export default function LabRunner() {
           {isTerraformSimLab && (
             <button
               type="button"
+              onClick={() => setShowAzureSim(true)}
+              title="Open Azure Portal — verify VMs created by Terraform apply (azurerm_*)"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(0,120,212,.5)', color: '#50b0f0', background: 'rgba(0,120,212,.12)' }}
+            >
+              <ExternalLink size={12} /> Azure Portal
+            </button>
+          )}
+          {isTerraformSimLab && (
+            <button
+              type="button"
+              onClick={() => setShowGcpSim(true)}
+              title="Open Google Cloud Console — verify instances created by Terraform apply (google_*)"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(66,133,244,.5)', color: '#8ab4f8', background: 'rgba(66,133,244,.12)' }}
+            >
+              <ExternalLink size={12} /> GCP Console
+            </button>
+          )}
+          {isTerraformSimLab && (
+            <button
+              type="button"
               onClick={() => setShowTerraformSim(true)}
-              title="Open Terraform + AWS CLI"
+              title="Open Terraform workspace IDE"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(124,58,237,.45)', color: '#a78bfa', background: 'rgba(124,58,237,.14)' }}
             >
@@ -3450,6 +3472,28 @@ export default function LabRunner() {
           scenario={scenario}
           onToggleTerminal={() => setShowAwsSim(false)}
           vmwareHref={showSimVmwareLink ? vmwareServerHref : null}
+          {...simChromeProps}
+        />
+      )}
+
+      {isTerraformSimLab && showAzureSim && (
+        <LazySimPanel
+          Sim={LazyAzureConsole}
+          label="Azure Portal"
+          sessionId={sessionId}
+          scenario={scenario}
+          onExit={() => setShowAzureSim(false)}
+          {...simChromeProps}
+        />
+      )}
+
+      {isTerraformSimLab && showGcpSim && (
+        <LazySimPanel
+          Sim={LazyGcpConsole}
+          label="GCP Console"
+          sessionId={sessionId}
+          scenario={scenario}
+          onExit={() => setShowGcpSim(false)}
           {...simChromeProps}
         />
       )}
