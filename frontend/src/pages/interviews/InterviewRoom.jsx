@@ -20,6 +20,7 @@ import {
   stopMediaStream,
   streamHasLiveTrack,
 } from '../../utils/mediaDevices'
+import { pickBackchannel } from '../../utils/interviewBackchannel'
 import InterviewVideoPreview from '../../components/interviews/InterviewVideoPreview'
 import InterviewerStage from '../../components/interviews/InterviewerStage'
 import PracticalAnswerPanel from '../../components/interviews/PracticalAnswerPanel'
@@ -164,6 +165,8 @@ export default function InterviewRoom() {
   const voiceAnswerRef = useRef(null)
   speakRef.current = speak
   cancelSpeechRef.current = cancelSpeech
+  const backchannelStateRef = useRef({})
+  const backchannelIdRef = useRef(0)
 
   const [round, setRound] = useState(null)
   const [messages, setMessages] = useState([])
@@ -1358,6 +1361,56 @@ export default function InterviewRoom() {
     // render and fight the hands-free loop.
   }, [started, preflight, observerMode, practicalMode, typingAnswer, isSpeaking, isListening, micOn])
 
+  // P2.R2 — while candidate is mid-answer (sustained interim STT), inject a soft
+  // greyed backchannel line so the call feels attended, not silent.
+  useEffect(() => {
+    if (!started || preflight || observerMode || practicalMode || typingAnswer) {
+      backchannelStateRef.current = pickBackchannel(backchannelStateRef.current, {
+        speechActive: false,
+      }).state
+      return undefined
+    }
+    const speechActive = Boolean(isListening && interimTranscript && interimTranscript.trim().length >= 8)
+    if (!speechActive) {
+      backchannelStateRef.current = pickBackchannel(backchannelStateRef.current, {
+        speechActive: false,
+      }).state
+      return undefined
+    }
+    const tick = () => {
+      const { cue, state } = pickBackchannel(backchannelStateRef.current, {
+        speechActive: true,
+      })
+      backchannelStateRef.current = state
+      if (!cue) return
+      backchannelIdRef.current += 1
+      const id = `bc-${backchannelIdRef.current}`
+      setMessages((prev) => [
+        ...prev,
+        {
+          id,
+          role: 'interviewer',
+          content: cue,
+          message_type: 'backchannel',
+          metadata: { backchannel: true },
+        },
+      ])
+      // Soft low-volume cue via browser TTS — never barge the candidate's pickup.
+      if (!interviewerMutedRef.current && typeof window !== 'undefined' && window.speechSynthesis) {
+        try {
+          const u = new SpeechSynthesisUtterance(cue)
+          u.volume = 0.22
+          u.rate = 0.95
+          u.pitch = 1.0
+          window.speechSynthesis.speak(u)
+        } catch { /* ignore */ }
+      }
+    }
+    const id = setInterval(tick, 1200)
+    tick()
+    return () => clearInterval(id)
+  }, [started, preflight, observerMode, practicalMode, typingAnswer, isListening, interimTranscript])
+
   const startRecording = (stream) => {
     if (!stream || !window.MediaRecorder) return
     try {
@@ -1632,17 +1685,21 @@ export default function InterviewRoom() {
             <div
               key={m.id}
               className={`text-xs rounded-lg p-2 border ${
-                m.role === 'interviewer'
+                m.message_type === 'backchannel' || m.metadata?.backchannel
+                  ? 'bg-transparent border-transparent text-surface-500 italic ml-2 py-0.5'
+                  : m.role === 'interviewer'
                   ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-100'
                   : m.role === 'candidate'
                     ? 'bg-surface-900 border-surface-800 text-surface-200 ml-6'
                     : 'bg-amber-500/10 border-amber-500/20 text-amber-200 text-center'
               }`}
             >
+              {!(m.message_type === 'backchannel' || m.metadata?.backchannel) && (
               <span className="text-[10px] uppercase opacity-60">
                 {m.metadata?.admin_host ? (m.metadata?.asked_by || 'host') : m.role}
               </span>
-              <p className="mt-0.5 whitespace-pre-wrap">{m.content}</p>
+              )}
+              <p className={`mt-0.5 whitespace-pre-wrap ${m.message_type === 'backchannel' || m.metadata?.backchannel ? 'text-[11px] opacity-70' : ''}`}>{m.content}</p>
               {m.score != null && (
                 <p className="text-[10px] text-surface-500 mt-1">
                   Score: {Math.round(m.score)}
@@ -2468,15 +2525,19 @@ export default function InterviewRoom() {
               <div
                 key={m.id}
                 className={`text-xs rounded-lg p-2 ${
-                  m.role === 'interviewer'
+                  m.message_type === 'backchannel' || m.metadata?.backchannel
+                    ? 'bg-transparent text-surface-500 italic ml-2 py-0.5'
+                    : m.role === 'interviewer'
                     ? 'bg-indigo-500/10 border border-indigo-500/20 text-indigo-100'
                     : m.role === 'candidate'
                       ? 'bg-surface-800 text-surface-200 ml-4'
                       : 'bg-amber-500/10 text-amber-200 text-center'
                 }`}
               >
-                <span className="text-[10px] uppercase opacity-60">{m.role}</span>
-                <p className="mt-0.5 whitespace-pre-wrap">{m.content}</p>
+                {!(m.message_type === 'backchannel' || m.metadata?.backchannel) && (
+                  <span className="text-[10px] uppercase opacity-60">{m.role}</span>
+                )}
+                <p className={`mt-0.5 whitespace-pre-wrap ${m.message_type === 'backchannel' || m.metadata?.backchannel ? 'text-[11px] opacity-70' : ''}`}>{m.content}</p>
                 {m.score != null && (
                   <p className="text-[10px] text-surface-500 mt-1">Score: {m.score}</p>
                 )}

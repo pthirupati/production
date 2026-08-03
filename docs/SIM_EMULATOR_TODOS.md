@@ -317,7 +317,7 @@ Track as waves; mark `[~]`/`[x]` when a 20-pack lands. Each tech needs: brand co
 Rule-based only (`interview_ai.py` + `services/conversation/` + new `services/realism/`). No paid LLM/STT/TTS.
 
 197. [x] **P2.R1** Response-timing model (`realism/timing.py`) — think-time + jitter + "persona is typing"
-198. [ ] **P2.R2** Backchannel layer (`realism/backchannel.py`) — live mm-hmm/okay off interim STT
+198. [x] **P2.R2** Backchannel layer (`realism/backchannel.py`) — live mm-hmm/okay off interim STT
 199. [ ] **P2.R3** Lab narration — real-time reactions to streamed commands (needs P2.4)
 200. [ ] **P2.R4** Wrong-answer probing state machine (narrow → hint → graceful move-on)
 201. [ ] **P2.R5** Callback memory → phrasing (in-round + cross-round from prior report)
