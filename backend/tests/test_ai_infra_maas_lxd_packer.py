@@ -75,6 +75,22 @@ class AiInfraMaasLxdPackerTests(SimpleTestCase):
         self.assertIn("eth1", out)
         self.assertIn("pxe", out.lower())
 
+    def test_vyos_configure_commit_rollback(self):
+        engine = UnifiedSimulationEngine(
+            scenario_slug="academy-ai-infra-007-automation-pxe",
+            simulation_type="baremetal",
+        )
+        self.assertIn("[edit]", str(engine.shell.run("configure")))
+        self.assertEqual(str(engine.shell.run("set interfaces ethernet eth2 address 10.64.99.1/24")).strip(), "")
+        commit = str(engine.shell.run("commit"))
+        self.assertIn("Commit complete", commit)
+        conf = str(engine.shell.run("show configuration"))
+        self.assertIn("eth2", conf)
+        rb = str(engine.shell.run("rollback 1"))
+        self.assertIn("Rollback complete", rb)
+        conf2 = str(engine.shell.run("show configuration"))
+        self.assertNotIn("# set interfaces ethernet eth2", conf2)
+
     def test_maas_commission_streams_pxe_steps(self):
         engine = UnifiedSimulationEngine(
             scenario_slug="ai-infra-maas-commission-h100",

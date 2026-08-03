@@ -213,6 +213,9 @@ export default function TerraformWorkspaceIde({
     if (key === 'aws') setBottomTab('console')
     else if (key === 'azure') setBottomTab('azure')
     else if (key === 'gcp') setBottomTab('gcp')
+    else if (key === 'vmware' && sessionId) {
+      window.open(`/vmware/${sessionId}?scenario=${scenario?.slug || ''}`, '_blank', 'noopener,noreferrer')
+    }
   }
 
   const bottomContent = () => {
@@ -377,7 +380,7 @@ export default function TerraformWorkspaceIde({
               <Terminal size={11} /> {cmd}
             </button>
           ))}
-          {(cloudLinks.aws || cloudLinks.azure || cloudLinks.gcp) && (
+          {(cloudLinks.aws || cloudLinks.azure || cloudLinks.gcp || cloudLinks.vmware) && (
             <div className="flex items-center gap-1 ml-1">
               <span className="text-[10px] text-[var(--vsc-muted)]">Open Cloud:</span>
               {cloudLinks.aws && (
@@ -393,6 +396,11 @@ export default function TerraformWorkspaceIde({
               {cloudLinks.gcp && (
                 <button type="button" onClick={() => openCloud('gcp')} className="vsc-btn text-[10px]" style={{ borderColor: '#4285f4', color: '#8ab4f8' }}>
                   <ExternalLink size={11} /> GCP
+                </button>
+              )}
+              {cloudLinks.vmware && (
+                <button type="button" onClick={() => openCloud('vmware')} className="vsc-btn text-[10px]" style={{ borderColor: '#71afe5', color: '#71afe5' }}>
+                  <ExternalLink size={11} /> VMware
                 </button>
               )}
             </div>

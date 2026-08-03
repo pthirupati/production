@@ -66,6 +66,7 @@ const TECH_TUTORIAL_TOPICS = {
   sqlite: ['SQLite'],
   database: ['Database'],
   gpu: ['GPU'],
+  'ai-infra': ['AI Infrastructure', 'AI Infra', 'MAAS', 'GPU'],
   baremetal: ['Bare Metal'],
   'ai-ml': ['AI', 'AI / ML'],
   'data-science': ['Data Science'],

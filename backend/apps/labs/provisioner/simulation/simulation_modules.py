@@ -2053,6 +2053,63 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
 
     def handler(parts, line):
         low = line.strip().lower()
+        slug = (engine.scenario_slug or "").lower()
+        vyos_lab = any(k in slug for k in ("vyos", "ai-infra", "pxe", "maas", "underlay", "bgp"))
+        vyos_cmds = (
+            low in ("configure", "commit", "rollback", "exit")
+            or low.startswith("configure ")
+            or low.startswith("commit ")
+            or low.startswith("rollback")
+            or low.startswith("set ")
+            or low.startswith("delete ")
+            or low.startswith("show conf")
+            or low.startswith("show configuration")
+            or low.startswith("show ip bgp")
+            or low.startswith("show protocols")
+            or low.startswith("show interfaces")
+            or low.startswith("show dhcp")
+        )
+        if vyos_lab and vyos_cmds:
+            if engine.networking is None:
+                engine.networking = NetworkingState(engine.scenario_slug)
+            net = engine.networking
+            if low == "configure" or low.startswith("configure "):
+                return net.vyos_enter_configure()
+            if low == "exit" and net.vyos_configure_mode:
+                return net.vyos_exit_configure()
+            if low == "commit" or low.startswith("commit "):
+                return net.vyos_commit()
+            if low.startswith("rollback"):
+                parts_r = line.strip().split()
+                steps = 1
+                if len(parts_r) > 1 and parts_r[1].lstrip("-").isdigit():
+                    steps = abs(int(parts_r[1]))
+                return net.vyos_rollback(steps)
+            if low.startswith("set "):
+                return net.vyos_set(line.strip()[4:].strip())
+            if low.startswith("delete "):
+                return net.vyos_delete(line.strip()[7:].strip())
+            if "show conf" in low or "configuration" in low:
+                cand = "candidate" in low or net.vyos_configure_mode
+                return net.vyos_show_config(candidate=cand)
+            if "show ip bgp" in low or "show protocols bgp" in low or "bgp summary" in low:
+                return net.bgp_summary()
+            if "show interfaces" in low:
+                return (
+                    "Codes: S - State, L - Link, u - Up, D - Down, A - Admin Down\n"
+                    "Interface        IP Address                        S/L  Description\n"
+                    "eth0             10.64.1.1/24                      u/u  management\n"
+                    "eth1             10.64.12.1/24                     u/u  pxe-provision\n"
+                    "eth1.100         10.64.100.1/24                    u/u  gpu-fabric\n"
+                    "lo               127.0.0.1/8                       u/u"
+                )
+            if "show dhcp" in low:
+                return (
+                    "IP address    Hardware address    Lease expiration     Pool      Client Name\n"
+                    "10.64.12.11   a4:bb:6d:aa:01:01   2026/08/01 12:00:00  pxe-pool  gpu-node-01\n"
+                    "10.64.12.12   a4:bb:6d:aa:01:02   2026/08/01 12:00:00  pxe-pool  gpu-node-02"
+                )
+
         bare_tools = (
             "ipmitool", "dmidecode", "esxcli", "maas", "lxc", "lxd", "virsh",
             "packer", "vyos", "vyatta",
@@ -2330,9 +2387,13 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                 "    validate        check template validity\n"
                 "    fmt             reformat HCL2 config"
             )
-        if low.startswith("vyos") or low.startswith("vyatta") or low.startswith("show ") and "vyos" in slug:
-            # Minimal VyOS-ish networking for PXE underlay labs
-            if "show interfaces" in low or "interfaces" in low:
+        if low.startswith("vyos") or low.startswith("vyatta"):
+            if engine.networking is None:
+                engine.networking = NetworkingState(engine.scenario_slug)
+            net = engine.networking
+            rest = line.strip().split(None, 1)
+            sub = rest[1].strip().lower() if len(rest) > 1 else ""
+            if "show interfaces" in sub or sub == "interfaces":
                 return (
                     "Codes: S - State, L - Link, u - Up, D - Down, A - Admin Down\n"
                     "Interface        IP Address                        S/L  Description\n"
@@ -2341,32 +2402,20 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                     "eth1.100         10.64.100.1/24                    u/u  gpu-fabric\n"
                     "lo               127.0.0.1/8                       u/u"
                 )
-            if "show dhcp" in low or "dhcp" in low:
+            if "show dhcp" in sub or "dhcp" in sub:
                 return (
                     "IP address    Hardware address    Lease expiration     Pool      Client Name\n"
                     "10.64.12.11   a4:bb:6d:aa:01:01   2026/08/01 12:00:00  pxe-pool  gpu-node-01\n"
                     "10.64.12.12   a4:bb:6d:aa:01:02   2026/08/01 12:00:00  pxe-pool  gpu-node-02"
                 )
-            if "show conf" in low or "configuration" in low:
-                return (
-                    "interfaces {\n"
-                    "    ethernet eth1 {\n"
-                    "        address 10.64.12.1/24\n"
-                    "        description pxe-provision\n"
-                    "    }\n"
-                    "}\nservice {\n"
-                    "    dhcp-server {\n"
-                    "        shared-network-name pxe {\n"
-                    "            subnet 10.64.12.0/24 {\n"
-                    "                default-router 10.64.12.1\n"
-                    "                bootfile-name undionly.kpxe\n"
-                    "                bootfile-server 10.64.1.2\n"
-                    "            }\n"
-                    "        }\n"
-                    "    }\n"
-                    "}"
-                )
-            return "VyOS OK — try: show interfaces / show dhcp server leases / show configuration"
+            if "show conf" in sub or "configuration" in sub:
+                return net.vyos_show_config(candidate=False)
+            if "bgp" in sub:
+                return net.bgp_summary()
+            return (
+                "VyOS OK — try: configure / set … / commit / rollback / "
+                "show interfaces / show dhcp server leases / show configuration / show ip bgp summary"
+            )
         return f"{line}: OK"
     shell.register_handler(handler)
 

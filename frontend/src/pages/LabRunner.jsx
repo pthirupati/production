@@ -3017,6 +3017,18 @@ export default function LabRunner() {
             </button>
           )}
           {isTerraformSimLab && (
+            <Link
+              to={`/vmware/${sessionId}?scenario=${scenario?.slug || ''}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open VMware vSphere — verify VMs created by Terraform apply (vsphere_*)"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(113,175,229,.5)', color: '#71afe5', background: 'rgba(113,175,229,.12)' }}
+            >
+              <ExternalLink size={12} /> Open VMware
+            </Link>
+          )}
+          {isTerraformSimLab && (
             <button
               type="button"
               onClick={() => setShowTerraformSim(true)}

@@ -111,6 +111,8 @@ const ICONS = {
 /** Map alternative / legacy slugs to a canonical icon key. */
 const SLUG_ALIASES = {
   databases: 'database',
+  'ai-infra': 'gpu',
+  'ai-infrastructure': 'gpu',
   'gpu-nvidia': 'gpu',
   nvidia: 'gpu',
   terraform: 'devops',
