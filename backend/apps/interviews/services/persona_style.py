@@ -154,26 +154,25 @@ def thinking_delay_ms(
     question_kind: str = "",
     category: str = "",
     persona_voice_id: str = "",
+    answer_text: str = "",
+    next_move: str = "",
+    scoring_elapsed_ms: float | None = None,
+    rng: random.Random | None = None,
 ) -> int:
-    """Adaptive pre-speech pause — harder / design questions get a longer beat."""
-    style = get_persona_style(round_type)
-    s = style["speech"]
-    base = int(s["thinking_base_ms"])
-    diff = int(s["thinking_per_difficulty"]) * max(0, int(difficulty or 2) - 1)
-    extra = 0
-    if category == "system_design":
-        extra += 220
-    if question_kind in ("cross", "drill"):
-        extra += 160
-    elif question_kind == "behavioral":
-        extra += 40
-    elif question_kind == "intro":
-        extra -= 120
-    # Slightly longer think for staff/deep-dive personas even at same difficulty.
-    if round_type in ("deep_dive", "leadership"):
-        extra += 80
-    delay = base + diff + extra
-    return max(180, min(1400, delay))
+    """Adaptive pre-speech pause — P2.R1 realism timing (jitter, length, probes)."""
+    from apps.interviews.services.realism.timing import thinking_delay_from_legacy_kwargs
+
+    return thinking_delay_from_legacy_kwargs(
+        round_type,
+        difficulty=difficulty,
+        question_kind=question_kind,
+        category=category,
+        persona_voice_id=persona_voice_id,
+        answer_text=answer_text,
+        next_move=next_move,
+        scoring_elapsed_ms=scoring_elapsed_ms,
+        rng=rng,
+    )
 
 
 def persona_ack(round_type: str, used: set[str], rng: random.Random) -> str:

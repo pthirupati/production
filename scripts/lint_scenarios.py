@@ -149,7 +149,85 @@ def lint_file(path: Path) -> list[str]:
         if not lab_servers:
             errors.append("hero scenario missing `lab_servers` (scenario-scoped hosts)")
 
+    # Environment resolver consistency (wrong Hosted-as / missing IDE / companion).
+    errors.extend(_env_resolver_errors(data, path))
+
     return errors
+
+
+# Technology folder / field → expected primary surfaces
+_CODING_TECHS = frozenset({
+    "javascript", "react", "java", "html", "shell-script", "nodejs", "typescript", "python",
+})
+_CLOUD_SIM = {
+    "aws": "aws",
+    "azure": "azure",
+    "gcp": "gcp",
+    "openstack": "openstack",
+    "vmware": "vmware",
+    "datacenter": "datacenter",
+    "ansible": "awx",
+    "ansible-awx": "awx",
+}
+
+
+def _norm_list(val) -> list[str]:
+    if not isinstance(val, list):
+        return []
+    return [str(x).strip().lower() for x in val if str(x).strip()]
+
+
+def _env_resolver_errors(data: dict, path: Path) -> list[str]:
+    """Catch mismatches that put learners in the wrong console (VMware-on-DC, etc.)."""
+    errs: list[str] = []
+    tech_dir = path.parent.parent.name.lower()
+    sim = str(data.get("simulation_type") or "").strip().lower()
+    hosted = str(data.get("hosted_as") or "").strip().lower()
+    consoles = _norm_list(data.get("consoles") or data.get("lab_consoles"))
+    vmware_link = data.get("vmware_link") is True
+    coding_mode = bool(data.get("coding_mode"))
+    tech_field = str(data.get("technology") or "").strip().lower()
+
+    if vmware_link:
+        if hosted and hosted not in ("vmware", "esxi", "vsphere"):
+            errs.append(
+                f"`vmware_link: true` but hosted_as={hosted!r} (expected vmware)"
+            )
+        if hosted == "datacenter":
+            errs.append("`vmware_link: true` must not use hosted_as=datacenter")
+
+    # simulation_type cloud/DC should agree with hosted_as when both set
+    if sim in _CLOUD_SIM and hosted:
+        expect = _CLOUD_SIM[sim]
+        # baremetal GPU labs may host as baremetal while sim=gpu — allow
+        if sim not in ("gpu", "generic", "rhel") and hosted not in (expect, sim, "baremetal", "linux"):
+            # Soft: only flag clear cloud↔wrong-cloud conflicts
+            cloud_hosts = {"aws", "azure", "gcp", "openstack", "vmware", "datacenter"}
+            if hosted in cloud_hosts and expect in cloud_hosts and hosted != expect:
+                errs.append(
+                    f"simulation_type={sim!r} conflicts with hosted_as={hosted!r}"
+                )
+
+    # Coding techs need coding_mode (IDE) — only when they already declare consoles
+    # (avoids mass-failing older packs that still rely on LabRunner heuristics).
+    slug = str(data.get("slug") or path.parent.name)
+    is_academy = slug.startswith("academy-")
+    if consoles and (tech_dir in _CODING_TECHS or any(t in tech_field for t in _CODING_TECHS)):
+        if is_academy and not coding_mode and "coding" not in consoles:
+            errs.append(
+                "coding technology academy lab with consoles missing `coding_mode: true`"
+            )
+
+    # Ansible labs should expose AWX companion when consoles declared
+    if tech_dir in ("ansible",) or "ansible" in tech_field:
+        if consoles and "awx" not in consoles and "ansible" not in consoles:
+            errs.append("ansible lab declares consoles but omits `awx`")
+
+    # AWS sim without aws console when consoles list present
+    if sim == "aws" and consoles and "aws" not in consoles:
+        errs.append("simulation_type=aws but consoles omit `aws`")
+
+    return errs
 
 
 def iter_scenario_files(paths: list[Path]) -> list[Path]:

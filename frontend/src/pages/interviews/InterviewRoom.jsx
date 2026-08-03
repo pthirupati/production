@@ -1148,11 +1148,18 @@ export default function InterviewRoom() {
     bargedInRef.current = false
     const sp = speechProfileRef.current
     if (thinking) {
-      const base = thinkingDelayMs ?? sp?.thinking_base_ms ?? 400
-      const jitter = 120 + Math.random() * 200
+      // Server already includes ±15% jitter (P2.R1). Only add client jitter when
+      // the API omitted thinking_delay_ms (older payloads / start-round).
+      let delay
+      if (thinkingDelayMs != null && Number.isFinite(Number(thinkingDelayMs))) {
+        delay = Math.max(500, Number(thinkingDelayMs))
+      } else {
+        const base = sp?.thinking_base_ms ?? 600
+        delay = Math.max(500, base + 120 + Math.random() * 200)
+      }
       setIsThinking(true)
-      setAiCaption(`${round?.persona_name || 'Interviewer'} is thinking…`)
-      await new Promise(r => setTimeout(r, base + jitter))
+      setAiCaption(`${round?.persona_name || 'Interviewer'} is typing…`)
+      await new Promise(r => setTimeout(r, delay))
       setIsThinking(false)
     }
     setAiCaption(text)

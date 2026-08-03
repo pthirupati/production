@@ -231,7 +231,7 @@ Update this file as items complete. Keep internal code names (`*Simulator`, `sim
 136. [ ] Surface `useSimSession.error` in Datacenter/AWS shells (403/API fail ≠ silent empty)
 137. [ ] Jira @team mentions: verify `JIRA_SIMULATION_MODE` in prod; coach reply when mention parse fails; E2E mention → bot → disk appears
 138. [ ] Theme/contrast pass: Windows + light portals — no white-on-white; brand-accurate colors per tech
-139. [ ] Lint: `vmware_link` ⇒ `hosted_as=vmware`; coding techs must set `coding_mode`; forbid unknown sim types after normalize
+139. [~] Lint: `vmware_link` ⇒ `hosted_as=vmware`; coding techs must set `coding_mode`; forbid unknown sim types after normalize
 
 ---
 
@@ -316,12 +316,12 @@ Track as waves; mark `[~]`/`[x]` when a 20-pack lands. Each tech needs: brand co
 
 Rule-based only (`interview_ai.py` + `services/conversation/` + new `services/realism/`). No paid LLM/STT/TTS.
 
-197. [ ] **P2.R1** Response-timing model (`realism/timing.py`) — think-time + jitter + "persona is typing"
+197. [x] **P2.R1** Response-timing model (`realism/timing.py`) — think-time + jitter + "persona is typing"
 198. [ ] **P2.R2** Backchannel layer (`realism/backchannel.py`) — live mm-hmm/okay off interim STT
 199. [ ] **P2.R3** Lab narration — real-time reactions to streamed commands (needs P2.4)
 200. [ ] **P2.R4** Wrong-answer probing state machine (narrow → hint → graceful move-on)
 201. [ ] **P2.R5** Callback memory → phrasing (in-round + cross-round from prior report)
-202. [ ] **P2.R6** Small-talk framing beats (2–3 turn open/close)
+202. [~] **P2.R6** Small-talk framing beats (beats stored on round start; two-way UI still open)
 203. [ ] **P2.R7** Phrasing variety / disfluency guard
 204. [ ] **P2.1** Fix browser voice loop + in-room voice switcher
 205. [ ] **P2.2** Barge-in + skip-on-silence
@@ -375,7 +375,7 @@ Learner-facing UI never says simulation/demo/mock.
 233. [ ] Coding IDEs for all language techs + HTML preview (finish 176)
 234. [ ] PeopleSoft app-server host persona (not generic EC2) (finish 175)
 235. [ ] SOC/SIEM events tied to twin assets (finish 172)
-236. [ ] Environment resolver CI: every scenario opens correct primary console + companions
+236. [~] Environment resolver CI: every scenario opens correct primary console + companions
 
 ### S6 — Interview realism (see §R)
 237. [ ] Ship P2.R1–R7 before paid STT; keep 100% free constraint

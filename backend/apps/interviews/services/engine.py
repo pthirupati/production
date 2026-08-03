@@ -200,11 +200,25 @@ def start_round(round_obj: InterviewRound) -> dict:
         round_obj.save(update_fields=["metadata", "difficulty_level"])
     except Exception:  # noqa: BLE001 - planning is best-effort, never fatal
         pass
-    # Seed conversation memory for cross-turn intelligence.
+    # Seed conversation memory for cross-turn intelligence + P2.R6 framing beats.
     try:
         conv = _conversation_meta(round_obj)
+        dirty = False
         if "memory" not in conv:
             conv["memory"] = empty_memory()
+            dirty = True
+        if "framing_beats" not in conv:
+            from apps.interviews.services.realism.framing import (
+                framing_beat_sequence,
+                framing_signoff,
+            )
+
+            conv["framing_beats"] = framing_beat_sequence(
+                duration_minutes=round_obj.duration_minutes or 45,
+            )
+            conv["framing_signoff"] = framing_signoff()
+            dirty = True
+        if dirty:
             round_obj.save(update_fields=["metadata"])
     except Exception:  # noqa: BLE001
         pass
@@ -527,7 +541,15 @@ def _recent_tail(round_obj: InterviewRound, limit: int = 6) -> list[dict]:
     )
 
 
-def _speech_hints_for_round(round_obj: InterviewRound, next_q=None, *, question_meta: dict | None = None) -> dict:
+def _speech_hints_for_round(
+    round_obj: InterviewRound,
+    next_q=None,
+    *,
+    question_meta: dict | None = None,
+    answer_text: str = "",
+    next_move: str = "",
+    scoring_elapsed_ms: float | None = None,
+) -> dict:
     """Persona speech cadence + adaptive thinking delay for the frontend TTS layer."""
     from apps.interviews.services.persona_style import speech_profile, thinking_delay_ms
 
@@ -540,18 +562,22 @@ def _speech_hints_for_round(round_obj: InterviewRound, next_q=None, *, question_
     tone = memory.get("tone") or "neutral"
 
     profile = speech_profile(round_obj.round_type, round_obj.persona_voice_id or "")
+    move = next_move or ("reprompt" if meta.get("reprompt") else "")
     delay = thinking_delay_ms(
         round_obj.round_type,
         difficulty=int(difficulty),
         question_kind=str(meta.get("kind") or ""),
         category=str(meta.get("category") or ""),
         persona_voice_id=round_obj.persona_voice_id or "",
+        answer_text=answer_text or "",
+        next_move=move,
+        scoring_elapsed_ms=scoring_elapsed_ms,
     )
     if tone == "nervous":
-        delay = max(180, int(delay * 0.75))
+        delay = max(500, int(delay * 0.85))
         profile = {**profile, "rate": round(max(0.88, profile.get("rate", 0.96) - 0.04), 2)}
     elif tone == "confident":
-        delay = min(1400, int(delay * 1.08))
+        delay = min(3500, int(delay * 1.08))
     return {"speech_profile": profile, "thinking_delay_ms": delay, "candidate_tone": tone}
 
 
@@ -797,7 +823,11 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         last_q_difficulty = last_q_msg.metadata.get("difficulty") or last_q_difficulty
     meta["question_category"] = last_q_category
 
+    from apps.interviews.services.realism.timing import wall_ms
+
+    _score_t0 = wall_ms()
     score_result = score_answer(question, answer_text, meta)
+    _scoring_elapsed_ms = wall_ms() - _score_t0
     score_result["question_category"] = last_q_category
     score_result["question_kind"] = last_q_kind
     score_result["question_difficulty"] = last_q_difficulty
@@ -932,7 +962,11 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
                 "category": last_q_category,
                 "kind": last_q_kind,
                 "difficulty": last_q_difficulty,
+                "reprompt": True,
             },
+            answer_text=answer_text,
+            next_move="reprompt",
+            scoring_elapsed_ms=_scoring_elapsed_ms,
         )
         return {
             "candidate_message": cand_msg,
@@ -993,7 +1027,12 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
     )
 
     coaching = _maybe_coaching(round_obj, meta, score_result, answer_text)
-    hints = _speech_hints_for_round(round_obj, next_q)
+    hints = _speech_hints_for_round(
+        round_obj,
+        next_q,
+        answer_text=answer_text,
+        scoring_elapsed_ms=_scoring_elapsed_ms,
+    )
 
     return {
         "candidate_message": cand_msg,
