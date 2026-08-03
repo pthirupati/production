@@ -218,6 +218,50 @@ EXTENDED_TOPIC_SNIPPETS: dict[str, dict[str, str]] = {
     "smart": {"label": "SMART disk health", "concept": "SMART attributes and predictive failure", "inspect": "`smartctl -a` output", "symptom": "a disk is failing silently", "verify": "SMART status is healthy or failing disks are flagged"},
     "console": {"label": "serial/remote console", "concept": "out-of-band console access", "inspect": "console redirection settings", "symptom": "no console access during boot failures", "verify": "the remote console is reachable"},
 
+    # ── AI Infrastructure Engineering ──
+    "maas": {
+        "label": "MAAS commissioning and deployment",
+        "concept": "machine enlistment, commissioning scripts, PXE, and Deployed status",
+        "inspect": "MAAS machine status, commissioning output, and BMC power actions",
+        "symptom": "nodes stuck in New/Failed commissioning or never reach Deployed",
+        "verify": "the machine commissions cleanly and deploys the approved Ubuntu image",
+    },
+    "lxd": {
+        "label": "LXD containers and VMs",
+        "concept": "LXD projects, profiles, storage pools, and GPU passthrough",
+        "inspect": "`lxc list`, `lxc profile show`, and `lxc config device show`",
+        "symptom": "LXD instances fail to start or cannot see GPUs",
+        "verify": "instances are Running with the expected devices and profiles",
+    },
+    "rocm": {
+        "label": "AMD ROCm / rocm-smi",
+        "concept": "ROCm runtime, amdgpu drivers, and rocm-smi / amd-smi telemetry",
+        "inspect": "`rocm-smi`, `amd-smi list`, and `rocminfo`",
+        "symptom": "AMD GPUs are missing, hung, or ROCm jobs cannot attach devices",
+        "verify": "rocm-smi lists healthy GPUs and a sample ROCm workload runs",
+    },
+    "chassis": {
+        "label": "chassis and tray replacement",
+        "concept": "DCOps RMA, SXM tray/chassis swap, cable reseat, and post-swap validation",
+        "inspect": "Datacenter twin rack view, BMC sensors, and nvidia-smi / dcgmi after swap",
+        "symptom": "a GPU tray or chassis needs replacement after thermal or PCIe failure",
+        "verify": "all GPUs enumerate, thermals are nominal, and DCGM diagnostics pass",
+    },
+    "packer": {
+        "label": "Packer GPU image factory",
+        "concept": "Packer builds, GitHub Actions, upstream base images, and vulnerability remediation",
+        "inspect": "Packer HCL, CI workflow logs, and image SBOM/CVE scan output",
+        "symptom": "custom H100/H200 images fail to build or ship with known CVEs",
+        "verify": "Packer builds succeed and the published image passes CVE gates",
+    },
+    "nccl": {
+        "label": "NCCL multi-GPU collectives",
+        "concept": "NCCL topology, NVLink/PCIe paths, and all-reduce health",
+        "inspect": "`nvidia-smi topo -m`, NCCL_DEBUG logs, and dcgmi / nccl-tests",
+        "symptom": "multi-GPU training hangs or shows wrong interconnect topology",
+        "verify": "NCCL tests complete and topology matches the expected fabric",
+    },
+
     # ── Nmap ──
     "tcp-scan": {"label": "TCP scanning", "concept": "SYN/connect scans and port states", "inspect": "`nmap -sS/-sT --reason`", "symptom": "an accurate port inventory is needed", "verify": "results match expected exposure"},
     "udp-scan": {"label": "UDP scanning", "concept": "UDP probes and open|filtered states", "inspect": "`nmap -sU` with timing tuning", "symptom": "UDP services are missed or ambiguous", "verify": "open UDP services are identified"},

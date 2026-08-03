@@ -185,9 +185,19 @@ def register_modules(engine: "UnifiedSimulationEngine", shell: RHELShell | None 
     """Register command handlers — generic gets ALL modules; others get RHEL + their tech."""
     sh = shell or engine.shell
     sim_type = engine.simulation_type
+    slug = (getattr(engine, "scenario_slug", "") or "").lower()
 
     # Every simulation includes full RHEL; generic enables all tech stacks
     modules = _modules_for_type(sim_type)
+    # AI Infra labs span MAAS/LXD/Packer/VyOS (baremetal) + GPU CLI + AWX — pull
+    # the complementary modules in so commission/build/GPU commands all work on
+    # the same Lab Terminal regardless of primary simulation_type.
+    if "ai-infra" in slug or slug.startswith("academy-ai-infra"):
+        modules |= {"baremetal", "gpu"}
+        if "awx" in slug or "ansible" in slug:
+            modules.add("ansible")
+    elif any(k in slug for k in ("maas", "lxd", "packer", "vyos", "pxe", "bmc")):
+        modules.add("baremetal")
     if "gpu" in modules:
         _register_gpu(engine, sh)
     if "kubernetes" in modules:
@@ -228,22 +238,126 @@ def _modules_for_type(sim_type: str) -> set[str]:
     return {sim_type, "docker"} if sim_type == "rhel" else {sim_type}
 
 
-# Datacenter GPU box the sim models: an 8x NVIDIA H100 80GB HBM3 SXM node
-# (driver 550.90.07 / CUDA 12.4). Kept consistent across nvidia-smi, nvidia-smi
-# -q, and dcgmi so a learner never sees the model/count/driver disagree.
+# Datacenter GPU profiles. Default is 8× H100 SXM; scenario slug can select
+# H200 / B300 / A100 / MI300X so labs match the ticket hardware.
 _SMI_DRIVER = "550.90.07"
 _SMI_CUDA = "12.4"
 _SMI_GPU_NAME = "NVIDIA H100 80GB HBM3"
 _SMI_GPU_COUNT = 8
 _SMI_MEM_TOTAL_MIB = 81559  # H100 80GB reports 81559 MiB in nvidia-smi
+_SMI_ARCH = "Hopper"
+_SMI_PCI_ID = "GH100"
+_SMI_PWR_CAP = 700
+
+_GPU_SKUS: dict[str, dict] = {
+    "h100": {
+        "name": "NVIDIA H100 80GB HBM3",
+        "count": 8,
+        "mem_mib": 81559,
+        "arch": "Hopper",
+        "pci": "GH100",
+        "pwr_cap": 700,
+        "driver": "550.90.07",
+        "cuda": "12.4",
+        "vendor": "nvidia",
+    },
+    "h200": {
+        "name": "NVIDIA H200 141GB HBM3e",
+        "count": 8,
+        "mem_mib": 143771,
+        "arch": "Hopper",
+        "pci": "GH100",
+        "pwr_cap": 700,
+        "driver": "550.90.07",
+        "cuda": "12.4",
+        "vendor": "nvidia",
+    },
+    "b300": {
+        "name": "NVIDIA B300",
+        "count": 8,
+        "mem_mib": 196608,
+        "arch": "Blackwell",
+        "pci": "GB300",
+        "pwr_cap": 1200,
+        "driver": "570.86.15",
+        "cuda": "12.8",
+        "vendor": "nvidia",
+    },
+    "a100": {
+        "name": "NVIDIA A100-SXM4-80GB",
+        "count": 8,
+        "mem_mib": 81920,
+        "arch": "Ampere",
+        "pci": "GA100",
+        "pwr_cap": 400,
+        "driver": "535.161.08",
+        "cuda": "12.2",
+        "vendor": "nvidia",
+    },
+    "l40s": {
+        "name": "NVIDIA L40S",
+        "count": 4,
+        "mem_mib": 46068,
+        "arch": "Ada",
+        "pci": "AD102",
+        "pwr_cap": 350,
+        "driver": "550.90.07",
+        "cuda": "12.4",
+        "vendor": "nvidia",
+    },
+    "mi300x": {
+        "name": "AMD Instinct MI300X",
+        "count": 8,
+        "mem_mib": 196592,
+        "arch": "CDNA3",
+        "pci": "gfx942",
+        "pwr_cap": 750,
+        "driver": "6.2.0",
+        "cuda": "",
+        "vendor": "amd",
+    },
+}
+
+
+def _resolve_gpu_sku(scenario_slug: str) -> dict:
+    """Pick GPU SKU from scenario slug keywords; default H100 SXM8."""
+    low = (scenario_slug or "").lower().replace("_", "-")
+    if "b300" in low:
+        return dict(_GPU_SKUS["b300"])
+    if "h200" in low:
+        return dict(_GPU_SKUS["h200"])
+    if "l40s" in low or "l40" in low:
+        return dict(_GPU_SKUS["l40s"])
+    if "a100" in low:
+        return dict(_GPU_SKUS["a100"])
+    if "mi300" in low or "rocm" in low or ("amd" in low and "nvidia" not in low):
+        return dict(_GPU_SKUS["mi300x"])
+    if "h100" in low:
+        return dict(_GPU_SKUS["h100"])
+    return dict(_GPU_SKUS["h100"])
+
+
+def _apply_gpu_sku_globals(sku: dict) -> None:
+    """Bind module-level nvidia-smi constants for render helpers (per-handler)."""
+    global _SMI_GPU_NAME, _SMI_GPU_COUNT, _SMI_MEM_TOTAL_MIB, _SMI_ARCH
+    global _SMI_PCI_ID, _SMI_PWR_CAP, _SMI_DRIVER, _SMI_CUDA
+    _SMI_GPU_NAME = sku["name"]
+    _SMI_GPU_COUNT = int(sku["count"])
+    _SMI_MEM_TOTAL_MIB = int(sku["mem_mib"])
+    _SMI_ARCH = sku["arch"]
+    _SMI_PCI_ID = sku["pci"]
+    _SMI_PWR_CAP = int(sku["pwr_cap"])
+    _SMI_DRIVER = sku.get("driver") or _SMI_DRIVER
+    if sku.get("cuda"):
+        _SMI_CUDA = sku["cuda"]
 
 
 def _render_nvidia_smi_table() -> str:
-    """Render the modern (driver 5xx) nvidia-smi summary table for the full 8x
-    H100 node plus a realistic compute-process table. Values wiggle per call so
-    successive runs look live, but the topology (count/model/driver/mem) is fixed
-    so it agrees with `nvidia-smi -q` and `dcgmi discovery -l`."""
+    """Render the modern (driver 5xx) nvidia-smi summary table for the full node
+    plus a realistic compute-process table. Values wiggle per call so successive
+    runs look live, but topology (count/model/driver/mem) is fixed for the SKU."""
     now = time.strftime("%a %b %d %H:%M:%S %Y")
+    pwr_cap = _SMI_PWR_CAP
     lines = [
         now,
         "+-----------------------------------------------------------------------------------------+",
@@ -258,16 +372,18 @@ def _render_nvidia_smi_table() -> str:
     for i in range(_SMI_GPU_COUNT):
         active = random.random() < 0.6
         util = random.randint(70, 100) if active else random.randint(0, 4)
-        mem_used = random.randint(40000, 78000) if active else random.randint(3, 12)
+        mem_hi = max(12, int(_SMI_MEM_TOTAL_MIB * 0.95))
+        mem_lo = max(3, int(_SMI_MEM_TOTAL_MIB * 0.5))
+        mem_used = random.randint(mem_lo, mem_hi) if active else random.randint(3, 12)
         temp = random.randint(58, 74) if active else random.randint(28, 36)
-        pwr = random.randint(420, 690) if active else random.randint(68, 92)
+        pwr = random.randint(int(pwr_cap * 0.55), pwr_cap - 10) if active else random.randint(68, 92)
         perf = "P0"
         bus = f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0"
         # Fixed-width cells matching the separator (41 / 24 / 22 chars).
         c1a = f"  {i}  {_SMI_GPU_NAME}"
         c2a = f" {bus} Off"
         lines.append(f"|{c1a:<33}   On  |{c2a:<24}|                    0 |")
-        c1b = f" N/A   {temp:2d}C    {perf}             {pwr:3d}W / 700W"
+        c1b = f" N/A   {temp:2d}C    {perf}             {pwr:3d}W / {pwr_cap}W"
         c2b = f"  {mem_used:6d}MiB / {_SMI_MEM_TOTAL_MIB}MiB "
         c3b = f"    {util:3d}%      Default"
         lines.append(f"|{c1b:<41}|{c2b:<24}|{c3b:<22}|")
@@ -351,9 +467,12 @@ def _render_query_gpu(line: str) -> str:
 
 def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
     is_gpu_focus = engine.simulation_type == "gpu" or "gpu" in engine.scenario_slug or "nvidia" in engine.scenario_slug
+    sku = _resolve_gpu_sku(getattr(engine, "scenario_slug", "") or "")
 
     def handler(parts, line):
         low = line.strip().lower()
+        # Bind SKU for this invocation so table/query helpers match the scenario.
+        _apply_gpu_sku_globals(sku)
         # GPU-specific tools always handled here. Generic kernel tools
         # (modprobe/lspci/lsmod/modinfo) are only intercepted when they
         # reference the NVIDIA driver, or when this is a GPU-focused sim — so
@@ -364,12 +483,42 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         kernel_tools = ("modprobe", "rmmod", "lspci", "lsmod", "modinfo")
         if any(low.startswith(c) for c in gpu_tools):
             pass
-        elif any(low.startswith(c) for c in kernel_tools) and ("nvidia" in low or is_gpu_focus):
+        elif any(low.startswith(c) for c in kernel_tools) and (
+            "nvidia" in low or "amd" in low or "3d" in low or "vga" in low or is_gpu_focus
+        ):
             pass
         else:
             return None
         healthy = engine.shell.state.gpu_healthy
         if low.startswith("nvidia-smi"):
+            if sku.get("vendor") == "amd":
+                return (
+                    "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. "
+                    "This node is configured with AMD Instinct GPUs — use rocm-smi / amd-smi."
+                )
+            if "-h" in parts or "--help" in low:
+                return (
+                    "NVIDIA System Management Interface -- NVIDIA Management Library (NVML)\n\n"
+                    "Usage: nvidia-smi [OPTION1] [OPTION2] ...\n\n"
+                    "    -L, --list-gpus                  Display a list of GPUs connected\n"
+                    "    -q, --query                      Display GPU/unit info\n"
+                    "    -d TYPE, --display=TYPE          Display only selected information\n"
+                    "    dmon                            Device monitoring (scrolling)\n"
+                    "    pmon                            Process monitoring (scrolling)\n"
+                    "    topo -m                         Topology matrix\n"
+                    "    nvlink --status                 NVLink status\n"
+                    "    --query-gpu=FIELD               CSV field query\n"
+                    "    -l SEC, --loop=SEC              Loop with delay\n"
+                    "    -pm, -pl, -c, -e, -am            Admin mode toggles\n"
+                )
+            if "-L" in parts or "--list-gpus" in low:
+                if not healthy:
+                    return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
+                rows = []
+                for i in range(_SMI_GPU_COUNT):
+                    uuid = f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"
+                    rows.append(f"GPU {i}: {_SMI_GPU_NAME} (UUID: {uuid})")
+                return "\n".join(rows)
             if "-l" in parts or "--loop" in low:
                 pass  # streaming flag — single snapshot is fine for the sim
             if "--query-gpu" in low:
@@ -381,7 +530,23 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
             # renders a clean view; the unhealthy path mirrors a fallen-off driver.
             if not healthy and any(k in low for k in ("topo", "nvlink", "mig", "-q")):
                 return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
-            if "topo" in low and "-m" in low:
+            if "topo" in low and ("-m" in parts or "-p" in parts or "-c" in parts):
+                if "-p" in parts:
+                    return (
+                        "GPU0\t GPU1\t GPU2\t GPU3\n"
+                        "GPU0\t X   \t PIX \t NODE\t SYS\n"
+                        "GPU1\t PIX \t X   \t NODE\t SYS\n"
+                        "GPU2\t NODE\t NODE\t X   \t PIX\n"
+                        "GPU3\t SYS \t SYS \t PIX \t X"
+                    )
+                if "-c" in parts:
+                    return (
+                        "GPU0\t CPU Affinity\t NUMA Affinity\n"
+                        "GPU0\t 0-31       \t 0\n"
+                        "GPU1\t 0-31       \t 0\n"
+                        "GPU2\t 32-63      \t 1\n"
+                        "GPU3\t 32-63      \t 1"
+                    )
                 return (
                     "\t GPU0\t GPU1\t GPU2\t GPU3\t CPU Affinity\t NUMA Affinity\n"
                     "GPU0\t X   \t NV18\t NV18\t NV18\t 0-31       \t 0\n"
@@ -391,12 +556,12 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                     "Legend: X = Self, NV# = NVLink connection (# links), "
                     "SYS = across PCIe+SMP interconnect, PIX = single PCIe bridge")
             if "nvlink" in low:
-                if "-e" in parts:
-                    return ("GPU 0: NVIDIA H100 80GB HBM3\n"
+                if "-e" in parts or "capabilities" in low:
+                    return ("GPU 0: " + _SMI_GPU_NAME + "\n"
                             "\t Link 0: Replay Errors: 0\n"
                             "\t Link 0: Recovery Errors: 0\n"
                             "\t Link 0: CRC Errors: 0")
-                return ("GPU 0: NVIDIA H100 80GB HBM3\n"
+                return ("GPU 0: " + _SMI_GPU_NAME + "\n"
                         "\t Link 0: 26.562 GB/s\n"
                         "\t Link 1: 26.562 GB/s\n"
                         "\t Link 2: 26.562 GB/s\n"
@@ -459,11 +624,50 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 if "power" in low:
                     return ("==============NVSMI LOG==============\n"
                             "Power Readings\n"
-                            "\t Power Draw                     : 118.42 W\n"
-                            "\t Current Power Limit            : 700.00 W\n"
-                            "\t Default Power Limit            : 700.00 W\n"
-                            "\t Enforced Power Limit           : 700.00 W\n"
-                            "\t Max Power Limit                : 700.00 W")
+                            f"\t Power Draw                     : {random.randint(90, _SMI_PWR_CAP - 20)}.42 W\n"
+                            f"\t Current Power Limit            : {_SMI_PWR_CAP}.00 W\n"
+                            f"\t Default Power Limit            : {_SMI_PWR_CAP}.00 W\n"
+                            f"\t Enforced Power Limit           : {_SMI_PWR_CAP}.00 W\n"
+                            f"\t Max Power Limit                : {_SMI_PWR_CAP}.00 W")
+                if "utilization" in low:
+                    return ("==============NVSMI LOG==============\n"
+                            "Utilization\n"
+                            f"\t Gpu                            : {random.randint(0, 99)} %\n"
+                            f"\t Memory                         : {random.randint(0, 90)} %\n"
+                            f"\t Encoder                        : {random.randint(0, 5)} %\n"
+                            f"\t Decoder                        : {random.randint(0, 5)} %")
+                if "memory" in low:
+                    used = random.randint(3, max(12, _SMI_MEM_TOTAL_MIB // 2))
+                    return ("==============NVSMI LOG==============\n"
+                            "FB Memory Usage\n"
+                            f"\t Total                          : {_SMI_MEM_TOTAL_MIB} MiB\n"
+                            f"\t Reserved                       : 455 MiB\n"
+                            f"\t Used                           : {used} MiB\n"
+                            f"\t Free                           : {_SMI_MEM_TOTAL_MIB - used} MiB")
+                if "compute" in low:
+                    return ("==============NVSMI LOG==============\n"
+                            "Compute Mode\n"
+                            "\t Current                       : Default")
+                if "pids" in low:
+                    return ("==============NVSMI LOG==============\n"
+                            "Processes\n"
+                            f"\t Process ID                    : {random.randint(20000, 65000)}\n"
+                            "\t   Type                         : C\n"
+                            "\t   Name                         : python\n"
+                            f"\t   Used GPU Memory              : {random.randint(1000, 40000)} MiB")
+                if "supported_clocks" in low:
+                    return ("==============NVSMI LOG==============\n"
+                            "Supported Clocks\n"
+                            "\t Memory                         : 2619 MHz\n"
+                            "\t\t Graphics                   : 1980 MHz\n"
+                            "\t\t Graphics                   : 1410 MHz\n"
+                            "\t Memory                         : 1593 MHz\n"
+                            "\t\t Graphics                   : 1410 MHz")
+                if "accounting" in low:
+                    return ("==============NVSMI LOG==============\n"
+                            "Accounting Mode\n"
+                            "\t Current                       : Disabled\n"
+                            "\t Buffer Size                   : 4000")
                 if "performance" in low or "clock" in low:
                     return ("==============NVSMI LOG==============\n"
                             "Clocks Throttle Reasons\n"
@@ -480,22 +684,73 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 blocks = []
                 for i in range(_SMI_GPU_COUNT):
                     bus = f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0"
+                    used = random.randint(3, 512)
                     blocks.append(
                         f"GPU {bus}\n"
                         f"\t Product Name                  : {_SMI_GPU_NAME}\n"
-                        f"\t Product Architecture          : Hopper\n"
+                        f"\t Product Architecture          : {_SMI_ARCH}\n"
                         f"\t Persistence Mode              : Enabled\n"
                         f"\t MIG Mode\n"
                         f"\t\t Current                   : Disabled\n"
                         f"\t\t Pending                   : Disabled\n"
                         f"\t FB Memory Usage\n"
                         f"\t\t Total                     : {_SMI_MEM_TOTAL_MIB} MiB\n"
-                        f"\t\t Used                      : {random.randint(3, 512)} MiB\n"
-                        f"\t\t Free                      : {_SMI_MEM_TOTAL_MIB - random.randint(3, 512)} MiB")
+                        f"\t\t Used                      : {used} MiB\n"
+                        f"\t\t Free                      : {_SMI_MEM_TOTAL_MIB - used} MiB")
                 return head + "\n" + "\n".join(blocks)
-            if "-pm" in parts or "-pl" in parts or low.startswith("nvidia-smi -r"):
-                # persistence-mode / power-limit set, or GPU reset — acknowledge.
+            if any(x in parts for x in ("-pm", "-pl", "-e", "-am", "-ac", "-rac")) or \
+               "--lock-gpu-clocks" in low or "--reset-gpu-clocks" in low or \
+               "--gpu-reset" in low or "--clear-accounting" in low or \
+               low.startswith("nvidia-smi -r") or \
+               (re.search(r"nvidia-smi\s+-c\b", low) and "dmon" not in low and "pmon" not in low) or \
+               (re.search(r"nvidia-smi\s+-p\b", low) and "dmon" not in low and "pmon" not in low):
+                # persistence-mode / power-limit / compute mode / ECC / clocks — acknowledge.
                 return "All done."
+            # Live monitors — paced like real dmon/pmon (and -l loop snapshots).
+            if "dmon" in low or "pmon" in low or "-l" in parts or "--loop" in low:
+                from .shell import StreamedCommandResult
+                if not healthy:
+                    return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
+                samples = 5
+                for tok in parts:
+                    if tok.startswith("-c") and tok[2:].isdigit():
+                        samples = min(30, max(1, int(tok[2:])))
+                    if tok == "-c" and parts.index(tok) + 1 < len(parts):
+                        try:
+                            samples = min(30, max(1, int(parts[parts.index(tok) + 1])))
+                        except ValueError:
+                            pass
+                lines: list[str] = []
+                if "pmon" in low:
+                    lines.append("# gpu        pid  type    sm   mem   enc   dec   command")
+                    for tick in range(samples):
+                        for gi in range(min(4, _SMI_GPU_COUNT)):
+                            pid = 12000 + gi * 10 + tick
+                            sm = random.randint(0, 98)
+                            mem = random.randint(0, 80)
+                            lines.append(
+                                f"    {gi}    {pid}     C    {sm:3d}   {mem:3d}     0     0   python"
+                            )
+                    delay = 0.55
+                else:
+                    # dmon header + samples (power / util / clocks — matches nvidia-smi dmon -s puc)
+                    lines.append("# gpu   pwr  gtemp  mtemp     sm    mem    enc    dec  mclk  pclk")
+                    lines.append("# Idx     W     C      C      %      %      %      %   MHz   MHz")
+                    for _tick in range(samples):
+                        for gi in range(min(8, _SMI_GPU_COUNT)):
+                            pwr = random.randint(80, max(120, _SMI_PWR_CAP - 50))
+                            gt = random.randint(32, 78)
+                            mt = gt + random.randint(4, 12)
+                            sm = random.randint(0, 99)
+                            mem = random.randint(0, 85)
+                            mclk = random.choice((1593, 2619))
+                            pclk = random.choice((1410, 1980))
+                            lines.append(
+                                f"    {gi}   {pwr:3d}    {gt:2d}     {mt:2d}    "
+                                f"{sm:3d}    {mem:3d}      0      0  {mclk:4d}  {pclk:4d}"
+                            )
+                    delay = 1.0 if ("-l" in parts or "--loop" in low) else 0.55
+                return StreamedCommandResult(lines=lines, delay_s=delay)
             if healthy:
                 return _render_nvidia_smi_table()
             return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running."
@@ -512,9 +767,25 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 _sync_gpu_identity(engine, healthy=False)
             return ""
         if low.startswith("lspci"):
-            out = "01:00.0 3D controller: NVIDIA Corporation GA100 [A100 SXM4 40GB] (rev a1)"
-            return out
+            if "amd" in low or sku.get("vendor") == "amd":
+                rows = []
+                for i in range(_SMI_GPU_COUNT):
+                    bus = f"{(i + 1) * 0x10 + 1:02x}:00.0"
+                    rows.append(f"{bus} Processing accelerators: Advanced Micro Devices, Inc. [AMD/ATI] Instinct MI300X")
+                return "\n".join(rows)
+            # Default / nvidia filter — match SKU product string.
+            rows = []
+            for i in range(_SMI_GPU_COUNT):
+                bus = f"{(i + 1) * 0x10 + 1:02x}:00.0"
+                rows.append(f"{bus} 3D controller: NVIDIA Corporation {_SMI_PCI_ID} [{_SMI_GPU_NAME}] (rev a1)")
+            return "\n".join(rows)
         if low.startswith("lsmod"):
+            if sku.get("vendor") == "amd":
+                if not healthy:
+                    return "Module                  Size  Used by"
+                return ("Module                  Size  Used by\n"
+                        "amdgpu             15728640  32\n"
+                        "amdkfd               1048576  8 amdgpu")
             if not healthy:
                 return "Module                  Size  Used by"
             return ("Module                  Size  Used by\n"
@@ -522,6 +793,11 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                     "nvidia_uvm           1048576  2 nvidia\n"
                     "nvidia_drm             69632  0")
         if low.startswith("modinfo"):
+            if "amdgpu" in low or (sku.get("vendor") == "amd" and "nvidia" not in low):
+                return ("filename:       /lib/modules/5.14.0/updates/dkms/amdgpu.ko\n"
+                        "version:        6.2.0\n"
+                        "license:        GPL and additional rights\n"
+                        "description:    AMDGPU")
             if not healthy:
                 return "modinfo: ERROR: Module nvidia not found."
             return ("filename:       /lib/modules/5.14.0/kernel/drivers/video/nvidia.ko\n"
@@ -624,7 +900,7 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 for i in range(_SMI_GPU_COUNT):
                     rows.append(
                         f"   GPU {i}   {random.randint(0, 100):3d}    {random.randint(0, 90):3d}"
-                        f"     {random.randint(30, 72):3d}     {random.randint(70, 690):3d}       0")
+                        f"     {random.randint(30, 72):3d}     {random.randint(70, max(120, _SMI_PWR_CAP - 10)):3d}       0")
                 return "\n".join(rows)
             return ("+----+-----------+----------------------------------------------------------+\n"
                     "| GPU| Health    | Details                                                  |\n"
@@ -639,7 +915,7 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
             for i in range(_SMI_GPU_COUNT):
                 temp = random.randint(30, 72)
                 util = random.randint(0, 100)
-                mem = random.randint(3, 78000)
+                mem = random.randint(3, max(12, _SMI_MEM_TOTAL_MIB - 100))
                 rows.append(
                     f"[{i}] {_SMI_GPU_NAME} | {temp}'C, {util:3d} % | "
                     f"{mem:5d} / {_SMI_MEM_TOTAL_MIB} MB")
@@ -663,26 +939,70 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                         "    KFD_ID: 63274\n    NODE_ID: 2\n    Market Name: AMD Instinct MI300X\n"
                         "GPU: 1\n    BDF: 0000:26:00.0\n    Market Name: AMD Instinct MI300X\n"
                         "... (8 accelerators)")
+            if low.startswith("amd-smi") and ("firmware" in low or "static" in low):
+                return ("GPU: 0\n  MARKET_NAME: AMD Instinct MI300X\n  VENDOR_ID: 0x1002\n"
+                        "  DEVICE_ID: 0x74a1\n  GFX: gfx942\n"
+                        "  VBIOS: 022.171.00.009.000001\n  FW_VERSION: 22.40\n"
+                        "GPU: 1\n  MARKET_NAME: AMD Instinct MI300X\n  ...")
+            if low.startswith("amd-smi") and "process" in low:
+                return ("GPU  PID   NAME      MEM_USAGE\n"
+                        f"0    {random.randint(20000, 65000)}  python    {random.randint(1000, 80000)} MB\n"
+                        f"1    {random.randint(20000, 65000)}  python    {random.randint(1000, 80000)} MB")
+            if low.startswith("amd-smi") and ("bad-pages" in low or "ras" in low):
+                return ("GPU  RETIRED_PAGES  PENDING  UNCORRECTABLE\n"
+                        "0    0               0        0\n"
+                        "1    0               0        0")
+            if low.startswith("amd-smi") and "xgmi" in low:
+                return ("XGMI LINK STATUS\n"
+                        "GPU0 <-> GPU1: UP  64 GT/s\n"
+                        "GPU0 <-> GPU2: UP  64 GT/s\n"
+                        "GPU1 <-> GPU3: UP  64 GT/s")
+            if low.startswith("amd-smi") and ("reset" in low or "set" in low):
+                return "Successfully applied AMD SMI command."
             if "static" in low or "rocminfo" in low:
                 return ("Agent 2\n  Name:                    gfx942\n  Marketing Name:          AMD Instinct MI300X\n"
                         "  Device Type:             GPU\n  Wavefront Size:          64(0x40)")
-            # amd-smi has its own layout (monitor / metric); it is NOT rocm-smi.
             if low.startswith("amd-smi"):
                 if "monitor" in low or "metric" in low or parts[:1] == ["amd-smi"] and len(parts) == 1:
+                    from .shell import StreamedCommandResult
                     rows = ["GPU  POWER   GPU_T  MEM_T  GFX_CLK  GFX%  MEM%  VRAM_USED  VRAM_TOTAL"]
-                    for i in range(8):
-                        rows.append(
-                            f"{i:<4} {random.randint(120, 700):3d} W  {random.randint(38, 68)}°C  "
-                            f"{random.randint(40, 70)}°C  {random.randint(1300, 2100)} MHz  "
-                            f"{random.randint(0, 100):3d}%  {random.randint(0, 95):3d}%  "
-                            f"{random.randint(1000, 190000):6d} MB  196592 MB")
-                    return "\n".join(rows)
+                    for _tick in range(4):
+                        for i in range(8):
+                            rows.append(
+                                f"{i:<4} {random.randint(120, 700):3d} W  {random.randint(38, 68)}°C  "
+                                f"{random.randint(40, 70)}°C  {random.randint(1300, 2100)} MHz  "
+                                f"{random.randint(0, 100):3d}%  {random.randint(0, 95):3d}%  "
+                                f"{random.randint(1000, 190000):6d} MB  196592 MB")
+                    return StreamedCommandResult(lines=rows, delay_s=0.6)
+            if any(f"--show{x}" in low or f"show{x}" in low.replace("-", "") for x in (
+                "temp", "power", "use", "clocks", "meminfo", "id", "bus", "pid", "pcie",
+                "perflevel", "overdrive", "profile", "ras", "ecc", "vbios", "serial",
+                "uniqueid", "pagesinfo", "all",
+            )) or "--showtemp" in low or "--showpower" in low or "--showuse" in low or "--showall" in low:
+                # Legacy rocm-smi flag family used in AMD Support One-Pager diagnostics.
+                rows = ["======================= ROCm System Management Interface ======================="]
+                for i in range(8):
+                    rows.append(
+                        f"GPU[{i}]\t: Temp: edge {random.randint(38, 72)}c  "
+                        f"junction {random.randint(42, 78)}c  "
+                        f"Power: {random.randint(90, 550)}W  "
+                        f"GPU use: {random.randint(0, 99)}%"
+                    )
+                rows.append("==================================================================================")
+                return "\n".join(rows)
+            if low.startswith("rocm-smi") and (
+                "--setpoweroverdrive" in low or "--setperflevel" in low or "--setprofile" in low
+                or "--setfan" in low or "--reset" in low
+            ):
+                return "Successfully set."
+            # amd-smi has its own layout (monitor / metric); it is NOT rocm-smi.
+            if low.startswith("amd-smi"):
                 if "version" in low:
                     return ("AMDSMI Tool: 24.6.2+2b02a07 | "
                             "AMDSMI Library version: 24.6.2 | ROCm version: 6.2.0")
                 # bare `amd-smi` prints usage
                 return ("usage: amd-smi [-h] {version,list,static,firmware,bad-pages,"
-                        "metric,process,event,topology,set,reset,monitor,xgmi} ...\n"
+                        "metric,process,event,topology,set,reset,monitor,xgmi,ras} ...\n"
                         "AMD System Management Interface | Version: 24.6.2 | ROCm version: 6.2.0")
             # rocm-smi concise info across the full 8x MI300X node.
             rows = ["========================= ROCm System Management Interface =========================",
@@ -1244,11 +1564,51 @@ def _handle_kubectl(c, parts: list[str], line: str, shell: RHELShell) -> str:
 
 
 def _register_ansible(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
+    slug = (getattr(engine, "scenario_slug", "") or "").lower()
+
     def handler(parts, line):
         low = line.strip().lower()
         if low.startswith("ssh-copy-id"):
             engine._ssh_key_fixed = True
             return "Number of key(s) added: 1"
+        # AWX / Tower CLI used in AI Infra driver-install & repave labs
+        if low.startswith("awx ") or low.startswith("tower-cli"):
+            if "login" in low or "--conf.host" in low:
+                return "ok"
+            if "job_templates" in low and ("list" in low or "get" in low):
+                return (
+                    "id  name                              inventory\n"
+                    "12  GPU Driver Install (H100)         maas-gpu-nodes\n"
+                    "18  DCGM Exporter Deploy              maas-gpu-nodes\n"
+                    "24  Image Repave (jammy-h100)         maas-gpu-nodes\n"
+                    "31  NVIDIA Persistence Mode           maas-gpu-nodes"
+                )
+            if "inventory" in low and "list" in low:
+                return (
+                    "id  name\n"
+                    "3   maas-gpu-nodes\n"
+                    "4   lxd-burn-in"
+                )
+            if "job_templates launch" in low or "jobs launch" in low or "launch" in low:
+                jid = random.randint(4000, 9000)
+                from .shell import StreamedCommandResult
+                lines = [
+                    f"Job {jid} launched (pending)",
+                    f"Job {jid} → running  (0%) waiting for capacity",
+                    f"Job {jid} → running (35%) installing nvidia-driver-565",
+                    f"Job {jid} → running (70%) enabling nvidia-persistenced",
+                    f"Job {jid} → successful",
+                    "PLAY RECAP *********************************************************************",
+                    "gpu-node-01 : ok=6  changed=3  unreachable=0  failed=0",
+                ]
+                return StreamedCommandResult(lines=lines, delay_s=0.5)
+            if "jobs get" in low or "jobs stdout" in low:
+                return "status: successful\nelapsed: 00:04:12"
+            return (
+                "usage: awx job_templates list|launch\n"
+                "       awx inventory list\n"
+                "       awx jobs get <id>"
+            )
         if not (low.startswith("ansible ") or low.startswith("ansible-playbook") or low.startswith("ansible-inventory")):
             return None
         if low in ("ansible --version", "ansible-playbook --version"):
@@ -1256,16 +1616,29 @@ def _register_ansible(engine: "UnifiedSimulationEngine", shell: RHELShell) -> No
         if "ping" in low:
             if engine._ssh_key_fixed:
                 return "web1 | SUCCESS => {\"ping\": \"pong\"}\nweb2 | SUCCESS => {\"ping\": \"pong\"}"
+            # AI Infra MAAS inventory nodes (when scenario mentions gpu/maas)
+            if "ai-infra" in slug or "gpu" in slug or "maas" in slug:
+                return (
+                    "gpu-node-01 | SUCCESS => {\"ping\": \"pong\"}\n"
+                    "gpu-node-02 | SUCCESS => {\"ping\": \"pong\"}"
+                )
             return (
                 "web1 | SUCCESS => {\"ping\": \"pong\"}\n"
                 "web2 | UNREACHABLE! => {\"msg\": \"Permission denied (publickey).\"}"
             )
         if "ansible-playbook" in low:
-            if engine._ssh_key_fixed:
+            if engine._ssh_key_fixed or "ai-infra" in slug or "nvidia" in low or "dcgm" in low:
                 engine._ansible_playbook_ok = True
-                return "PLAY RECAP *****\nweb1 : ok=2 changed=1\nweb2 : ok=2 changed=1"
+                hosts = "gpu-node-01\ngpu-node-02" if ("ai-infra" in slug or "gpu" in slug) else "web1\nweb2"
+                recap = "\n".join(
+                    f"{h} : ok=3 changed=2 unreachable=0 failed=0"
+                    for h in hosts.splitlines()
+                )
+                return f"PLAY RECAP *****\n{recap}"
             return "fatal: [web2]: FAILED! => Unable to start service nginx"
         if "ansible-inventory" in low:
+            if "ai-infra" in slug or "gpu" in slug:
+                return '{"gpu_nodes": {"hosts": ["gpu-node-01", "gpu-node-02", "gpu-node-03"]}}'
             return '{"webservers": {"hosts": ["web1", "web2"]}}'
         return f"{line}: OK"
     shell.register_handler(handler)
@@ -1314,30 +1687,76 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
     slug = (engine.scenario_slug or "").lower()
     if slug in ("sim-baremetal-ipmi", "sim-rhel-baremetal-ipmi", "maas-ipmi-bmc-unreachable"):
         engine._power_state = "off"
+    # MAAS machine inventory for AI Infra / baremetal commission labs.
+    if not hasattr(engine, "_maas_machines") or not engine._maas_machines:
+        engine._maas_machines = [
+            {"name": "gpu-node-01", "status": "Ready", "power": "on", "arch": "amd64/generic",
+             "zone": "default", "pool": "default", "ip": "10.64.12.11"},
+            {"name": "gpu-node-02", "status": "Deployed", "power": "on", "arch": "amd64/generic",
+             "zone": "default", "pool": "default", "ip": "10.64.12.12"},
+            {"name": "gpu-node-03", "status": "Failed commissioning", "power": "on",
+             "arch": "amd64/generic", "zone": "default", "pool": "default", "ip": "10.64.12.13"},
+            {"name": "gpu-node-04", "status": "New", "power": "off", "arch": "amd64/generic",
+             "zone": "default", "pool": "default", "ip": "-"},
+        ]
+    if not hasattr(engine, "_lxd_instances"):
+        engine._lxd_instances = {
+            "gpu-worker-1": {"state": "RUNNING", "type": "container", "ipv4": "10.150.1.10"},
+            "k8s-node-2": {"state": "STOPPED", "type": "virtual-machine", "ipv4": ""},
+            "burn-in-h100": {"state": "RUNNING", "type": "container", "ipv4": "10.150.1.20"},
+        }
 
     def handler(parts, line):
         low = line.strip().lower()
-        if not (low.startswith("ipmitool") or low.startswith("dmidecode") or low.startswith("esxcli")):
+        bare_tools = (
+            "ipmitool", "dmidecode", "esxcli", "maas", "lxc", "lxd", "virsh",
+            "packer", "vyos", "vyatta",
+        )
+        if not any(low.startswith(t) for t in bare_tools):
             return None
-        if "power status" in low:
-            return f"Chassis Power is {engine._power_state}"
-        if "power cycle" in low or "power reset" in low:
-            return "Chassis Power Control: Reset"
-        if "power off" in low:
-            engine._power_state = "off"
-            return "Chassis Power Control: Down/Off"
-        if "power on" in low:
-            engine._power_state = "on"
-            return "Chassis Power Control: Up/On"
-        if "sensor" in low:
-            return "CPU Temp        | 42 degrees C      | ok"
-        if "fru" in low:
-            return " Board Product         : ProLiant DL380 Gen10"
+        if low.startswith("ipmitool"):
+            if "power status" in low:
+                return f"Chassis Power is {engine._power_state}"
+            if "power cycle" in low or "power reset" in low:
+                return "Chassis Power Control: Reset"
+            if "power off" in low:
+                engine._power_state = "off"
+                return "Chassis Power Control: Down/Off"
+            if "power on" in low:
+                engine._power_state = "on"
+                return "Chassis Power Control: Up/On"
+            if "sensor" in low:
+                return (
+                    "CPU1 Temp       | 42.000     | degrees C  | ok\n"
+                    "Inlet Temp      | 23.000     | degrees C  | ok\n"
+                    "Pwr Consumption | 812.000    | Watts      | ok\n"
+                    "Fan1A RPM       | 7200.000   | RPM        | ok"
+                )
+            if "fru" in low:
+                mfr = getattr(shell.state, "dmi_manufacturer", None) or "Hewlett Packard Enterprise"
+                prod = getattr(shell.state, "dmi_product", None) or "ProLiant DL380 Gen10"
+                serial = "CN7293672A008A"
+                return (
+                    f" Board Mfg Date        : Mon Jan 15 12:00:00 2024\n"
+                    f" Board Mfg             : {mfr}\n"
+                    f" Board Product         : {prod}\n"
+                    f" Board Serial          : {serial}\n"
+                    f" Product Name          : {prod}"
+                )
+            if "lan print" in low or "lan print 1" in low:
+                return (
+                    "IP Address Source       : Static Address\n"
+                    "IP Address              : 10.64.90.11\n"
+                    "Subnet Mask             : 255.255.255.0\n"
+                    "MAC Address             : a4:bb:6d:12:34:56\n"
+                    "Default Gateway IP      : 10.64.90.1"
+                )
+            return f"ipmitool: executed ({' '.join(parts[1:]) or 'ok'})"
         if "dmidecode" in low:
             # Persona-aware DMI: AWS Nitro / Azure / GCE / VMware / HPE bare metal.
             # Generic labs used to always answer HPE even on EC2 guests.
-            mfr = getattr(shell.state, "dmi_manufacturer", None) or "HPE"
-            prod = getattr(shell.state, "dmi_product", None) or "ProLiant DL380 Gen10"
+            mfr = getattr(shell.state, "dmi_manufacturer", None) or "Dell Inc."
+            prod = getattr(shell.state, "dmi_product", None) or "PowerEdge XE9680"
             platform = getattr(shell.state, "host_platform", "") or ""
             # Only claim HPE ProLiant when this Lab Server is actually bare metal /
             # datacenter — otherwise prefer the hosting persona already applied.
@@ -1348,23 +1767,230 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
         if "esxcli" in low:
             return "Host CPU: Intel Xeon Gold 6248R\nMemory: 256 GB"
         if low.startswith("maas"):
-            if "list" in low and "machines" in low:
-                return "Machine 1: ready (node-01)\nMachine 2: deployed (node-02)\nMachine 3: failed commissioning"
+            machines = engine._maas_machines
+            # `maas admin machines read` / `maas login` / commission / deploy
+            if "login" in low:
+                return "Logged into MAAS at http://10.64.1.2:5240/MAAS/ (user: admin)"
+            if "machines" in low and ("read" in low or "list" in low):
+                rows = [
+                    "hostname       status                 power  arch            zone     pool     ip",
+                    "-------------  ---------------------  -----  --------------  -------  -------  ------------",
+                ]
+                for m in machines:
+                    rows.append(
+                        f"{m['name']:<14} {m['status']:<22} {m['power']:<6} "
+                        f"{m['arch']:<15} {m['zone']:<8} {m['pool']:<8} {m['ip']}"
+                    )
+                return "\n".join(rows)
             if "commission" in low:
-                return "Commissioning started for node-03"
+                target = None
+                for tok in parts:
+                    if tok.startswith("gpu-node") or tok.startswith("node-"):
+                        target = tok
+                        break
+                for m in machines:
+                    if target and m["name"] != target:
+                        continue
+                    if m["status"] in ("New", "Failed commissioning", "Ready"):
+                        m["status"] = "Commissioning"
+                        m["power"] = "on"
+                        name = m["name"]
+                        # Simulate quick transition for lab UX
+                        m["status"] = "Ready"
+                        from .shell import StreamedCommandResult
+                        return StreamedCommandResult(
+                            lines=[
+                                f"Commissioning started for {name}…",
+                                "BMC power on → PXE (undionly.kpxe)",
+                                "DHCP ACK 10.64.12.x from region controller",
+                                "TFTP: downloading kernel + initrd (ephemeral)",
+                                "Running 00-maas-03-install-lldpd … ok",
+                                "Running 20-maas-01-bmc … ok",
+                                "Running 50-maas-01-commissioning … ok",
+                                "Hardware inventory synced (CPU/RAM/NIC/GPU)",
+                                f"Status → Ready (commissioning passed for {name}).",
+                            ],
+                            delay_s=0.45,
+                        )
+                return "No matching machine available to commission."
             if "deploy" in low:
-                return "Deploying Ubuntu 22.04 to node-02"
-            return "MAAS: OK"
+                for m in machines:
+                    if m["status"] == "Ready":
+                        m["status"] = "Deployed"
+                        m["ip"] = m["ip"] if m["ip"] != "-" else "10.64.12.40"
+                        from .shell import StreamedCommandResult
+                        return StreamedCommandResult(
+                            lines=[
+                                f"Deploying Ubuntu 22.04 LTS to {m['name']} "
+                                f"(osystem=ubuntu, distro_series=jammy)…",
+                                "PXE: DHCP discover → offer → request → ack",
+                                "TFTP: bootx64.efi / grubx64.efi / vmlinuz / initrd",
+                                "Curtin: partitioning + installing rootfs",
+                                "cloud-init: datasource MAAS, applying netplan + users",
+                                "Reboot → cloud-init final → sshd listening",
+                                f"Deployed. IP {m['ip']}  Status → Deployed",
+                            ],
+                            delay_s=0.5,
+                        )
+                return "No Ready machine available to deploy (commission first)."
+            if "release" in low:
+                for m in machines:
+                    if m["status"] == "Deployed":
+                        m["status"] = "Ready"
+                        return f"Released {m['name']} → Ready"
+                return "No Deployed machine to release."
+            if "power" in low:
+                action = "on" if "on" in low else "off" if "off" in low else "status"
+                for m in machines:
+                    if action == "status":
+                        return "\n".join(f"{x['name']}: power {x['power']}" for x in machines)
+                    m["power"] = action
+                return f"Power {action} requested for matching machines."
+            if "boot-resources" in low or "boot" in low:
+                return (
+                    "id  name              architecture  type\n"
+                    "1   ubuntu/jammy      amd64/generic  Synced\n"
+                    "2   ubuntu/noble      amd64/generic  Synced\n"
+                    "3   custom/h100-jammy amd64/generic  Uploaded"
+                )
+            return (
+                "usage: maas <profile> machines read|commission|deploy|release\n"
+                "       maas <profile> boot-resources read\n"
+                "       maas login <profile> <url> <api-key>"
+            )
         if low.startswith("lxc") or low.startswith("lxd"):
+            inst = engine._lxd_instances
             if "list" in low:
-                return "gpu-worker-1 (RUNNING)\nk8s-node-2 (STOPPED)"
+                rows = [
+                    "+---------------+---------+----------------------+------+-----------+-----------+",
+                    "| NAME          | STATE   | IPV4                 | TYPE | PROCESSES | LOCATION  |",
+                    "+---------------+---------+----------------------+------+-----------+-----------+",
+                ]
+                for name, meta in inst.items():
+                    rows.append(
+                        f"| {name:<13} | {meta['state']:<7} | {meta.get('ipv4') or '-':<20} "
+                        f"| {meta['type']:<4} | 42        | none      |"
+                    )
+                rows.append("+---------------+---------+----------------------+------+-----------+-----------+")
+                return "\n".join(rows)
             if "start" in low:
-                return "Instance started"
-            return "LXD: OK"
+                for name, meta in inst.items():
+                    if name in low or (len(parts) > 2 and parts[-1] == name):
+                        meta["state"] = "RUNNING"
+                        if not meta.get("ipv4"):
+                            meta["ipv4"] = "10.150.1.99"
+                        return f"Instance {name} started"
+                # start last stopped
+                for name, meta in inst.items():
+                    if meta["state"] != "RUNNING":
+                        meta["state"] = "RUNNING"
+                        meta["ipv4"] = meta.get("ipv4") or "10.150.1.99"
+                        return f"Instance {name} started"
+                return "All instances already running"
+            if "stop" in low:
+                for name, meta in inst.items():
+                    if name in low:
+                        meta["state"] = "STOPPED"
+                        return f"Instance {name} stopped"
+                return "Specify instance name"
+            if "profile" in low:
+                return (
+                    "name: gpu-passthrough\n"
+                    "config:\n"
+                    "  nvidia.runtime: \"true\"\n"
+                    "devices:\n"
+                    "  gpu0:\n"
+                    "    type: gpu\n"
+                    "    gputype: physical\n"
+                    "    pci: \"0000:19:00.0\""
+                )
+            if "launch" in low or "init" in low:
+                name = parts[-1] if len(parts) > 2 else "lab-container"
+                inst[name] = {"state": "RUNNING", "type": "container", "ipv4": "10.150.1.50"}
+                return f"Creating {name}\nStarting {name}\n{name} is ready"
+            return "LXD: OK — try `lxc list`, `lxc start <name>`, `lxc profile show gpu-passthrough`"
         if low.startswith("virsh"):
             if "list" in low:
                 return " Id   Name         State\n------------------------\n 1    vm-k8s-node  running"
             return "virsh: OK"
+        if low.startswith("packer"):
+            if "version" in low or "-v" in parts:
+                return "Packer v1.11.2"
+            if "fmt" in low:
+                return ""
+            if "validate" in low:
+                return "The configuration is valid."
+            if "init" in low:
+                return (
+                    "Installed plugin github.com/hashicorp/amazon v1.3.2\n"
+                    "Installed plugin github.com/hashicorp/qemu v1.1.0"
+                )
+            if "build" in low:
+                sku = "h100"
+                for key in ("b300", "h200", "h100", "a100", "mi300"):
+                    if key in low or key in slug:
+                        sku = key
+                        break
+                from .shell import StreamedCommandResult
+                lines = [
+                    f"qemu.gpu-{sku}: output will be in this color.",
+                    f"qemu.gpu-{sku}: Retrieving Ubuntu jammy cloud image…",
+                    f"qemu.gpu-{sku}: Starting HTTP server on port 8701",
+                    f"qemu.gpu-{sku}: Creating local QEMU disk image…",
+                    f"qemu.gpu-{sku}: Booting VM for provisioning (NVIDIA driver + DCGM)…",
+                    f"qemu.gpu-{sku}: Provisioning with shell script scripts/install-gpu-{sku}.sh",
+                    f"qemu.gpu-{sku}: Running CVE scan gate (trivy image)… PASS",
+                    f"qemu.gpu-{sku}: Publishing artifact to maas boot-resource custom/{sku}-jammy",
+                    "==> Wait completed after 4 minutes 12 seconds",
+                    f"==> Builds finished. The artifacts of successful builds are:",
+                    f"--> qemu.gpu-{sku}: VM files in directory: output-gpu-{sku}/",
+                ]
+                return StreamedCommandResult(lines=lines, delay_s=0.45)
+            return (
+                "Usage: packer [--version] [--help] <command> [<args>]\n\n"
+                "Common commands:\n"
+                "    build           build image(s) from template\n"
+                "    init            install missing plugins\n"
+                "    validate        check template validity\n"
+                "    fmt             reformat HCL2 config"
+            )
+        if low.startswith("vyos") or low.startswith("vyatta") or low.startswith("show ") and "vyos" in slug:
+            # Minimal VyOS-ish networking for PXE underlay labs
+            if "show interfaces" in low or "interfaces" in low:
+                return (
+                    "Codes: S - State, L - Link, u - Up, D - Down, A - Admin Down\n"
+                    "Interface        IP Address                        S/L  Description\n"
+                    "eth0             10.64.1.1/24                      u/u  management\n"
+                    "eth1             10.64.12.1/24                     u/u  pxe-provision\n"
+                    "eth1.100         10.64.100.1/24                    u/u  gpu-fabric\n"
+                    "lo               127.0.0.1/8                       u/u"
+                )
+            if "show dhcp" in low or "dhcp" in low:
+                return (
+                    "IP address    Hardware address    Lease expiration     Pool      Client Name\n"
+                    "10.64.12.11   a4:bb:6d:aa:01:01   2026/08/01 12:00:00  pxe-pool  gpu-node-01\n"
+                    "10.64.12.12   a4:bb:6d:aa:01:02   2026/08/01 12:00:00  pxe-pool  gpu-node-02"
+                )
+            if "show conf" in low or "configuration" in low:
+                return (
+                    "interfaces {\n"
+                    "    ethernet eth1 {\n"
+                    "        address 10.64.12.1/24\n"
+                    "        description pxe-provision\n"
+                    "    }\n"
+                    "}\nservice {\n"
+                    "    dhcp-server {\n"
+                    "        shared-network-name pxe {\n"
+                    "            subnet 10.64.12.0/24 {\n"
+                    "                default-router 10.64.12.1\n"
+                    "                bootfile-name undionly.kpxe\n"
+                    "                bootfile-server 10.64.1.2\n"
+                    "            }\n"
+                    "        }\n"
+                    "    }\n"
+                    "}"
+                )
+            return "VyOS OK — try: show interfaces / show dhcp server leases / show configuration"
         return f"{line}: OK"
     shell.register_handler(handler)
 

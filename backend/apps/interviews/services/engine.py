@@ -200,11 +200,25 @@ def start_round(round_obj: InterviewRound) -> dict:
         round_obj.save(update_fields=["metadata", "difficulty_level"])
     except Exception:  # noqa: BLE001 - planning is best-effort, never fatal
         pass
-    # Seed conversation memory for cross-turn intelligence.
+    # Seed conversation memory for cross-turn intelligence + P2.R6 framing beats.
     try:
         conv = _conversation_meta(round_obj)
+        dirty = False
         if "memory" not in conv:
             conv["memory"] = empty_memory()
+            dirty = True
+        if "framing_beats" not in conv:
+            from apps.interviews.services.realism.framing import (
+                framing_beat_sequence,
+                framing_signoff,
+            )
+
+            conv["framing_beats"] = framing_beat_sequence(
+                duration_minutes=round_obj.duration_minutes or 45,
+            )
+            conv["framing_signoff"] = framing_signoff()
+            dirty = True
+        if dirty:
             round_obj.save(update_fields=["metadata"])
     except Exception:  # noqa: BLE001
         pass
@@ -291,6 +305,80 @@ def _conversation_meta(round_obj: InterviewRound) -> dict:
     meta = round_obj.metadata if isinstance(round_obj.metadata, dict) else {}
     round_obj.metadata = meta
     return meta.setdefault("conversation", {})
+
+
+def _apply_reply_realism(
+    round_obj: InterviewRound,
+    reply: str,
+    *,
+    score_result: dict | None = None,
+    answer_text: str = "",
+    quality: str = "",
+    allow_callback: bool = True,
+) -> str:
+    """P2.R5 callback memory + P2.R7 phrasing variety on interviewer replies.
+
+    Mutates ``round.metadata.conversation`` (used_openers / callback_phrases).
+    Caller should save metadata after. Failures never block the interview.
+    """
+    text = (reply or "").strip()
+    if not text:
+        return text
+    try:
+        from apps.interviews.services.realism.callbacks import (
+            extract_callback_phrases,
+            maybe_callback_opener,
+            phrases_from_meta,
+            remember_phrases,
+        )
+        from apps.interviews.services.realism.phrasing import (
+            apply_variety,
+            load_used_openers,
+            store_used_openers,
+        )
+
+        conv = _conversation_meta(round_obj)
+        score_result = score_result or {}
+        prior_phrases = phrases_from_meta(conv)
+        new_phrases = extract_callback_phrases(
+            answer_text,
+            expected_keywords=list(score_result.get("expected_signals") or []),
+        )
+        if new_phrases:
+            remember_phrases(conv, new_phrases)
+
+        reaction = (quality or score_result.get("quality") or "partial").lower()
+        if reaction not in ("strong", "partial", "weak", "off_topic", "skipped", "reprompt"):
+            if reaction in ("adequate", "good"):
+                reaction = "strong"
+            elif reaction in ("brief",):
+                reaction = "weak"
+            else:
+                reaction = "partial"
+
+        turn_index = 0
+        try:
+            turn_index = int(round_obj.messages.count())
+        except Exception:  # noqa: BLE001
+            turn_index = 0
+        used = load_used_openers(conv)
+        text, used = apply_variety(
+            text,
+            reaction=reaction,
+            used_openers=used,
+            answer_text=answer_text,
+            turn_index=turn_index,
+            stt_confidence=score_result.get("stt_confidence"),
+        )
+        store_used_openers(conv, used)
+
+        if allow_callback and prior_phrases and reaction in ("strong", "partial", "adequate"):
+            cb = maybe_callback_opener(prior_phrases, chance=0.28)
+            if cb:
+                text = f"{cb} {text}".strip()
+        return text
+    except Exception:  # noqa: BLE001
+        return (reply or "").strip()
 
 
 def _reprompt_count(round_obj: InterviewRound, question_text: str) -> int:
@@ -527,7 +615,15 @@ def _recent_tail(round_obj: InterviewRound, limit: int = 6) -> list[dict]:
     )
 
 
-def _speech_hints_for_round(round_obj: InterviewRound, next_q=None, *, question_meta: dict | None = None) -> dict:
+def _speech_hints_for_round(
+    round_obj: InterviewRound,
+    next_q=None,
+    *,
+    question_meta: dict | None = None,
+    answer_text: str = "",
+    next_move: str = "",
+    scoring_elapsed_ms: float | None = None,
+) -> dict:
     """Persona speech cadence + adaptive thinking delay for the frontend TTS layer."""
     from apps.interviews.services.persona_style import speech_profile, thinking_delay_ms
 
@@ -540,18 +636,22 @@ def _speech_hints_for_round(round_obj: InterviewRound, next_q=None, *, question_
     tone = memory.get("tone") or "neutral"
 
     profile = speech_profile(round_obj.round_type, round_obj.persona_voice_id or "")
+    move = next_move or ("reprompt" if meta.get("reprompt") else "")
     delay = thinking_delay_ms(
         round_obj.round_type,
         difficulty=int(difficulty),
         question_kind=str(meta.get("kind") or ""),
         category=str(meta.get("category") or ""),
         persona_voice_id=round_obj.persona_voice_id or "",
+        answer_text=answer_text or "",
+        next_move=move,
+        scoring_elapsed_ms=scoring_elapsed_ms,
     )
     if tone == "nervous":
-        delay = max(180, int(delay * 0.75))
+        delay = max(500, int(delay * 0.85))
         profile = {**profile, "rate": round(max(0.88, profile.get("rate", 0.96) - 0.04), 2)}
     elif tone == "confident":
-        delay = min(1400, int(delay * 1.08))
+        delay = min(3500, int(delay * 1.08))
     return {"speech_profile": profile, "thinking_delay_ms": delay, "candidate_tone": tone}
 
 
@@ -797,7 +897,11 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         last_q_difficulty = last_q_msg.metadata.get("difficulty") or last_q_difficulty
     meta["question_category"] = last_q_category
 
+    from apps.interviews.services.realism.timing import wall_ms
+
+    _score_t0 = wall_ms()
     score_result = score_answer(question, answer_text, meta)
+    _scoring_elapsed_ms = wall_ms() - _score_t0
     score_result["question_category"] = last_q_category
     score_result["question_kind"] = last_q_kind
     score_result["question_difficulty"] = last_q_difficulty
@@ -894,9 +998,119 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
     warmup_slot = last_q_category in ("intro", "experience", "personal", "casual")
 
     quality = score_result.get("quality", "")
+    q_key = _normalize_q(question_text) or f"msg:{(last_q_msg.id if last_q_msg else 0)}"
+    from apps.interviews.services.realism.probe import (
+        ProbeAction,
+        hint_line,
+        move_on_line,
+        narrow_prompt,
+        next_probe_action,
+    )
+
+    # P2.R4 — multi-step probe ladder (narrow → hint → move on) instead of a
+    # single re-ask. Warm-up slots still always advance.
+    probe_decision = None
+    if (
+        _should_reprompt_answer(score_result, correctness)
+        and bool(question_text)
+        and not warmup_slot
+    ):
+        conv = _conversation_meta(round_obj)
+        probe_map = conv.get("probe_state") if isinstance(conv.get("probe_state"), dict) else {}
+        probe_decision, probe_map = next_probe_action(
+            question_key=q_key,
+            quality=quality,
+            correctness=correctness,
+            probe_state=probe_map,
+            max_attempts=3,
+        )
+        conv["probe_state"] = probe_map
+        try:
+            round_obj.save(update_fields=["metadata"])
+        except Exception:  # noqa: BLE001
+            pass
+
+    if probe_decision and probe_decision.action in (
+        ProbeAction.NARROW,
+        ProbeAction.HINT,
+    ):
+        follow_ups = []
+        expected_kw = []
+        if question is not None:
+            follow_ups = getattr(question, "follow_ups", None) or []
+            expected_kw = getattr(question, "expected_keywords", None) or []
+        if last_q_msg and isinstance(last_q_msg.metadata, dict):
+            pc = last_q_msg.metadata.get("practical_config") or {}
+            if isinstance(pc, dict) and pc.get("expected_signals"):
+                expected_kw = list(expected_kw) + list(pc.get("expected_signals") or [])
+        if probe_decision.action == ProbeAction.NARROW:
+            reply = narrow_prompt(question_text, follow_ups if isinstance(follow_ups, list) else None)
+        else:
+            reply = hint_line(expected_kw if isinstance(expected_kw, list) else None)
+        reply = _apply_reply_realism(
+            round_obj,
+            reply,
+            score_result=score_result,
+            answer_text=answer_text,
+            quality="reprompt",
+            allow_callback=False,
+        )
+        _bump_reprompt(round_obj, question_text)
+        try:
+            round_obj.save(update_fields=["metadata"])
+        except Exception:  # noqa: BLE001
+            pass
+        interviewer_msg = InterviewMessage.objects.create(
+            round=round_obj,
+            role="interviewer",
+            content=reply,
+            message_type="follow_up",
+            metadata={
+                "prior_score": score_result["score"],
+                "reprompt": True,
+                "probe_action": probe_decision.action.value,
+                "probe_attempt": probe_decision.attempt,
+                "advanced": False,
+            },
+        )
+        coaching = _maybe_coaching(round_obj, meta, score_result, answer_text)
+        hints = _speech_hints_for_round(
+            round_obj,
+            question_meta={
+                "category": last_q_category,
+                "kind": last_q_kind,
+                "difficulty": last_q_difficulty,
+                "reprompt": True,
+            },
+            answer_text=answer_text,
+            next_move="probe",
+            scoring_elapsed_ms=_scoring_elapsed_ms,
+        )
+        return {
+            "candidate_message": cand_msg,
+            "interviewer_reply": interviewer_msg,
+            "reply": reply,
+            "advanced": False,
+            "correctness": correctness,
+            "score": score_result,
+            "next_question": None,
+            "coaching": coaching,
+            "skipped": quality == "skipped",
+            "probe_action": probe_decision.action.value,
+            **hints,
+        }
+
+    # Graceful move-on after probe ladder — prefix soft redirect, then advance.
+    move_on_prefix = ""
+    if probe_decision and probe_decision.action == ProbeAction.MOVE_ON:
+        move_on_prefix = move_on_line() + " "
+
+    # Legacy single-reprompt path kept for non-probe weak answers that somehow
+    # skip the ladder (should be rare). Prefer probe_decision above.
     already_reprompted = _reprompt_count(round_obj, question_text) >= 1
     reprompt_now = (
-        _should_reprompt_answer(score_result, correctness)
+        probe_decision is None
+        and _should_reprompt_answer(score_result, correctness)
         and not already_reprompted
         and bool(question_text)
         and not warmup_slot
@@ -912,6 +1126,14 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
             )
         except Exception:  # noqa: BLE001
             reply = "Thanks — can you walk me through that concretely, step by step?"
+        reply = _apply_reply_realism(
+            round_obj,
+            reply,
+            score_result=score_result,
+            answer_text=answer_text,
+            quality="reprompt",
+            allow_callback=False,
+        )
         _bump_reprompt(round_obj, question_text)
         # Persist the reprompt counter (lives on round.metadata).
         try:
@@ -932,7 +1154,11 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
                 "category": last_q_category,
                 "kind": last_q_kind,
                 "difficulty": last_q_difficulty,
+                "reprompt": True,
             },
+            answer_text=answer_text,
+            next_move="reprompt",
+            scoring_elapsed_ms=_scoring_elapsed_ms,
         )
         return {
             "candidate_message": cand_msg,
@@ -964,6 +1190,22 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
     except Exception:  # noqa: BLE001
         reply = "Got it — thanks. Let's keep going."
 
+    reply = _apply_reply_realism(
+        round_obj,
+        reply,
+        score_result=score_result,
+        answer_text=answer_text,
+        quality=quality,
+        allow_callback=True,
+    )
+    try:
+        round_obj.save(update_fields=["metadata"])
+    except Exception:  # noqa: BLE001
+        pass
+
+    if move_on_prefix:
+        reply = f"{move_on_prefix}{reply}".strip()
+
     next_q = None
     if _should_ask_another(round_obj):
         try:
@@ -993,7 +1235,12 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
     )
 
     coaching = _maybe_coaching(round_obj, meta, score_result, answer_text)
-    hints = _speech_hints_for_round(round_obj, next_q)
+    hints = _speech_hints_for_round(
+        round_obj,
+        next_q,
+        answer_text=answer_text,
+        scoring_elapsed_ms=_scoring_elapsed_ms,
+    )
 
     return {
         "candidate_message": cand_msg,

@@ -1,0 +1,116 @@
+title: 'AWX: Roll NVIDIA Driver Playbook Fleet-Wide'
+slug: ai-infra-awx-nvidia-driver-rollout
+technology: AI Infrastructure Engineering
+category: Automation
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: ansible-awx
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: A team operating AI infrastructure engineering has raised a ticket for `AWX: Roll
+  NVIDIA Driver Playbook Fleet-Wide`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GPU bare-metal lab (MAAS + node + Datacenter twin
+  + AWX). The architecture is a single lab-primary node exposing MAAS commissioning, LXD, PXE/BMC, nvidia-smi/DCGM/rocm-smi,
+  AWX jobs, and Datacenter twin; treat it as the production host for this incident. All tools run locally
+  — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Driver job template exists; canary node still on previous driver. Bare-metal
+  GPU fleet needs a controlled NVIDIA driver roll via AWX / Automation Controller.
+
+  AWX console + Lab Terminal on a canary node.
+
+  Launch the driver playbook job, verify nvidia-smi on canary, mark FIXED-OK.
+
+
+  OBJECTIVE: Open AWX and select the GPU driver job template; Run against canary inventory; Verify driver
+  with nvidia-smi on the Lab Server. Acceptance criteria: the change is minimal and reversible, and success
+  means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant MAAS commissioning, LXD, PXE/BMC, nvidia-smi/DCGM/rocm-smi, AWX jobs, and Datacenter
+  twin), changing one thing at a time. Check your work continuously against the objective — success means
+  `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
+  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Open AWX and select the GPU driver job template
+- Run against canary inventory
+- Verify driver with nvidia-smi on the Lab Server
+initial_state: Driver job template exists; canary node still on previous driver.
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: AWX is not behaving as the scenario objectives
+    require. This lab is about AWX — how AWX behaves in a AI infrastructure engineering environment. Read
+    the objectives and the current state, and note precisely what looks wrong versus healthy before you
+    form any theory.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For AWX problems the reliable method is: (1) reproduce/observe the
+    failure, (2) narrow from the whole system down to the one component that owns the symptom, (3) change
+    exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just the
+    noisy log line), changing one thing at a time.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `nvidia-smi` and `dmesg | grep -i nvidia` for driver visibility.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. Check if the GPU appears in `lspci | grep -i nvidia`.
+
+    2. Verify the correct driver module is loaded (`lsmod | grep nvidia`).
+
+    3. Look for Xid errors or fallen-off-bus messages in dmesg.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Reload driver, rebind PCI, or fix persistence mode per the scenario.
+
+    2. Re-run `nvidia-smi`.
+
+    3. Confirm GPU name and memory report without errors.
+
+
+    WHY: workloads need the driver to see the device.'
+consoles:
+- awx
+- terminal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - awx
+  - terminal

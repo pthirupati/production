@@ -122,6 +122,11 @@ TECH_PROFILES: dict[str, dict[str, str]] = {
     "prometheus": {"domain": "Prometheus monitoring", "env": "Prometheus stack", "surface": "scrape configs, PromQL, rules, and Alertmanager"},
     "security": {"domain": "security hardening", "env": "hardening lab", "surface": "SSH, firewall, TLS, audit logs, and IAM settings"},
     "gpu": {"domain": "GPU operations", "env": "GPU node", "surface": "nvidia-smi, drivers, CUDA, and container toolkit"},
+    "ai-infra": {
+        "domain": "AI infrastructure engineering",
+        "env": "GPU bare-metal lab (MAAS + node + Datacenter twin + AWX)",
+        "surface": "MAAS commissioning, LXD, PXE/BMC, nvidia-smi/DCGM/rocm-smi, AWX jobs, and Datacenter twin",
+    },
     "baremetal": {"domain": "bare metal operations", "env": "physical server lab", "surface": "IPMI, RAID, BIOS, and out-of-band console"},
     "nmap": {"domain": "network scanning", "env": "scanning lab", "surface": "nmap CLI, targets, and scan output"},
     "wireshark": {"domain": "packet analysis", "env": "capture lab", "surface": "pcap files, display filters, and protocol decode"},

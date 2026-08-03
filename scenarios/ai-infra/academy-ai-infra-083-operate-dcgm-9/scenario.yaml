@@ -1,0 +1,113 @@
+title: 'AI Infrastructure Engineering: Dcgm — Daily Operations'
+slug: academy-ai-infra-083-operate-dcgm-9
+technology: AI Infrastructure Engineering
+category: Operations
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A team operating AI infrastructure engineering has raised a ticket for `AI Infrastructure
+  Engineering: Dcgm — Daily Operations`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GPU bare-metal lab (MAAS + node + Datacenter twin
+  + AWX). The architecture is a single lab-primary node exposing MAAS commissioning, LXD, PXE/BMC, nvidia-smi/DCGM/rocm-smi,
+  AWX jobs, and Datacenter twin; treat it as the production host for this incident. All tools run locally
+  — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The lab environment is healthy enough for scheduled work on DCGM. Complete
+  the maintenance task without unnecessary downtime. Day-2 operations: perform a routine DCGM task safely
+  in AI Infrastructure Engineering. Follow change control — inspect, change, verify — while working with
+  GPU health and telemetry.
+
+
+  OBJECTIVE: Day-2 DCGM work completes safely in this environment; Changes are verified with before/after
+  checks; The system remains stable for dependent teams. Acceptance criteria: the change is minimal and
+  reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant MAAS commissioning, LXD, PXE/BMC, nvidia-smi/DCGM/rocm-smi, AWX jobs, and Datacenter
+  twin), changing one thing at a time. Check your work continuously against the objective — success means
+  `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Day-2 DCGM work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The lab environment is healthy enough for scheduled work on DCGM. Complete
+  the maintenance task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: GPU health issues go undetected. This lab is
+    about DCGM — GPU health and telemetry. Read the objectives and the current state, and note precisely
+    what looks wrong versus healthy before you form any theory.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For DCGM problems the reliable method is: (1) reproduce/observe the
+    failure, (2) narrow from the whole system down to the one component that owns the symptom, (3) change
+    exactly one thing, (4) re-check. Execute the maintenance in small, reversible steps, taking a snapshot
+    or backup first if the change is risky.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `nvidia-smi` and `dmesg | grep -i nvidia` for driver visibility.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. Check if the GPU appears in `lspci | grep -i nvidia`.
+
+    2. Verify the correct driver module is loaded (`lsmod | grep nvidia`).
+
+    3. Look for Xid errors or fallen-off-bus messages in dmesg.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Reload driver, rebind PCI, or fix persistence mode per the scenario.
+
+    2. Re-run `nvidia-smi`.
+
+    3. Confirm GPU name and memory report without errors.
+
+
+    WHY: workloads need the driver to see the device.'
+consoles:
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: linux
+  appears_in:
+  - terminal
