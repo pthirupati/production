@@ -4788,4 +4788,139 @@ EXTRA_PROJECTS = [{'technology_slug': 'aws',
                      'frame numbers, 4) Impact, 5) Remediation, 6) Artifacts (evidence.pcapng sha256, '
                      'packets.csv). Every claim cites a packet.',
              'order': 6,
-             'depends_on': 'WSFOR-5'}]}]
+             'depends_on': 'WSFOR-5'}]},
+
+    # ── AI Infrastructure Engineering (slug: ai-infra) — 5 projects ──
+    {
+        'technology_slug': 'ai-infra',
+        'title': 'MAAS Commission & Deploy an H100 Node',
+        'slug': 'ai-infra-maas-commission-h100',
+        'architecture_type': 'custom',
+        'description': (
+            'Onboard a GPU bare-metal server end to end: BMC reachability, MAAS enlistment, '
+            'commissioning scripts, PXE deploy of Ubuntu, and post-install nvidia-smi validation.'
+        ),
+        'objectives': [
+            'Enlist and commission a machine in MAAS',
+            'Deploy Ubuntu via PXE/Curtin/cloud-init',
+            'Verify GPUs with nvidia-smi after deploy',
+            'Document Ready → Deployed lifecycle',
+        ],
+        'difficulty': 'intermediate',
+        'estimated_hours': 5,
+        'order': 1,
+        'tasks': [
+            {'jira_key': 'AII-1', 'title': 'Reach the BMC and verify power', 'description': 'Confirm out-of-band reachability and power state before MAAS commission.', 'acceptance_criteria': '`ipmitool power status` / LAN print succeed against the BMC.', 'hint': 'Use ipmitool chassis power status and lan print; fix credentials if auth fails.', 'order': 1},
+            {'jira_key': 'AII-2', 'title': 'Enlist the machine in MAAS', 'description': 'Add the node so MAAS can PXE it; confirm New/Ready inventory.', 'acceptance_criteria': '`maas admin machines read` lists the hostname.', 'hint': 'maas login, then machines read — look for serial/BMC power type.', 'order': 2, 'depends_on': 'AII-1'},
+            {'jira_key': 'AII-3', 'title': 'Commission hardware', 'description': 'Run commissioning scripts and wait for Ready.', 'acceptance_criteria': 'Machine status is Ready after commission.', 'hint': 'maas admin machine commission <name> — watch BMC power + PXE ephemeral.', 'order': 3, 'depends_on': 'AII-2'},
+            {'jira_key': 'AII-4', 'title': 'Deploy Ubuntu jammy', 'description': 'Deploy an approved Ubuntu image via PXE.', 'acceptance_criteria': 'Machine status Deployed with a management IP.', 'hint': 'maas admin machine deploy — Curtin + cloud-init must finish.', 'order': 4, 'depends_on': 'AII-3'},
+            {'jira_key': 'AII-5', 'title': 'Validate GPUs on the node', 'description': 'SSH to the node and confirm all GPUs enumerate.', 'acceptance_criteria': '`nvidia-smi -L` lists the expected GPU count.', 'hint': 'ssh to the deployed IP; lspci | grep -i nvidia then nvidia-smi.', 'order': 5, 'depends_on': 'AII-4'},
+            {'jira_key': 'AII-6', 'title': 'Hand off with inventory notes', 'description': 'Record hostname, serial, rack/U, image, and GPU SKU for CMDB.', 'acceptance_criteria': 'A short inventory note covers identity + deploy image + GPU model.', 'hint': 'Pull serial from ipmitool fru / dmidecode; SKU from nvidia-smi.', 'order': 6, 'depends_on': 'AII-5'},
+        ],
+    },
+    {
+        'technology_slug': 'ai-infra',
+        'title': 'DCGM Health & Exporter for GPU Fleet',
+        'slug': 'ai-infra-dcgm-exporter-fleet',
+        'architecture_type': 'custom',
+        'description': (
+            'Stand up DCGM diagnostics and dcgm-exporter so Prometheus/Grafana can scrape GPU '
+            'health. Cover discovery, diag levels 1–4, and blank-metrics triage.'
+        ),
+        'objectives': [
+            'Run dcgmi discovery and health checks',
+            'Execute diag run levels appropriately',
+            'Deploy/verify dcgm-exporter metrics',
+            'Triage blank or missing GPU metrics',
+        ],
+        'difficulty': 'intermediate',
+        'estimated_hours': 4,
+        'order': 2,
+        'tasks': [
+            {'jira_key': 'AII2-1', 'title': 'Discover GPUs with dcgmi', 'description': 'Confirm DCGM sees every GPU on the node.', 'acceptance_criteria': '`dcgmi discovery -l` lists all GPUs.', 'hint': 'If discovery fails, check nvidia driver and nv-hostengine.', 'order': 1},
+            {'jira_key': 'AII2-2', 'title': 'Run deployment-level diagnostics', 'description': 'Execute a level-1/2 diagnostic and capture pass/fail.', 'acceptance_criteria': '`dcgmi diag -r 1` (or 2) completes with Pass.', 'hint': 'Start with -r 1; escalate to 2/3/4 only as needed.', 'order': 2, 'depends_on': 'AII2-1'},
+            {'jira_key': 'AII2-3', 'title': 'Start dcgm-exporter', 'description': 'Run the exporter and confirm it listens on :9400.', 'acceptance_criteria': 'Exporter log shows Listening on :9400 and sample metrics render.', 'hint': 'dcgm-exporter; curl localhost:9400/metrics | grep DCGM_FI_DEV_GPU_UTIL.', 'order': 3, 'depends_on': 'AII2-1'},
+            {'jira_key': 'AII2-4', 'title': 'Triage blank metrics', 'description': 'Diagnose a node that exports process but no GPU gauges.', 'acceptance_criteria': 'Root cause documented (driver/hostengine/field group) with fix applied.', 'hint': 'Check nv-hostengine, DCGM field groups, and nvidia-smi health first.', 'order': 4, 'depends_on': 'AII2-3'},
+            {'jira_key': 'AII2-5', 'title': 'Wire a scrape target note', 'description': 'Document the Prometheus scrape job for this exporter.', 'acceptance_criteria': 'Scrape config snippet or runbook entry for :9400 exists.', 'hint': 'job_name: dcgm; metrics_path /metrics; targets node:9400.', 'order': 5, 'depends_on': 'AII2-3'},
+        ],
+    },
+    {
+        'technology_slug': 'ai-infra',
+        'title': 'AWX Driver Rollout for GPU Nodes',
+        'slug': 'ai-infra-awx-gpu-driver-rollout',
+        'architecture_type': 'custom',
+        'description': (
+            'Use AWX to roll NVIDIA drivers across a MAAS inventory group safely: inventory sync, '
+            'credentials, job template, rolling run, and verification with nvidia-smi.'
+        ),
+        'objectives': [
+            'Sync inventory from MAAS GPU pool',
+            'Author/run a driver install job template',
+            'Verify drivers on sample nodes',
+            'Capture job history evidence',
+        ],
+        'difficulty': 'intermediate',
+        'estimated_hours': 4,
+        'order': 3,
+        'tasks': [
+            {'jira_key': 'AII3-1', 'title': 'Confirm AWX inventory group', 'description': 'Ensure maas-gpu-nodes (or equivalent) exists and is populated.', 'acceptance_criteria': 'Inventory lists expected GPU hosts.', 'hint': 'awx inventories / hosts; sync from MAAS source if empty.', 'order': 1},
+            {'jira_key': 'AII3-2', 'title': 'Create driver job template', 'description': 'Point a job template at the driver playbook and credentials.', 'acceptance_criteria': 'Job template is saved and launchable.', 'hint': 'Project + playbook + machine cred + inventory.', 'order': 2, 'depends_on': 'AII3-1'},
+            {'jira_key': 'AII3-3', 'title': 'Launch a canary run', 'description': 'Run against one host first.', 'acceptance_criteria': 'Canary job is successful.', 'hint': 'Limit to a single hostname; watch live stdout.', 'order': 3, 'depends_on': 'AII3-2'},
+            {'jira_key': 'AII3-4', 'title': 'Roll remaining nodes', 'description': 'Complete the fleet with rolling batch size.', 'acceptance_criteria': 'All target hosts show successful job status.', 'hint': 'Use forks/serial; fail fast on nvidia-smi errors.', 'order': 4, 'depends_on': 'AII3-3'},
+            {'jira_key': 'AII3-5', 'title': 'Verify with nvidia-smi', 'description': 'Spot-check driver version consistency.', 'acceptance_criteria': 'Sample nodes report the expected driver version.', 'hint': 'nvidia-smi --query-gpu=driver_version --format=csv.', 'order': 5, 'depends_on': 'AII3-4'},
+        ],
+    },
+    {
+        'technology_slug': 'ai-infra',
+        'title': 'Packer GPU Image Factory',
+        'slug': 'ai-infra-packer-gpu-image-factory',
+        'architecture_type': 'custom',
+        'description': (
+            'Build a custom H100/H200 jammy image with Packer: base upstream image, driver/CUDA layer, '
+            'CVE gate, and publish into MAAS boot-resources — no manual bake.'
+        ),
+        'objectives': [
+            'Author Packer HCL for GPU image',
+            'Run a build with streamed logs',
+            'Pass a CVE/SBOM gate',
+            'Publish artifact to MAAS boot-resources',
+        ],
+        'difficulty': 'advanced',
+        'estimated_hours': 6,
+        'order': 4,
+        'tasks': [
+            {'jira_key': 'AII4-1', 'title': 'Define Packer template', 'description': 'HCL for jammy + NVIDIA driver layer targeting H100.', 'acceptance_criteria': 'packer validate succeeds on the template.', 'hint': 'Source upstream cloud image; provisioner shell for driver install.', 'order': 1},
+            {'jira_key': 'AII4-2', 'title': 'Run packer build', 'description': 'Execute the build and capture artifact path.', 'acceptance_criteria': 'Build completes and prints artifact location.', 'hint': 'packer build gpu-h100.pkr.hcl — watch CVE gate step.', 'order': 2, 'depends_on': 'AII4-1'},
+            {'jira_key': 'AII4-3', 'title': 'Clear vulnerability gate', 'description': 'Ensure high/critical CVEs are remediated or waived with rationale.', 'acceptance_criteria': 'Gate report shows allowed ship state.', 'hint': 'Rebuild after package bumps; document waivers.', 'order': 3, 'depends_on': 'AII4-2'},
+            {'jira_key': 'AII4-4', 'title': 'Publish to MAAS', 'description': 'Upload custom boot resource for deploy.', 'acceptance_criteria': '`maas boot-resources read` shows custom/h100-jammy (or equivalent).', 'hint': 'maas boot-resources create / upload API.', 'order': 4, 'depends_on': 'AII4-3'},
+            {'jira_key': 'AII4-5', 'title': 'Deploy from custom image', 'description': 'Deploy one Ready machine using the new image.', 'acceptance_criteria': 'Node reaches Deployed on the custom series.', 'hint': 'Specify distro_series/osystem for the custom resource.', 'order': 5, 'depends_on': 'AII4-4'},
+        ],
+    },
+    {
+        'technology_slug': 'ai-infra',
+        'title': 'DCOps Thermal Incident on H100 Tray',
+        'slug': 'ai-infra-dcops-h100-thermal-rma',
+        'architecture_type': 'custom',
+        'description': (
+            'Work a realistic DCOPS thermal ticket: locate the rack, confirm GPU thermals, '
+            'reseat/replace SXM tray or fans, burn-in with DCGM, and close the RMA.'
+        ),
+        'objectives': [
+            'Locate asset in the datacenter twin',
+            'Confirm thermal/power evidence',
+            'Execute FRU/tray replacement workflow',
+            'Burn-in and close the ticket',
+        ],
+        'difficulty': 'advanced',
+        'estimated_hours': 5,
+        'order': 5,
+        'tasks': [
+            {'jira_key': 'AII5-1', 'title': 'Badge in and locate the rack', 'description': 'Enter the DC twin and find the failing H100 node.', 'acceptance_criteria': 'Server selected in the correct rack/U.', 'hint': 'Search hostname/serial; confirm row/aisle from ticket.', 'order': 1},
+            {'jira_key': 'AII5-2', 'title': 'Collect thermal evidence', 'description': 'Capture nvidia-smi / dcgmi temps and BMC sensors.', 'acceptance_criteria': 'Evidence shows which GPU(s) violate thresholds.', 'hint': 'nvidia-smi -q -d TEMPERATURE; ipmitool sensor.', 'order': 2, 'depends_on': 'AII5-1'},
+            {'jira_key': 'AII5-3', 'title': 'Open RMA / pull spare', 'description': 'Order or pull the correct FRU from inventory.', 'acceptance_criteria': 'Parts ticket references correct FRU and availability.', 'hint': 'Match SXM tray / fan FRU to vendor BOM.', 'order': 3, 'depends_on': 'AII5-2'},
+            {'jira_key': 'AII5-4', 'title': 'Replace and reseat', 'description': 'Power down via BMC, swap FRU, reseat power/data cables.', 'acceptance_criteria': 'Node powers on; all GPUs enumerate.', 'hint': 'ipmitool power cycle after tray seat; nvidia-smi -L.', 'order': 4, 'depends_on': 'AII5-3'},
+            {'jira_key': 'AII5-5', 'title': 'Burn-in diagnostics', 'description': 'Run DCGM diag and a short stress window.', 'acceptance_criteria': 'Diag Pass and thermals stay within limit.', 'hint': 'dcgmi diag -r 3 or 4; watch dmon for 5–10 minutes.', 'order': 5, 'depends_on': 'AII5-4'},
+            {'jira_key': 'AII5-6', 'title': 'Close ticket with evidence', 'description': 'Attach before/after metrics and return node to production pool.', 'acceptance_criteria': 'Ticket closed with evidence pack linked.', 'hint': 'Include nvidia-smi, dcgmi, and BMC sensor snippets.', 'order': 6, 'depends_on': 'AII5-5'},
+        ],
+    },
+]

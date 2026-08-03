@@ -307,6 +307,80 @@ def _conversation_meta(round_obj: InterviewRound) -> dict:
     return meta.setdefault("conversation", {})
 
 
+def _apply_reply_realism(
+    round_obj: InterviewRound,
+    reply: str,
+    *,
+    score_result: dict | None = None,
+    answer_text: str = "",
+    quality: str = "",
+    allow_callback: bool = True,
+) -> str:
+    """P2.R5 callback memory + P2.R7 phrasing variety on interviewer replies.
+
+    Mutates ``round.metadata.conversation`` (used_openers / callback_phrases).
+    Caller should save metadata after. Failures never block the interview.
+    """
+    text = (reply or "").strip()
+    if not text:
+        return text
+    try:
+        from apps.interviews.services.realism.callbacks import (
+            extract_callback_phrases,
+            maybe_callback_opener,
+            phrases_from_meta,
+            remember_phrases,
+        )
+        from apps.interviews.services.realism.phrasing import (
+            apply_variety,
+            load_used_openers,
+            store_used_openers,
+        )
+
+        conv = _conversation_meta(round_obj)
+        score_result = score_result or {}
+        prior_phrases = phrases_from_meta(conv)
+        new_phrases = extract_callback_phrases(
+            answer_text,
+            expected_keywords=list(score_result.get("expected_signals") or []),
+        )
+        if new_phrases:
+            remember_phrases(conv, new_phrases)
+
+        reaction = (quality or score_result.get("quality") or "partial").lower()
+        if reaction not in ("strong", "partial", "weak", "off_topic", "skipped", "reprompt"):
+            if reaction in ("adequate", "good"):
+                reaction = "strong"
+            elif reaction in ("brief",):
+                reaction = "weak"
+            else:
+                reaction = "partial"
+
+        turn_index = 0
+        try:
+            turn_index = int(round_obj.messages.count())
+        except Exception:  # noqa: BLE001
+            turn_index = 0
+        used = load_used_openers(conv)
+        text, used = apply_variety(
+            text,
+            reaction=reaction,
+            used_openers=used,
+            answer_text=answer_text,
+            turn_index=turn_index,
+            stt_confidence=score_result.get("stt_confidence"),
+        )
+        store_used_openers(conv, used)
+
+        if allow_callback and prior_phrases and reaction in ("strong", "partial", "adequate"):
+            cb = maybe_callback_opener(prior_phrases, chance=0.28)
+            if cb:
+                text = f"{cb} {text}".strip()
+        return text
+    except Exception:  # noqa: BLE001
+        return (reply or "").strip()
+
+
 def _reprompt_count(round_obj: InterviewRound, question_text: str) -> int:
     """How many times THIS exact question has already been re-asked (WS2)."""
     conv = _conversation_meta(round_obj)
@@ -973,6 +1047,14 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
             reply = narrow_prompt(question_text, follow_ups if isinstance(follow_ups, list) else None)
         else:
             reply = hint_line(expected_kw if isinstance(expected_kw, list) else None)
+        reply = _apply_reply_realism(
+            round_obj,
+            reply,
+            score_result=score_result,
+            answer_text=answer_text,
+            quality="reprompt",
+            allow_callback=False,
+        )
         _bump_reprompt(round_obj, question_text)
         try:
             round_obj.save(update_fields=["metadata"])
@@ -1044,6 +1126,14 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
             )
         except Exception:  # noqa: BLE001
             reply = "Thanks — can you walk me through that concretely, step by step?"
+        reply = _apply_reply_realism(
+            round_obj,
+            reply,
+            score_result=score_result,
+            answer_text=answer_text,
+            quality="reprompt",
+            allow_callback=False,
+        )
         _bump_reprompt(round_obj, question_text)
         # Persist the reprompt counter (lives on round.metadata).
         try:
@@ -1099,6 +1189,19 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         )
     except Exception:  # noqa: BLE001
         reply = "Got it — thanks. Let's keep going."
+
+    reply = _apply_reply_realism(
+        round_obj,
+        reply,
+        score_result=score_result,
+        answer_text=answer_text,
+        quality=quality,
+        allow_callback=True,
+    )
+    try:
+        round_obj.save(update_fields=["metadata"])
+    except Exception:  # noqa: BLE001
+        pass
 
     if move_on_prefix:
         reply = f"{move_on_prefix}{reply}".strip()

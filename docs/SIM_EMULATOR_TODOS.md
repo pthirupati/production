@@ -320,9 +320,9 @@ Rule-based only (`interview_ai.py` + `services/conversation/` + new `services/re
 198. [x] **P2.R2** Backchannel layer (`realism/backchannel.py`) — live mm-hmm/okay off interim STT
 199. [ ] **P2.R3** Lab narration — real-time reactions to streamed commands (needs P2.4)
 200. [x] **P2.R4** Wrong-answer probing state machine (narrow → hint → graceful move-on)
-201. [ ] **P2.R5** Callback memory → phrasing (in-round + cross-round from prior report)
+201. [x] **P2.R5** Callback memory → phrasing (in-round + cross-round from prior report)
 202. [~] **P2.R6** Small-talk framing beats (beats stored on round start; two-way UI still open)
-203. [ ] **P2.R7** Phrasing variety / disfluency guard
+203. [x] **P2.R7** Phrasing variety / disfluency guard
 204. [ ] **P2.1** Fix browser voice loop + in-room voice switcher
 205. [ ] **P2.2** Barge-in + skip-on-silence
 206. [ ] **P2.3** Human follow-ups (quote-the-candidate, de-dupe)

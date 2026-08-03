@@ -1733,12 +1733,15 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                     "Fan1A RPM       | 7200.000   | RPM        | ok"
                 )
             if "fru" in low:
+                mfr = getattr(shell.state, "dmi_manufacturer", None) or "Hewlett Packard Enterprise"
+                prod = getattr(shell.state, "dmi_product", None) or "ProLiant DL380 Gen10"
+                serial = "CN7293672A008A"
                 return (
-                    " Board Mfg Date        : Mon Jan 15 12:00:00 2024\n"
-                    " Board Mfg             : Dell Inc.\n"
-                    " Board Product         : PowerEdge XE9680\n"
-                    " Board Serial          : CN7293672A008A\n"
-                    " Product Name          : PowerEdge XE9680"
+                    f" Board Mfg Date        : Mon Jan 15 12:00:00 2024\n"
+                    f" Board Mfg             : {mfr}\n"
+                    f" Board Product         : {prod}\n"
+                    f" Board Serial          : {serial}\n"
+                    f" Product Name          : {prod}"
                 )
             if "lan print" in low or "lan print 1" in low:
                 return (

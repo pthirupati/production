@@ -82,3 +82,49 @@ class RealismFramingTests(SimpleTestCase):
         self.assertIn("minute", beats[1]["content"])
         self.assertTrue(framing_opener())
         self.assertTrue(framing_signoff())
+
+
+class RealismPhrasingTests(SimpleTestCase):
+    def test_opener_not_repeated(self):
+        import random
+
+        from apps.interviews.services.realism.phrasing import apply_variety, pick_opener
+
+        rng = random.Random(11)
+        used = []
+        for _ in range(5):
+            opener = pick_opener("strong", used, rng=rng)
+            self.assertNotIn(opener, used)
+            used.append(opener)
+        text, used2 = apply_variety(
+            "Let's dig into the failover path.",
+            reaction="strong",
+            used_openers=[],
+            rng=random.Random(2),
+        )
+        self.assertTrue(text)
+        self.assertEqual(len(used2), 1)
+
+
+class RealismCallbackTests(SimpleTestCase):
+    def test_extract_and_callback(self):
+        import random
+
+        from apps.interviews.services.realism.callbacks import (
+            extract_callback_phrases,
+            maybe_callback_opener,
+            remember_phrases,
+            phrases_from_meta,
+        )
+
+        phrases = extract_callback_phrases(
+            "I would roll the nvidia driver with AWX across the MAAS inventory."
+        )
+        self.assertTrue(phrases)
+        joined = " ".join(p.lower() for p in phrases)
+        self.assertTrue("nvidia" in joined or "awx" in joined or "maas" in joined)
+        meta = remember_phrases({}, phrases)
+        self.assertEqual(phrases_from_meta(meta), phrases)
+        cb = maybe_callback_opener(phrases, chance=1.0, rng=random.Random(1))
+        self.assertIsNotNone(cb)
+        self.assertTrue(any(p.lower() in cb.lower() for p in phrases))
