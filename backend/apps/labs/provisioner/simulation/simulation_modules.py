@@ -223,6 +223,8 @@ def register_modules(engine: "UnifiedSimulationEngine", shell: RHELShell | None 
 def _modules_for_type(sim_type: str) -> set[str]:
     if sim_type == "generic":
         return {"gpu", "kubernetes", "ansible", "baremetal", "database", "docker", "devops", "networking", "terraform"}
+    if sim_type in ("ansible", "ansible-awx", "awx"):
+        return {"ansible"}
     if sim_type == "devops":
         return {"devops", "docker", "terraform"}
     if sim_type == "networking":
@@ -1705,6 +1707,8 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
             "k8s-node-2": {"state": "STOPPED", "type": "virtual-machine", "ipv4": ""},
             "burn-in-h100": {"state": "RUNNING", "type": "container", "ipv4": "10.150.1.20"},
         }
+    if not hasattr(engine, "_maas_boot_resources") or engine._maas_boot_resources is None:
+        engine._maas_boot_resources = ["ubuntu/jammy", "ubuntu/noble"]
 
     def handler(parts, line):
         low = line.strip().lower()
@@ -1846,13 +1850,13 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                         return "\n".join(f"{x['name']}: power {x['power']}" for x in machines)
                     m["power"] = action
                 return f"Power {action} requested for matching machines."
-            if "boot-resources" in low or "boot" in low:
-                return (
-                    "id  name              architecture  type\n"
-                    "1   ubuntu/jammy      amd64/generic  Synced\n"
-                    "2   ubuntu/noble      amd64/generic  Synced\n"
-                    "3   custom/h100-jammy amd64/generic  Uploaded"
-                )
+            if "boot-resources" in low or ("boot" in low and "resource" in low):
+                resources = list(getattr(engine, "_maas_boot_resources", None) or ["ubuntu/jammy", "ubuntu/noble"])
+                rows = ["id  name              architecture  type"]
+                for i, name in enumerate(resources, start=1):
+                    kind = "Uploaded" if name.startswith("custom/") else "Synced"
+                    rows.append(f"{i:<3} {name:<17} amd64/generic  {kind}")
+                return "\n".join(rows)
             return (
                 "usage: maas <profile> machines read|commission|deploy|release\n"
                 "       maas <profile> boot-resources read\n"
@@ -1931,6 +1935,12 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                     if key in low or key in slug:
                         sku = key
                         break
+                # CVE gate fails when the scenario/slug/template name asks for it
+                # (vuln / cve / fail / gate-fail) — publish must not claim success.
+                fail_cve = any(
+                    k in low or k in slug
+                    for k in ("cve-fail", "vuln", "gate-fail", "trivy-fail")
+                ) or ("cve" in slug and "fail" in slug)
                 from .shell import StreamedCommandResult
                 lines = [
                     f"qemu.gpu-{sku}: output will be in this color.",
@@ -1939,12 +1949,34 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                     f"qemu.gpu-{sku}: Creating local QEMU disk image…",
                     f"qemu.gpu-{sku}: Booting VM for provisioning (NVIDIA driver + DCGM)…",
                     f"qemu.gpu-{sku}: Provisioning with shell script scripts/install-gpu-{sku}.sh",
-                    f"qemu.gpu-{sku}: Running CVE scan gate (trivy image)… PASS",
-                    f"qemu.gpu-{sku}: Publishing artifact to maas boot-resource custom/{sku}-jammy",
-                    "==> Wait completed after 4 minutes 12 seconds",
-                    f"==> Builds finished. The artifacts of successful builds are:",
-                    f"--> qemu.gpu-{sku}: VM files in directory: output-gpu-{sku}/",
                 ]
+                if fail_cve:
+                    lines += [
+                        f"qemu.gpu-{sku}: Running CVE scan gate (trivy image)… FAIL",
+                        f"qemu.gpu-{sku}: HIGH CVE-2024-XXXX in libc6 — see output-gpu-{sku}/cve-report.json",
+                        "==> Builds finished but no artifacts were saved.",
+                        f"--> qemu.gpu-{sku}: CVE gate blocked publish to MAAS boot-resources",
+                    ]
+                    engine._packer_cve_failed = True
+                else:
+                    lines += [
+                        f"qemu.gpu-{sku}: Running CVE scan gate (trivy image)… PASS",
+                        f"qemu.gpu-{sku}: Writing gate report output-gpu-{sku}/cve-report.json",
+                        f"qemu.gpu-{sku}: Publishing artifact to maas boot-resource custom/{sku}-jammy",
+                        "==> Wait completed after 4 minutes 12 seconds",
+                        "==> Builds finished. The artifacts of successful builds are:",
+                        f"--> qemu.gpu-{sku}: VM files in directory: output-gpu-{sku}/",
+                    ]
+                    engine._packer_cve_failed = False
+                    # Mirror into MAAS boot-resources list when present.
+                    try:
+                        resources = getattr(engine, "_maas_boot_resources", None)
+                        if isinstance(resources, list):
+                            name = f"custom/{sku}-jammy"
+                            if name not in resources:
+                                resources.append(name)
+                    except Exception:
+                        pass
                 return StreamedCommandResult(lines=lines, delay_s=0.45)
             return (
                 "Usage: packer [--version] [--help] <command> [<args>]\n\n"

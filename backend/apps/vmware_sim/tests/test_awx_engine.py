@@ -184,3 +184,45 @@ class AwxStateBackedViewTests(TestCase):
         after = ae.get_state(sid)["inventory"]["activity"]
         self.assertGreater(len(after), before)
         self.assertEqual(after[0]["action"].startswith("Launched"), True)
+
+
+class AwxAiInfraGpuSeedTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_ai_infra_driver_rollout_seeds_gpu_templates(self):
+        sid = "test-awx-ai-infra"
+        ae.drop_session(sid)
+        state = ae.get_state(sid, "ai-infra-awx-nvidia-driver-rollout")["inventory"]
+        names = [t["name"] for t in state["job_templates"]]
+        self.assertIn("GPU Driver Install (H100)", names)
+        self.assertIn("DCGM Exporter Deploy", names)
+        self.assertIn("Image Repave (jammy-h100)", names)
+        inv = [i["name"] for i in state["inventories"]]
+        self.assertIn("maas-gpu-nodes", inv)
+        hosts = [h["name"] for h in state["hosts"]]
+        self.assertIn("gpu-node-01", hosts)
+        self.assertNotIn("Patch Linux", names)
+
+    def test_launch_gpu_driver_streams_fleet_recap(self):
+        sid = "test-awx-ai-infra-launch"
+        ae.drop_session(sid)
+        ae.get_state(sid, "ai-infra-awx-nvidia-driver-rollout")
+        ae.apply_action(sid, "login", {})
+        res = ae.apply_action(sid, "launch_template", {"template_id": 12})
+        self.assertTrue(res["ok"])
+        jid = res["job_id"]
+        entry = ae._load(sid)
+        raw = next(j for j in entry["state"]["jobs"] if j["id"] == jid)
+        raw["started_ts"] = ae._now() - (ae._JOB_FINISH_AT + 1)
+        ae._save(sid, entry)
+        job = next(j for j in ae.get_state(sid)["inventory"]["jobs"] if j["id"] == jid)
+        self.assertEqual(job["status"], "successful")
+        blob = "\n".join(job.get("stdout") or [])
+        self.assertIn("gpu-node-01", blob)
+        self.assertIn("nvidia", blob.lower())
+        ok, msg = ae.validate_awx_lab(sid, "ai-infra-awx-nvidia-driver-rollout")
+        self.assertTrue(ok, msg)

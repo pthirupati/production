@@ -46,7 +46,25 @@ class AiInfraMaasLxdPackerTests(SimpleTestCase):
         self.assertIsInstance(out, StreamedCommandResult)
         blob = str(out)
         self.assertIn("CVE", blob)
+        self.assertIn("PASS", blob)
         self.assertIn("h100", blob.lower())
+        self.assertIn("Publishing", blob)
+        boots = str(engine.shell.run("maas admin boot-resources read"))
+        self.assertIn("custom/h100-jammy", boots)
+
+    def test_packer_cve_gate_blocks_publish(self):
+        engine = UnifiedSimulationEngine(
+            scenario_slug="academy-ai-infra-packer-cve-fail",
+            simulation_type="gpu",
+        )
+        out = engine.shell.run("packer build gpu-h100-cve-fail.pkr.hcl")
+        self.assertIsInstance(out, StreamedCommandResult)
+        blob = str(out)
+        self.assertIn("FAIL", blob)
+        self.assertIn("blocked publish", blob)
+        self.assertNotIn("Publishing artifact", blob)
+        boots = str(engine.shell.run("maas admin boot-resources read"))
+        self.assertNotIn("custom/h100-jammy", boots)
 
     def test_vyos_interfaces_on_pxe_lab(self):
         engine = UnifiedSimulationEngine(
