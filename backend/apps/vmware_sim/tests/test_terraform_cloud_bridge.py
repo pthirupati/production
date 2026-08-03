@@ -5,6 +5,7 @@ from django.test import TestCase
 from apps.vmware_sim import aws_engine as ae
 from apps.vmware_sim import azure_engine as aze
 from apps.vmware_sim import gcp_engine as gce
+from apps.vmware_sim import engine as ve
 from apps.vmware_sim import terraform_engine as te
 
 
@@ -31,12 +32,20 @@ resource "google_compute_instance" "batch" {
 }
 """
 
+VSPHERE_MAIN = """
+provider "vsphere" {}
+
+resource "vsphere_virtual_machine" "web01" {
+  name = "web01"
+}
+"""
+
 
 class TerraformCloudBridgeTests(TestCase):
     def setUp(self):
         cache.clear()
         self.sid = "test-tf-cloud-bridge"
-        for drop in (te.drop_session, ae.drop_session, aze.drop_session, gce.drop_session):
+        for drop in (te.drop_session, ae.drop_session, aze.drop_session, gce.drop_session, ve.drop_session):
             drop(self.sid)
 
     def tearDown(self):
@@ -120,3 +129,16 @@ class TerraformCloudBridgeTests(TestCase):
         self.assertTrue(links.get("azure"))
         self.assertTrue(links.get("gcp"))
         self.assertGreaterEqual((plan.get("plan") or {}).get("add", 0), 3)
+
+    def test_apply_mirrors_vsphere_into_vmware(self):
+        self._boot(VSPHERE_MAIN)
+        res = te.apply_action(self.sid, "terraform_apply", {})
+        self.assertTrue(res.get("ok"), res)
+        self.assertTrue(res.get("cloud_links", {}).get("vmware"))
+        vms = (ve.get_state(self.sid).get("inventory") or {}).get("vms") or []
+        self.assertTrue(any(v.get("name") == "web01" for v in vms), vms)
+        # Idempotent re-apply
+        te.apply_action(self.sid, "terraform_plan", {})
+        te.apply_action(self.sid, "terraform_apply", {})
+        vms2 = (ve.get_state(self.sid).get("inventory") or {}).get("vms") or []
+        self.assertEqual(sum(1 for v in vms2 if v.get("name") == "web01"), 1)

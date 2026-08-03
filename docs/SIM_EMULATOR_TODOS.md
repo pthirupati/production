@@ -343,7 +343,7 @@ Learner-facing UI never says simulation/demo/mock.
 ### S1 — Unified enterprise state bus
 210. [~] Single asset/resource registry (hostname, serial, asset tag, rack/U, CPU/RAM/disk/RAID, firmware, BIOS, BMC, NICs, VLANs, GPUs, power/thermal, OS, deploy status, owner) — *schema + list_assets on server_identity*
 211. [~] Write-once identity: MAAS commission → appears in CMDB, DC twin, monitoring, Terraform import targets, AWX inventory — *MAAS terminal/baremetal → identity → AWX maas-gpu-nodes; Terraform/monitoring still open*
-212. [~] Terraform apply → create/update/delete mirrors into AWS/Azure/GCP/VMware/MAAS/LXD consoles — *AWS/Azure/GCP create mirror + Open Cloud links shipped; destroy + VMware/MAAS/LXD fan-out open*
+212. [~] Terraform apply → create/update/delete mirrors into AWS/Azure/GCP/VMware/MAAS/LXD consoles — *AWS/Azure/GCP/VMware create mirror + Open Cloud links; destroy + MAAS/LXD fan-out open*
 213. [ ] Hardware failure events fan out to Grafana alerts, SOC tickets, DCIM LEDs, and lab terminal `dmesg`
 214. [ ] Cross-console sync: disk/NIC/CPU/RAM edits in VMware/DC update guest `lsblk`/`ip`/`nvidia-smi`
 215. [ ] Persistent twin replay (undo/timeline) for cable/firmware/part swaps
@@ -363,7 +363,7 @@ Learner-facing UI never says simulation/demo/mock.
 223. [~] MAAS machines read/commission/deploy/release with **paced PXE stream** (DHCP→TFTP→scripts)
 224. [ ] MAAS UI pixel surface (or deepen BaremetalSimulator MAAS panes): region/rack, images, scripts
 225. [ ] Full PXE animation in DC twin (boot menu + Curtin + cloud-init)
-226. [~] VyOS CLI interfaces/DHCP/PXE helper; add commit/rollback + BGP/firewall UI
+226. [~] VyOS CLI interfaces/DHCP/PXE helper; add commit/rollback + BGP/firewall UI — *configure/set/commit/rollback + BGP summary done; pixel UI + firewall still open*
 227. [~] LXD list/start/stop + GPU passthrough; add clustering/projects/migration
 228. [x] AWX job templates (driver/DCGM/repave) streamed; inventory sync from MAAS
 229. [~] Packer+GH Actions image factory publishes to MAAS boot-resources *(CLI CVE gate + publish done; GH Actions factory open)*
@@ -382,15 +382,106 @@ Learner-facing UI never says simulation/demo/mock.
 
 ---
 
+## T. Deep gap backlog (code-inspected Aug 2026 — ship without missing lines)
+
+### T0 — Deploy / visibility (blocker for AI Infra in app)
+238. [ ] **Prod four-droplet deploy** so `seed_scenarios` creates `Technology(slug=ai-infra)` + 150 scenarios (last green prod was pre-#127)
+239. [x] Frontend `techCatalog` entry + TechIcon alias for `ai-infra`
+240. [x] Tutorial topic map `ai-infrastructure` → `ai-infra` (was incorrectly `gpu`)
+241. [ ] Learning journey / career track row for AI Infra on `/technologies/ai-infra`
+242. [ ] Scenarios page chip shows AI Infra after seed (API-driven — verify post-deploy)
+
+### T1 — Environment resolver & hosting (wrong console / wrong host)
+243. [ ] Backfill `hosted_as: vmware` on every `vmware_link` scenario YAML (not only nic-add-vmware-rescan)
+244. [ ] PeopleSoft: `hosted_as` + PeopleSoft persona (never AWS DMI rotate) on all PS scenarios
+245. [ ] Harden `scripts/lint_scenarios.py` to **fail CI** on wrong host / missing coding_mode / unknown sim_type
+246. [ ] Ansible labs: always surface Open AWX companion when `simulation_type`/consoles include awx
+247. [ ] AWS labs: always surface Open AWS Console companion (not only terraform/hosted heuristics)
+248. [ ] Coding techs (java, shell-script, html heroes, nodejs academy): reseed `coding_mode: true` + real `coding_spec.files` (~450 still terminal-only)
+249. [ ] HTML heroes: CodingIDE + live preview iframe (academy done; heroes still terminal)
+250. [ ] Cross-tech scenarios: assert each companion console link opens and shares session_id
+
+### T2 — Terminal realism (paced I/O)
+251. [ ] Audit all instant multi-line commands (`ping`, `tail -f`, `journalctl -f`, `kubectl logs -f`, `dmesg -w`, `nvidia-smi -l`, `top`) — must stream line-by-line
+252. [ ] `subscription-manager` RHEL commands: status/register/list/repos + broken entitlement preset + Jira credential hint
+253. [ ] RHEL repos/subscription credentials surfaced in Jira ticket comments for labs that need them
+
+### T3 — Terraform / cloud bridge remaining
+254. [x] Terraform `vsphere_virtual_machine` → VMware `create_vm` + Open VMware link
+255. [ ] Terraform destroy → terminate/delete mirrored AWS/Azure/GCP/VMware resources
+256. [ ] Terraform → MAAS enlist / LXD create fan-out
+257. [ ] Terraform import + state list/show parity with mirrored consoles
+258. [ ] Provider resource coverage beyond instance/VM (S3, VPC, SG, Azure RG, GCP disk, vsphere network)
+
+### T4 — VyOS / MAAS / LXD / AWX spine
+259. [x] VyOS `configure` / `set` / `commit` / `rollback` + BGP summary
+260. [ ] VyOS firewall / NAT / VPN / VRRP / QoS CLI depth
+261. [ ] VyOS pixel UI (router appliance shell) linked from ai-infra + networking labs
+262. [ ] MAAS UI region/rack/images/scripts panes (pixel)
+263. [ ] Full PXE animation in DC twin (DHCP→TFTP→kernel→Curtin→cloud-init)
+264. [ ] LXD clustering / projects / migration depth
+265. [ ] Packer + GitHub Actions image factory → MAAS boot-resources (end-to-end, not CLI-only)
+266. [ ] Integrated stack project: MAAS + VyOS underlay + LXD + AWX + DC + GPU CLI as one graded flow
+
+### T5 — Datacenter Steam-class immersion
+267. [ ] Reception / security checkpoint / staging / repair bay / warehouse / dock walkable stubs
+268. [ ] Per-rack LEDs, fan audio, fiber/copper trays, PDU/UPS/CRAC interactivity
+269. [ ] Dell/HPE engineer badge + access control for rack entry
+270. [ ] Full FRU RMA: locate → diagnose → order → dock → swap → burn-in → close
+271. [ ] DC ↔ ai-infra GPU tray cross-link (same asset id)
+272. [ ] 3D twin ErrorBoundary + progressive enhancement (keep 2D fallback)
+
+### T6 — Per-technology depth packs (20 items each — track progress)
+273. [ ] AWS 20-pack: IAM/Org/Control Tower/EC2/EBS/VPC/R53/ELB/CFN/Lambda/ECS/EKS/S3/RDS/CW/CT/SSM/Secrets/GuardDuty/Billing pages live
+274. [ ] Azure 20-pack: Entra/VM/VNet/NSG/AKS/Storage/KeyVault/Monitor/LogAnalytics/Automation/ResourceGraph/Defender/Policy/Cost/AppGW/…
+275. [ ] GCP 20-pack: Projects/IAM/GCE/GKE/GCS/VPC/SQL/Artifact/Build/Logging/Monitoring/…
+276. [ ] Grafana/Prometheus 20-pack: datasources, folders, alerts, Explore, Loki, Tempo, DCGM scrape
+277. [ ] DellEMC / NetApp / Commvault storage 20-pack each
+278. [ ] Security/SOC/SIEM 20-pack: tickets tied to twin assets
+279. [ ] GitOps 20-pack: Git IDE + PR + Flux/Argo sync health
+280. [ ] DevOps/CI 20-pack: pipeline IDE + preview after deploy
+281. [ ] AI/ML agents 20-pack: build agents that call twin tools
+282. [ ] Windows contrast/theme pass (no white-on-white)
+283. [ ] VMware page matrix remaining (HA/DRS/vSAN/NSX polish)
+
+### T7 — Interview realism leftovers
+284. [ ] P2.1 browser voice loop + in-room switcher
+285. [ ] P2.R6 framing UI two-way open/close beats
+286. [ ] P2.2 barge-in + skip-on-silence
+287. [ ] P2.4 inline practical validation + P2.R3 lab narration
+288. [ ] P2.5 resume score tips
+
+### T8 — Jira / collaboration
+289. [ ] Coach reply when `@…team` parse fails (TODO 137)
+290. [ ] E2E: mention → bot → disk appears in session `lsblk`
+291. [ ] Teams channel bot parity
+
+### T9 — Unified state bus remaining
+292. [ ] Hardware failure fan-out → Grafana + SOC + DCIM LED + dmesg
+293. [ ] Cross-console disk/NIC/CPU/RAM edits update guest tools
+294. [ ] Twin replay timeline (undo cable/firmware/part swaps)
+295. [ ] Org login → living enterprise chrome (tickets/CMDB/monitoring/clouds/DC/Git/AWX)
+
+### T10 — AI Infra field ops depth
+296. [ ] Ops runbooks: scp diag scripts MAAS↔node, PSBCheck, fieldiag, dcgmprofrunner, gpu-admin-tools PPCIe/CC
+297. [ ] Pixel NVIDIA green / AMD red telemetry consoles
+298. [ ] `dcgm-exporter` + Prometheus/Grafana companion scrape
+299. [ ] MIG / vGPU partitions in twin + terminal
+300. [ ] Multi-node NVLink fabric view
+301. [ ] End-to-end commission → burn-in → production handoff project
+302. [ ] CI lint: ai-infra scenarios never host as wrong cloud without `hosted_as`
+
+---
+
 ## Execution order (updated)
 
 1. **Ship** lab-surfaces PR (121–129) — hosting, links, ping stream, DC 3D fallback
 2. Consoles schema + academy coding_mode reseed (130–133)
-3. Terraform↔cloud bridge + AWS/DC load hardening (134–136)
+3. Terraform↔cloud bridge + AWS/DC load hardening (134–136) — **merged #131–#132**
 4. Jira mentions + contrast (137–138)
-5. **Merged PR #127–#129** AI Infra Engineering + AWX/Packer + GPU command matrix
-6. AI Infra depth (remaining): VyOS UI, MAAS UI, Packer GH Actions, DCOps RMA (186–196, 223–229)
-7. Interview realism P2 leftovers (P2.1–P2.4, P2.R3, P2.R6 UI) in parallel with coding IDE leftovers
-8. **Unified state bus foundation (210–215)** — *MAAS→identity→AWX slice shipping; Terraform/Grafana fan-out next*
-9. Per-tech 20-packs in priority waves (AWS/DC/GitOps/AI-ML first)
-10. Steam-class DC immersion (180–185, 219–222)
+5. **Merged PR #127–#132** AI Infra + AWX/Packer + GPU matrix + TF cloud + load harden
+6. **This wave:** TF→VMware + VyOS commit/rollback + AI Infra catalog visibility + **prod deploy seed**
+7. Coding IDE reseed (java/shell/html/nodejs) + env-resolver CI hard-fail (243–250)
+8. AI Infra depth: MAAS UI, Packer GH Actions, DCOps RMA, Steam DC stubs (259–272, 296–302)
+9. Interview realism P2 leftovers (284–288)
+10. Per-tech 20-packs + unified bus finish (273–283, 292–295)

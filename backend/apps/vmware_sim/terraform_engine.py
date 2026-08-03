@@ -526,6 +526,62 @@ def _mirror_apply_to_clouds(session_id: str, resources: list[dict]) -> dict[str,
                     "create_instance",
                     {"name": name, "machine_type": "e2-medium", "zone": "us-central1-a"},
                 )
+            elif rtype == "vsphere_virtual_machine":
+                from apps.vmware_sim import engine as ve
+
+                ve.get_state(session_id, "terraform-apply")
+                inv = (ve.get_state(session_id) or {}).get("inventory") or {}
+                existing = [
+                    v for v in (inv.get("vms") or [])
+                    if (v.get("name") or "") == name
+                ]
+                if not existing:
+                    # create_vm is idempotent-by-name at the call site; engine
+                    # rejects duplicates with ok=False — we skip when present.
+                    res = ve.apply_action(
+                        session_id,
+                        "create_vm",
+                        {
+                            "name": name,
+                            "cpu": 2,
+                            "memory_mb": 4096,
+                            "disk_gb": 40,
+                            "guest_os": "Ubuntu Linux (64-bit)",
+                            "annotation": "Managed by Terraform",
+                        },
+                    )
+                    if res.get("ok"):
+                        try:
+                            ve.apply_action(
+                                session_id,
+                                "power_on",
+                                {"vm_name": name},
+                            )
+                        except Exception:
+                            pass
+                try:
+                    from apps.labs.provisioner.simulation.server_identity import upsert_server
+
+                    upsert_server(
+                        session_id,
+                        {
+                            "id": f"tf-vsphere-{name}",
+                            "hostname": f"{name}.fixitlab.local",
+                            "primary_ip": "10.20.30.50",
+                            "power": "on",
+                            "os": "ubuntu-22.04",
+                            "install_state": "deployed",
+                            "owner": "terraform",
+                            "tags": {
+                                "role": "terraform",
+                                "provider": "vmware",
+                                "appears_in": ["vmware", "terraform"],
+                            },
+                        },
+                        source="terraform",
+                    )
+                except Exception:
+                    pass
         except Exception:
             continue
     return {k: v for k, v in links.items() if v}
@@ -645,7 +701,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         out = _format_apply_output(tool, tf)
         if cloud_links:
             providers = ", ".join(sorted(k.upper() for k, v in cloud_links.items() if v))
-            out = f"{out}\n\nCloud consoles updated: {providers}\nOpen AWS / Azure / GCP from the lab toolbar to verify."
+            out = f"{out}\n\nCloud consoles updated: {providers}\nOpen AWS / Azure / GCP / VMware from the lab toolbar to verify."
         state["events"].insert(
             0,
             {"time": _now_iso(), "message": "Apply complete! Resources provisioned.", "severity": "success"},
