@@ -243,8 +243,8 @@ New tech slug: `ai-infra` (MAAS · VyOS · LXD · AWX · GPU DC · DCGM · Packe
 140. [x] Technology seed + catalog page + subscription product (`ai-infra`) — PR #127
 141. [x] Lab surfaces: reuse MAAS/baremetal + DC twin + AWX + GPU terminal
 142. [x] Scenario pack (150): academy 145 + heroes (DCOPS thermal, MAAS commission, ESC dcgm-exporter, AWX driver, SXM tray)
-143. [~] NVIDIA: `nvidia-smi dmon` / `pmon` / `-l` paced streaming (continue full 75-flag matrix)
-144. [~] AMD: `rocm-smi --show*` + streamed `amd-smi monitor` (continue full matrix)
+143. [x] NVIDIA: `nvidia-smi dmon` / `pmon` / `-l` paced streaming + expanded query/topo/nvlink/MIG/CC matrix
+144. [x] AMD: `rocm-smi --show*` + streamed `amd-smi monitor` + event/topology/firmware depth
 145. [ ] Ops runbooks: scp diag scripts MAAS↔node, PSBCheck, fieldiag, dcgmprofrunner, gpu-admin-tools PPCIe/CC
 146. [x] DCOps tickets: thermal / tray / commission heroes from wiki+Jira patterns
 147. [~] Image factory: Packer + Terraform + Python + shell + upstream base + vuln fix (no manual) — *Packer CVE gate + MAAS publish in lab terminal*
