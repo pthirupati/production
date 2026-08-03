@@ -385,11 +385,11 @@ Learner-facing UI never says simulation/demo/mock.
 ## T. Deep gap backlog (code-inspected Aug 2026 — ship without missing lines)
 
 ### T0 — Deploy / visibility (blocker for AI Infra in app)
-238. [ ] **Prod four-droplet deploy** so `seed_scenarios` creates `Technology(slug=ai-infra)` + 150 scenarios (last green prod was pre-#127)
+238. [x] **Prod four-droplet deploy** so `seed_scenarios` creates `Technology(slug=ai-infra)` + 150 scenarios (last green prod was pre-#127)
 239. [x] Frontend `techCatalog` entry + TechIcon alias for `ai-infra`
 240. [x] Tutorial topic map `ai-infrastructure` → `ai-infra` (was incorrectly `gpu`)
 241. [ ] Learning journey / career track row for AI Infra on `/technologies/ai-infra`
-242. [ ] Scenarios page chip shows AI Infra after seed (API-driven — verify post-deploy)
+242. [x] Scenarios page chip shows AI Infra after seed (API-driven — verify post-deploy)
 
 ### T1 — Environment resolver & hosting (wrong console / wrong host)
 243. [ ] Backfill `hosted_as: vmware` on every `vmware_link` scenario YAML (not only nic-add-vmware-rescan)
