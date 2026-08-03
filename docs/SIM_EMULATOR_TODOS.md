@@ -260,9 +260,9 @@ New tech slug: `ai-infra` (MAAS · VyOS · LXD · AWX · GPU DC · DCGM · Packe
 157. [ ] GPU MIG / vGPU partitions in twin + terminal
 158. [ ] Multi-node NVLink fabric view in DC + `nvidia-smi nvlink`
 159. [ ] End-to-end commission → burn-in → production handoff project
-186. [ ] Full NVIDIA 75-command matrix (query/dmon/pmon/topo/lock clocks/ECC/accounting)
-187. [ ] Full AMD 75-command matrix (rocm-smi + amd-smi + sysfs/debugfs)
-188. [~] GPU SKU matrix: H100 / H200 / B300 / A100 / L40S / MI300X with correct PCIe/SXM topology
+186. [~] Full NVIDIA 75-command matrix (query/dmon/pmon/topo/lock clocks/ECC/accounting) — *core matrix + table tests landed; keep extending fields*
+187. [~] Full AMD 75-command matrix (rocm-smi + amd-smi + sysfs/debugfs) — *core matrix + table tests landed; sysfs still open*
+188. [x] GPU SKU matrix: H100 / H200 / B300 / A100 / L40S / MI300X with correct PCIe/SXM topology
 189. [~] VyOS CLI: interfaces/DHCP/PXE helper (UI + BGP depth still open)
 190. [~] MAAS E2E: machines read → commission → deploy → release (PXE menu depth open)
 191. [~] LXD list/start/stop + gpu-passthrough profile (nested burn-in depth open)
