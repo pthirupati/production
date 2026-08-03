@@ -246,3 +246,70 @@ class TerminalSshHostRegistrationTests(SimpleTestCase):
         out = self.engine.shell.run("ssh ubuntu@10.128.0.55")
         self.assertIn("Permanently added", out)
         self.assertNotIn("Connection refused", out)
+
+
+class S1AssetRegistryTests(SimpleTestCase):
+    """Unified asset registry: MAAS → CMDB → AWX (S1 #210–211)."""
+
+    def setUp(self):
+        self.sid = "s1-asset-session"
+        si.drop_session(self.sid)
+        self.addCleanup(si.drop_session, self.sid)
+        cache.clear()
+
+    def test_upsert_from_maas_and_list_assets(self):
+        asset = si.upsert_from_maas_machine(
+            self.sid,
+            {
+                "name": "gpu-node-04",
+                "status": "Ready",
+                "power": "on",
+                "ip": "10.64.12.14",
+                "arch": "amd64/generic",
+            },
+            source="maas",
+        )
+        self.assertIsNotNone(asset)
+        self.assertEqual(asset["install_state"], "Ready")
+        self.assertTrue(asset["serial"])
+        self.assertTrue(asset["asset_tag"])
+        self.assertEqual(asset["owner"], "ai-infra")
+        self.assertEqual(len(asset.get("gpus") or []), 8)
+        rows = si.list_assets(self.sid)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["hostname"], "gpu-node-04")
+        self.assertEqual(rows[0]["rack"], "R12")
+        self.assertEqual(rows[0]["gpu_count"], 8)
+
+    def test_maas_terminal_commission_mirrors_identity(self):
+        from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
+
+        engine = UnifiedSimulationEngine(
+            scenario_slug="ai-infra-maas-commission-h100",
+            simulation_type="baremetal",
+        )
+        engine.lab_session_id = self.sid
+        engine.shell.state.session_id = self.sid
+        engine.shell.run("maas admin machine commission gpu-node-04")
+        servers = si.list_servers(self.sid)
+        names = {s["hostname"] for s in servers}
+        self.assertIn("gpu-node-04", names)
+        node = next(s for s in servers if s["hostname"] == "gpu-node-04")
+        self.assertEqual(node["install_state"], "Ready")
+        self.assertIn("maas", node["sources"])
+
+    def test_awx_merges_maas_identity_hosts(self):
+        from apps.vmware_sim import awx_engine as ae
+
+        ae.drop_session(self.sid)
+        self.addCleanup(ae.drop_session, self.sid)
+        si.upsert_from_maas_machine(
+            self.sid,
+            {"name": "gpu-node-99", "status": "Deployed", "power": "on", "ip": "10.64.12.99"},
+            source="maas",
+        )
+        ae.get_state(self.sid, "ai-infra-awx-nvidia-driver-rollout")
+        ae.apply_action(self.sid, "login", {})
+        state = ae.get_state(self.sid, "ai-infra-awx-nvidia-driver-rollout")["inventory"]
+        names = [h["name"] for h in state["hosts"] if h.get("inventory") == "maas-gpu-nodes"]
+        self.assertIn("gpu-node-99", names)

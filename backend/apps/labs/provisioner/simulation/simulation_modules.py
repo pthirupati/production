@@ -610,6 +610,52 @@ def _render_compute_apps(line: str = "") -> str:
 def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
     is_gpu_focus = engine.simulation_type == "gpu" or "gpu" in engine.scenario_slug or "nvidia" in engine.scenario_slug
     sku = _resolve_gpu_sku(getattr(engine, "scenario_slug", "") or "")
+    # Seed kernel/sysfs paths learners cat during DCOPS diagnostics (TODO 187).
+    try:
+        st = shell.state
+        _apply_gpu_sku_globals(sku)
+        if sku.get("vendor") == "amd":
+            st._mkdir("/sys/class/drm/card0/device")
+            st._mkdir("/sys/class/drm/card0/device/hwmon/hwmon0")
+            st._mkdir("/sys/kernel/debug/dri/0")
+            st._write_file("/sys/class/drm/card0/device/power_dpm_state", "performance\n")
+            st._write_file(
+                "/sys/class/drm/card0/device/pp_dpm_sclk",
+                "0: 500Mhz\n1: 1000Mhz\n2: 1700Mhz *\n3: 2100Mhz\n",
+            )
+            st._write_file(
+                "/sys/class/drm/card0/device/pp_dpm_mclk",
+                "0: 400Mhz\n1: 1200Mhz *\n2: 1600Mhz\n",
+            )
+            st._write_file(
+                "/sys/class/drm/card0/device/hwmon/hwmon0/gpu_metrics",
+                f"temp_edge={random.randint(40, 70)}\npower={random.randint(120, 550)}\n",
+            )
+            st._write_file(
+                "/sys/kernel/debug/dri/0/amdgpu_pm_info",
+                "GFX Clocks and Power:\n\t800 MHz (MCLK)\n\t1700 MHz (SCLK)\n\tAverage GPU Power: 220 W\n",
+            )
+        else:
+            st._mkdir("/proc/driver/nvidia")
+            st._write_file(
+                "/proc/driver/nvidia/version",
+                f"NVRM version: NVIDIA UNIX x86_64 Kernel Module  {_SMI_DRIVER}  "
+                f"Tue May 14 00:00:00 UTC 2024\n"
+                f"GCC version:  gcc version 11.4.1 20230605 (Red Hat 11.4.1-2)\n",
+            )
+            st._mkdir("/proc/driver/nvidia/gpus")
+            for i in range(min(8, _SMI_GPU_COUNT)):
+                bus = f"0000:{(i + 1) * 0x10 + 1:02x}:00.0"
+                st._mkdir(f"/proc/driver/nvidia/gpus/{bus}")
+                st._write_file(
+                    f"/proc/driver/nvidia/gpus/{bus}/information",
+                    f"Model: 		 {_SMI_GPU_NAME}\n"
+                    f"IRQ:   		 150\n"
+                    f"GPU UUID: 	 GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}\n"
+                    f"Video BIOS: 	 96.00.74.00.01\n",
+                )
+    except Exception:
+        pass
 
     def handler(parts, line):
         low = line.strip().lower()
@@ -1986,6 +2032,25 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
     if not hasattr(engine, "_maas_boot_resources") or engine._maas_boot_resources is None:
         engine._maas_boot_resources = ["ubuntu/jammy", "ubuntu/noble"]
 
+    def _session_id() -> str:
+        return str(
+            getattr(engine, "lab_session_id", None)
+            or getattr(shell.state, "session_id", None)
+            or ""
+        )
+
+    def _mirror_maas(machine: dict) -> None:
+        """S1: commission/deploy → unified asset registry."""
+        sid = _session_id()
+        if not sid:
+            return
+        try:
+            from .server_identity import upsert_from_maas_machine
+
+            upsert_from_maas_machine(sid, machine, source="maas")
+        except Exception:
+            pass
+
     def handler(parts, line):
         low = line.strip().lower()
         bare_tools = (
@@ -2078,6 +2143,7 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                         # Simulate quick transition for lab UX
                         m["status"] = "Ready"
                         from .shell import StreamedCommandResult
+                        _mirror_maas(m)
                         return StreamedCommandResult(
                             lines=[
                                 f"Commissioning started for {name}…",
@@ -2099,6 +2165,7 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                         m["status"] = "Deployed"
                         m["ip"] = m["ip"] if m["ip"] != "-" else "10.64.12.40"
                         from .shell import StreamedCommandResult
+                        _mirror_maas(m)
                         return StreamedCommandResult(
                             lines=[
                                 f"Deploying Ubuntu 22.04 LTS to {m['name']} "
@@ -2117,6 +2184,7 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                 for m in machines:
                     if m["status"] == "Deployed":
                         m["status"] = "Ready"
+                        _mirror_maas(m)
                         return f"Released {m['name']} → Ready"
                 return "No Deployed machine to release."
             if "power" in low:

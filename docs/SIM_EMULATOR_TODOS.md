@@ -260,8 +260,8 @@ New tech slug: `ai-infra` (MAAS · VyOS · LXD · AWX · GPU DC · DCGM · Packe
 157. [ ] GPU MIG / vGPU partitions in twin + terminal
 158. [ ] Multi-node NVLink fabric view in DC + `nvidia-smi nvlink`
 159. [ ] End-to-end commission → burn-in → production handoff project
-186. [~] Full NVIDIA 75-command matrix (query/dmon/pmon/topo/lock clocks/ECC/accounting) — *core matrix + table tests landed; keep extending fields*
-187. [~] Full AMD 75-command matrix (rocm-smi + amd-smi + sysfs/debugfs) — *core matrix + table tests landed; sysfs still open*
+186. [~] Full NVIDIA 75-command matrix (query/dmon/pmon/topo/lock clocks/ECC/accounting) — *core matrix + `/proc/driver/nvidia` sysfs; keep extending*
+187. [~] Full AMD 75-command matrix (rocm-smi + amd-smi + sysfs/debugfs) — *core matrix + drm/pp_dpm_* / amdgpu_pm_info seeded*
 188. [x] GPU SKU matrix: H100 / H200 / B300 / A100 / L40S / MI300X with correct PCIe/SXM topology
 189. [~] VyOS CLI: interfaces/DHCP/PXE helper (UI + BGP depth still open)
 190. [~] MAAS E2E: machines read → commission → deploy → release (PXE menu depth open)
@@ -341,8 +341,8 @@ monitoring, security, storage, AI infra, and software share **one backend state*
 Learner-facing UI never says simulation/demo/mock.
 
 ### S1 — Unified enterprise state bus
-210. [ ] Single asset/resource registry (hostname, serial, asset tag, rack/U, CPU/RAM/disk/RAID, firmware, BIOS, BMC, NICs, VLANs, GPUs, power/thermal, OS, deploy status, owner)
-211. [ ] Write-once identity: MAAS commission → appears in CMDB, DC twin, monitoring, Terraform import targets, AWX inventory
+210. [~] Single asset/resource registry (hostname, serial, asset tag, rack/U, CPU/RAM/disk/RAID, firmware, BIOS, BMC, NICs, VLANs, GPUs, power/thermal, OS, deploy status, owner) — *schema + list_assets on server_identity*
+211. [~] Write-once identity: MAAS commission → appears in CMDB, DC twin, monitoring, Terraform import targets, AWX inventory — *MAAS terminal/baremetal → identity → AWX maas-gpu-nodes; Terraform/monitoring still open*
 212. [ ] Terraform apply → create/update/delete mirrors into AWS/Azure/GCP/VMware/MAAS/LXD consoles
 213. [ ] Hardware failure events fan out to Grafana alerts, SOC tickets, DCIM LEDs, and lab terminal `dmesg`
 214. [ ] Cross-console sync: disk/NIC/CPU/RAM edits in VMware/DC update guest `lsblk`/`ip`/`nvidia-smi`
@@ -378,7 +378,7 @@ Learner-facing UI never says simulation/demo/mock.
 236. [~] Environment resolver CI: every scenario opens correct primary console + companions
 
 ### S6 — Interview realism (see §R)
-237. [ ] Ship P2.R1–R7 before paid STT; keep 100% free constraint
+237. [~] Ship P2.R1–R7 before paid STT; keep 100% free constraint — *R1–R5/R7 + R4 done; R6 UI two-way + P2.1–P2.4 still open*
 
 ---
 
@@ -388,9 +388,9 @@ Learner-facing UI never says simulation/demo/mock.
 2. Consoles schema + academy coding_mode reseed (130–133)
 3. Terraform↔cloud bridge + AWS/DC load hardening (134–136)
 4. Jira mentions + contrast (137–138)
-5. **Merge PR #127** AI Infra Engineering (140–159) — ticket copy lint fixed *(needs `gh auth refresh` if token expired)*
-6. AI Infra depth wave: 75×75 matrices, SKUs, VyOS, Packer, MAAS E2E (186–196, 223–229)
-7. Interview realism P2.R* (197–209) in parallel with coding IDE leftovers
-8. Unified state bus foundation (210–215) — unlocks true digital twin
+5. **Merged PR #127–#129** AI Infra Engineering + AWX/Packer + GPU command matrix
+6. AI Infra depth (remaining): VyOS UI, MAAS UI, Packer GH Actions, DCOps RMA (186–196, 223–229)
+7. Interview realism P2 leftovers (P2.1–P2.4, P2.R3, P2.R6 UI) in parallel with coding IDE leftovers
+8. **Unified state bus foundation (210–215)** — *MAAS→identity→AWX slice shipping; Terraform/Grafana fan-out next*
 9. Per-tech 20-packs in priority waves (AWS/DC/GitOps/AI-ML first)
 10. Steam-class DC immersion (180–185, 219–222)
