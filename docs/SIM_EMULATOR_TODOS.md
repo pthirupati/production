@@ -227,8 +227,8 @@ Update this file as items complete. Keep internal code names (`*Simulator`, `sim
 132. [x] Academy generator: JS/React/HTML → `coding_mode: true` + real `coding_spec` (Java/shell deferred)
 133. [x] HTML/Web labs: live iframe preview pane in CodingIDE + academy HTML → coding_mode
 134. [x] Terraform apply → mutate AWS/Azure/GCP console inventory + Open Cloud links in dropdown
-135. [ ] AWS/Datacenter "Lab environment error": prod Cache-Control on `index.html`; Terraform AWS overlay same Zustand reset as primary
-136. [ ] Surface `useSimSession.error` in Datacenter/AWS shells (403/API fail ≠ silent empty)
+135. [x] AWS/Datacenter "Lab environment error": prod Cache-Control on `index.html`; Terraform AWS overlay same Zustand reset as primary
+136. [x] Surface `useSimSession.error` in Datacenter/AWS shells (403/API fail ≠ silent empty) — *DC done; Terraform/Azure/GCP Retry UI + companion AWS auto-reset*
 137. [ ] Jira @team mentions: verify `JIRA_SIMULATION_MODE` in prod; coach reply when mention parse fails; E2E mention → bot → disk appears
 138. [ ] Theme/contrast pass: Windows + light portals — no white-on-white; brand-accurate colors per tech
 139. [~] Lint: `vmware_link` ⇒ `hosted_as=vmware`; coding techs must set `coding_mode`; forbid unknown sim types after normalize

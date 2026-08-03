@@ -3452,7 +3452,10 @@ export default function LabRunner() {
       {isTerraformSimLab && !isSimPrimaryLab && showTerraformSim && (
         <LazySimPanel
           Sim={LazyTerraformSimulator}
+          name="terraform"
           label="Terraform"
+          autoResetStorageOnError
+          onResetStorage={() => { hardResetAwsSim(); resetTerraformAwsLabState() }}
           sessionId={sessionId}
           scenario={scenario}
           terminalSession={terminalSession}
@@ -3467,7 +3470,11 @@ export default function LabRunner() {
       {isTerraformSimLab && showAwsSim && (
         <LazySimPanel
           Sim={LazyAwsLabOverlay}
+          name="aws"
           label="AWS Console"
+          autoResetStorageOnError
+          resetStorageKey={awsSimStorageKey(useAuthStore.getState().user?.id)}
+          onResetStorage={() => hardResetAwsSim()}
           sessionId={sessionId}
           scenario={scenario}
           onToggleTerminal={() => setShowAwsSim(false)}
@@ -3501,7 +3508,11 @@ export default function LabRunner() {
       {showHostedAwsLink && showAwsSim && (
         <LazySimPanel
           Sim={LazyAwsLabOverlay}
+          name="aws"
           label="AWS Console"
+          autoResetStorageOnError
+          resetStorageKey={awsSimStorageKey(useAuthStore.getState().user?.id)}
+          onResetStorage={() => hardResetAwsSim()}
           sessionId={sessionId}
           scenario={scenario}
           onToggleTerminal={() => setShowAwsSim(false)}

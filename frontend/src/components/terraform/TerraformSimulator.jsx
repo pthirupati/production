@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { terraformApi } from '../../api/terraform'
 import LabChromeBar from '../lab/LabChromeBar'
-import { Cloud, LogIn } from 'lucide-react'
+import { Cloud, LogIn, AlertTriangle, RefreshCw } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { getIacProfile } from '../../utils/iacFlavor'
 import { useSimSession } from '../sim/shared'
@@ -30,7 +30,7 @@ export default function TerraformSimulator(props) {
   } = props
   const slug = scenario?.slug || ''
   const iac = getIacProfile()
-  const { state, setState, loading, busy, refresh, run } = useSimSession(sessionId, slug, terraformApi)
+  const { state, setState, loading, busy, error, refresh, run } = useSimSession(sessionId, slug, terraformApi)
   const [authenticated, setAuthenticated] = useState(isTerraformAuthed)
   const [loginUser, setLoginUser] = useState('')
   const [loginPass, setLoginPass] = useState('')
@@ -48,6 +48,27 @@ export default function TerraformSimulator(props) {
       <div className={simPanelRoot(embedded, 'tfc-shell flex items-center justify-center text-slate-400')}>
         <LabChromeBar icon={Cloud} title={iac.cloudTitle} subtitle={slug} accent={iac.accent} {...chromeProps} />
         <p className="p-8 text-sm">Loading {iac.label} workspace…</p>
+      </div>
+    )
+  }
+
+  if (error || !state) {
+    return (
+      <div className={simPanelRoot(embedded, 'tfc-shell flex flex-col bg-[#1e1e1e]')}>
+        <LabChromeBar icon={Cloud} title={iac.cloudTitle} subtitle={scenario?.title || slug} accent={iac.accent} {...chromeProps} />
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
+          <AlertTriangle className="text-amber-400" size={32} aria-hidden />
+          <p className="text-sm text-slate-300 max-w-md">
+            {error || `Could not load ${iac.label} state. Check that the lab session is running, then retry.`}
+          </p>
+          <button
+            type="button"
+            onClick={() => refresh()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-violet-500/40 text-violet-300 text-sm hover:bg-violet-500/10"
+          >
+            <RefreshCw size={14} /> Retry
+          </button>
+        </div>
       </div>
     )
   }
