@@ -420,7 +420,7 @@ def _render_nvidia_smi_table() -> str:
 
 def _render_query_gpu(line: str) -> str:
     """Emulate `nvidia-smi --query-gpu=<fields> --format=csv[,noheader][,nounits]`
-    across all 8 GPUs. Honors the requested field list and the csv formatting
+    across all GPUs. Honors the requested field list and the csv formatting
     modifiers so scripts that parse the output behave like on a real box."""
     m = re.search(r"--query-gpu[= ]([^\s]+)", line)
     fields = [f.strip() for f in (m.group(1) if m else "name").split(",") if f.strip()]
@@ -429,42 +429,182 @@ def _render_query_gpu(line: str) -> str:
     noheader = "noheader" in fmt_opts
     nounits = "nounits" in fmt_opts
 
-    # (value_fn, unit) per supported field. value_fn(idx) → live-ish value.
+    # Optional `-i N` / `--id=N` restricts rows to one GPU.
+    only_idx = None
+    mi = re.search(r"(?:-i|--id)[= ]?(\d+)", line)
+    if mi:
+        only_idx = int(mi.group(1))
+
     def _mem_used(i):
-        return random.randint(40000, 78000) if i % 2 == 0 else random.randint(3, 12)
+        return random.randint(40000, min(78000, _SMI_MEM_TOTAL_MIB - 100)) if i % 2 == 0 else random.randint(3, 12)
 
     units = {
         "index": ("", lambda i: str(i)),
         "name": ("", lambda i: _SMI_GPU_NAME),
         "uuid": ("", lambda i: f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"),
         "pci.bus_id": ("", lambda i: f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0"),
+        "pci.device_id": ("", lambda i: "0x2330"),
+        "pci.domain": ("", lambda i: "0x0000"),
+        "pci.bus": ("", lambda i: f"0x{(i + 1) * 0x10 + 1:02x}"),
+        "pci.device": ("", lambda i: "0x00"),
+        "pci.sub_device_id": ("", lambda i: "0x1799"),
+        "pcie.link.gen.current": ("", lambda i: "5"),
+        "pcie.link.gen.max": ("", lambda i: "5"),
+        "pcie.link.width.current": ("", lambda i: "16x"),
+        "pcie.link.width.max": ("", lambda i: "16x"),
         "driver_version": ("", lambda i: _SMI_DRIVER),
+        "vbios_version": ("", lambda i: "96.00.74.00.01"),
+        "serial": ("", lambda i: f"13207{i:08d}"),
+        "board_id": ("", lambda i: f"0x{0x10DE + i:04x}"),
         "temperature.gpu": (" C", lambda i: str(random.randint(30, 72))),
+        "temperature.memory": (" C", lambda i: str(random.randint(36, 78))),
+        "fan.speed": (" %", lambda i: "[N/A]"),
         "utilization.gpu": (" %", lambda i: str(random.randint(0, 100))),
         "utilization.memory": (" %", lambda i: str(random.randint(0, 95))),
+        "utilization.encoder": (" %", lambda i: str(random.randint(0, 5))),
+        "utilization.decoder": (" %", lambda i: str(random.randint(0, 5))),
         "memory.total": (" MiB", lambda i: str(_SMI_MEM_TOTAL_MIB)),
         "memory.used": (" MiB", lambda i: str(_mem_used(i))),
         "memory.free": (" MiB", lambda i: str(_SMI_MEM_TOTAL_MIB - _mem_used(i))),
-        "power.draw": (" W", lambda i: f"{random.uniform(70, 690):.2f}"),
-        "power.limit": (" W", lambda i: "700.00"),
+        "memory.reserved": (" MiB", lambda i: "455"),
+        "power.draw": (" W", lambda i: f"{random.uniform(70, max(80, _SMI_PWR_CAP - 20)):.2f}"),
+        "power.limit": (" W", lambda i: f"{_SMI_PWR_CAP}.00"),
+        "power.default_limit": (" W", lambda i: f"{_SMI_PWR_CAP}.00"),
+        "power.max_limit": (" W", lambda i: f"{_SMI_PWR_CAP}.00"),
+        "power.min_limit": (" W", lambda i: "100.00"),
+        "enforced.power.limit": (" W", lambda i: f"{_SMI_PWR_CAP}.00"),
+        "clocks.current.graphics": (" MHz", lambda i: str(random.randint(1200, 1980))),
+        "clocks.current.sm": (" MHz", lambda i: str(random.randint(1200, 1980))),
+        "clocks.current.memory": (" MHz", lambda i: str(random.choice((1593, 2619)))),
+        "clocks.current.video": (" MHz", lambda i: str(random.randint(900, 1600))),
         "clocks.sm": (" MHz", lambda i: str(random.randint(1200, 1980))),
+        "clocks.mem": (" MHz", lambda i: str(random.choice((1593, 2619)))),
+        "clocks.gr": (" MHz", lambda i: str(random.randint(1200, 1980))),
+        "clocks.max.sm": (" MHz", lambda i: "1980"),
+        "clocks.max.memory": (" MHz", lambda i: "2619"),
+        "clocks_throttle_reasons.supported": ("", lambda i: "0x00000000000001FF"),
+        "clocks_throttle_reasons.active": ("", lambda i: "0x0000000000000000"),
+        "clocks_throttle_reasons.gpu_idle": ("", lambda i: "Not Active"),
+        "clocks_throttle_reasons.sw_power_cap": ("", lambda i: "Not Active"),
+        "clocks_throttle_reasons.hw_thermal_slowdown": ("", lambda i: "Not Active"),
+        "clocks_throttle_reasons.hw_power_brake_slowdown": ("", lambda i: "Not Active"),
+        "clocks_throttle_reasons.sw_thermal_slowdown": ("", lambda i: "Not Active"),
+        "ecc.mode.current": ("", lambda i: "Enabled"),
+        "ecc.mode.pending": ("", lambda i: "Enabled"),
+        "ecc.errors.corrected.volatile.device_memory": ("", lambda i: "0"),
+        "ecc.errors.corrected.aggregate.device_memory": ("", lambda i: "0"),
+        "ecc.errors.uncorrected.volatile.device_memory": ("", lambda i: "0"),
+        "ecc.errors.uncorrected.aggregate.device_memory": ("", lambda i: "0"),
         "ecc.errors.uncorrected.aggregate.total": ("", lambda i: "0"),
+        "ecc.errors.corrected.aggregate.total": ("", lambda i: "0"),
+        "retired_pages.single_bit_ecc.count": ("", lambda i: "0"),
+        "retired_pages.double_bit.count": ("", lambda i: "0"),
+        "retired_pages.pending": ("", lambda i: "No"),
+        "remapped_rows": ("", lambda i: "0"),
+        "remapped_rows.pending": ("", lambda i: "No"),
+        "remapped_rows.failure": ("", lambda i: "No"),
+        "compute_mode": ("", lambda i: "Default"),
+        "persistence_mode": ("", lambda i: "Enabled"),
+        "accounting.mode": ("", lambda i: "Disabled"),
+        "accounting.buffer_size": ("", lambda i: "4000"),
+        "display_mode": ("", lambda i: "Disabled"),
+        "display_active": ("", lambda i: "Disabled"),
+        "encoder.stats.sessionCount": ("", lambda i: "0"),
+        "encoder.stats.averageFps": ("", lambda i: "0"),
+        "encoder.stats.averageLatency": ("", lambda i: "0"),
+        "compute.apps.count": ("", lambda i: str(random.randint(0, 2))),
         "count": ("", lambda i: str(_SMI_GPU_COUNT)),
+        "gpu_uuid": ("", lambda i: f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"),
+        "inforom.ecc": ("", lambda i: "2.0"),
+        "inforom.oem": ("", lambda i: "2.0"),
+        "inforom.img": ("", lambda i: "G001.0000.01.03"),
+        "pstate": ("", lambda i: "P0"),
     }
     header = ", ".join(
         f + ("" if nounits or not units.get(f, ("", None))[0] else f" [{units[f][0].strip()}]")
         for f in fields
     )
     rows = []
-    for i in range(_SMI_GPU_COUNT):
+    indices = [only_idx] if only_idx is not None and 0 <= only_idx < _SMI_GPU_COUNT else list(range(_SMI_GPU_COUNT))
+    for i in indices:
         cells = []
         for f in fields:
-            unit, fn = units.get(f, ("", lambda i: "[Not Supported]"))
+            unit, fn = units.get(f, ("", lambda i, _f=f: "[N/A]"))
             val = fn(i)
-            cells.append(val if nounits else f"{val}{unit}")
+            cells.append(val if nounits or not unit else f"{val}{unit}")
         rows.append(", ".join(cells))
     out = rows if noheader else [header, *rows]
     return "\n".join(out)
+
+
+def _render_nvlink_status() -> str:
+    lines = []
+    for i in range(_SMI_GPU_COUNT):
+        lines.append(f"GPU {i}: {_SMI_GPU_NAME}")
+        nlinks = 18 if _SMI_GPU_COUNT >= 8 else 4
+        for link in range(min(4, nlinks)):
+            lines.append(f"\t Link {link}: 26.562 GB/s")
+    return "\n".join(lines)
+
+
+def _render_topo_matrix(kind: str = "m") -> str:
+    n = min(_SMI_GPU_COUNT, 8)
+    if kind == "c":
+        rows = ["GPU\t CPU Affinity\t NUMA Affinity"]
+        for i in range(n):
+            numa = 0 if i < n // 2 else 1
+            cpus = "0-31" if numa == 0 else "32-63"
+            rows.append(f"GPU{i}\t {cpus}\t\t {numa}")
+        return "\n".join(rows)
+    if kind == "p":
+        # PCIe path matrix
+        hdr = "\t " + "\t ".join(f"GPU{i}" for i in range(min(n, 4)))
+        rows = [hdr]
+        labels = ("X", "PIX", "NODE", "SYS")
+        for i in range(min(n, 4)):
+            cells = []
+            for j in range(min(n, 4)):
+                if i == j:
+                    cells.append("X")
+                elif abs(i - j) == 1:
+                    cells.append("PIX")
+                elif (i // 2) == (j // 2):
+                    cells.append("NODE")
+                else:
+                    cells.append("SYS")
+            rows.append(f"GPU{i}\t " + "\t ".join(f"{c:<4}" for c in cells))
+        return "\n".join(rows)
+    # NVLink fabric matrix (NV18 on dense SXM nodes)
+    hdr = "\t " + "\t ".join(f"GPU{i}" for i in range(n)) + "\t CPU Affinity\t NUMA Affinity"
+    rows = [hdr]
+    for i in range(n):
+        cells = []
+        for j in range(n):
+            if i == j:
+                cells.append("X")
+            else:
+                cells.append("NV18" if n >= 4 else "PIX")
+        numa = 0 if i < n // 2 else 1
+        cpus = "0-31" if numa == 0 else "32-63"
+        rows.append(f"GPU{i}\t " + "\t ".join(f"{c:<4}" for c in cells) + f"\t {cpus}\t\t {numa}")
+    rows.append("")
+    rows.append(
+        "Legend: X = Self, NV# = NVLink connection (# links), "
+        "SYS = across PCIe+SMP interconnect, PIX = single PCIe bridge"
+    )
+    return "\n".join(rows)
+
+
+def _render_compute_apps(line: str = "") -> str:
+    header = "gpu_uuid, pid, process_name, used_gpu_memory [MiB]"
+    if "noheader" in line.lower():
+        rows = []
+    else:
+        rows = [header]
+    for i in range(min(2, _SMI_GPU_COUNT)):
+        uuid = f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"
+        rows.append(f"{uuid}, {12000 + i}, python, {random.randint(2048, 40000)}")
+    return "\n".join(rows)
 
 
 def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
@@ -507,11 +647,17 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                     "    -d TYPE, --display=TYPE          Display only selected information\n"
                     "    dmon                            Device monitoring (scrolling)\n"
                     "    pmon                            Process monitoring (scrolling)\n"
-                    "    topo -m                         Topology matrix\n"
+                    "    topo -m|-p|-c                   Topology / PCIe / CPU affinity\n"
                     "    nvlink --status                 NVLink status\n"
+                    "    mig -lgip|-lgi                  MIG profiles / instances\n"
+                    "    compute-apps                    Running compute processes\n"
+                    "    conf-compute                    Confidential compute status\n"
                     "    --query-gpu=FIELD               CSV field query\n"
+                    "    --query-compute-apps=FIELD      Compute process CSV\n"
                     "    -l SEC, --loop=SEC              Loop with delay\n"
+                    "    -i ID                           Select GPU index\n"
                     "    -pm, -pl, -c, -e, -am            Admin mode toggles\n"
+                    "    --lock-gpu-clocks / --gpu-reset Admin clock / reset\n"
                 )
             if "-L" in parts or "--list-gpus" in low:
                 if not healthy:
@@ -532,42 +678,49 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
             # renders a clean view; the unhealthy path mirrors a fallen-off driver.
             if not healthy and any(k in low for k in ("topo", "nvlink", "mig", "-q")):
                 return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
-            if "topo" in low and ("-m" in parts or "-p" in parts or "-c" in parts):
-                if "-p" in parts:
-                    return (
-                        "GPU0\t GPU1\t GPU2\t GPU3\n"
-                        "GPU0\t X   \t PIX \t NODE\t SYS\n"
-                        "GPU1\t PIX \t X   \t NODE\t SYS\n"
-                        "GPU2\t NODE\t NODE\t X   \t PIX\n"
-                        "GPU3\t SYS \t SYS \t PIX \t X"
-                    )
-                if "-c" in parts:
-                    return (
-                        "GPU0\t CPU Affinity\t NUMA Affinity\n"
-                        "GPU0\t 0-31       \t 0\n"
-                        "GPU1\t 0-31       \t 0\n"
-                        "GPU2\t 32-63      \t 1\n"
-                        "GPU3\t 32-63      \t 1"
-                    )
-                return (
-                    "\t GPU0\t GPU1\t GPU2\t GPU3\t CPU Affinity\t NUMA Affinity\n"
-                    "GPU0\t X   \t NV18\t NV18\t NV18\t 0-31       \t 0\n"
-                    "GPU1\t NV18\t X   \t NV18\t NV18\t 0-31       \t 0\n"
-                    "GPU2\t NV18\t NV18\t X   \t NV18\t 32-63      \t 1\n"
-                    "GPU3\t NV18\t NV18\t NV18\t X   \t 32-63      \t 1\n\n"
-                    "Legend: X = Self, NV# = NVLink connection (# links), "
-                    "SYS = across PCIe+SMP interconnect, PIX = single PCIe bridge")
+            if "topo" in low and ("-m" in parts or "-p" in parts or "-c" in parts or "topo" in parts):
+                kind = "p" if "-p" in parts else "c" if "-c" in parts else "m"
+                return _render_topo_matrix(kind)
             if "nvlink" in low:
-                if "-e" in parts or "capabilities" in low:
-                    return ("GPU 0: " + _SMI_GPU_NAME + "\n"
-                            "\t Link 0: Replay Errors: 0\n"
-                            "\t Link 0: Recovery Errors: 0\n"
-                            "\t Link 0: CRC Errors: 0")
-                return ("GPU 0: " + _SMI_GPU_NAME + "\n"
-                        "\t Link 0: 26.562 GB/s\n"
-                        "\t Link 1: 26.562 GB/s\n"
-                        "\t Link 2: 26.562 GB/s\n"
-                        "\t Link 3: 26.562 GB/s")
+                if "-e" in parts or "capabilities" in low or "errors" in low:
+                    lines = []
+                    for i in range(_SMI_GPU_COUNT):
+                        lines.append(f"GPU {i}: {_SMI_GPU_NAME}")
+                        lines.append("\t Link 0: Replay Errors: 0")
+                        lines.append("\t Link 0: Recovery Errors: 0")
+                        lines.append("\t Link 0: CRC Errors: 0")
+                    return "\n".join(lines)
+                return _render_nvlink_status()
+            if "compute-apps" in low or "--query-compute-apps" in low:
+                return _render_compute_apps(line)
+            if "--query-accounted-apps" in low or "accounted-apps" in low:
+                return (
+                    "gpu_uuid, pid, gpu_utilization [%], memory_utilization [%], max_memory_usage [MiB], time [ms]\n"
+                    f"GPU-00000000-1a2b-3c4d-5e6f-001122334400, 12000, 88, 62, 42000, 912334"
+                )
+            if "conf-compute" in low or "confidential" in low:
+                return (
+                    "Confidential Compute Status\n"
+                    "\t CC Mode                         : DevTools\n"
+                    "\t Multi-GPU Protected PCIe        : Disabled\n"
+                    "\t Environment                     : Unset"
+                )
+            if "boost-slider" in low:
+                return "GPU Boost Slider\n\t Enabled                         : Yes"
+            if low.strip() in ("nvidia-smi clocks",) or (parts[:2] == ["nvidia-smi", "clocks"]):
+                return (
+                    "Clocks\n"
+                    f"\t Graphics                        : {random.randint(1200, 1980)} MHz\n"
+                    f"\t SM                              : {random.randint(1200, 1980)} MHz\n"
+                    f"\t Memory                          : {random.choice((1593, 2619))} MHz\n"
+                    f"\t Video                           : {random.randint(900, 1600)} MHz"
+                )
+            if "fieldiag" in low or "nvidia-bug-report" in low:
+                return (
+                    "nvidia-bug-report.sh: collecting diagnostics…\n"
+                    "Wrote /tmp/nvidia-bug-report.log.gz\n"
+                    "fieldiag: PASS (no FRU faults)"
+                )
             if "mig" in low:
                 if "-lgip" in low:
                     return ("+-----------------------------------------------------------------------------+\n"
@@ -650,6 +803,39 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                     return ("==============NVSMI LOG==============\n"
                             "Compute Mode\n"
                             "\t Current                       : Default")
+                if "pci" in low:
+                    return (
+                        "==============NVSMI LOG==============\n"
+                        "PCI\n"
+                        "\t Bus                          : 0x19\n"
+                        "\t Device                       : 0x00\n"
+                        "\t Domain                       : 0x0000\n"
+                        "\t Device Id                    : 0x233010DE\n"
+                        "\t Bus Id                       : 00000000:19:00.0\n"
+                        "\t Sub System Id                : 0x179910DE\n"
+                        "\t GPU Link Info\n"
+                        "\t\t PCIe Generation\n"
+                        "\t\t\t Max                     : 5\n"
+                        "\t\t\t Current                 : 5\n"
+                        "\t\t Link Width\n"
+                        "\t\t\t Max                     : 16x\n"
+                        "\t\t\t Current                 : 16x"
+                    )
+                if re.search(r"-d\s*clock", low) or "clocks" in low and "supported" not in low:
+                    return (
+                        "==============NVSMI LOG==============\n"
+                        "Clocks\n"
+                        f"\t Graphics                      : {random.randint(1200, 1980)} MHz\n"
+                        f"\t SM                            : {random.randint(1200, 1980)} MHz\n"
+                        f"\t Memory                        : {random.choice((1593, 2619))} MHz\n"
+                        f"\t Video                         : {random.randint(900, 1600)} MHz\n"
+                        "Applications Clocks\n"
+                        "\t Graphics                      : 1410 MHz\n"
+                        "\t Memory                        : 1593 MHz\n"
+                        "Default Applications Clocks\n"
+                        "\t Graphics                      : 1410 MHz\n"
+                        "\t Memory                        : 1593 MHz"
+                    )
                 if "pids" in low:
                     return ("==============NVSMI LOG==============\n"
                             "Processes\n"
@@ -707,6 +893,14 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                (re.search(r"nvidia-smi\s+-c\b", low) and "dmon" not in low and "pmon" not in low) or \
                (re.search(r"nvidia-smi\s+-p\b", low) and "dmon" not in low and "pmon" not in low):
                 # persistence-mode / power-limit / compute mode / ECC / clocks — acknowledge.
+                if "-pm" in parts or "persistence" in low:
+                    return "Enabled persistence mode for GPU 00000000:19:00.0.\nAll done."
+                if "--lock-gpu-clocks" in low:
+                    return "GPU clocks set to (min,max)=(1410,1410) MHz for GPU 0.\nAll done."
+                if "--gpu-reset" in low or low.startswith("nvidia-smi -r"):
+                    return "GPU 0: GpuReset succeeded.\nAll done."
+                if "-pl" in parts:
+                    return f"Power limit for GPU 0 is already set to {_SMI_PWR_CAP}.00 W.\nAll done."
                 return "All done."
             # Live monitors — paced like real dmon/pmon (and -l loop snapshots).
             if "dmon" in low or "pmon" in low or "-l" in parts or "--loop" in low:
@@ -896,6 +1090,55 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                         "+=================================+===========================================+\n"
                         "| Overall Health                  | Healthy                                   |\n"
                         "+---------------------------------+-------------------------------------------+")
+            if "stats" in low:
+                return (
+                    "+-----------------------------------------------------------------------------+\n"
+                    "| GPU Stats                                                                   |\n"
+                    "+=============+===============================================================+\n"
+                    "| GPU ID      | Power (W) | GPU Util (%) | Mem Util (%) | Temp (C)            |\n"
+                    "+=============+===============================================================+\n"
+                    + "\n".join(
+                        f"| {i:<11} | {random.randint(90, max(120, _SMI_PWR_CAP - 50)):<9} | "
+                        f"{random.randint(0, 99):<12} | {random.randint(0, 90):<12} | "
+                        f"{random.randint(30, 72):<19} |"
+                        for i in range(_SMI_GPU_COUNT)
+                    )
+                    + "\n+=============+===============================================================+"
+                )
+            if "group" in low:
+                return (
+                    "+-------------------+---------------------------------------------------------+\n"
+                    "| Groups            |                                                          |\n"
+                    "| GROUP 0 (default) | GPUs: " + ",".join(str(i) for i in range(_SMI_GPU_COUNT)) + "\n"
+                    "+-------------------+---------------------------------------------------------+"
+                )
+            if "modules" in low:
+                return (
+                    "Module ID  Name                 State\n"
+                    "0          Core                 Loaded\n"
+                    "1          NvSwitch             Loaded\n"
+                    "2          VGPU                 Not Loaded\n"
+                    "3          Introspection        Loaded\n"
+                    "4          Health               Loaded\n"
+                    "5          Policy               Loaded\n"
+                    "6          Config               Loaded"
+                )
+            if "policy" in low:
+                return (
+                    "+-----------------------------------------------------------------------------+\n"
+                    "| Policy Information                                                          |\n"
+                    "| Violation Notification      : On                                             |\n"
+                    "| Max XID                      : None                                          |\n"
+                    "+-----------------------------------------------------------------------------+"
+                )
+            if "fieldgroup" in low or "field" in low and "group" in low:
+                return (
+                    "Field Group 0: default\n"
+                    "  DCGM_FI_DEV_GPU_TEMP\n"
+                    "  DCGM_FI_DEV_POWER_USAGE\n"
+                    "  DCGM_FI_DEV_GPU_UTIL\n"
+                    "  DCGM_FI_DEV_MEM_COPY_UTIL"
+                )
             if "dmon" in low:
                 rows = ["# Entity  GPUTL  MCUTL   TMPTR   POWER   ECCUC",
                         "# Id      %      %       C       W       "]
@@ -959,6 +1202,21 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                         "GPU0 <-> GPU1: UP  64 GT/s\n"
                         "GPU0 <-> GPU2: UP  64 GT/s\n"
                         "GPU1 <-> GPU3: UP  64 GT/s")
+            if low.startswith("amd-smi") and "event" in low:
+                return (
+                    "GPU  TIMESTAMP            EVENT\n"
+                    f"0    {time.strftime('%Y-%m-%dT%H:%M:%S')}  THERMAL_THROTTLE cleared\n"
+                    f"1    {time.strftime('%Y-%m-%dT%H:%M:%S')}  VM_PAGE_FAULT none"
+                )
+            if low.startswith("amd-smi") and "topology" in low:
+                return (
+                    "============================ Weight between two GPUs ========================\n"
+                    "       GPU0         GPU1         GPU2         GPU3\n"
+                    "GPU0   0            15           15           15\n"
+                    "GPU1   15           0            15           15\n"
+                    "GPU2   15           15           0            15\n"
+                    "GPU3   15           15           15           0"
+                )
             if low.startswith("amd-smi") and ("reset" in low or "set" in low):
                 return "Successfully applied AMD SMI command."
             if "static" in low or "rocminfo" in low:
@@ -979,17 +1237,35 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
             if any(f"--show{x}" in low or f"show{x}" in low.replace("-", "") for x in (
                 "temp", "power", "use", "clocks", "meminfo", "id", "bus", "pid", "pcie",
                 "perflevel", "overdrive", "profile", "ras", "ecc", "vbios", "serial",
-                "uniqueid", "pagesinfo", "all",
+                "uniqueid", "pagesinfo", "all", "productname", "driverversion", "hw",
+                "fwinfo", "voltage", "memvendor", "computepartition", "memorypartition",
             )) or "--showtemp" in low or "--showpower" in low or "--showuse" in low or "--showall" in low:
                 # Legacy rocm-smi flag family used in AMD Support One-Pager diagnostics.
                 rows = ["======================= ROCm System Management Interface ======================="]
-                for i in range(8):
-                    rows.append(
-                        f"GPU[{i}]\t: Temp: edge {random.randint(38, 72)}c  "
-                        f"junction {random.randint(42, 78)}c  "
-                        f"Power: {random.randint(90, 550)}W  "
-                        f"GPU use: {random.randint(0, 99)}%"
-                    )
+                if "meminfo" in low or "vram" in low:
+                    for i in range(8):
+                        used = random.randint(1000, 180000)
+                        rows.append(
+                            f"GPU[{i}]\t: VRAM Total: 196592 MB  Used: {used} MB  "
+                            f"Free: {196592 - used} MB"
+                        )
+                elif "productname" in low or "hw" in low or "driverversion" in low:
+                    for i in range(8):
+                        rows.append(
+                            f"GPU[{i}]\t: Card series: Instinct MI300X  "
+                            f"Card model: 0x74a1  Driver: 6.2.0  VBIOS: 022.171.00.009"
+                        )
+                elif "fwinfo" in low or "vbios" in low:
+                    for i in range(8):
+                        rows.append(f"GPU[{i}]\t: VBIOS: 022.171.00.009.000001  FW: 22.40")
+                else:
+                    for i in range(8):
+                        rows.append(
+                            f"GPU[{i}]\t: Temp: edge {random.randint(38, 72)}c  "
+                            f"junction {random.randint(42, 78)}c  "
+                            f"Power: {random.randint(90, 550)}W  "
+                            f"GPU use: {random.randint(0, 99)}%"
+                        )
                 rows.append("==================================================================================")
                 return "\n".join(rows)
             if low.startswith("rocm-smi") and (
