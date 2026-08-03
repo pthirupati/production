@@ -319,7 +319,7 @@ Rule-based only (`interview_ai.py` + `services/conversation/` + new `services/re
 197. [x] **P2.R1** Response-timing model (`realism/timing.py`) — think-time + jitter + "persona is typing"
 198. [x] **P2.R2** Backchannel layer (`realism/backchannel.py`) — live mm-hmm/okay off interim STT
 199. [ ] **P2.R3** Lab narration — real-time reactions to streamed commands (needs P2.4)
-200. [ ] **P2.R4** Wrong-answer probing state machine (narrow → hint → graceful move-on)
+200. [x] **P2.R4** Wrong-answer probing state machine (narrow → hint → graceful move-on)
 201. [ ] **P2.R5** Callback memory → phrasing (in-round + cross-round from prior report)
 202. [~] **P2.R6** Small-talk framing beats (beats stored on round start; two-way UI still open)
 203. [ ] **P2.R7** Phrasing variety / disfluency guard

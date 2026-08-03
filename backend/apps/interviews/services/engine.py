@@ -924,9 +924,111 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
     warmup_slot = last_q_category in ("intro", "experience", "personal", "casual")
 
     quality = score_result.get("quality", "")
+    q_key = _normalize_q(question_text) or f"msg:{(last_q_msg.id if last_q_msg else 0)}"
+    from apps.interviews.services.realism.probe import (
+        ProbeAction,
+        hint_line,
+        move_on_line,
+        narrow_prompt,
+        next_probe_action,
+    )
+
+    # P2.R4 — multi-step probe ladder (narrow → hint → move on) instead of a
+    # single re-ask. Warm-up slots still always advance.
+    probe_decision = None
+    if (
+        _should_reprompt_answer(score_result, correctness)
+        and bool(question_text)
+        and not warmup_slot
+    ):
+        conv = _conversation_meta(round_obj)
+        probe_map = conv.get("probe_state") if isinstance(conv.get("probe_state"), dict) else {}
+        probe_decision, probe_map = next_probe_action(
+            question_key=q_key,
+            quality=quality,
+            correctness=correctness,
+            probe_state=probe_map,
+            max_attempts=3,
+        )
+        conv["probe_state"] = probe_map
+        try:
+            round_obj.save(update_fields=["metadata"])
+        except Exception:  # noqa: BLE001
+            pass
+
+    if probe_decision and probe_decision.action in (
+        ProbeAction.NARROW,
+        ProbeAction.HINT,
+    ):
+        follow_ups = []
+        expected_kw = []
+        if question is not None:
+            follow_ups = getattr(question, "follow_ups", None) or []
+            expected_kw = getattr(question, "expected_keywords", None) or []
+        if last_q_msg and isinstance(last_q_msg.metadata, dict):
+            pc = last_q_msg.metadata.get("practical_config") or {}
+            if isinstance(pc, dict) and pc.get("expected_signals"):
+                expected_kw = list(expected_kw) + list(pc.get("expected_signals") or [])
+        if probe_decision.action == ProbeAction.NARROW:
+            reply = narrow_prompt(question_text, follow_ups if isinstance(follow_ups, list) else None)
+        else:
+            reply = hint_line(expected_kw if isinstance(expected_kw, list) else None)
+        _bump_reprompt(round_obj, question_text)
+        try:
+            round_obj.save(update_fields=["metadata"])
+        except Exception:  # noqa: BLE001
+            pass
+        interviewer_msg = InterviewMessage.objects.create(
+            round=round_obj,
+            role="interviewer",
+            content=reply,
+            message_type="follow_up",
+            metadata={
+                "prior_score": score_result["score"],
+                "reprompt": True,
+                "probe_action": probe_decision.action.value,
+                "probe_attempt": probe_decision.attempt,
+                "advanced": False,
+            },
+        )
+        coaching = _maybe_coaching(round_obj, meta, score_result, answer_text)
+        hints = _speech_hints_for_round(
+            round_obj,
+            question_meta={
+                "category": last_q_category,
+                "kind": last_q_kind,
+                "difficulty": last_q_difficulty,
+                "reprompt": True,
+            },
+            answer_text=answer_text,
+            next_move="probe",
+            scoring_elapsed_ms=_scoring_elapsed_ms,
+        )
+        return {
+            "candidate_message": cand_msg,
+            "interviewer_reply": interviewer_msg,
+            "reply": reply,
+            "advanced": False,
+            "correctness": correctness,
+            "score": score_result,
+            "next_question": None,
+            "coaching": coaching,
+            "skipped": quality == "skipped",
+            "probe_action": probe_decision.action.value,
+            **hints,
+        }
+
+    # Graceful move-on after probe ladder — prefix soft redirect, then advance.
+    move_on_prefix = ""
+    if probe_decision and probe_decision.action == ProbeAction.MOVE_ON:
+        move_on_prefix = move_on_line() + " "
+
+    # Legacy single-reprompt path kept for non-probe weak answers that somehow
+    # skip the ladder (should be rare). Prefer probe_decision above.
     already_reprompted = _reprompt_count(round_obj, question_text) >= 1
     reprompt_now = (
-        _should_reprompt_answer(score_result, correctness)
+        probe_decision is None
+        and _should_reprompt_answer(score_result, correctness)
         and not already_reprompted
         and bool(question_text)
         and not warmup_slot
@@ -997,6 +1099,9 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         )
     except Exception:  # noqa: BLE001
         reply = "Got it — thanks. Let's keep going."
+
+    if move_on_prefix:
+        reply = f"{move_on_prefix}{reply}".strip()
 
     next_q = None
     if _should_ask_another(round_obj):
