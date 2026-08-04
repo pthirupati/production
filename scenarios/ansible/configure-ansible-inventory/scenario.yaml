@@ -8,6 +8,10 @@ time_limit: 900
 max_score: 100
 infrastructure_type: docker
 lab_mode: docker
+awx_link: true
+consoles:
+  - terminal
+  - awx
 jira_priority: Low
 is_free: false
 description: 'CONTEXT: A team operating Ansible automation has raised a ticket for `Configure Ansible

@@ -95,6 +95,10 @@ objectives:
 - Verify all webservers respond to ansible -m ping
 requires_companion_hosts: true
 simulation_type: ansible
+awx_link: true
+consoles:
+  - terminal
+  - awx
 slug: sim-ansible-ssh-key
 time_limit: 900
 title: Ansible SSH Key Failure

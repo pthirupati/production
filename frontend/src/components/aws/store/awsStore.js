@@ -598,7 +598,11 @@ function mergePersistedAws(persisted, current) {
   for (const key of Object.keys(seed)) {
     if (objectKeys.has(key)) continue
     if (Array.isArray(seed[key])) {
-      merged[key] = Array.isArray(p[key]) ? p[key] : seed[key]
+      // Drop null/non-object rows from corrupt localStorage blobs so scoped()/
+      // TopNav alarms.filter never throw on mount (BUG A / Lab environment error).
+      merged[key] = Array.isArray(p[key])
+        ? p[key].filter((row) => row != null && typeof row === 'object')
+        : seed[key]
     }
   }
   // genericResources: deep-merge per service so new nested seeds appear for old
@@ -2264,4 +2268,4 @@ try {
 
 // ---------- Region-scoped selectors ----------
 export const ACCOUNT = ACCOUNT_ID
-export const scoped = (arr, region) => (arr || []).filter((x) => !x.region || x.region === region)
+export const scoped = (arr, region) => (arr || []).filter((x) => x && (!x.region || x.region === region))

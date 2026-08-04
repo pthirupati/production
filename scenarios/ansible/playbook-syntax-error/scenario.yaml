@@ -50,6 +50,10 @@ objectives:
 - Confirm ansible-playbook site.yml runs without parse errors
 lab_mode: simulation
 simulation_type: ansible
+awx_link: true
+consoles:
+  - terminal
+  - awx
 time_limit: 900
 max_score: 100
 is_free: true

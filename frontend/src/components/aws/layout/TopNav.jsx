@@ -179,7 +179,7 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
     }
   }
 
-  const inAlarm = alarms.filter((a) => a.state === 'ALARM').length
+  const inAlarm = alarms.filter((a) => a && a.state === 'ALARM').length
   const favServices = favorites.map((k) => SERVICE_BY_KEY[k]).filter(Boolean)
   const recentServiceObjs = recentServices.map((k) => SERVICE_BY_KEY[k]).filter(Boolean)
 
@@ -196,7 +196,7 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
   const regionMatches = (r) => r.name.toLowerCase().includes(rq) || r.code.includes(rq)
 
   const notifications = [
-    ...alarms.filter((a) => a.state === 'ALARM').map((a) => ({ type: 'error', title: `Alarm: ${a.name}`, body: `${a.metric} ${a.threshold}` })),
+    ...alarms.filter((a) => a && a.state === 'ALARM').map((a) => ({ type: 'error', title: `Alarm: ${a.name}`, body: `${a.metric} ${a.threshold}` })),
     { type: 'success', title: 'Welcome to the AWS Management Console', body: 'Explore services, launch resources, and complete guided labs.' },
     { type: 'info', title: 'Free tier usage', body: 'You are within Free Tier limits this month.' },
   ]

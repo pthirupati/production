@@ -51,6 +51,10 @@ objectives:
 - Run the playbook again and confirm it completes without variable errors
 lab_mode: simulation
 simulation_type: ansible
+awx_link: true
+consoles:
+  - terminal
+  - awx
 time_limit: 900
 max_score: 100
 is_free: false

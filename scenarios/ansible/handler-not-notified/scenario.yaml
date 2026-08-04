@@ -52,6 +52,10 @@ objectives:
 - Verify the handler runs (nginx reloads) on the next playbook execution
 lab_mode: simulation
 simulation_type: ansible
+awx_link: true
+consoles:
+  - terminal
+  - awx
 time_limit: 1200
 max_score: 100
 is_free: false

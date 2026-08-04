@@ -477,8 +477,8 @@ Learner-facing UI never says simulation/demo/mock.
 305. [x] Paced streams: `ping` (already) + `journalctl -f` / `tail -f` / `top` / `watch` via StreamedCommandResult
 306. [x] Open AWX companion for `ai-infra` + `consoles` include awx (ansible tech already)
 307. [x] Jira coach when @mention near-miss fails parse (`@team storage`, typos)
-308. [ ] AWS console ErrorBoundary: capture production stack from returning-user localStorage (reproduce harness exists — pin remaining throw)
-309. [ ] Datacenter twin ErrorBoundary: same chunk-recovery + store-reset path as AWS
+308. [~] AWS console ErrorBoundary: capture production stack from returning-user localStorage — *null-safe scoped/merge + TopNav/CW filters*
+309. [~] Datacenter twin ErrorBoundary: same chunk-recovery + store-reset path as AWS — *default floorView 2d to avoid R3F on open*
 310. [ ] Ansible YAML backfill: `consoles: [terminal, awx]` or `awx_link: true` on all ansible heroes (not only academy `simulation_type: ansible`)
 311. [ ] AWS companion link on every AWS-tech scenario (not only terraform/hosted heuristics)
 312. [ ] TypeScript coding tech tree (missing entirely) + academy coding_mode pack

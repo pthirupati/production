@@ -7,6 +7,10 @@ time_limit: 1200
 max_score: 100
 lab_mode: simulation
 simulation_type: ansible
+awx_link: true
+consoles:
+  - terminal
+  - awx
 requires_companion_hosts: true
 dual_terminal: true
 infrastructure_type: docker
