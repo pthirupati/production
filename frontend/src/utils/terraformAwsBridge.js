@@ -49,6 +49,8 @@ export function detectCloudProvidersFromHcl(filesOrSrc = {}) {
     azure: [...types].some((t) => t.startsWith('azurerm_')),
     gcp: [...types].some((t) => t.startsWith('google_')),
     vmware: [...types].some((t) => t.startsWith('vsphere_')),
+    maas: [...types].some((t) => t.startsWith('maas_')),
+    lxd: [...types].some((t) => t.startsWith('lxd_')),
   }
   return Object.fromEntries(Object.entries(links).filter(([, v]) => v))
 }

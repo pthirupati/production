@@ -450,11 +450,13 @@ def _cloud_links_from_resources(resources: list[dict]) -> dict[str, bool]:
         "azure": any(t.startswith("azurerm_") for t in types),
         "gcp": any(t.startswith("google_") for t in types),
         "vmware": any(t.startswith("vsphere_") for t in types),
+        "maas": any(t.startswith("maas_") for t in types),
+        "lxd": any(t.startswith("lxd_") for t in types),
     }
 
 
 def _mirror_apply_to_clouds(session_id: str, resources: list[dict]) -> dict[str, bool]:
-    """S1.5: terraform apply → AWS/Azure/GCP console inventory + identity.
+    """S1.5: terraform apply → AWS/Azure/GCP/VMware/MAAS/LXD inventory + identity.
 
     Idempotent: cloud engines return ok when the named VM/instance already exists.
     Failures are non-fatal so pure-AWS labs still complete apply.
@@ -582,13 +584,70 @@ def _mirror_apply_to_clouds(session_id: str, resources: list[dict]) -> dict[str,
                     )
                 except Exception:
                     pass
+            elif rtype == "maas_machine":
+                from apps.vmware_sim import baremetal_engine as be
+
+                be.get_state(session_id, "terraform-apply")
+                be.apply_action(session_id, "login", {"user": "terraform"})
+                machines = (
+                    ((be.get_state(session_id) or {}).get("state") or {})
+                    .get("maas", {})
+                    .get("machines")
+                    or []
+                )
+                if not any((m.get("hostname") or "") == name for m in machines):
+                    be.apply_action(
+                        session_id,
+                        "maas_enlist",
+                        {"hostname": name},
+                    )
+                try:
+                    from apps.labs.provisioner.simulation.server_identity import upsert_server
+
+                    upsert_server(
+                        session_id,
+                        {
+                            "id": f"tf-maas-{name}",
+                            "hostname": name,
+                            "primary_ip": "",
+                            "power": "off",
+                            "os": "",
+                            "install_state": "new",
+                            "owner": "terraform",
+                            "tags": {
+                                "role": "terraform",
+                                "provider": "maas",
+                                "appears_in": ["maas", "baremetal", "terraform"],
+                            },
+                        },
+                        source="terraform",
+                    )
+                except Exception:
+                    pass
+            elif rtype in ("lxd_instance", "lxd_container"):
+                from apps.vmware_sim import baremetal_engine as be
+
+                be.get_state(session_id, "terraform-apply")
+                be.apply_action(session_id, "login", {"user": "terraform"})
+                containers = (
+                    ((be.get_state(session_id) or {}).get("state") or {})
+                    .get("lxd", {})
+                    .get("containers")
+                    or []
+                )
+                if not any((c.get("name") or "") == name for c in containers):
+                    be.apply_action(
+                        session_id,
+                        "create_lxd",
+                        {"name": name, "image": "ubuntu:22.04"},
+                    )
         except Exception:
             continue
     return {k: v for k, v in links.items() if v}
 
 
 def _mirror_destroy_to_clouds(session_id: str, resources: list[dict]) -> dict[str, bool]:
-    """Terraform destroy → terminate/delete mirrored AWS/Azure/GCP/VMware resources."""
+    """Terraform destroy → terminate/delete mirrored AWS/Azure/GCP/VMware/MAAS/LXD resources."""
     links = _cloud_links_from_resources(resources)
     for r in resources:
         rtype = str(r.get("type") or "")
@@ -638,6 +697,18 @@ def _mirror_destroy_to_clouds(session_id: str, resources: list[dict]) -> dict[st
                 except Exception:
                     pass
                 ve.apply_action(session_id, "delete_vm", {"vm_name": name})
+            elif rtype == "maas_machine":
+                from apps.vmware_sim import baremetal_engine as be
+
+                be.get_state(session_id, "terraform-destroy")
+                be.apply_action(session_id, "login", {"user": "terraform"})
+                be.apply_action(session_id, "maas_delete", {"hostname": name})
+            elif rtype in ("lxd_instance", "lxd_container"):
+                from apps.vmware_sim import baremetal_engine as be
+
+                be.get_state(session_id, "terraform-destroy")
+                be.apply_action(session_id, "login", {"user": "terraform"})
+                be.apply_action(session_id, "delete_lxd", {"name": name})
         except Exception:
             continue
     return {k: v for k, v in links.items() if v}

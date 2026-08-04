@@ -40,6 +40,20 @@ resource "vsphere_virtual_machine" "web01" {
 }
 """
 
+MAAS_LXD_MAIN = """
+provider "maas" {}
+provider "lxd" {}
+
+resource "maas_machine" "gpu_node" {
+  hostname = "gpu_node"
+}
+
+resource "lxd_instance" "batch" {
+  name  = "batch"
+  image = "ubuntu:22.04"
+}
+"""
+
 
 class TerraformCloudBridgeTests(TestCase):
     def setUp(self):
@@ -47,6 +61,8 @@ class TerraformCloudBridgeTests(TestCase):
         self.sid = "test-tf-cloud-bridge"
         for drop in (te.drop_session, ae.drop_session, aze.drop_session, gce.drop_session, ve.drop_session):
             drop(self.sid)
+        from apps.vmware_sim import baremetal_engine as be
+        be.drop_session(self.sid)
 
     def tearDown(self):
         cache.clear()
@@ -174,3 +190,44 @@ class TerraformCloudBridgeTests(TestCase):
         self.assertTrue(res.get("ok"), res)
         vms = (ve.get_state(self.sid).get("inventory") or {}).get("vms") or []
         self.assertFalse(any(v.get("name") == "web01" for v in vms), vms)
+
+    def test_apply_mirrors_maas_and_lxd(self):
+        from apps.vmware_sim import baremetal_engine as be
+
+        self._boot(MAAS_LXD_MAIN)
+        res = te.apply_action(self.sid, "terraform_apply", {})
+        self.assertTrue(res.get("ok"), res)
+        self.assertTrue(res.get("cloud_links", {}).get("maas"))
+        self.assertTrue(res.get("cloud_links", {}).get("lxd"))
+
+        st = (be.get_state(self.sid).get("state") or {})
+        machines = (st.get("maas") or {}).get("machines") or []
+        self.assertTrue(any(m.get("hostname") == "gpu_node" for m in machines), machines)
+        containers = (st.get("lxd") or {}).get("containers") or []
+        self.assertTrue(any(c.get("name") == "batch" for c in containers), containers)
+
+        # Idempotent re-apply
+        te.apply_action(self.sid, "terraform_plan", {})
+        te.apply_action(self.sid, "terraform_apply", {})
+        st2 = (be.get_state(self.sid).get("state") or {})
+        self.assertEqual(
+            sum(1 for m in ((st2.get("maas") or {}).get("machines") or []) if m.get("hostname") == "gpu_node"),
+            1,
+        )
+        self.assertEqual(
+            sum(1 for c in ((st2.get("lxd") or {}).get("containers") or []) if c.get("name") == "batch"),
+            1,
+        )
+
+    def test_destroy_removes_maas_and_lxd(self):
+        from apps.vmware_sim import baremetal_engine as be
+
+        self._boot(MAAS_LXD_MAIN)
+        te.apply_action(self.sid, "terraform_apply", {})
+        res = te.apply_action(self.sid, "terraform_destroy", {})
+        self.assertTrue(res.get("ok"), res)
+        st = (be.get_state(self.sid).get("state") or {})
+        machines = (st.get("maas") or {}).get("machines") or []
+        self.assertFalse(any(m.get("hostname") == "gpu_node" for m in machines), machines)
+        containers = (st.get("lxd") or {}).get("containers") or []
+        self.assertFalse(any(c.get("name") == "batch" for c in containers), containers)

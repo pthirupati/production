@@ -508,6 +508,18 @@ export default function LabRunner() {
     setGuidedDone({})
   }, [sessionId])
 
+  // Terraform IDE "Open Bare Metal" (and similar) → companion overlay in this lab.
+  useEffect(() => {
+    const onOpen = (ev) => {
+      const kind = ev?.detail?.kind
+      if (kind === 'baremetal') setShowBaremetalSim(true)
+      else if (kind === 'aws') setShowAwsSim(true)
+      else if (kind === 'datacenter') setShowDatacenterSim(true)
+    }
+    window.addEventListener('fixitlab:open-companion', onOpen)
+    return () => window.removeEventListener('fixitlab:open-companion', onOpen)
+  }, [])
+
   // Companion console entitlement (VMware / Datacenter) — revenue lock.
   useEffect(() => {
     let cancelled = false
@@ -1747,6 +1759,16 @@ export default function LabRunner() {
     || isTerraformSimLab
     || scenario?.aws_link === true
     || consolesInclude(scenario?.consoles, 'aws')
+  )
+  // Terraform (and ai-infra) apply can enlist MAAS / create LXD — surface companion console.
+  const showHostedBaremetalLink = !isBaremetalGuiLab && (
+    techSlugLc === 'terraform'
+    || isTerraformSimLab
+    || techSlugLc === 'ai-infra'
+    || scenario?.baremetal_link === true
+    || consolesInclude(scenario?.consoles, 'baremetal')
+    || consolesInclude(scenario?.consoles, 'maas')
+    || consolesInclude(scenario?.consoles, 'lxd')
   )
   const showHostedAzureLink = !isAzureLab && canAzureConsole && (
     hostPlatform === 'azure' || techSlugLc === 'azure'
@@ -3080,6 +3102,17 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open Bare Metal
             </button>
           )}
+          {showHostedBaremetalLink && (
+            <button
+              type="button"
+              onClick={() => setShowBaremetalSim(true)}
+              title="Open MAAS / LXD console — Terraform apply mirrors enlist/create here"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(13,148,136,.45)', color: '#2dd4bf', background: 'rgba(13,148,136,.14)' }}
+            >
+              <ExternalLink size={12} /> Open Bare Metal
+            </button>
+          )}
           {isSimulationLab && (
             <>
               <SimLabQuickActions
@@ -3461,6 +3494,9 @@ export default function LabRunner() {
       )}
 
       {isBaremetalGuiLab && !isSimPrimaryLab && showBaremetalSim && (
+        <LazySimPanel Sim={LazyBaremetalSimulator} label="bare metal" sessionId={sessionId} scenario={scenario} onExit={() => setShowBaremetalSim(false)} {...simChromeProps} />
+      )}
+      {showHostedBaremetalLink && showBaremetalSim && (
         <LazySimPanel Sim={LazyBaremetalSimulator} label="bare metal" sessionId={sessionId} scenario={scenario} onExit={() => setShowBaremetalSim(false)} {...simChromeProps} />
       )}
       {showDatacenterLink && showDatacenterSim && (
