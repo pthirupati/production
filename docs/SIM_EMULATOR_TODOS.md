@@ -343,7 +343,7 @@ Learner-facing UI never says simulation/demo/mock.
 ### S1 — Unified enterprise state bus
 210. [~] Single asset/resource registry (hostname, serial, asset tag, rack/U, CPU/RAM/disk/RAID, firmware, BIOS, BMC, NICs, VLANs, GPUs, power/thermal, OS, deploy status, owner) — *schema + list_assets on server_identity*
 211. [~] Write-once identity: MAAS commission → appears in CMDB, DC twin, monitoring, Terraform import targets, AWX inventory — *MAAS terminal/baremetal → identity → AWX maas-gpu-nodes; Terraform/monitoring still open*
-212. [~] Terraform apply → create/update/delete mirrors into AWS/Azure/GCP/VMware/MAAS/LXD consoles — *AWS/Azure/GCP/VMware create mirror + Open Cloud links; destroy + MAAS/LXD fan-out open*
+212. [~] Terraform apply → create/update/delete mirrors into AWS/Azure/GCP/VMware/MAAS/LXD consoles — *AWS/Azure/GCP/VMware create + destroy mirror; MAAS/LXD fan-out open*
 213. [ ] Hardware failure events fan out to Grafana alerts, SOC tickets, DCIM LEDs, and lab terminal `dmesg`
 214. [ ] Cross-console sync: disk/NIC/CPU/RAM edits in VMware/DC update guest `lsblk`/`ip`/`nvidia-smi`
 215. [ ] Persistent twin replay (undo/timeline) for cable/firmware/part swaps
@@ -395,7 +395,7 @@ Learner-facing UI never says simulation/demo/mock.
 243. [x] Backfill `hosted_as: vmware` on every `vmware_link` scenario YAML (not only nic-add-vmware-rescan)
 244. [x] PeopleSoft: `hosted_as` + PeopleSoft persona (never AWS DMI rotate) on all PS scenarios
 245. [x] Harden `scripts/lint_scenarios.py` to **fail CI** on wrong host / missing coding_mode / unknown sim_type — *academy coding packs + vmware_link/peoplesoft hosted_as*
-246. [~] Ansible labs: always surface Open AWX companion when `simulation_type`/consoles include awx — *LabRunner shows for ansible + ai-infra; YAML consoles backfill still open*
+246. [x] Ansible labs: always surface Open AWX companion when `simulation_type`/consoles include awx — *LabRunner + YAML backfill + lint*
 247. [ ] AWS labs: always surface Open AWS Console companion (not only terraform/hosted heuristics)
 248. [x] Coding techs: academy java/shell/nodejs/python + HTML heroes → `coding_mode` + `coding_spec` *(java/shell heroes remain simulation marker labs; typescript still pending)*
 249. [x] HTML heroes: CodingIDE + live preview iframe (academy done; heroes still terminal)
@@ -408,7 +408,7 @@ Learner-facing UI never says simulation/demo/mock.
 
 ### T3 — Terraform / cloud bridge remaining
 254. [x] Terraform `vsphere_virtual_machine` → VMware `create_vm` + Open VMware link
-255. [ ] Terraform destroy → terminate/delete mirrored AWS/Azure/GCP/VMware resources
+255. [x] Terraform destroy → terminate/delete mirrored AWS/Azure/GCP/VMware resources
 256. [ ] Terraform → MAAS enlist / LXD create fan-out
 257. [ ] Terraform import + state list/show parity with mirrored consoles
 258. [ ] Provider resource coverage beyond instance/VM (S3, VPC, SG, Azure RG, GCP disk, vsphere network)
@@ -479,11 +479,11 @@ Learner-facing UI never says simulation/demo/mock.
 307. [x] Jira coach when @mention near-miss fails parse (`@team storage`, typos)
 308. [~] AWS console ErrorBoundary: capture production stack from returning-user localStorage — *null-safe scoped/merge + TopNav/CW filters*
 309. [~] Datacenter twin ErrorBoundary: same chunk-recovery + store-reset path as AWS — *default floorView 2d to avoid R3F on open*
-310. [ ] Ansible YAML backfill: `consoles: [terminal, awx]` or `awx_link: true` on all ansible heroes (not only academy `simulation_type: ansible`)
+310. [x] Ansible YAML backfill: `consoles: [terminal, awx]` or `awx_link: true` on all ansible heroes (not only academy `simulation_type: ansible`)
 311. [ ] AWS companion link on every AWS-tech scenario (not only terraform/hosted heuristics)
 312. [ ] TypeScript coding tech tree (missing entirely) + academy coding_mode pack
 313. [ ] Packer CodingIDE / workspace for image-factory scenarios (ai-infra)
-314. [ ] Terraform destroy → delete mirrored cloud/VMware resources
+314. [x] Terraform destroy → delete mirrored cloud/VMware resources
 315. [ ] MAAS UI region/rack/images panes pixel surface
 316. [ ] VyOS firewall/NAT/VPN/VRRP CLI + pixel appliance UI
 317. [ ] Steam DC: reception → security → staging → repair bay walkable stubs
