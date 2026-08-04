@@ -1740,7 +1740,13 @@ export default function LabRunner() {
   const canGcpConsole = userHasTechAccess(techSubs, 'gcp')
   const canAwxConsole = userHasTechAccess(techSubs, 'ansible') || userHasTechAccess(techSubs, 'ansible-awx')
   const showHostedAwsLink = !isAwsLab && canAwsConsole && (
-    isAwsAcademyLab || hostPlatform === 'aws' || techSlugLc === 'aws'
+    isAwsAcademyLab
+    || hostPlatform === 'aws'
+    || techSlugLc === 'aws'
+    || techSlugLc === 'terraform'
+    || isTerraformSimLab
+    || scenario?.aws_link === true
+    || consolesInclude(scenario?.consoles, 'aws')
   )
   const showHostedAzureLink = !isAzureLab && canAzureConsole && (
     hostPlatform === 'azure' || techSlugLc === 'azure'
