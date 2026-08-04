@@ -11,96 +11,61 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating Python development has raised a ticket for `Testing — Troubleshoot
-  Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
-  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
+description: 'CONTEXT: Complete the testing coding exercise in the browser IDE.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace. The architecture is a
-  single lab-primary node exposing source files, venv, tests, and CLI entrypoints; treat it as the production
-  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: FixitLab coding practice IDE — edit solution.py, Run visible tests,
+  then Check Solution.
 
 
-  SYMPTOM / STARTING STATE: The Python project workspace is degraded. Code changes break behavior with
-  no safety net. Recent changes may exist around testing, but do not restart blindly — gather evidence
-  first.
+  SYMPTOM / STARTING STATE: Coding challenge: testing. The stub in solution.py is
+  incomplete so tests fail until you implement it.
 
 
-  OBJECTIVE: The incident symptom is clear: code changes break behavior with no safety net; Root cause
-  is isolated with evidence, not guesswork; Service behavior returns to normal after the fix. Acceptance
-  criteria: the change is minimal and reversible, and success means `systemctl is-active gunicorn`` returns
-  active.
+  OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
 
 
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant source files, venv, tests, and CLI entrypoints), changing one thing at a time. Check
-  your work continuously against the objective — success means `systemctl is-active gunicorn`` returns
-  active.
+  VERIFY: Check Solution passes all hidden tests.
 
-
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active gunicorn` returns active.
-  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
-  on a repeat check, not just once.
-
-
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
-
-
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  '
 objectives:
-- 'The incident symptom is clear: code changes break behavior with no safety net'
-- Root cause is isolated with evidence, not guesswork
-- Service behavior returns to normal after the fix
-initial_state: The Python project workspace is degraded. Code changes break behavior with no safety net.
-  Recent changes may exist around testing, but do not restart blindly — gather evidence first.
+- Implement the required function in solution.py
+- Pass visible tests with Run
+- Pass Check Solution (hidden tests)
+initial_state: 'Coding challenge: testing. The stub in solution.py is incomplete so
+  tests fail until you implement it.'
 hints:
 - order: 1
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: code changes break behavior with no safety net.
-    This lab is about testing — unit tests, fixtures, and assertions. Read the objectives and the current
-    state, and note precisely what looks wrong versus healthy before you form any theory.'
+    Do not touch anything yet. First observe the symptom: code changes break behavior
+    with no safety net. This lab is about testing — unit tests, fixtures, and assertions.
+    Read the objectives and the current state, and note precisely what looks wrong
+    versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For testing problems the reliable method is: (1) reproduce/observe
-    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
-    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
-    the noisy log line), changing one thing at a time.'
+    Work from evidence, not guesses. For testing problems the reliable method is:
+    (1) reproduce/observe the failure, (2) narrow from the whole system down to the
+    one component that owns the symptom, (3) change exactly one thing, (4) re-check.
+    Fix the underlying misconfiguration you identified (not just the noisy log line),
+    changing one thing at a time.'
 - order: 3
   cost: 25
-  content: 'WHICH TOOL — the diagnostic command(s):
-
-    Start with `systemctl status gunicorn` and `journalctl -u gunicorn -n 50 --no-pager` before changing
-    anything.'
+  content: WHICH TOOL — use the IDE Run button on visible tests first; read the failing
+    assertion message carefully.
 - order: 4
   cost: 40
-  content: 'NARROW DOWN — isolate the subsystem:
-
-    1. Run `systemctl status gunicorn` — note Active/Failed and the last log lines.
-
-    2. Read `journalctl -u gunicorn -n 50` for the root error.
-
-    3. Form a hypothesis about the smallest config or permission fix.'
+  content: NARROW DOWN — implement the smallest change that satisfies one failing
+    test, then re-run.
 - order: 5
   cost: 60
-  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
-
-    1. Apply the minimal fix (config, unit override, or missing directory).
-
-    2. Run `systemctl daemon-reload` if you edited a unit file.
-
-    3. Run `systemctl restart gunicorn` and confirm `systemctl is-active gunicorn` succeeds.
-
-
-    WHY: the grader checks real service state, not marker files.'
-summary: Complete the testing — troubleshoot lab python lab and verify success with the checker
+  content: NEAR-SOLUTION — finish the function so all visible tests pass, then Check
+    Solution.
+summary: Complete the testing — troubleshoot lab python lab and verify success with
+  the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -133,20 +98,18 @@ environment:
 tasks:
 - id: task_1
   title: Testing — Troubleshoot Lab
-  description: Restore healthy behavior for Testing — Troubleshoot Lab by investigating the failure, applying
-    the smallest safe fix, and validating the outcome.
-  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Implement the testing exercise in the browser IDE and pass all tests.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
-    type: service_active
-    command: systemctl is-active nginx
-    expected_status: active
-    error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
-      -u nginx -n 50`.
+    type: script
+    script: hidden_tests
+    error_message: Hidden tests still failing — keep iterating in the IDE.
 solution:
-  summary: The root cause is an unhealthy `nginx` service; repair it and verify active state.
-  files_changed: []
-  commands_run:
-  - systemctl is-active nginx
+  summary: Implement the function so visible and hidden tests pass in the coding IDE.
+  files_changed:
+  - solution.py
+  commands_run: []
   reference_docs: python-fundamentals
 guided_mode:
   enabled: true
@@ -172,3 +135,27 @@ guided_mode:
     expected_output: '`systemctl is-active nginx`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success
+coding_mode: true
+coding_spec:
+  language: python
+  entrypoint: solution.py
+  kind: impl
+  instructions: 'Implement assert_equal(a, b) → True if a==b else raise AssertionError.
+
+    Click Run to try it, then Check Solution to grade.
+
+    '
+  files:
+  - path: solution.py
+    content: "def assert_equal(a, b):\n    # TODO\n    pass\n"
+    readonly: false
+  visible_tests:
+  - name: ok
+    code: assert assert_equal(1, 1) is True
+  hidden_tests:
+  - name: fail
+    code: "raised=False\ntry:\n assert_equal(1, 2)\nexcept AssertionError:\n raised=True\n\
+      assert raised"
+  - name: n
+    code: assert assert_equal('v6', 'v6') is True
+  timeout: 8

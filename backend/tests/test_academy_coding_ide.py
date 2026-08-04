@@ -59,6 +59,7 @@ class AcademyCodingIdeTests(SimpleTestCase):
                     "academy-java-",
                     "academy-shell-script-",
                     "academy-nodejs-",
+                    "academy-python-",
                 )),
                 msg=slug,
             )
@@ -145,6 +146,26 @@ class AcademyCodingIdeTests(SimpleTestCase):
             "}\n"
         )
         ok = grade_submission("javascript", fixed, tests, timeout=8)
+        self.assertTrue(ok.all_passed, ok.error or ok.outcomes)
+
+    def test_python_academy_venv_grades(self):
+        path = ROOT / "scenarios/python/academy-python-001-learn-venv/scenario.yaml"
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        self.assertTrue(data.get("coding_mode"))
+        spec = data["coding_spec"]
+        self.assertEqual(spec["language"], "python")
+        self.assertEqual(spec["entrypoint"], "solution.py")
+        tests = [{**t, "hidden": False} for t in spec["visible_tests"]] + [
+            {**t, "hidden": True} for t in spec["hidden_tests"]
+        ]
+        stub = grade_submission("python", spec["files"][0]["content"], tests, timeout=8)
+        self.assertFalse(stub.all_passed)
+        fixed = (
+            "def venv_python_bin(root):\n"
+            "    r = str(root).rstrip('/')\n"
+            "    return r + '/bin/python'\n"
+        )
+        ok = grade_submission("python", fixed, tests, timeout=8)
         self.assertTrue(ok.all_passed, ok.error or ok.outcomes)
 
     def test_html_hero_has_coding_mode(self):

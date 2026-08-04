@@ -5,11 +5,11 @@ Rewrites scenario.yaml (coding_mode + coding_spec), vestigial check.sh, and stri
 those slugs from generated academy_service_presets / e2e fix maps.
 
 Usage:
-  python3 scripts/migrate_academy_coding_labs.py [--dry-run] [--technology javascript|react|html|java|shell-script|nodejs]
+  python3 scripts/migrate_academy_coding_labs.py [--dry-run] [--technology javascript|react|html|java|shell-script|nodejs|python]
   python3 scripts/migrate_academy_coding_labs.py --html-heroes [--dry-run]
 
 Note: java/shell-script *heroes* stay simulation (marker/check.sh labs). Only academy-*
-packs and HTML heroes are Coding IDE targets.
+packs and HTML heroes are Coding IDE targets. Python academy uses real Python grading.
 """
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ from coding_academy_extra_catalogs import (
     html_hero_spec,
     java_catalog,
     nodejs_catalog,
+    python_catalog,
     shell_catalog,
 )
 
@@ -33,7 +34,7 @@ SCEN = ROOT / "scenarios"
 PRESET_OUT = ROOT / "backend/apps/labs/provisioner/simulation/academy_service_presets.py"
 E2E_OUT = ROOT / "backend/apps/labs/provisioner/simulation/academy_service_e2e_fixes.py"
 
-CODING_TECHS = ("javascript", "react", "html", "java", "shell-script", "nodejs")
+CODING_TECHS = ("javascript", "react", "html", "java", "shell-script", "nodejs", "python")
 HERO_TECHS = ("java", "shell-script")
 ACADEMY_PREFIXES = (
     "academy-javascript-",
@@ -42,6 +43,7 @@ ACADEMY_PREFIXES = (
     "academy-java-",
     "academy-shell-script-",
     "academy-nodejs-",
+    "academy-python-",
 )
 
 # Topic → coding_spec builder. `n` is the cycle variant (1..10) for mild uniqueness.
@@ -494,7 +496,7 @@ def _html(n: int) -> dict[str, dict]:
 def parse_slug(slug: str) -> tuple[str, int, str, str, int] | None:
     """academy-{tech}-{seq:03d}-{kind}-{topic}[-cycle] → tech, seq, kind, topic, cycle."""
     m = re.match(
-        r"^academy-(javascript|react|html|java|shell-script|nodejs)-(\d{3})-"
+        r"^academy-(javascript|react|html|java|shell-script|nodejs|python)-(\d{3})-"
         r"(learn|build|operate|troubleshoot|production|"
         r"security|automation|observability|backup|integration)-(.+)$",
         slug,
@@ -524,6 +526,8 @@ def build_coding_spec(tech: str, topic: str, cycle: int) -> dict | None:
         catalog = shell_catalog(cycle)
     elif tech == "nodejs":
         catalog = nodejs_catalog(cycle)
+    elif tech == "python":
+        catalog = python_catalog(cycle)
     else:
         return None
     key = topic.replace("_", "-")
@@ -547,6 +551,19 @@ def build_coding_spec(tech: str, topic: str, cycle: int) -> dict | None:
                     ),
                     "readonly": True,
                 },
+            ],
+            "visible_tests": [{"name": name, "code": code} for name, code in t["visible"]],
+            "hidden_tests": [{"name": name, "code": code} for name, code in t["hidden"]],
+            "timeout": 8,
+        }
+    if tech == "python":
+        return {
+            "language": "python",
+            "entrypoint": "solution.py",
+            "kind": "impl",
+            "instructions": t["instructions"] + "\nClick Run to try it, then Check Solution to grade.\n",
+            "files": [
+                {"path": "solution.py", "content": t["stub"], "readonly": False},
             ],
             "visible_tests": [{"name": name, "code": code} for name, code in t["visible"]],
             "hidden_tests": [{"name": name, "code": code} for name, code in t["hidden"]],
@@ -581,6 +598,7 @@ def patch_yaml(path: Path, tech: str, topic: str, cycle: int, *, dry_run: bool) 
         "java": "java",
         "shell-script": "shell",
         "nodejs": "nodejs",
+        "python": "python",
     }.get(tech, "python")
     data["coding_spec"] = spec
     # Grading is hidden_tests — rewrite task validation language lightly
@@ -591,21 +609,24 @@ def patch_yaml(path: Path, tech: str, topic: str, cycle: int, *, dry_run: bool) 
         "Pass visible tests with Run",
         "Pass Check Solution (hidden tests)",
     ]
+    stub_name = "solution.py" if tech == "python" else "solution.js"
     data["initial_state"] = (
         f"Coding challenge: {topic_label}. "
         + (
             "Edit index.html / styles.css — Preview shows the page; Check Solution grades markup."
             if tech == "html"
-            else "The stub in solution.js is incomplete so tests fail until you implement it."
+            else f"The stub in {stub_name} is incomplete so tests fail until you implement it."
         )
     )
     # Rewrite ticket description verify language away from systemd
     desc = str(data.get("description") or "")
-    if "systemctl" in desc or "node-app" in desc or "nginx" in desc or "httpd" in desc:
+    if "systemctl" in desc or "node-app" in desc or "nginx" in desc or "httpd" in desc or "gunicorn" in desc:
         env = (
             "FixitLab HTML practice IDE — edit index.html / styles.css, open Preview, then Check Solution."
             if tech == "html"
-            else "FixitLab coding practice IDE — edit solution.js, Run visible tests, then Check Solution."
+            else (
+                f"FixitLab coding practice IDE — edit {stub_name}, Run visible tests, then Check Solution."
+            )
         )
         data["description"] = (
             f"CONTEXT: Complete the {topic_label} coding exercise in the browser IDE.\n\n"
@@ -626,7 +647,7 @@ def patch_yaml(path: Path, tech: str, topic: str, cycle: int, *, dry_run: bool) 
     if "solution" in data and isinstance(data["solution"], dict):
         data["solution"] = {
             "summary": "Implement the function so visible and hidden tests pass in the coding IDE.",
-            "files_changed": ["solution.js"],
+            "files_changed": ["solution.py"] if tech == "python" else ["solution.js"],
             "commands_run": [],
             "reference_docs": data.get("linked_tutorial") or tech,
         }
@@ -636,7 +657,7 @@ def patch_yaml(path: Path, tech: str, topic: str, cycle: int, *, dry_run: bool) 
         if not isinstance(h, dict):
             continue
         content = str(h.get("content") or "")
-        if "systemctl" in content or "journalctl" in content:
+        if "systemctl" in content or "journalctl" in content or "gunicorn" in content:
             order = h.get("order", 3)
             if order <= 2:
                 new_hints.append(h)
@@ -800,7 +821,7 @@ def main() -> None:
     parser.add_argument(
         "--technology",
         default="",
-        help="javascript, react, html, java, shell-script, or nodejs",
+        help="javascript, react, html, java, shell-script, nodejs, or python",
     )
     parser.add_argument(
         "--html-heroes",

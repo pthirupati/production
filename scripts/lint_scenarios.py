@@ -159,9 +159,9 @@ def lint_file(path: Path) -> list[str]:
 _CODING_TECHS = frozenset({
     "javascript", "react", "java", "html", "shell-script", "nodejs", "typescript", "python",
 })
-# Academy packs that must open Coding IDE (migrated). python/typescript remain soft until reseeding.
+# Academy packs that must open Coding IDE (migrated). typescript remains soft until reseeding.
 _CODING_IDE_ACADEMY_TECHS = frozenset({
-    "javascript", "react", "java", "html", "shell-script", "nodejs",
+    "javascript", "react", "java", "html", "shell-script", "nodejs", "python",
 })
 _CLOUD_SIM = {
     "aws": "aws",
@@ -208,7 +208,7 @@ def _env_resolver_errors(data: dict, path: Path) -> list[str]:
         if coding_mode and (not isinstance(files, list) or not files):
             errs.append("coding_mode academy lab missing `coding_spec.files`")
 
-    # Soft gate for other coding techs (python/typescript) when consoles declared
+    # Soft gate for other coding techs (typescript) when consoles declared
     coding_tech = tech_dir in _CODING_TECHS or any(t in tech_field for t in _CODING_TECHS)
     if (
         coding_tech

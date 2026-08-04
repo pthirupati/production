@@ -1,9 +1,185 @@
-"""Extra academy coding catalogs: java, shell-script, nodejs (JS-graded themed exercises).
+"""Extra academy coding catalogs: java, shell-script, nodejs, python.
 
-Imported by migrate_academy_coding_labs.py. Graded via code_exec javascript runtime
-(same pattern as React academy — no JVM/bash sandbox in CodingIDE).
+Java/shell/nodejs are JS-graded themed exercises (same pattern as React academy).
+Python academy uses the real Python code_exec runtime (solution.py + assert tests).
 """
 from __future__ import annotations
+
+
+def python_catalog(n: int) -> dict[str, dict]:
+    """Python-language academy topics matching generate_complete_technology_scenarios."""
+    return {
+        "venv": {
+            "fn": "venv_python_bin",
+            "instructions": (
+                f"Implement venv_python_bin(root) → path to the venv interpreter "
+                f"(root/bin/python). Variant {n}."
+            ),
+            "stub": "def venv_python_bin(root):\n    # TODO\n    pass\n",
+            "visible": [
+                ("basic", "assert venv_python_bin('/opt/app/.venv') == '/opt/app/.venv/bin/python'"),
+            ],
+            "hidden": [
+                ("trail", "assert venv_python_bin('/x/') == '/x/bin/python'"),
+                ("n", f"assert venv_python_bin('/v{n}') == '/v{n}/bin/python'"),
+            ],
+            "reference": (
+                "def venv_python_bin(root):\n"
+                "    r = str(root).rstrip('/')\n"
+                "    return r + '/bin/python'\n"
+            ),
+        },
+        "files": {
+            "fn": "join_path",
+            "instructions": "Implement join_path(base, name) → base/name with exactly one slash between.",
+            "stub": "def join_path(base, name):\n    # TODO\n    pass\n",
+            "visible": [
+                ("basic", "assert join_path('/data', 'a.txt') == '/data/a.txt'"),
+            ],
+            "hidden": [
+                ("slash", "assert join_path('/data/', '/a.txt') == '/data/a.txt'"),
+                ("n", f"assert join_path('/p{n}', 'f') == '/p{n}/f'"),
+            ],
+            "reference": (
+                "def join_path(base, name):\n"
+                "    return str(base).rstrip('/') + '/' + str(name).lstrip('/')\n"
+            ),
+        },
+        "http-api": {
+            "fn": "json_status",
+            "instructions": "Implement json_status(code) → dict {'status': code, 'ok': True if 200<=code<300 else False}.",
+            "stub": "def json_status(code):\n    # TODO\n    pass\n",
+            "visible": [
+                ("ok", "assert json_status(200) == {'status': 200, 'ok': True}"),
+            ],
+            "hidden": [
+                ("nf", "assert json_status(404) == {'status': 404, 'ok': False}"),
+                ("n", f"assert json_status({200 + (n % 10)})['ok'] is True"),
+            ],
+            "reference": (
+                "def json_status(code):\n"
+                "    c = int(code)\n"
+                "    return {'status': c, 'ok': 200 <= c < 300}\n"
+            ),
+        },
+        "testing": {
+            "fn": "assert_equal",
+            "instructions": "Implement assert_equal(a, b) → True if a==b else raise AssertionError.",
+            "stub": "def assert_equal(a, b):\n    # TODO\n    pass\n",
+            "visible": [
+                ("ok", "assert assert_equal(1, 1) is True"),
+            ],
+            "hidden": [
+                ("fail", "raised=False\ntry:\n assert_equal(1, 2)\nexcept AssertionError:\n raised=True\nassert raised"),
+                ("n", f"assert assert_equal('v{n}', 'v{n}') is True"),
+            ],
+            "reference": (
+                "def assert_equal(a, b):\n"
+                "    if a != b:\n"
+                "        raise AssertionError(f'{a!r} != {b!r}')\n"
+                "    return True\n"
+            ),
+        },
+        "logging": {
+            "fn": "format_log",
+            "instructions": "Implement format_log(level, msg) → '[LEVEL] msg' with level uppercased.",
+            "stub": "def format_log(level, msg):\n    # TODO\n    pass\n",
+            "visible": [
+                ("info", "assert format_log('info', 'hi') == '[INFO] hi'"),
+            ],
+            "hidden": [
+                ("err", "assert format_log('error', 'x') == '[ERROR] x'"),
+                ("n", f"assert format_log('debug', 'n{n}') == '[DEBUG] n{n}'"),
+            ],
+            "reference": (
+                "def format_log(level, msg):\n"
+                "    return f'[{str(level).upper()}] {msg}'\n"
+            ),
+        },
+        "exceptions": {
+            "fn": "safe_int",
+            "instructions": "Implement safe_int(s, default=0) → int(s) or default on ValueError/TypeError.",
+            "stub": "def safe_int(s, default=0):\n    # TODO\n    pass\n",
+            "visible": [
+                ("ok", "assert safe_int('42') == 42"),
+            ],
+            "hidden": [
+                ("bad", "assert safe_int('x', -1) == -1"),
+                ("n", f"assert safe_int('{n}') == {n}"),
+            ],
+            "reference": (
+                "def safe_int(s, default=0):\n"
+                "    try:\n"
+                "        return int(s)\n"
+                "    except (TypeError, ValueError):\n"
+                "        return default\n"
+            ),
+        },
+        "cli": {
+            "fn": "parse_flag",
+            "instructions": "Implement parse_flag(argv, name) → True if '--name' in argv else False.",
+            "stub": "def parse_flag(argv, name):\n    # TODO\n    pass\n",
+            "visible": [
+                ("yes", "assert parse_flag(['app', '--verbose'], 'verbose') is True"),
+            ],
+            "hidden": [
+                ("no", "assert parse_flag(['app'], 'verbose') is False"),
+                ("n", f"assert parse_flag(['--v{n}'], 'v{n}') is True"),
+            ],
+            "reference": (
+                "def parse_flag(argv, name):\n"
+                "    return f'--{name}' in list(argv)\n"
+            ),
+        },
+        "packaging": {
+            "fn": "normalize_version",
+            "instructions": "Implement normalize_version(v) → strip leading 'v'/'V' then return the rest.",
+            "stub": "def normalize_version(v):\n    # TODO\n    pass\n",
+            "visible": [
+                ("v", "assert normalize_version('v1.2.3') == '1.2.3'"),
+            ],
+            "hidden": [
+                ("plain", "assert normalize_version('2.0') == '2.0'"),
+                ("n", f"assert normalize_version('V{n}.0') == '{n}.0'"),
+            ],
+            "reference": (
+                "def normalize_version(v):\n"
+                "    s = str(v)\n"
+                "    return s[1:] if s[:1] in 'vV' else s\n"
+            ),
+        },
+        "async": {
+            "fn": "gather_results",
+            "instructions": "Implement gather_results(items) → list of each item (identity gather for sync stub).",
+            "stub": "def gather_results(items):\n    # TODO\n    pass\n",
+            "visible": [
+                ("list", "assert gather_results([1, 2]) == [1, 2]"),
+            ],
+            "hidden": [
+                ("empty", "assert gather_results([]) == []"),
+                ("n", f"assert gather_results([{n}]) == [{n}]"),
+            ],
+            "reference": "def gather_results(items):\n    return list(items)\n",
+        },
+        "data-processing": {
+            "fn": "chunk_list",
+            "instructions": "Implement chunk_list(items, size) → list of consecutive chunks of length size (last may be shorter).",
+            "stub": "def chunk_list(items, size):\n    # TODO\n    pass\n",
+            "visible": [
+                ("basic", "assert chunk_list([1, 2, 3, 4], 2) == [[1, 2], [3, 4]]"),
+            ],
+            "hidden": [
+                ("odd", "assert chunk_list([1, 2, 3], 2) == [[1, 2], [3]]"),
+                ("n", f"assert chunk_list(list(range({n})), {max(1, n)}) == [list(range({n}))]"),
+            ],
+            "reference": (
+                "def chunk_list(items, size):\n"
+                "    size = max(1, int(size))\n"
+                "    seq = list(items)\n"
+                "    return [seq[i:i + size] for i in range(0, len(seq), size)]\n"
+            ),
+        },
+    }
 
 
 def java_catalog(n: int) -> dict[str, dict]:
