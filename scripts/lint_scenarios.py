@@ -258,7 +258,7 @@ def _env_resolver_errors(data: dict, path: Path) -> list[str]:
             errs.append("ansible lab declares consoles but omits `awx`")
 
     # AWS sim without aws console when consoles list present
-    if sim == "aws" and consoles and "aws" not in consoless:
+    if sim == "aws" and consoles and "aws" not in consoles:
         errs.append("simulation_type=aws but consoles omit `aws`")
 
     return errs
