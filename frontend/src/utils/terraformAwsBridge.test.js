@@ -217,3 +217,24 @@ describe('detectCloudProvidersFromHcl', () => {
     expect(detectCloudProvidersFromHcl({ 'main.tf': 'resource "null_resource" "x" {}' })).toEqual({})
   })
 })
+
+describe('syncTerraformDestroyToClouds', () => {
+  it('clears AWS lab-managed mirrors after destroy', async () => {
+    const { syncTerraformDestroyToClouds } = await import('./terraformAwsBridge.js')
+    syncTerraformApplyToAwsConsole(applied({
+      'main.tf': DEFAULT_IDE_MAIN_TF,
+      'variables.tf': DEFAULT_IDE_VARIABLES_TF,
+    }))
+    expect(useAwsStore.getState().instances.some((i) => i.name === 'web-server' || i.tags?.Name === 'web-server')).toBe(true)
+    syncTerraformDestroyToClouds({
+      state: {
+        files: { 'main.tf': DEFAULT_IDE_MAIN_TF, 'variables.tf': DEFAULT_IDE_VARIABLES_TF },
+      },
+    })
+    const live = useAwsStore.getState().instances.filter(
+      (i) => i.name === 'web-server' || i.tags?.Name === 'web-server',
+    )
+    // resetLabManaged removes terraform-created rows; leftover seed instances OK
+    expect(live.every((i) => !i.labManaged)).toBe(true)
+  })
+})

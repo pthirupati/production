@@ -10,7 +10,7 @@ import TerraformAwsTerminal from './TerraformAwsTerminal'
 import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab, VscActivityButton } from '../ide/VsCodeWorkbench'
 import { getIacProfile } from '../../utils/iacFlavor'
 import { LabChromeControls } from '../lab/LabChromeBar'
-import { syncTerraformApplyToAwsConsole, detectCloudProvidersFromHcl } from '../../utils/terraformAwsBridge'
+import { syncTerraformApplyToAwsConsole, syncTerraformDestroyToClouds, detectCloudProvidersFromHcl } from '../../utils/terraformAwsBridge'
 import { useAwsStore } from '../aws/store/awsStore'
 import {
   FileCode, FolderOpen, Play, Plus, Trash2, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History, ExternalLink, LayoutDashboard,
@@ -145,6 +145,10 @@ export default function TerraformWorkspaceIde({
         if (action === `${actionPrefix}_apply` || action === 'terraform_apply') {
           syncTerraformApplyToAwsConsole(res?.state ? { state: res.state } : state, { sessionId })
           toast.success('Resources mirrored to cloud consoles — open AWS / Azure / GCP tabs to verify.', { duration: 3500 })
+        }
+        if (action === `${actionPrefix}_destroy` || action === 'terraform_destroy') {
+          syncTerraformDestroyToClouds(res?.state ? { state: res.state } : { state: { ...(state?.state || {}), files } }, { sessionId })
+          toast.success('Destroyed — cloud consoles updated.', { duration: 3000 })
         }
       }
       if (res?.state) setState(res.state)
@@ -303,6 +307,16 @@ export default function TerraformWorkspaceIde({
           <button type="button" onClick={() => run(`${actionPrefix}_apply`)} disabled={busy || !tf.last_plan} className="vsc-btn vsc-btn-primary" style={{ background: '#107c10', borderColor: '#107c10' }}>
             <Play size={11} /> {cli} apply
           </button>
+          <button
+            type="button"
+            onClick={() => run(`${actionPrefix}_destroy`)}
+            disabled={busy || !tf.last_apply || (tf.resources || []).length === 0}
+            className="vsc-btn"
+            style={{ color: '#f87171', borderColor: '#7f1d1d' }}
+            title={`${cli} destroy — remove mirrored cloud resources`}
+          >
+            {cli} destroy
+          </button>
           {broken.stale_lock && (
             <button type="button" onClick={() => run('force_unlock', {}, 'Unlocked')} className="vsc-btn" style={{ color: '#fbbf24' }}>force-unlock</button>
           )}
@@ -374,7 +388,7 @@ export default function TerraformWorkspaceIde({
       ))}
       editorToolbar={(
         <>
-          {!standalone && [`${cli} init`, `${cli} plan`, `${cli} apply -auto-approve`].map((cmd) => (
+          {!standalone && [`${cli} init`, `${cli} plan`, `${cli} apply -auto-approve`, `${cli} destroy -auto-approve`].map((cmd) => (
             <button key={cmd} type="button" onClick={() => sendToTerminal(cmd)} className="vsc-btn"
               title={terminalReady[terminalHost] ? `Run: ${cmd}` : 'Opens the terminal and runs once connected'}>
               <Terminal size={11} /> {cmd}
