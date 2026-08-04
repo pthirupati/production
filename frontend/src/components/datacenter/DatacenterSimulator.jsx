@@ -613,8 +613,16 @@ export default function DatacenterSimulator({
           <CampusRoomView
             room={currentRoom}
             campus={campus}
+            access={accessControl}
+            rooms={rooms}
             busy={busy}
-            onOp={(op, extra) => doAction(() => datacenterApi.campusPlantOps(sessionId, op, extra), `Campus ${op}`)}
+            onEnterRoom={enterRoom}
+            onOp={(op, extra) => {
+              if (op === 'badge_in') {
+                return doAction(() => datacenterApi.accessOps(sessionId, op, extra), `Access ${op}`)
+              }
+              return doAction(() => datacenterApi.campusPlantOps(sessionId, op, extra), `Campus ${op}`)
+            }}
           />
           <div style={{ marginTop: '1rem' }}>
             <DrFailoverPanel
@@ -833,8 +841,16 @@ export default function DatacenterSimulator({
           <CampusRoomView
             room={currentRoom}
             campus={campus}
+            access={accessControl}
+            rooms={rooms}
             busy={busy}
-            onOp={(op, extra) => doAction(() => datacenterApi.campusPlantOps(sessionId, op, extra), `Campus ${op}`)}
+            onEnterRoom={enterRoom}
+            onOp={(op, extra) => {
+              if (op === 'badge_in') {
+                return doAction(() => datacenterApi.accessOps(sessionId, op, extra), `Access ${op}`)
+              }
+              return doAction(() => datacenterApi.campusPlantOps(sessionId, op, extra), `Campus ${op}`)
+            }}
           />
         </div>
       )}

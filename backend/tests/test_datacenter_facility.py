@@ -108,6 +108,20 @@ class DatacenterFacilityTests(SimpleTestCase):
         result = dc.apply_action(self.session_id, "enter_room", {"room_id": "roof"})
         self.assertFalse(result["ok"])
 
+    def test_enter_reception_repair_warehouse_walkable_stubs(self):
+        state = dc.get_state(self.session_id)["state"]
+        room_ids = {r["id"] for r in state.get("rooms") or []}
+        self.assertIn("reception", room_ids)
+        self.assertIn("repair", room_ids)
+        self.assertIn("warehouse", room_ids)
+        for rid in ("reception", "repair", "warehouse"):
+            result = dc.apply_action(self.session_id, "enter_room", {"room_id": rid})
+            self.assertTrue(result["ok"], result)
+            cur = dc.get_state(self.session_id)["state"]
+            self.assertEqual(cur["current_room"], rid)
+            room = next(r for r in cur["rooms"] if r["id"] == rid)
+            self.assertTrue(room.get("exits"), f"{rid} should list adjacent exits")
+
     # ── BMC ──────────────────────────────────────────────────────────────
     def test_open_bmc_returns_bmc_and_selects_asset(self):
         dc.get_state(self.session_id)

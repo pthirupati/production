@@ -354,7 +354,7 @@ Learner-facing UI never says simulation/demo/mock.
 218. [ ] RBAC personas (DC tech Dell/HPE badge, cloud eng, SRE, SOC analyst, interviewer)
 
 ### S3 — Datacenter Steam-class immersion
-219. [ ] Reception → security → staging → repair bay → warehouse → dock → halls (walkable)
+219. [~] Reception → security → staging → repair bay → warehouse → dock → halls (walkable) — *room exits + reception/repair/warehouse stubs; full 3D corridor open*
 220. [ ] Per-rack realism: servers, GPUs, ToR, storage, PDUs, UPS, CRAC, fiber/copper, LEDs, fan audio
 221. [ ] Full FRU RMA: locate → diagnose → order part → dock receive → swap → burn-in → close
 222. [ ] Ambient audio + blink patterns + thermal aisle effects (extend Q 180–185)
@@ -424,7 +424,7 @@ Learner-facing UI never says simulation/demo/mock.
 266. [ ] Integrated stack project: MAAS + VyOS underlay + LXD + AWX + DC + GPU CLI as one graded flow
 
 ### T5 — Datacenter Steam-class immersion
-267. [ ] Reception / security checkpoint / staging / repair bay / warehouse / dock walkable stubs
+267. [x] Reception / security checkpoint / staging / repair bay / warehouse / dock walkable stubs
 268. [ ] Per-rack LEDs, fan audio, fiber/copper trays, PDU/UPS/CRAC interactivity
 269. [ ] Dell/HPE engineer badge + access control for rack entry
 270. [ ] Full FRU RMA: locate → diagnose → order → dock → swap → burn-in → close
@@ -486,7 +486,7 @@ Learner-facing UI never says simulation/demo/mock.
 314. [x] Terraform destroy → delete mirrored cloud/VMware resources
 315. [ ] MAAS UI region/rack/images panes pixel surface
 316. [ ] VyOS firewall/NAT/VPN/VRRP CLI + pixel appliance UI
-317. [ ] Steam DC: reception → security → staging → repair bay walkable stubs
+317. [x] Steam DC: reception → security → staging → repair bay walkable stubs
 318. [ ] IDE polish: file tree, tabs, run terminal panel, theme parity for Java/JS/React/HTML/Python/Shell/Node
 319. [ ] GitOps: GitHub PR approve + Flux/Argo sync health end-to-end
 320. [ ] Windows Simulator contrast pass (no white-on-white)

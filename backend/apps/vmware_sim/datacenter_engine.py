@@ -671,6 +671,21 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             elif r.get("racks") is None:
                 r["racks"] = []
         state["rooms"] = rooms
+    else:
+        # Merge newly added rooms (e.g. warehouse) and refresh exits metadata.
+        by_id = {r["id"]: r for r in state.get("rooms", [])}
+        for room in campus_rooms():
+            rid = room["id"]
+            if rid not in by_id:
+                added = copy.deepcopy(room)
+                if added.get("racks") is None:
+                    added["racks"] = []
+                state["rooms"].append(added)
+                by_id[rid] = added
+            elif "exits" in room:
+                by_id[rid]["exits"] = list(room["exits"])
+            if "name" in room and by_id[rid].get("name") != room["name"] and rid == "warehouse":
+                by_id[rid]["name"] = room["name"]
     if not state.get("campus"):
         state["campus"] = campus_assets()
     else:
