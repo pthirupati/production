@@ -159,6 +159,10 @@ def lint_file(path: Path) -> list[str]:
 _CODING_TECHS = frozenset({
     "javascript", "react", "java", "html", "shell-script", "nodejs", "typescript", "python",
 })
+# Academy packs that must open Coding IDE (migrated). python/typescript remain soft until reseeding.
+_CODING_IDE_ACADEMY_TECHS = frozenset({
+    "javascript", "react", "java", "html", "shell-script", "nodejs",
+})
 _CLOUD_SIM = {
     "aws": "aws",
     "azure": "azure",
@@ -188,11 +192,13 @@ def _env_resolver_errors(data: dict, path: Path) -> list[str]:
     coding_mode = bool(data.get("coding_mode"))
     tech_field = str(data.get("technology") or "").strip().lower()
 
-    # Coding techs need coding_mode + coding_spec.files (academy packs hard-fail).
+    # Coding IDE academy packs (migrated techs) need coding_mode + coding_spec.files.
     slug = str(data.get("slug") or path.parent.name)
     is_academy = slug.startswith("academy-")
-    coding_tech = tech_dir in _CODING_TECHS or any(t in tech_field for t in _CODING_TECHS)
-    if coding_tech and is_academy:
+    ide_tech = tech_dir in _CODING_IDE_ACADEMY_TECHS or any(
+        t in tech_field for t in _CODING_IDE_ACADEMY_TECHS
+    )
+    if ide_tech and is_academy:
         if not coding_mode and "coding" not in consoles:
             errs.append(
                 "coding technology academy lab missing `coding_mode: true`"
@@ -201,6 +207,20 @@ def _env_resolver_errors(data: dict, path: Path) -> list[str]:
         files = spec.get("files") if isinstance(spec, dict) else None
         if coding_mode and (not isinstance(files, list) or not files):
             errs.append("coding_mode academy lab missing `coding_spec.files`")
+
+    # Soft gate for other coding techs (python/typescript) when consoles declared
+    coding_tech = tech_dir in _CODING_TECHS or any(t in tech_field for t in _CODING_TECHS)
+    if (
+        coding_tech
+        and not ide_tech
+        and is_academy
+        and consoles
+        and not coding_mode
+        and "coding" not in consoles
+    ):
+        errs.append(
+            "coding technology academy lab with consoles missing `coding_mode: true`"
+        )
 
     if vmware_link:
         if not hosted:
