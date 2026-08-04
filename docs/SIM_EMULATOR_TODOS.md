@@ -396,7 +396,7 @@ Learner-facing UI never says simulation/demo/mock.
 244. [x] PeopleSoft: `hosted_as` + PeopleSoft persona (never AWS DMI rotate) on all PS scenarios
 245. [x] Harden `scripts/lint_scenarios.py` to **fail CI** on wrong host / missing coding_mode / unknown sim_type — *academy coding packs + vmware_link/peoplesoft hosted_as*
 246. [x] Ansible labs: always surface Open AWX companion when `simulation_type`/consoles include awx — *LabRunner + YAML backfill + lint*
-247. [ ] AWS labs: always surface Open AWS Console companion (not only terraform/hosted heuristics)
+247. [x] AWS labs: always surface Open AWS Console companion (not only terraform/hosted heuristics) — *terraform + aws_link + consoles:aws*
 248. [x] Coding techs: academy java/shell/nodejs/python + HTML heroes → `coding_mode` + `coding_spec` *(java/shell heroes remain simulation marker labs; typescript still pending)*
 249. [x] HTML heroes: CodingIDE + live preview iframe (academy done; heroes still terminal)
 250. [ ] Cross-tech scenarios: assert each companion console link opens and shares session_id
@@ -480,7 +480,7 @@ Learner-facing UI never says simulation/demo/mock.
 308. [~] AWS console ErrorBoundary: capture production stack from returning-user localStorage — *null-safe scoped/merge + TopNav/CW filters*
 309. [~] Datacenter twin ErrorBoundary: same chunk-recovery + store-reset path as AWS — *default floorView 2d to avoid R3F on open*
 310. [x] Ansible YAML backfill: `consoles: [terminal, awx]` or `awx_link: true` on all ansible heroes (not only academy `simulation_type: ansible`)
-311. [ ] AWS companion link on every AWS-tech scenario (not only terraform/hosted heuristics)
+311. [x] AWS companion link on every AWS-tech scenario (not only terraform/hosted heuristics)
 312. [ ] TypeScript coding tech tree (missing entirely) + academy coding_mode pack
 313. [ ] Packer CodingIDE / workspace for image-factory scenarios (ai-infra)
 314. [x] Terraform destroy → delete mirrored cloud/VMware resources
