@@ -123,7 +123,7 @@ export default function DatacenterSimulator({
   const [flashId, setFlashId] = useState(null)
   const [drawerTab, setDrawerTab] = useState('overview')
   const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [floorView, setFloorView] = useState('3d') // default 3D twin; 2D is fallback overview
+  const [floorView, setFloorView] = useState('2d') // 2D first paint; 3D opt-in (avoids R3F chunk throws on open)
   const dragRef = useRef(null)
   const movedRef = useRef(false)
   const liveTickInFlight = useRef(false)

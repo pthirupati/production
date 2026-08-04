@@ -54,7 +54,7 @@ export function CloudWatchOverview() {
   const navigate = useNavigate()
   const region = useAwsStore((s) => s.region)
   const alarms = scoped(useAwsStore((s) => s.cwAlarms), region)
-  const inAlarm = alarms.filter((a) => a.state === 'ALARM').length
+  const inAlarm = alarms.filter((a) => a && a.state === 'ALARM').length
   return (
     <Page title="CloudWatch Overview">
       <div className="aws-card" style={{ marginBottom: 16 }}>
@@ -68,8 +68,8 @@ export function CloudWatchOverview() {
         </div>
         <div className="aws-summary-grid" style={{ marginTop: 8 }}>
           <div className="aws-kv"><span className="v" style={{ fontSize: 24, fontWeight: 700, color: 'var(--aws-error)' }}>{inAlarm}</span><span className="k">In alarm</span></div>
-          <div className="aws-kv"><span className="v" style={{ fontSize: 24, fontWeight: 700, color: 'var(--aws-success)' }}>{alarms.filter((a) => a.state === 'OK').length}</span><span className="k">OK</span></div>
-          <div className="aws-kv"><span className="v" style={{ fontSize: 24, fontWeight: 700, color: 'var(--aws-text-muted)' }}>{alarms.filter((a) => a.state === 'INSUFFICIENT_DATA').length}</span><span className="k">Insufficient data</span></div>
+          <div className="aws-kv"><span className="v" style={{ fontSize: 24, fontWeight: 700, color: 'var(--aws-success)' }}>{alarms.filter((a) => a && a.state === 'OK').length}</span><span className="k">OK</span></div>
+          <div className="aws-kv"><span className="v" style={{ fontSize: 24, fontWeight: 700, color: 'var(--aws-text-muted)' }}>{alarms.filter((a) => a && a.state === 'INSUFFICIENT_DATA').length}</span><span className="k">Insufficient data</span></div>
         </div>
       </div>
       <SectionLabel>Account metrics (last 7 days)</SectionLabel>
