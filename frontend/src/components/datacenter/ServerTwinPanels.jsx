@@ -610,10 +610,17 @@ export function FailureInjectBar({ presets, busy, onInject, onClear, broken, ass
 }
 
 /** Campus / plant room overview cards with light live ops */
-export function CampusRoomView({ room, campus, busy = false, onOp }) {
+export function CampusRoomView({ room, campus, access = null, rooms = [], busy = false, onOp, onEnterRoom }) {
   if (!room) return null
   const c = campus || {}
   const act = (op, extra = {}) => onOp?.(op, extra)
+  const go = (roomId) => {
+    const next = (rooms || []).find((r) => r.id === roomId)
+    if (next) onEnterRoom?.(next)
+  }
+  const exits = (
+    <RoomExits room={room} rooms={rooms} onEnter={go} />
+  )
 
   if (room.type === 'campus' || room.id === 'campus') {
     return (
@@ -638,6 +645,7 @@ export function CampusRoomView({ room, campus, busy = false, onOp }) {
           title="Loading dock"
           body={`${c.loading_dock?.occupied_bays ?? 0}/${c.loading_dock?.bays ?? 0} bays · ${c.loading_dock?.received_today ?? 0} received today`}
         />
+        {exits}
       </div>
     )
   }
@@ -650,6 +658,7 @@ export function CampusRoomView({ room, campus, busy = false, onOp }) {
         {(c.diesel_tanks || []).map((t) => (
           <CampusCard key={t.id} title={t.id} body={`${t.liters} L · ${t.level_pct}%`} />
         ))}
+        {exits}
       </div>
     )
   }
@@ -673,6 +682,7 @@ export function CampusRoomView({ room, campus, busy = false, onOp }) {
         {(c.cooling_towers || []).map((t) => (
           <CampusCard key={t.id} title={t.id} body={`${t.status} · approach ${t.approach_c}°C`} />
         ))}
+        {exits}
       </div>
     )
   }
@@ -691,6 +701,7 @@ export function CampusRoomView({ room, campus, busy = false, onOp }) {
             )}
           />
         ))}
+        {exits}
       </div>
     )
   }
@@ -711,6 +722,7 @@ export function CampusRoomView({ room, campus, busy = false, onOp }) {
             <button type="button" className="dc-btn-sm" disabled={busy} onClick={() => act('sync_battery')}>Sync from UPS</button>
           )}
         />
+        {exits}
       </div>
     )
   }
@@ -737,16 +749,18 @@ export function CampusRoomView({ room, campus, busy = false, onOp }) {
             )}
           />
         ))}
+        {exits}
       </div>
     )
   }
-  if (room.id === 'spares') {
+  if (room.id === 'spares' || room.id === 'warehouse') {
     const spares = c.spares || {}
+    const title = room.id === 'warehouse' ? 'Parts warehouse' : 'Stockroom'
     return (
       <div className="dc-campus-grid">
         <CampusCard
-          title="Stockroom"
-          body={`Issued today ${spares.issued_today ?? 0} · Quarantine ${(spares.quarantine || []).length}`}
+          title={title}
+          body={`Issued today ${spares.issued_today ?? 0} · Quarantine ${(spares.quarantine || []).length}${room.id === 'warehouse' ? ' · Bulk staging for dock → spares' : ''}`}
         />
         {(spares.bins || []).map((b) => {
           const low = intOr(b.qty, 0) <= intOr(b.min_qty, 0)
@@ -768,13 +782,109 @@ export function CampusRoomView({ room, campus, busy = false, onOp }) {
         {(spares.kits_staged || []).slice(0, 4).map((k) => (
           <CampusCard key={k.id} title={k.id} body={`${k.sku} → ${k.for_asset} · ${k.status}`} />
         ))}
+        {exits}
+      </div>
+    )
+  }
+  if (room.id === 'reception') {
+    const badges = access?.badges || []
+    const visitors = badges.filter((b) => b.role === 'visitor' || b.escort_required)
+    const staff = badges.filter((b) => !(b.role === 'visitor' || b.escort_required))
+    const mantrap = access?.mantrap || {}
+    return (
+      <div className="dc-campus-grid">
+        <CampusCard
+          title="Front desk"
+          body={`Visitor check-in · Gate ${access?.gate?.status || c.access?.gate || 'secured'} · Mantrap ${mantrap.occupied ? 'occupied' : (mantrap.status || 'ready')}`}
+        />
+        <CampusCard
+          title="Badged staff"
+          body={staff.length ? staff.map((b) => `${b.holder} (${b.id})`).join(' · ') : 'No staff badges on file'}
+        />
+        <CampusCard
+          title="Visitors"
+          body={visitors.length
+            ? visitors.map((b) => `${b.holder}${b.escort_required ? ' · escort required' : ''}`).join(' · ')
+            : 'No open visitor badges'}
+          actions={onOp && visitors[0] && (
+            <button
+              type="button"
+              className="dc-btn-sm"
+              disabled={busy}
+              onClick={() => act('badge_in', { badge_id: visitors[0].id, zone: 'reception' })}
+            >
+              Badge visitor into reception
+            </button>
+          )}
+        />
+        <CampusCard
+          title="Open work orders"
+          body="Escort visitors → staging · Issue visitor badge at Security Gate · Hand off to NOC for hall access"
+        />
+        {exits}
+      </div>
+    )
+  }
+  if (room.id === 'repair') {
+    const quarantine = (c.spares?.quarantine || [])
+    const kits = (c.spares?.kits_staged || []).slice(0, 4)
+    return (
+      <div className="dc-campus-grid">
+        <CampusCard
+          title="Repair bay"
+          body="ESD bench · torque drivers · spare trays · RMA label printer. Swap FRUs here before burn-in or return to hall."
+        />
+        <CampusCard
+          title="Open FRUs"
+          body={quarantine.length
+            ? quarantine.slice(0, 4).map((q) => `${q.sku || q.id || 'FRU'} · ${q.reason || q.status || 'quarantine'}`).join(' · ')
+            : 'No quarantined parts — pull from Spare Inventory or Warehouse'}
+        />
+        <CampusCard
+          title="Staged kits"
+          body={kits.length
+            ? kits.map((k) => `${k.id}: ${k.sku} → ${k.for_asset} (${k.status})`).join(' · ')
+            : 'No kits staged — issue from stockroom then return here to assemble'}
+        />
+        <CampusCard
+          title="Bay workflow"
+          body="1) Receive from dock/warehouse · 2) Diagnose on bench · 3) Burn-in · 4) Restock or RMA"
+        />
+        {exits}
       </div>
     )
   }
   return (
     <div className="dc-campus-empty">
       <BuildingHint room={room} />
+      {exits}
     </div>
+  )
+}
+
+function RoomExits({ room, rooms, onEnter }) {
+  const exitIds = room?.exits || []
+  if (!exitIds.length || !onEnter) return null
+  const labels = new Map((rooms || []).map((r) => [r.id, r.name || r.id]))
+  return (
+    <CampusCard
+      title="Go to"
+      body="Adjacent zones"
+      actions={(
+        <>
+          {exitIds.map((id) => (
+            <button
+              key={id}
+              type="button"
+              className="dc-btn-sm"
+              onClick={() => onEnter(id)}
+            >
+              {labels.get(id) || id}
+            </button>
+          ))}
+        </>
+      )}
+    />
   )
 }
 
