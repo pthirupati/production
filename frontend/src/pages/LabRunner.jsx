@@ -1785,6 +1785,8 @@ export default function LabRunner() {
       || scenario?.simulation_type === 'ansible'
       || scenario?.simulation_type === 'ansible-awx'
       || techSlugLc === 'ansible'
+      || techSlugLc === 'ai-infra'
+      || consolesInclude(scenario?.consoles, 'awx')
       || /(?:^|-)(awx|tower)(?:-|$)/i.test(scenarioSlug)
     )
   const vmwareWorkflowHint = showVmwareCompanionLink

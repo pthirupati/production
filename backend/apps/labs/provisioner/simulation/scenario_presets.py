@@ -1017,7 +1017,16 @@ def _preset_rs_rhel_subscription_manager_config(state: RHELOSState) -> None:
     d = os.path.dirname('/etc/yum.repos.d/redhat.repo')
     if d:
         state._mkdir(d)
-    state._write_file('/etc/yum.repos.d/redhat.repo', '# broken configuration for rhel-subscription-manager-config\n# this file needs the documented fix\n')
+    # Broken entitlement + empty repo file — learner must re-register / refresh
+    # and rewrite redhat.repo (credentials are on the Jira ticket).
+    state.rhsm_registered = True
+    state.rhsm_entitlement_valid = False
+    state.rhsm_repos_enabled = set()
+    state._write_file(
+        '/etc/yum.repos.d/redhat.repo',
+        '# broken configuration for rhel-subscription-manager-config\n'
+        '# entitlement expired — refresh or re-register with the lab activation key\n',
+    )
 
 
 def _preset_rs_rhel_tuned_wrong_profile(state: RHELOSState) -> None:

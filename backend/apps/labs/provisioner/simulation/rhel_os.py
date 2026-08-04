@@ -457,6 +457,19 @@ class RHELOSState:
             "HOSTNAME": hostname,
         }
         self.dmesg_extra: list[str] = []
+        # Red Hat Subscription Manager (subscription-manager / rhsm)
+        self.rhsm_registered: bool = True
+        self.rhsm_entitlement_valid: bool = True
+        self.rhsm_org_id: str = "15678901"
+        self.rhsm_account: str = "542001234567"
+        self.rhsm_username: str = "lab-admin@fixitlab.internal"
+        self.rhsm_password: str = "RedHatLab!Practice2024"
+        self.rhsm_activation_key: str = "lab-rhel9-prod"
+        self.rhsm_pool_id: str = "8a85f9817a3c4e2f017a3c5b9d0e0001"
+        self.rhsm_repos_enabled: set[str] = {
+            "rhel-9-for-x86_64-baseos-rpms",
+            "rhel-9-for-x86_64-appstream-rpms",
+        }
         self.gpu_healthy: bool = True
         self.initramfs_fixed: bool = False
         self.grub_fixed: bool = False

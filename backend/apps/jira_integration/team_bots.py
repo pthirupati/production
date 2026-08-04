@@ -21,13 +21,41 @@ TEAM_AUTHORS = {
 }
 
 MENTION_PATTERNS = {
-    "backup": re.compile(r"@?\s*backup\s*team|@backup\b", re.I),
-    "database": re.compile(r"@?\s*database\s*team|@database\b|@dba\b", re.I),
-    "application": re.compile(r"@?\s*application\s*team|@application\b|@app\s*team", re.I),
-    "storage": re.compile(r"@?\s*storage\s*team|@storage\b", re.I),
-    "network": re.compile(r"@?\s*network\s*team|@network\b", re.I),
-    "security": re.compile(r"@?\s*security\s*team|@security\b", re.I),
+    "backup": re.compile(r"@?\s*backup\s+team\b|@backup\b|@\s*team\s+backup\b", re.I),
+    "database": re.compile(r"@?\s*database\s+team\b|@database\b|@dba\b|@\s*team\s+database\b", re.I),
+    "application": re.compile(r"@?\s*application\s+team\b|@application\b|@app\s+team\b|@\s*team\s+application\b", re.I),
+    "storage": re.compile(r"@?\s*storage\s+team\b|@storage\b|@\s*team\s+storage\b", re.I),
+    "network": re.compile(r"@?\s*network\s+team\b|@network\b|@\s*team\s+network\b", re.I),
+    "security": re.compile(r"@?\s*security\s+team\b|@security\b|@\s*team\s+security\b", re.I),
 }
+
+_NEAR_MISS_MENTION = re.compile(
+    r"@\s*[\w.-]+|"
+    r"\b(storage|network|backup|database|application|security|dba)\s+team\b|"
+    r"\bteam\s+(storage|network|backup|database|application|security)\b",
+    re.I,
+)
+
+
+def looks_like_failed_team_mention(text: str) -> bool:
+    """True when the learner tried to ping a team but parse_team_mentions missed it."""
+    if not text or parse_team_mentions(text):
+        return False
+    return bool(_NEAR_MISS_MENTION.search(text))
+
+
+def build_mention_coach_reply() -> tuple[str, str]:
+    return (
+        TEAM_AUTHORS["changemgmt"],
+        "I saw an @mention that didn't match a known ops team. Try one of these exact forms "
+        "(they unlock the change window):\n\n"
+        "- `@storage team` — attach / expand disk\n"
+        "- `@network team` — NIC / VLAN / IP\n"
+        "- `@backup team` — backup before patching\n"
+        "- `@database team` / `@application team` — stop or start services\n"
+        "- `@security team` — firewall / access approval\n\n"
+        "Example: `@storage team please add disk for LVM`",
+    )
 
 
 def team_reply_delay_seconds() -> int:
