@@ -1,45 +1,48 @@
 title: Restore a Missing Permission to a Permission List
 slug: ps-add-missing-permission-list
 category: Fix
-description: 'CONTEXT: A team operating PeopleSoft administration has raised a ticket for `Restore a Missing
-  Permission to a Permission List`. A customer-facing workflow is degraded and the on-call engineer (you)
-  must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
-  underlying state is repaired.
+description: 'CONTEXT: A team operating PeopleSoft administration has raised a ticket
+  for `Restore a Missing Permission to a Permission List`. A customer-facing workflow
+  is degraded and the on-call engineer (you) must diagnose and resolve it. Business
+  impact: reduced service reliability and blocked users until the underlying state
+  is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline PeopleSoft app server lab. The architecture is a
-  single lab-primary node exposing PIA, Process Scheduler, Integration Broker, and app server logs; treat
-  it as the production host for this incident. All tools run locally — no paid APIs or external cloud
-  calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline PeopleSoft app server lab. The
+  architecture is a single lab-primary node exposing PIA, Process Scheduler, Integration
+  Broker, and app server logs; treat it as the production host for this incident.
+  All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: A PeopleSoft HCM environment where the HCCPPRM permission list is missing
-  the HC_POSITION_DATA permission, blocking the Position Data component.
+  SYMPTOM / STARTING STATE: A PeopleSoft HCM environment where the HCCPPRM permission
+  list is missing the HC_POSITION_DATA permission, blocking the Position Data component.
 
 
-  OBJECTIVE: Open the PeopleSoft (PIA) console from the lab toolbar; Navigate to PeopleTools > Security
-  > Permission Lists and open HCCPPRM; Identify the permission missing for the Position Data component.
-  Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
+  OBJECTIVE: Open the PeopleSoft (PIA) console from the lab toolbar; Navigate to PeopleTools
+  > Security > Permission Lists and open HCCPPRM; Identify the permission missing
+  for the Position Data component. Acceptance criteria: the change is minimal and
+  reversible, and success means `check.sh` exits successfully.
 
 
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant PIA, Process Scheduler, Integration Broker, and app server logs), changing one thing
-  at a time. Check your work continuously against the objective — success means `check.sh` exits successfully.
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it
+  and use the equivalent already on the host. Make the smallest configuration change
+  that moves the system toward the objective (edit the relevant PIA, Process Scheduler,
+  Integration Broker, and app server logs), changing one thing at a time. Check your
+  work continuously against the objective — success means `check.sh` exits successfully.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
-  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
-  check, not just once.
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully.
+  Capture the before/after output as evidence. Success criteria: the objective''s
+  healthy state holds on a repeat check, not just once.
 
 
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
+  ROLLBACK: If a change makes things worse, revert that single change immediately
+  (restore the original config file / undo the edit / restart the affected component)
+  and re-observe before trying another hypothesis. Never stack unverified changes.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 difficulty: medium
 lab_mode: simulation
 simulation_type: peoplesoft
@@ -54,65 +57,70 @@ objectives:
 - Navigate to PeopleTools > Security > Permission Lists and open HCCPPRM
 - Identify the permission missing for the Position Data component
 - Add the HC_POSITION_DATA permission back to the HCCPPRM permission list
-initial_state: A PeopleSoft HCM environment where the HCCPPRM permission list is missing the HC_POSITION_DATA
-  permission, blocking the Position Data component.
+initial_state: A PeopleSoft HCM environment where the HCCPPRM permission list is missing
+  the HC_POSITION_DATA permission, blocking the Position Data component.
 hints:
 - order: 1
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: restore a missing permission to a permission
-    list is not behaving as the scenario objectives require. This lab is about restore a missing permission
-    to a permission list — how restore a missing permission to a permission list behaves in a PeopleSoft
-    administration environment. Read the objectives and the current state, and note precisely what looks
-    wrong versus healthy before you form any theory.'
+    Do not touch anything yet. First observe the symptom: restore a missing permission
+    to a permission list is not behaving as the scenario objectives require. This
+    lab is about restore a missing permission to a permission list — how restore a
+    missing permission to a permission list behaves in a PeopleSoft administration
+    environment. Read the objectives and the current state, and note precisely what
+    looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For restore a missing permission to a permission list problems the
-    reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the
-    one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
-    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
+    Work from evidence, not guesses. For restore a missing permission to a permission
+    list problems the reliable method is: (1) reproduce/observe the failure, (2) narrow
+    from the whole system down to the one component that owns the symptom, (3) change
+    exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified
+    (not just the noisy log line), changing one thing at a time.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Inspect the current state with PIA, Process Scheduler, Integration Broker, and app server logs.
+    1. Inspect the current state with PIA, Process Scheduler, Integration Broker,
+    and app server logs.
 
-    2. Each command above tells you something specific — status/health, recent errors, and the effective
-    configuration. Read them in that order.
+    2. Each command above tells you something specific — status/health, recent errors,
+    and the effective configuration. Read them in that order.
 
     3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. From the evidence above, decide which single part of restore a missing permission to a permission
-    list is at fault.
+    1. From the evidence above, decide which single part of restore a missing permission
+    to a permission list is at fault.
 
-    2. Re-run the most relevant of PIA, Process Scheduler, Integration Broker, and app server logs focused
-    on just that part to confirm it.
+    2. Re-run the most relevant of PIA, Process Scheduler, Integration Broker, and
+    app server logs focused on just that part to confirm it.
 
-    3. State a one-line hypothesis: the smallest change that would move the state from ''restore a missing
-    permission to a permission list is not behaving as the scenario objectives require'' toward ''`check.sh`
-    exits successfully''.'
+    3. State a one-line hypothesis: the smallest change that would move the state
+    from ''restore a missing permission to a permission list is not behaving as the
+    scenario objectives require'' toward ''`check.sh` exits successfully''.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
-    you identified (not just the noisy log line), changing one thing at a time.
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing
+    at a time.
 
     2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
 
-    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not
+    stack changes.
 
 
-    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
-    is actually healthy.'
-summary: Complete the restore a missing permission to a permission list peoplesoft lab and verify success
-  with the checker
+    WHY: the grader validates real system state, not marker files — a fix only counts
+    when the subsystem is actually healthy.'
+summary: Complete the restore a missing permission to a permission list peoplesoft
+  lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -146,16 +154,21 @@ environment:
 tasks:
 - id: task_1
   title: Restore a Missing Permission to a Permission List
-  description: Restore healthy behavior for Restore a Missing Permission to a Permission List by investigating
-    the failure, applying the smallest safe fix, and validating the outcome.
-  background: 'This peoplesoft lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Restore a Missing Permission to a Permission
+    List by investigating the failure, applying the smallest safe fix, and validating
+    the outcome.
+  background: 'This peoplesoft lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
+      steps.
 solution:
-  summary: Identify the misconfiguration affecting this peoplesoft lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this peoplesoft lab and apply the
+    minimal fix.
   files_changed: []
   commands_run:
   - bash check.sh
   reference_docs: peoplesoft-fundamentals
+hosted_as: peoplesoft

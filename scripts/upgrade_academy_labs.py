@@ -115,7 +115,7 @@ TECH_SERVICE_POOLS: dict[str, list[str]] = {
     "sqlite": ["postgresql"],
     "python": ["gunicorn"],
     "java": ["spring-boot"],
-    # javascript / react academy packs are Coding IDE labs — do not systemd-break them
+    # javascript / react / html / java / shell / nodejs academy packs are Coding IDE labs
     "nodejs": ["node-app"],
     "ai-ml": ["model-server"],
     "data-science": ["jupyter"],
@@ -169,7 +169,10 @@ CLOUD_SLUG_PREFIXES = ("aws-", "azure-", "gcp-", "openstack-")
 def assign_service_unit(tech: str, slug: str) -> str:
     low = (slug or "").lower()
     # Avoid matching "java" inside "javascript" for non-coding paths
-    if tech in ("javascript", "react") or low.startswith(("academy-javascript-", "academy-react-")):
+    if tech in ("javascript", "react", "html", "java", "shell-script", "nodejs") or low.startswith(
+        ("academy-javascript-", "academy-react-", "academy-html-",
+         "academy-java-", "academy-shell-script-", "academy-nodejs-")
+    ):
         return "node-app"  # unused when classify_mode skips coding academies
     for keys, unit in TOPIC_UNIT_RULES:
         if any(k in low for k in keys):
@@ -184,8 +187,9 @@ def classify_mode(tech: str, sim_type: str, slug: str) -> str:
         return "skip"
     low = (slug or "").lower()
     # Coding IDE academy packs — never re-upgrade to systemd drills
-    if tech in ("javascript", "react", "html") or low.startswith(
-        ("academy-javascript-", "academy-react-", "academy-html-")
+    if tech in ("javascript", "react", "html", "java", "shell-script", "nodejs") or low.startswith(
+        ("academy-javascript-", "academy-react-", "academy-html-",
+         "academy-java-", "academy-shell-script-", "academy-nodejs-")
     ):
         return "skip"
     # Cloud academies: grade via is-failed + planted sentinel (same contract as AWS).

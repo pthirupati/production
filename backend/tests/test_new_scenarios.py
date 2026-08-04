@@ -188,8 +188,7 @@ MARKER_SAMPLE = [
     ("ansible", "ansible-handler-missing", "/home/ansible/site.yml"),
     ("shell-script", "shell-pipefail-missing", "/opt/scripts/deploy-pipeline.sh"),
     ("shell-script", "shell-rm-rf-variable", "/opt/scripts/wipe.sh"),
-    ("html", "html-broken-doctype", "/var/www/html/index.html"),
-    ("html", "html-mixed-content", "/var/www/html/secure.html"),
+    # HTML heroes are coding_mode IDE labs (graded via hidden_tests), not FIXED-OK markers.
     ("gpu", "gpu-ecc-disabled", "/etc/nvidia/ecc.conf"),
     ("gpu", "gpu-driver-blacklist-nouveau", "/etc/modprobe.d/blacklist-nouveau.conf"),
     ("baremetal", "baremetal-bmc-default-creds", "/etc/bmc/credentials.cfg"),
@@ -486,6 +485,8 @@ class JavaScenarioCatalogTests(SimpleTestCase):
 
         A simulation scenario with a trivial check validates as 'Validation not
         configured' and is NOT completable — the exact bug this work fixes.
+        coding_mode labs are graded via /code-validate/ (hidden_tests), so their
+        stub check.sh is intentionally trivial and excluded here.
         """
         import glob
 
@@ -496,6 +497,8 @@ class JavaScenarioCatalogTests(SimpleTestCase):
             data = _yaml.safe_load(open(f))
             if (data.get("lab_mode") or "docker") != "simulation":
                 continue  # docker-mode build labs are graded by the build harness
+            if data.get("coding_mode"):
+                continue  # Coding IDE — graded by coding_spec, not check.sh
             check_path = Path(f).with_name("check.sh")
             script = check_path.read_text() if check_path.exists() else ""
             if is_trivial_validation_script(script):
