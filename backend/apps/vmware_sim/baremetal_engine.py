@@ -539,6 +539,42 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": f"Container {name} created"}
 
+    if action == "delete_lxd":
+        name = payload.get("name") or ""
+        before = len(state["lxd"]["containers"])
+        state["lxd"]["containers"] = [
+            c for c in state["lxd"]["containers"] if (c.get("name") or "") != name
+        ]
+        removed = before - len(state["lxd"]["containers"])
+        if removed:
+            state["events"].insert(0, {
+                "time": _now_iso(),
+                "message": f"LXD container {name} deleted",
+                "severity": "info",
+            })
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Container {name} deleted" if removed else f"Container {name} not found"}
+
+    if action == "maas_delete":
+        hostname = payload.get("hostname") or ""
+        machines = state["maas"]["machines"]
+        before = len(machines)
+        state["maas"]["machines"] = [
+            m for m in machines if (m.get("hostname") or "") != hostname
+        ]
+        removed = before - len(state["maas"]["machines"])
+        if removed:
+            state["ipmi"]["bmc_hosts"] = [
+                b for b in state["ipmi"]["bmc_hosts"] if (b.get("name") or "") != hostname
+            ]
+            state["events"].insert(0, {
+                "time": _now_iso(),
+                "message": f"Machine {hostname} removed from MAAS",
+                "severity": "info",
+            })
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Machine {hostname} deleted" if removed else f"Machine {hostname} not found"}
+
     if action == "create_kvm":
         name = payload.get("name") or "new-vm"
         state["kvm"]["vms"].append(

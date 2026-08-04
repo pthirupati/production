@@ -343,7 +343,7 @@ Learner-facing UI never says simulation/demo/mock.
 ### S1 — Unified enterprise state bus
 210. [~] Single asset/resource registry (hostname, serial, asset tag, rack/U, CPU/RAM/disk/RAID, firmware, BIOS, BMC, NICs, VLANs, GPUs, power/thermal, OS, deploy status, owner) — *schema + list_assets on server_identity*
 211. [~] Write-once identity: MAAS commission → appears in CMDB, DC twin, monitoring, Terraform import targets, AWX inventory — *MAAS terminal/baremetal → identity → AWX maas-gpu-nodes; Terraform/monitoring still open*
-212. [~] Terraform apply → create/update/delete mirrors into AWS/Azure/GCP/VMware/MAAS/LXD consoles — *AWS/Azure/GCP/VMware create + destroy mirror; MAAS/LXD fan-out open*
+212. [~] Terraform apply → create/update/delete mirrors into AWS/Azure/GCP/VMware/MAAS/LXD consoles — *AWS/Azure/GCP/VMware + MAAS enlist + LXD create/destroy; deeper maas_* types open*
 213. [ ] Hardware failure events fan out to Grafana alerts, SOC tickets, DCIM LEDs, and lab terminal `dmesg`
 214. [ ] Cross-console sync: disk/NIC/CPU/RAM edits in VMware/DC update guest `lsblk`/`ip`/`nvidia-smi`
 215. [ ] Persistent twin replay (undo/timeline) for cable/firmware/part swaps
@@ -409,7 +409,7 @@ Learner-facing UI never says simulation/demo/mock.
 ### T3 — Terraform / cloud bridge remaining
 254. [x] Terraform `vsphere_virtual_machine` → VMware `create_vm` + Open VMware link
 255. [x] Terraform destroy → terminate/delete mirrored AWS/Azure/GCP/VMware resources
-256. [ ] Terraform → MAAS enlist / LXD create fan-out
+256. [x] Terraform → MAAS enlist / LXD create fan-out
 257. [ ] Terraform import + state list/show parity with mirrored consoles
 258. [ ] Provider resource coverage beyond instance/VM (S3, VPC, SG, Azure RG, GCP disk, vsphere network)
 

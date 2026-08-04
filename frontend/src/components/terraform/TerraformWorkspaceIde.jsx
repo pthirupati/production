@@ -219,6 +219,8 @@ export default function TerraformWorkspaceIde({
     else if (key === 'gcp') setBottomTab('gcp')
     else if (key === 'vmware' && sessionId) {
       window.open(`/vmware/${sessionId}?scenario=${scenario?.slug || ''}`, '_blank', 'noopener,noreferrer')
+    } else if ((key === 'maas' || key === 'lxd' || key === 'baremetal') && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind: 'baremetal' } }))
     }
   }
 
@@ -394,7 +396,7 @@ export default function TerraformWorkspaceIde({
               <Terminal size={11} /> {cmd}
             </button>
           ))}
-          {(cloudLinks.aws || cloudLinks.azure || cloudLinks.gcp || cloudLinks.vmware) && (
+          {(cloudLinks.aws || cloudLinks.azure || cloudLinks.gcp || cloudLinks.vmware || cloudLinks.maas || cloudLinks.lxd) && (
             <div className="flex items-center gap-1 ml-1">
               <span className="text-[10px] text-[var(--vsc-muted)]">Open Cloud:</span>
               {cloudLinks.aws && (
@@ -415,6 +417,11 @@ export default function TerraformWorkspaceIde({
               {cloudLinks.vmware && (
                 <button type="button" onClick={() => openCloud('vmware')} className="vsc-btn text-[10px]" style={{ borderColor: '#71afe5', color: '#71afe5' }}>
                   <ExternalLink size={11} /> VMware
+                </button>
+              )}
+              {(cloudLinks.maas || cloudLinks.lxd) && (
+                <button type="button" onClick={() => openCloud('baremetal')} className="vsc-btn text-[10px]" style={{ borderColor: '#0d9488', color: '#2dd4bf' }}>
+                  <ExternalLink size={11} /> Bare Metal
                 </button>
               )}
             </div>
