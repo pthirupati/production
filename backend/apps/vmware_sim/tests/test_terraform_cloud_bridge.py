@@ -142,3 +142,35 @@ class TerraformCloudBridgeTests(TestCase):
         te.apply_action(self.sid, "terraform_apply", {})
         vms2 = (ve.get_state(self.sid).get("inventory") or {}).get("vms") or []
         self.assertEqual(sum(1 for v in vms2 if v.get("name") == "web01"), 1)
+
+    def test_destroy_removes_mirrored_cloud_resources(self):
+        self._boot(MULTI_CLOUD_MAIN)
+        te.apply_action(self.sid, "terraform_apply", {})
+        res = te.apply_action(self.sid, "terraform_destroy", {})
+        self.assertTrue(res.get("ok"), res)
+        self.assertIn("Destroy complete", res.get("output") or "")
+        self.assertGreaterEqual(res.get("destroyed") or 0, 3)
+
+        aws_live = [
+            i for i in (ae.get_state(self.sid)["state"].get("instances") or [])
+            if (i.get("state") or "") not in ("terminated", "shutting-down")
+            and (
+                i.get("name") == "web-server"
+                or (i.get("tags") or {}).get("Name") == "web-server"
+            )
+        ]
+        self.assertEqual(aws_live, [], aws_live)
+
+        azure_vms = aze.get_state(self.sid)["state"].get("vms") or []
+        self.assertFalse(any(v.get("name") == "app" for v in azure_vms), azure_vms)
+
+        gcp_inst = gce.get_state(self.sid)["state"].get("instances") or []
+        self.assertFalse(any(i.get("name") == "batch" for i in gcp_inst), gcp_inst)
+
+    def test_destroy_removes_vsphere_vm(self):
+        self._boot(VSPHERE_MAIN)
+        te.apply_action(self.sid, "terraform_apply", {})
+        res = te.apply_action(self.sid, "terraform_destroy", {})
+        self.assertTrue(res.get("ok"), res)
+        vms = (ve.get_state(self.sid).get("inventory") or {}).get("vms") or []
+        self.assertFalse(any(v.get("name") == "web01" for v in vms), vms)

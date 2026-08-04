@@ -587,6 +587,62 @@ def _mirror_apply_to_clouds(session_id: str, resources: list[dict]) -> dict[str,
     return {k: v for k, v in links.items() if v}
 
 
+def _mirror_destroy_to_clouds(session_id: str, resources: list[dict]) -> dict[str, bool]:
+    """Terraform destroy → terminate/delete mirrored AWS/Azure/GCP/VMware resources."""
+    links = _cloud_links_from_resources(resources)
+    for r in resources:
+        rtype = str(r.get("type") or "")
+        name = str(r.get("name") or "web")
+        try:
+            if rtype == "aws_instance":
+                from apps.vmware_sim import aws_engine as ae
+
+                host = name if name != "web" else "web-server"
+                aws_st = ae.get_state(session_id, "terraform-destroy")
+                live = [
+                    i for i in (aws_st.get("state") or {}).get("instances") or []
+                    if (
+                        i.get("name") == host
+                        or (i.get("tags") or {}).get("Name") == host
+                        or i.get("name") == name
+                    )
+                    and (i.get("state") or "") != "terminated"
+                ]
+                for inst in live:
+                    ae.apply_action(
+                        session_id,
+                        "terminate_instance",
+                        {"instance_id": inst.get("id") or inst.get("name")},
+                    )
+            elif rtype in (
+                "azurerm_linux_virtual_machine",
+                "azurerm_windows_virtual_machine",
+                "azurerm_virtual_machine",
+            ):
+                from apps.vmware_sim import azure_engine as aze
+
+                aze.get_state(session_id, "terraform-destroy")
+                aze.apply_action(session_id, "delete_vm", {"name": name})
+            elif rtype == "google_compute_instance":
+                from apps.vmware_sim import gcp_engine as gce
+
+                gce.get_state(session_id, "terraform-destroy")
+                gce.apply_action(session_id, "delete_instance", {"name": name})
+            elif rtype == "vsphere_virtual_machine":
+                from apps.vmware_sim import engine as ve
+
+                ve.get_state(session_id, "terraform-destroy")
+                # Must power off before delete_vm
+                try:
+                    ve.apply_action(session_id, "power_off", {"vm_name": name})
+                except Exception:
+                    pass
+                ve.apply_action(session_id, "delete_vm", {"vm_name": name})
+        except Exception:
+            continue
+    return {k: v for k, v in links.items() if v}
+
+
 def apply_action(session_id: str, action: str, payload: dict | None = None) -> dict:
     payload = payload or {}
     entry = _load(session_id)
@@ -708,6 +764,51 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         )
         _save(session_id, entry)
         return {"ok": True, "message": "Apply complete", "output": out, "cloud_links": cloud_links}
+
+    if action == "terraform_destroy":
+        if not tf.get("initialized"):
+            return {"ok": False, "error": f"Run {tool.lower()} init first"}
+        resources = list(tf.get("resources") or [])
+        if not resources:
+            hcl_blob = "\n".join(str(v) for v in files.values() if isinstance(v, str))
+            resources = _parse_tf_resources(hcl_blob) or [
+                {"type": "aws_instance", "name": "web", "status": "applied"}
+            ]
+        cloud_links = _mirror_destroy_to_clouds(str(session_id), resources)
+        destroyed_n = len(resources)
+        for r in resources:
+            r["status"] = "destroyed"
+        tf["resources"] = []
+        tf["last_destroy"] = _now_iso()
+        tf["cloud_links"] = {}
+        tf["last_plan"] = None
+        lines = [
+            f"{tool} destroy — auto-approving",
+            "",
+        ]
+        for r in resources:
+            lines.append(f"{r.get('type')}.{r.get('name')}: Destroying...")
+            lines.append(f"{r.get('type')}.{r.get('name')}: Destruction complete")
+        lines.extend([
+            "",
+            f"Destroy complete! Resources: {destroyed_n} destroyed.",
+        ])
+        if cloud_links:
+            providers = ", ".join(sorted(k.upper() for k, v in cloud_links.items() if v))
+            lines.append(f"\nCloud consoles updated: {providers} (resources removed)")
+        out = "\n".join(lines)
+        state["events"].insert(
+            0,
+            {"time": _now_iso(), "message": f"Destroy complete! {destroyed_n} resources destroyed.", "severity": "warning"},
+        )
+        _save(session_id, entry)
+        return {
+            "ok": True,
+            "message": "Destroy complete",
+            "output": out,
+            "cloud_links": cloud_links,
+            "destroyed": destroyed_n,
+        }
 
     if action == "force_unlock":
         broken.pop("stale_lock", None)

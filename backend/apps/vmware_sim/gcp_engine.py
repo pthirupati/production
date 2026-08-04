@@ -357,6 +357,23 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": "Instance created", "instance": inst}
 
+    if action == "delete_instance":
+        inst = _find_instance(
+            state,
+            payload.get("instance_id") or payload.get("instance_name") or payload.get("name"),
+        )
+        if not inst:
+            return {"ok": False, "error": "Instance not found"}
+        name = inst.get("name")
+        state["instances"] = [i for i in (state.get("instances") or []) if i.get("name") != name]
+        for d in state.get("disks") or []:
+            if d.get("attached_to") == name:
+                d["state"] = "READY"
+                d["attached_to"] = None
+        _event(state, f"Deleted instance {name}", "warning")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Instance '{name}' deleted"}
+
     if action in ("start_instance", "stop_instance", "reset_instance", "instance_action"):
         op = payload.get("op") or {
             "start_instance": "start", "stop_instance": "stop", "reset_instance": "reset",

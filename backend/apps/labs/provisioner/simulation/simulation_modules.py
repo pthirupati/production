@@ -2920,13 +2920,15 @@ def _register_terraform(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
             res = te.apply_action(sid, "terraform_plan")
         elif low.startswith("terraform apply"):
             res = te.apply_action(sid, "terraform_apply")
+        elif low.startswith("terraform destroy"):
+            res = te.apply_action(sid, "terraform_destroy")
         elif low.startswith("terraform validate"):
             res = te.apply_action(sid, "terraform_validate")
         elif low.startswith("aws "):
             res = te.apply_action(sid, "aws_cli", {"command": line.strip()})
         else:
             return (
-                "Usage: terraform init | plan | apply | validate | force-unlock\n"
+                "Usage: terraform init | plan | apply | destroy | validate | force-unlock\n"
                 "       aws <service> <command> …\n"
                 "(state synced with Terraform workspace simulator)"
             )

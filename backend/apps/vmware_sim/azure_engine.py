@@ -410,6 +410,22 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"Created virtual machine {name}", "success", trace_id=trace_id)
         _save(session_id, entry)
         return {"ok": True, "message": "VM created", "vm": vm}
+
+    if action == "delete_vm":
+        vm = _find_vm(state, payload.get("vm_id") or payload.get("vm_name") or payload.get("name"))
+        if not vm:
+            return {"ok": False, "error": "Virtual machine not found"}
+        name = vm.get("name")
+        state["vms"] = [v for v in (state.get("vms") or []) if v.get("name") != name]
+        # Detach OS disks tied to this VM
+        for d in state.get("disks") or []:
+            if d.get("attached_to") == name:
+                d["state"] = "Unattached"
+                d["attached_to"] = None
+        _event(state, f"Deleted virtual machine {name}", "warning")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"VM '{name}' deleted"}
+
     if action in ("start_vm", "stop_vm", "restart_vm", "vm_action"):
         op = payload.get("op") or {"start_vm": "start", "stop_vm": "stop", "restart_vm": "restart"}.get(action, "start")
         vm = _find_vm(state, payload.get("vm_id") or payload.get("vm_name") or payload.get("name"))
