@@ -2,19 +2,20 @@ title: Scale-Out Blocked - Add a Worker VM in VMware to Fit the
 slug: k8s-scale-out-add-vmware-node
 category: Fix
 difficulty: medium
-description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Scale-Out Blocked - Add a
-  Worker VM in VMware to Fit the`. A customer-facing workflow is degraded and the on-call engineer (you)
-  must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
-  underlying state is repaired.
+description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Scale-Out
+  Blocked - Add a Worker VM in VMware to Fit the`. A customer-facing workflow is degraded
+  and the on-call engineer (you) must diagnose and resolve it. Business impact: reduced
+  service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster. The architecture is a single
-  lab-primary node exposing kubectl, manifests, and cluster resources; treat it as the production host
-  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster. The architecture
+  is a single lab-primary node exposing kubectl, manifests, and cluster resources;
+  treat it as the production host for this incident. All tools run locally — no paid
+  APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: A Kubernetes cluster with one control-plane and one worker (worker-1). The
-  `api`
+  SYMPTOM / STARTING STATE: A Kubernetes cluster with one control-plane and one worker
+  (worker-1). The `api`
 
   Deployment is set to 4 replicas; 2 are Running on worker-1 and 2 are Pending
 
@@ -23,31 +24,34 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Scal
   VMware inventory but is powered off, so node worker-2 has not joined.
 
 
-  OBJECTIVE: Confirm 2 api pods are Pending due to FailedScheduling (kubectl get pods, kubectl describe
-  pod); Confirm the cluster has only one worker node (kubectl get nodes); Open the VMware console and
-  power on the worker-node VM k8s-worker-2. Acceptance criteria: the change is minimal and reversible,
-  and success means `kubectl get pods` shows every pod Running.
+  OBJECTIVE: Confirm 2 api pods are Pending due to FailedScheduling (kubectl get pods,
+  kubectl describe pod); Confirm the cluster has only one worker node (kubectl get
+  nodes); Open the VMware console and power on the worker-node VM k8s-worker-2. Acceptance
+  criteria: the change is minimal and reversible, and success means `kubectl get pods`
+  shows every pod Running.
 
 
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant kubectl, manifests, and cluster resources), changing one thing at a time. Check your
-  work continuously against the objective — success means `kubectl get pods` shows every pod Running.
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it
+  and use the equivalent already on the host. Make the smallest configuration change
+  that moves the system toward the objective (edit the relevant kubectl, manifests,
+  and cluster resources), changing one thing at a time. Check your work continuously
+  against the objective — success means `kubectl get pods` shows every pod Running.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `kubectl get pods` shows every pod Running.
-  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
-  on a repeat check, not just once.
+  VERIFY: Re-run the same check the grader uses and confirm `kubectl get pods` shows
+  every pod Running. Capture the before/after output as evidence. Success criteria:
+  the objective''s healthy state holds on a repeat check, not just once.
 
 
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
+  ROLLBACK: If a change makes things worse, revert that single change immediately
+  (restore the original config file / undo the edit / restart the affected component)
+  and re-observe before trying another hypothesis. Never stack unverified changes.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
-initial_state: 'A Kubernetes cluster with one control-plane and one worker (worker-1). The `api`
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
+initial_state: 'A Kubernetes cluster with one control-plane and one worker (worker-1).
+  The `api`
 
   Deployment is set to 4 replicas; 2 are Running on worker-1 and 2 are Pending
 
@@ -57,7 +61,8 @@ initial_state: 'A Kubernetes cluster with one control-plane and one worker (work
 
   '
 objectives:
-- Confirm 2 api pods are Pending due to FailedScheduling (kubectl get pods, kubectl describe pod)
+- Confirm 2 api pods are Pending due to FailedScheduling (kubectl get pods, kubectl
+  describe pod)
 - Confirm the cluster has only one worker node (kubectl get nodes)
 - Open the VMware console and power on the worker-node VM k8s-worker-2
 - Confirm worker-2 is Ready and the Pending pods schedule onto it
@@ -76,24 +81,27 @@ hints:
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: Scale-Out blocked - add a worker VM in VMware
-    to fit the is not behaving as the scenario objectives require. This lab is about Scale-Out blocked
-    - add a worker VM in VMware to fit the — how Scale-Out blocked - add a worker VM in VMware to fit
-    the behaves in a Kubernetes environment. Read the objectives and the current state, and note precisely
-    what looks wrong versus healthy before you form any theory.'
+    Do not touch anything yet. First observe the symptom: Scale-Out blocked - add
+    a worker VM in VMware to fit the is not behaving as the scenario objectives require.
+    This lab is about Scale-Out blocked - add a worker VM in VMware to fit the — how
+    Scale-Out blocked - add a worker VM in VMware to fit the behaves in a Kubernetes
+    environment. Read the objectives and the current state, and note precisely what
+    looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For Scale-Out blocked - add a worker VM in VMware to fit the problems
-    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
-    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
-    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
+    Work from evidence, not guesses. For Scale-Out blocked - add a worker VM in VMware
+    to fit the problems the reliable method is: (1) reproduce/observe the failure,
+    (2) narrow from the whole system down to the one component that owns the symptom,
+    (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `kubectl get pods -A` and `kubectl describe pod <name>` for Events and container state.'
+    Run `kubectl get pods -A` and `kubectl describe pod <name>` for Events and container
+    state.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
@@ -117,8 +125,8 @@ hints:
     WHY: Kubernetes labs grade real cluster state.'
 requires_companion_hosts: false
 technology: kubernetes
-summary: Complete the scale-out blocked - add a worker vm in vmware to fit the kubernetes lab and verify
-  success with the checker
+summary: Complete the scale-out blocked - add a worker vm in vmware to fit the kubernetes
+  lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -129,7 +137,8 @@ tags:
 - kubernetes
 linked_tutorial: kubernetes-fundamentals
 what_you_will_learn:
-- Confirm 2 api pods are Pending due to FailedScheduling (kubectl get pods, kubectl describe pod)
+- Confirm 2 api pods are Pending due to FailedScheduling (kubectl get pods, kubectl
+  describe pod)
 - Confirm the cluster has only one worker node (kubectl get nodes)
 - Open the VMware console and power on the worker-node VM k8s-worker-2
 - Confirm worker-2 is Ready and the Pending pods schedule onto it
@@ -153,18 +162,23 @@ environment:
 tasks:
 - id: task_1
   title: Scale-Out Blocked - Add a Worker VM in VMware to Fit the
-  description: Restore healthy behavior for Scale-Out Blocked - Add a Worker VM in VMware to Fit the by
-    investigating the failure, applying the smallest safe fix, and validating the outcome.
-  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Scale-Out Blocked - Add a Worker VM in
+    VMware to Fit the by investigating the failure, applying the smallest safe fix,
+    and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: k8s_resource_state
     resource_kind: Pod
     resource_name: all
     namespace: default
     expected_state: Running
-    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+    error_message: One or more pods are not Running. Use kubectl describe pod and
+      kubectl logs.
 solution:
-  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the
+    minimal fix.
   files_changed: []
   commands_run: []
   reference_docs: kubernetes-fundamentals
+hosted_as: vmware

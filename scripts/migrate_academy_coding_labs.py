@@ -5,7 +5,9 @@ Rewrites scenario.yaml (coding_mode + coding_spec), vestigial check.sh, and stri
 those slugs from generated academy_service_presets / e2e fix maps.
 
 Usage:
-  python3 scripts/migrate_academy_coding_labs.py [--dry-run] [--technology javascript|react]
+  python3 scripts/migrate_academy_coding_labs.py [--dry-run] [--technology javascript|react|html|java|shell-script|nodejs]
+  python3 scripts/migrate_academy_coding_labs.py --html-heroes [--dry-run]
+  python3 scripts/migrate_academy_coding_labs.py --heroes java|shell-script [--dry-run]
 """
 from __future__ import annotations
 
@@ -16,12 +18,29 @@ from pathlib import Path
 
 import yaml
 
+from coding_academy_extra_catalogs import (
+    hero_topic_for,
+    html_hero_spec,
+    java_catalog,
+    nodejs_catalog,
+    shell_catalog,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 SCEN = ROOT / "scenarios"
 PRESET_OUT = ROOT / "backend/apps/labs/provisioner/simulation/academy_service_presets.py"
 E2E_OUT = ROOT / "backend/apps/labs/provisioner/simulation/academy_service_e2e_fixes.py"
 
-CODING_TECHS = ("javascript", "react", "html")
+CODING_TECHS = ("javascript", "react", "html", "java", "shell-script", "nodejs")
+HERO_TECHS = ("java", "shell-script")
+ACADEMY_PREFIXES = (
+    "academy-javascript-",
+    "academy-react-",
+    "academy-html-",
+    "academy-java-",
+    "academy-shell-script-",
+    "academy-nodejs-",
+)
 
 # Topic → coding_spec builder. `n` is the cycle variant (1..10) for mild uniqueness.
 def _js(n: int) -> dict[str, dict]:
@@ -473,7 +492,8 @@ def _html(n: int) -> dict[str, dict]:
 def parse_slug(slug: str) -> tuple[str, int, str, str, int] | None:
     """academy-{tech}-{seq:03d}-{kind}-{topic}[-cycle] → tech, seq, kind, topic, cycle."""
     m = re.match(
-        r"^academy-(javascript|react|html)-(\d{3})-(learn|build|operate|troubleshoot|production|"
+        r"^academy-(javascript|react|html|java|shell-script|nodejs)-(\d{3})-"
+        r"(learn|build|operate|troubleshoot|production|"
         r"security|automation|observability|backup|integration)-(.+)$",
         slug,
     )
@@ -496,6 +516,12 @@ def build_coding_spec(tech: str, topic: str, cycle: int) -> dict | None:
         catalog = _react(cycle)
     elif tech == "html":
         catalog = _html(cycle)
+    elif tech == "java":
+        catalog = java_catalog(cycle)
+    elif tech == "shell-script":
+        catalog = shell_catalog(cycle)
+    elif tech == "nodejs":
+        catalog = nodejs_catalog(cycle)
     else:
         return None
     key = topic.replace("_", "-")
@@ -550,6 +576,9 @@ def patch_yaml(path: Path, tech: str, topic: str, cycle: int, *, dry_run: bool) 
         "javascript": "javascript",
         "react": "react",
         "html": "html",
+        "java": "java",
+        "shell-script": "shell",
+        "nodejs": "nodejs",
     }.get(tech, "python")
     data["coding_spec"] = spec
     # Grading is hidden_tests — rewrite task validation language lightly
@@ -574,7 +603,7 @@ def patch_yaml(path: Path, tech: str, topic: str, cycle: int, *, dry_run: bool) 
         env = (
             "FixitLab HTML practice IDE — edit index.html / styles.css, open Preview, then Check Solution."
             if tech == "html"
-            else "FixitLab JavaScript/React practice IDE — edit solution.js, Run visible tests, then Check Solution."
+            else "FixitLab coding practice IDE — edit solution.js, Run visible tests, then Check Solution."
         )
         data["description"] = (
             f"CONTEXT: Complete the {topic_label} coding exercise in the browser IDE.\n\n"
@@ -656,6 +685,91 @@ def patch_yaml(path: Path, tech: str, topic: str, cycle: int, *, dry_run: bool) 
     return True
 
 
+def patch_hero_yaml(
+    path: Path,
+    tech: str,
+    *,
+    dry_run: bool,
+    cycle: int = 1,
+) -> bool:
+    """Migrate a non-academy hero lab to coding IDE."""
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    slug = path.parent.name
+    if tech == "html":
+        spec = html_hero_spec(slug, cycle)
+    else:
+        topic = hero_topic_for(tech, slug)
+        spec = build_coding_spec(tech, topic, cycle)
+        if not spec:
+            print(f"  SKIP hero unknown topic {topic} in {slug}")
+            return False
+    data["coding_mode"] = True
+    data["simulation_type"] = {
+        "html": "html",
+        "java": "java",
+        "shell-script": "shell",
+        "nodejs": "nodejs",
+    }.get(tech, data.get("simulation_type") or "python")
+    data["coding_spec"] = spec
+    fn = "index.html" if tech == "html" else "solution.js"
+    data["objectives"] = [
+        f"Complete the exercise in {fn}",
+        "Pass visible tests with Run / Preview",
+        "Pass Check Solution (hidden tests)",
+    ]
+    data["initial_state"] = (
+        "Coding challenge in the browser IDE. "
+        + (
+            "Edit index.html / styles.css — Preview shows the page; Check Solution grades markup."
+            if tech == "html"
+            else "The stub in solution.js is incomplete so tests fail until you implement it."
+        )
+    )
+    env = (
+        "FixitLab HTML practice IDE — edit index.html / styles.css, open Preview, then Check Solution."
+        if tech == "html"
+        else "FixitLab coding practice IDE — edit solution.js, Run visible tests, then Check Solution."
+    )
+    data["description"] = (
+        f"CONTEXT: Complete the coding exercise for {slug} in the browser IDE.\n\n"
+        f"ENVIRONMENT: {env}\n\n"
+        f"SYMPTOM / STARTING STATE: {data['initial_state']}\n\n"
+        f"OBJECTIVE: Implement the required changes so all visible and hidden tests pass.\n\n"
+        f"VERIFY: Check Solution passes all hidden tests.\n"
+    )
+    if "tasks" in data and isinstance(data["tasks"], list) and data["tasks"]:
+        data["tasks"][0]["validation"] = {
+            "type": "script",
+            "script": "hidden_tests",
+            "error_message": "Hidden tests still failing — keep iterating in the IDE.",
+        }
+        data["tasks"][0]["description"] = (
+            f"Implement the {slug} exercise in the browser IDE and pass all tests."
+        )
+    if "solution" in data and isinstance(data["solution"], dict):
+        data["solution"] = {
+            "summary": "Implement so visible and hidden tests pass in the coding IDE.",
+            "files_changed": ["index.html", "styles.css"] if tech == "html" else ["solution.js"],
+            "commands_run": [],
+            "reference_docs": data.get("linked_tutorial") or tech,
+        }
+    if dry_run:
+        return True
+    path.write_text(
+        yaml.dump(data, default_flow_style=False, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    check = path.parent / "check.sh"
+    check.write_text(
+        "#!/usr/bin/env bash\n"
+        "# coding_mode lab — graded by hidden_tests via /code-validate/\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    check.chmod(check.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return True
+
+
 def strip_generated_maps(slugs: set[str], *, dry_run: bool) -> None:
     """Remove migrated slugs from generated preset/e2e Python modules."""
     for path in (PRESET_OUT, E2E_OUT):
@@ -668,7 +782,7 @@ def strip_generated_maps(slugs: set[str], *, dry_run: bool) -> None:
         for line in lines:
             if any(f"'{slug}'" in line or f'"{slug}"' in line for slug in slugs):
                 # Keep frozenset/dict structural lines; drop entry lines for our slugs
-                if line.strip().startswith(("'", '"')) or "academy-javascript-" in line or "academy-react-" in line or "academy-html-" in line:
+                if line.strip().startswith(("'", '"')) or any(p in line for p in ACADEMY_PREFIXES):
                     if any(s in line for s in slugs):
                         removed += 1
                         continue
@@ -681,10 +795,60 @@ def strip_generated_maps(slugs: set[str], *, dry_run: bool) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--technology", default="", help="javascript, react, or html")
+    parser.add_argument(
+        "--technology",
+        default="",
+        help="javascript, react, html, java, shell-script, or nodejs",
+    )
+    parser.add_argument(
+        "--html-heroes",
+        action="store_true",
+        help="Migrate non-academy HTML hero labs to Coding IDE",
+    )
+    parser.add_argument(
+        "--heroes",
+        default="",
+        help="Migrate non-academy heroes for java or shell-script",
+    )
     args = parser.parse_args()
-    techs = [args.technology] if args.technology else list(CODING_TECHS)
     migrated: set[str] = set()
+
+    if args.html_heroes:
+        count = 0
+        for i, folder in enumerate(sorted((SCEN / "html").iterdir()), start=1):
+            if not folder.is_dir() or folder.name.startswith("academy-"):
+                continue
+            yaml_path = folder / "scenario.yaml"
+            if not yaml_path.is_file():
+                continue
+            if patch_hero_yaml(yaml_path, "html", dry_run=args.dry_run, cycle=(i % 10) + 1):
+                migrated.add(folder.name)
+                count += 1
+        print(f"html heroes: migrated {count} labs")
+        print(f"total migrated: {len(migrated)}")
+        print("done" + (" (dry-run)" if args.dry_run else ""))
+        return
+
+    if args.heroes:
+        tech = args.heroes
+        if tech not in HERO_TECHS:
+            raise SystemExit(f"--heroes expects one of {HERO_TECHS}")
+        count = 0
+        for i, folder in enumerate(sorted((SCEN / tech).iterdir()), start=1):
+            if not folder.is_dir() or folder.name.startswith("academy-"):
+                continue
+            yaml_path = folder / "scenario.yaml"
+            if not yaml_path.is_file():
+                continue
+            if patch_hero_yaml(yaml_path, tech, dry_run=args.dry_run, cycle=(i % 10) + 1):
+                migrated.add(folder.name)
+                count += 1
+        print(f"{tech} heroes: migrated {count} labs")
+        print(f"total migrated: {len(migrated)}")
+        print("done" + (" (dry-run)" if args.dry_run else ""))
+        return
+
+    techs = [args.technology] if args.technology else list(CODING_TECHS)
     for tech in techs:
         if tech not in CODING_TECHS:
             raise SystemExit(f"unsupported tech {tech}")

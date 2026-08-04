@@ -231,7 +231,7 @@ Update this file as items complete. Keep internal code names (`*Simulator`, `sim
 136. [x] Surface `useSimSession.error` in Datacenter/AWS shells (403/API fail ≠ silent empty) — *DC done; Terraform/Azure/GCP Retry UI + companion AWS auto-reset*
 137. [ ] Jira @team mentions: verify `JIRA_SIMULATION_MODE` in prod; coach reply when mention parse fails; E2E mention → bot → disk appears
 138. [ ] Theme/contrast pass: Windows + light portals — no white-on-white; brand-accurate colors per tech
-139. [~] Lint: `vmware_link` ⇒ `hosted_as=vmware`; coding techs must set `coding_mode`; forbid unknown sim types after normalize
+139. [x] Lint: `vmware_link` ⇒ `hosted_as=vmware`; coding techs must set `coding_mode`; forbid unknown sim types after normalize
 
 ---
 
@@ -392,13 +392,13 @@ Learner-facing UI never says simulation/demo/mock.
 242. [x] Scenarios page chip shows AI Infra after seed (API-driven — verify post-deploy)
 
 ### T1 — Environment resolver & hosting (wrong console / wrong host)
-243. [ ] Backfill `hosted_as: vmware` on every `vmware_link` scenario YAML (not only nic-add-vmware-rescan)
-244. [ ] PeopleSoft: `hosted_as` + PeopleSoft persona (never AWS DMI rotate) on all PS scenarios
+243. [x] Backfill `hosted_as: vmware` on every `vmware_link` scenario YAML (not only nic-add-vmware-rescan)
+244. [x] PeopleSoft: `hosted_as` + PeopleSoft persona (never AWS DMI rotate) on all PS scenarios
 245. [ ] Harden `scripts/lint_scenarios.py` to **fail CI** on wrong host / missing coding_mode / unknown sim_type
 246. [ ] Ansible labs: always surface Open AWX companion when `simulation_type`/consoles include awx
 247. [ ] AWS labs: always surface Open AWS Console companion (not only terraform/hosted heuristics)
-248. [ ] Coding techs (java, shell-script, html heroes, nodejs academy): reseed `coding_mode: true` + real `coding_spec.files` (~450 still terminal-only)
-249. [ ] HTML heroes: CodingIDE + live preview iframe (academy done; heroes still terminal)
+248. [x] Coding techs (java, shell-script, html heroes, nodejs academy): reseed `coding_mode: true` + real `coding_spec.files` (~450 still terminal-only)
+249. [x] HTML heroes: CodingIDE + live preview iframe (academy done; heroes still terminal)
 250. [ ] Cross-tech scenarios: assert each companion console link opens and shares session_id
 
 ### T2 — Terminal realism (paced I/O)
@@ -481,7 +481,7 @@ Learner-facing UI never says simulation/demo/mock.
 4. Jira mentions + contrast (137–138)
 5. **Merged PR #127–#132** AI Infra + AWX/Packer + GPU matrix + TF cloud + load harden
 6. **This wave:** TF→VMware + VyOS commit/rollback + AI Infra catalog visibility + **prod deploy seed**
-7. Coding IDE reseed (java/shell/html/nodejs) + env-resolver CI hard-fail (243–250)
+7. ~~Coding IDE reseed (java/shell/html/nodejs) + env-resolver CI hard-fail (243–250)~~
 8. AI Infra depth: MAAS UI, Packer GH Actions, DCOps RMA, Steam DC stubs (259–272, 296–302)
 9. Interview realism P2 leftovers (284–288)
 10. Per-tech 20-packs + unified bus finish (273–283, 292–295)

@@ -11,65 +11,71 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `Policy As Code — Integration
-  Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
-  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
+description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `Policy
+  As Code — Integration Lab`. A customer-facing workflow is degraded and the on-call
+  engineer (you) must diagnose and resolve it. Business impact: reduced service reliability
+  and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace. The architecture is a single
-  lab-primary node exposing HCL files, state, and plan/apply workflow; treat it as the production host
-  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace. The architecture
+  is a single lab-primary node exposing HCL files, state, and plan/apply workflow;
+  treat it as the production host for this incident. All tools run locally — no paid
+  APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Two systems are deployed but not fully wired together for policy as code.
-  Downstream consumers are waiting on this integration path.
+  SYMPTOM / STARTING STATE: Two systems are deployed but not fully wired together
+  for policy as code. Downstream consumers are waiting on this integration path.
 
 
-  OBJECTIVE: policy as code is connected to the adjacent system successfully; Handoff points are authenticated
-  and observable; End-to-end workflow completes without manual intervention. Acceptance criteria: the
-  change is minimal and reversible, and success means `terraform validate` includes `Success`.
+  OBJECTIVE: policy as code is connected to the adjacent system successfully; Handoff
+  points are authenticated and observable; End-to-end workflow completes without manual
+  intervention. Acceptance criteria: the change is minimal and reversible, and success
+  means `terraform validate` includes `Success`.
 
 
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant HCL files, state, and plan/apply workflow), changing one thing at a time. Check your
-  work continuously against the objective — success means `terraform validate` includes `Success`.
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it
+  and use the equivalent already on the host. Make the smallest configuration change
+  that moves the system toward the objective (edit the relevant HCL files, state,
+  and plan/apply workflow), changing one thing at a time. Check your work continuously
+  against the objective — success means `terraform validate` includes `Success`.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `terraform validate` includes `Success`. Capture
-  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
-  check, not just once.
+  VERIFY: Re-run the same check the grader uses and confirm `terraform validate` includes
+  `Success`. Capture the before/after output as evidence. Success criteria: the objective''s
+  healthy state holds on a repeat check, not just once.
 
 
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
+  ROLLBACK: If a change makes things worse, revert that single change immediately
+  (restore the original config file / undo the edit / restart the affected component)
+  and re-observe before trying another hypothesis. Never stack unverified changes.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - policy as code is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for policy as code. Downstream consumers
-  are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for policy as
+  code. Downstream consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: non-compliant changes can be applied. This lab
-    is about policy as code — guardrails, validation, and sentinel/OPA checks. Read the objectives and
-    the current state, and note precisely what looks wrong versus healthy before you form any theory.'
+    Do not touch anything yet. First observe the symptom: non-compliant changes can
+    be applied. This lab is about policy as code — guardrails, validation, and sentinel/OPA
+    checks. Read the objectives and the current state, and note precisely what looks
+    wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For policy as code problems the reliable method is: (1) reproduce/observe
-    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
-    change exactly one thing, (4) re-check. Configure credentials and networking, then drive one happy-path
-    transaction end to end across both systems.'
+    Work from evidence, not guesses. For policy as code problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check.
+    Configure credentials and networking, then drive one happy-path transaction end
+    to end across both systems.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
@@ -98,7 +104,8 @@ hints:
     WHY: validate catches config errors before any apply.'
 cross_technology: true
 vmware_link: true
-summary: Complete the policy as code — integration lab terraform lab and verify success with the checker
+summary: Complete the policy as code — integration lab terraform lab and verify success
+  with the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -129,16 +136,19 @@ environment:
 tasks:
 - id: task_1
   title: Policy As Code — Integration Lab
-  description: Restore healthy behavior for Policy As Code — Integration Lab by investigating the failure,
-    applying the smallest safe fix, and validating the outcome.
-  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Policy As Code — Integration Lab by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: command_output
     command: terraform validate
     expected_output: Success
-    error_message: Terraform configuration is invalid. Run terraform validate and fix reported errors.
+    error_message: Terraform configuration is invalid. Run terraform validate and
+      fix reported errors.
 solution:
-  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this terraform lab and apply the
+    minimal fix.
   files_changed: []
   commands_run:
   - terraform validate
@@ -167,3 +177,4 @@ guided_mode:
     expected_output: '`terraform validate` includes `Success`'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success
+hosted_as: vmware

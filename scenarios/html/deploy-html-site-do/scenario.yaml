@@ -10,72 +10,55 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: 'CONTEXT: A team operating HTML and web delivery has raised a ticket for `Deploy HTML Static
-  Site`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
-  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
+description: 'CONTEXT: Complete the coding exercise for deploy-html-site-do in the
+  browser IDE.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline web server lab. The architecture is a single lab-primary
-  node exposing HTML pages, nginx/apache config, and browser devtools; treat it as the production host
-  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: FixitLab HTML practice IDE — edit index.html / styles.css, open Preview,
+  then Check Solution.
 
 
-  SYMPTOM / STARTING STATE: Linux host with nginx installed but no site content deployed. Port 80 should
-  serve your static page once configured.
+  SYMPTOM / STARTING STATE: Coding challenge in the browser IDE. Edit index.html /
+  styles.css — Preview shows the page; Check Solution grades markup.
 
 
-  OBJECTIVE: Create an index.html in the nginx document root; Ensure nginx is configured to serve it on
-  port 80 and is running; Verify the page is reachable over HTTP. Acceptance criteria: the change is minimal
-  and reversible, and success means `check.sh` exits successfully.
+  OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
 
 
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant HTML pages, nginx/apache config, and browser devtools), changing one thing at a time.
-  Check your work continuously against the objective — success means `check.sh` exits successfully.
+  VERIFY: Check Solution passes all hidden tests.
 
-
-  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
-  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
-  check, not just once.
-
-
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
-
-
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  '
 objectives:
-- Create an index.html in the nginx document root
-- Ensure nginx is configured to serve it on port 80 and is running
-- Verify the page is reachable over HTTP
-initial_state: Linux host with nginx installed but no site content deployed. Port 80 should serve your
-  static page once configured.
+- Complete the exercise in index.html
+- Pass visible tests with Run / Preview
+- Pass Check Solution (hidden tests)
+initial_state: Coding challenge in the browser IDE. Edit index.html / styles.css —
+  Preview shows the page; Check Solution grades markup.
 hints:
 - order: 1
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: deploy HTML static site is not behaving as the
-    scenario objectives require. This lab is about deploy HTML static site — how deploy HTML static site
-    behaves in a HTML and web delivery environment. Read the objectives and the current state, and note
-    precisely what looks wrong versus healthy before you form any theory.'
+    Do not touch anything yet. First observe the symptom: deploy HTML static site
+    is not behaving as the scenario objectives require. This lab is about deploy HTML
+    static site — how deploy HTML static site behaves in a HTML and web delivery environment.
+    Read the objectives and the current state, and note precisely what looks wrong
+    versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For deploy HTML static site problems the reliable method is: (1)
-    reproduce/observe the failure, (2) narrow from the whole system down to the one component that owns
-    the symptom, (3) change exactly one thing, (4) re-check. Execute the maintenance in small, reversible
-    steps, taking a snapshot or backup first if the change is risky.'
+    Work from evidence, not guesses. For deploy HTML static site problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system
+    down to the one component that owns the symptom, (3) change exactly one thing,
+    (4) re-check. Execute the maintenance in small, reversible steps, taking a snapshot
+    or backup first if the change is risky.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Test the config to get the exact file and line: `nginx -t`. It prints the offending directive (e.g.
-    unknown directive "listn").'
+    Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
@@ -93,11 +76,13 @@ hints:
 
     2. Re-run `nginx -t` until it reports syntax is ok.
 
-    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect
+    HTTP 200).
 
 
     WHY: systemd will not start nginx until `nginx -t` passes.'
-summary: Complete the deploy html static site html lab and verify success with the checker
+summary: Complete the deploy html static site html lab and verify success with the
+  checker
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
@@ -130,18 +115,20 @@ environment:
 tasks:
 - id: task_1
   title: Deploy HTML Static Site
-  description: Restore healthy behavior for Deploy HTML Static Site by investigating the failure, applying
-    the smallest safe fix, and validating the outcome.
-  background: 'This html lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Implement the deploy-html-site-do exercise in the browser IDE and pass
+    all tests.
+  background: 'This html lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
-    type: custom_script
-    script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    type: script
+    script: hidden_tests
+    error_message: Hidden tests still failing — keep iterating in the IDE.
 solution:
-  summary: Identify the misconfiguration affecting this html lab and apply the minimal fix.
-  files_changed: []
-  commands_run:
-  - bash check.sh
+  summary: Implement so visible and hidden tests pass in the coding IDE.
+  files_changed:
+  - index.html
+  - styles.css
+  commands_run: []
   reference_docs: html-fundamentals
 guided_mode:
   enabled: true
@@ -167,3 +154,39 @@ guided_mode:
     expected_output: '`check.sh` exits successfully'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success
+coding_mode: true
+simulation_type: html
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: 'Add a landmark <main> wrapping the page content. Variant 2.
+
+    Edit index.html / styles.css, use Preview, then Check Solution.
+
+    '
+  files:
+  - path: index.html
+    content: '<!DOCTYPE html><html lang="en"><head><title>Lab</title></head><body><h1>Welcome</h1></body></html>
+
+      '
+    readonly: false
+  - path: styles.css
+    content: 'body { font-family: system-ui, sans-serif; }
+
+      '
+    readonly: false
+  - path: solution.js
+    content: '// Grader harness — PAGE_HTML / PAGE_CSS are injected server-side.
+
+      // Keep this file; edit index.html and styles.css instead.
+
+      '
+    readonly: true
+  visible_tests:
+  - name: main
+    code: assert(/<main[\s>]/i.test(PAGE_HTML), 'wrap content in <main>');
+  hidden_tests:
+  - name: doctype
+    code: assert(/<!DOCTYPE\s+html>/i.test(PAGE_HTML));
+  timeout: 8

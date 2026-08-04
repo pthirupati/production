@@ -13,84 +13,94 @@ jira_priority: High
 dual_terminal: false
 cross_technology: false
 vmware_link: true
-description: 'CONTEXT: A team operating Commvault backup operations has raised a ticket for `Cross-Tech:
-  New VM Migration Leaves db01''s Backup Overdue`. A customer-facing workflow is degraded and the on-call
-  engineer (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked
-  users until the underlying state is repaired.
+description: 'CONTEXT: A team operating Commvault backup operations has raised a ticket
+  for `Cross-Tech: New VM Migration Leaves db01''s Backup Overdue`. A customer-facing
+  workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CommCell practice lab. The architecture is a single
-  lab-primary node exposing CommServe, MediaAgent, backup plans, and restore jobs; treat it as the production
-  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CommCell practice lab. The architecture
+  is a single lab-primary node exposing CommServe, MediaAgent, backup plans, and restore
+  jobs; treat it as the production host for this incident. All tools run locally —
+  no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Commvault Command Center with db01 flagged "Overdue" for backup health despite
-  a correctly configured subclient and storage policy. A batch of freshly migrated VMs sits powered-off
-  in the companion VMware console and has not yet appeared as CommCell clients. In Client Computers, db01''s
-  Backup Health column reads "Overdue" while web01 and app01 show "Protected" and "Unprotected" respectively.
-  db01''s default subclient is already correctly assigned to the Gold-Retention-30d storage policy with
-  /var/lib/mysql in its content — the policy and content are fine, the job itself simply never ran to
-  completion. Separately, none of the three newly migrated VMs appear yet in Client Computers because
-  they are still powered off in vCenter.
+  SYMPTOM / STARTING STATE: Commvault Command Center with db01 flagged "Overdue" for
+  backup health despite a correctly configured subclient and storage policy. A batch
+  of freshly migrated VMs sits powered-off in the companion VMware console and has
+  not yet appeared as CommCell clients. In Client Computers, db01''s Backup Health
+  column reads "Overdue" while web01 and app01 show "Protected" and "Unprotected"
+  respectively. db01''s default subclient is already correctly assigned to the Gold-Retention-30d
+  storage policy with /var/lib/mysql in its content — the policy and content are fine,
+  the job itself simply never ran to completion. Separately, none of the three newly
+  migrated VMs appear yet in Client Computers because they are still powered off in
+  vCenter.
 
 
-  OBJECTIVE: Open the VMware console (companion "Open VMware" link) and power on the migrated VM so it
-  is discovered as a CommCell client; Sign in to the Commvault Command Center; Open Client Computers and
-  locate db01, flagged "Overdue". Acceptance criteria: the change is minimal and reversible, and success
-  means `systemctl is-active mysqld`` returns active.
+  OBJECTIVE: Open the VMware console (companion "Open VMware" link) and power on the
+  migrated VM so it is discovered as a CommCell client; Sign in to the Commvault Command
+  Center; Open Client Computers and locate db01, flagged "Overdue". Acceptance criteria:
+  the change is minimal and reversible, and success means `systemctl is-active mysqld``
+  returns active.
 
 
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant CommServe, MediaAgent, backup plans, and restore jobs), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active mysqld``` returns
-  active.
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it
+  and use the equivalent already on the host. Make the smallest configuration change
+  that moves the system toward the objective (edit the relevant CommServe, MediaAgent,
+  backup plans, and restore jobs), changing one thing at a time. Check your work continuously
+  against the objective — success means `systemctl is-active mysqld``` returns active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active mysqld`` returns active.
-  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
-  on a repeat check, not just once.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active mysqld``
+  returns active. Capture the before/after output as evidence. Success criteria: the
+  objective''s healthy state holds on a repeat check, not just once.
 
 
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
+  ROLLBACK: If a change makes things worse, revert that single change immediately
+  (restore the original config file / undo the edit / restart the affected component)
+  and re-observe before trying another hypothesis. Never stack unverified changes.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
-initial_state: Commvault Command Center with db01 flagged "Overdue" for backup health despite a correctly
-  configured subclient and storage policy. A batch of freshly migrated VMs sits powered-off in the companion
-  VMware console and has not yet appeared as CommCell clients.
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
+initial_state: Commvault Command Center with db01 flagged "Overdue" for backup health
+  despite a correctly configured subclient and storage policy. A batch of freshly
+  migrated VMs sits powered-off in the companion VMware console and has not yet appeared
+  as CommCell clients.
 objectives:
-- Open the VMware console (companion "Open VMware" link) and power on the migrated VM so it is discovered
-  as a CommCell client
+- Open the VMware console (companion "Open VMware" link) and power on the migrated
+  VM so it is discovered as a CommCell client
 - Sign in to the Commvault Command Center
 - Open Client Computers and locate db01, flagged "Overdue"
 - Run a Full backup for db01 from its client row
-- Confirm in Job Controller that the backup job reaches "Completed" and db01's health returns to "Protected"
+- Confirm in Job Controller that the backup job reaches "Completed" and db01's health
+  returns to "Protected"
 hints:
 - order: 1
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: Cross-Tech is not behaving as the scenario objectives
-    require. This lab is about Cross-Tech — how Cross-Tech behaves in a Commvault backup operations environment.
-    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
-    you form any theory.'
+    Do not touch anything yet. First observe the symptom: Cross-Tech is not behaving
+    as the scenario objectives require. This lab is about Cross-Tech — how Cross-Tech
+    behaves in a Commvault backup operations environment. Read the objectives and
+    the current state, and note precisely what looks wrong versus healthy before you
+    form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For Cross-Tech problems the reliable method is: (1) reproduce/observe
-    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
-    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
-    the noisy log line), changing one thing at a time.'
+    Work from evidence, not guesses. For Cross-Tech problems the reliable method is:
+    (1) reproduce/observe the failure, (2) narrow from the whole system down to the
+    one component that owns the symptom, (3) change exactly one thing, (4) re-check.
+    Fix the underlying misconfiguration you identified (not just the noisy log line),
+    changing one thing at a time.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Start with `systemctl status mysqld` and `journalctl -u mysqld -n 50 --no-pager` before changing anything.'
+    Start with `systemctl status mysqld` and `journalctl -u mysqld -n 50 --no-pager`
+    before changing anything.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
@@ -112,8 +122,9 @@ hints:
 
 
     WHY: the grader checks real service state, not marker files.'
-summary: Discover a newly migrated VM as a CommCell client via the companion VMware console, then clear
-  db01's overdue backup protection by running and completing a Full backup job.
+summary: Discover a newly migrated VM as a CommCell client via the companion VMware
+  console, then clear db01's overdue backup protection by running and completing a
+  Full backup job.
 estimated_minutes: 15
 xp_reward: 120
 prerequisites:
@@ -128,7 +139,8 @@ tags:
 linked_tutorial: commvault-fundamentals
 what_you_will_learn:
 - How CommCell client discovery works when backed by a VMware VSA proxy
-- Reading client Backup Health status (Protected / Overdue / Unprotected) in Client Computers
+- Reading client Backup Health status (Protected / Overdue / Unprotected) in Client
+  Computers
 - Launching an on-demand Full backup job against a specific client and subclient
 - Tracking a running job through the Job Controller's wall-clock lifecycle
 environment:
@@ -137,7 +149,8 @@ environment:
     os: FixitLab Commvault CommCell environment
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline lab environment (Commvault Command Center + companion VMware vCenter console)
+    specs: local offline lab environment (Commvault Command Center + companion VMware
+      vCenter console)
   pre_installed:
   - commvault-command-center
   - vmware-vcenter-console
@@ -147,19 +160,20 @@ environment:
 tasks:
 - id: task_1
   title: Onboard the migrated VM and clear db01's overdue backup
-  description: Power on the migrated VM in the companion VMware console so it registers as a CommCell
-    client, then run a Full backup job for db01 in the Commvault Command Center and confirm it completes.
-  background: 'This lab teaches the CommCell client-discovery + on-demand-backup workflow that resolves
-    an SLA breach: identify the overdue client, verify its policy/subclient are sound, and run the job
-    to completion rather than reconfiguring anything.'
+  description: Power on the migrated VM in the companion VMware console so it registers
+    as a CommCell client, then run a Full backup job for db01 in the Commvault Command
+    Center and confirm it completes.
+  background: 'This lab teaches the CommCell client-discovery + on-demand-backup workflow
+    that resolves an SLA breach: identify the overdue client, verify its policy/subclient
+    are sound, and run the job to completion rather than reconfiguring anything.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Run a Full backup for db01 from Client Computers and confirm
-      the job reaches "Completed" in Job Controller.
+    error_message: Validation did not pass. Run a Full backup for db01 from Client
+      Computers and confirm the job reaches "Completed" in Job Controller.
 solution:
-  summary: Open the VMware console and power on the migrated VM (client discovery), then in Commvault
-    run a Full backup for db01 and let it complete in Job Controller.
+  summary: Open the VMware console and power on the migrated VM (client discovery),
+    then in Commvault run a Full backup for db01 and let it complete in Job Controller.
   files_changed: []
   commands_run:
   - 'VMware console: power on the migrated VM'
@@ -186,3 +200,4 @@ lab_servers:
   appears_in:
   - vmware
   - commvault
+hosted_as: vmware

@@ -188,13 +188,34 @@ def _env_resolver_errors(data: dict, path: Path) -> list[str]:
     coding_mode = bool(data.get("coding_mode"))
     tech_field = str(data.get("technology") or "").strip().lower()
 
+    # Coding techs need coding_mode + coding_spec.files (academy packs hard-fail).
+    slug = str(data.get("slug") or path.parent.name)
+    is_academy = slug.startswith("academy-")
+    coding_tech = tech_dir in _CODING_TECHS or any(t in tech_field for t in _CODING_TECHS)
+    if coding_tech and is_academy:
+        if not coding_mode and "coding" not in consoles:
+            errs.append(
+                "coding technology academy lab missing `coding_mode: true`"
+            )
+        spec = data.get("coding_spec") if isinstance(data.get("coding_spec"), dict) else {}
+        files = spec.get("files") if isinstance(spec, dict) else None
+        if coding_mode and (not isinstance(files, list) or not files):
+            errs.append("coding_mode academy lab missing `coding_spec.files`")
+
     if vmware_link:
-        if hosted and hosted not in ("vmware", "esxi", "vsphere"):
+        if not hosted:
+            errs.append("`vmware_link: true` requires `hosted_as` in {vmware, esxi, vsphere}")
+        elif hosted not in ("vmware", "esxi", "vsphere"):
             errs.append(
                 f"`vmware_link: true` but hosted_as={hosted!r} (expected vmware)"
             )
         if hosted == "datacenter":
             errs.append("`vmware_link: true` must not use hosted_as=datacenter")
+
+    # PeopleSoft should declare hosted_as (persona / env resolver)
+    if tech_dir == "peoplesoft" or "peoplesoft" in tech_field:
+        if not hosted:
+            errs.append("peoplesoft scenario missing `hosted_as`")
 
     # simulation_type cloud/DC should agree with hosted_as when both set
     if sim in _CLOUD_SIM and hosted:
@@ -207,16 +228,6 @@ def _env_resolver_errors(data: dict, path: Path) -> list[str]:
                 errs.append(
                     f"simulation_type={sim!r} conflicts with hosted_as={hosted!r}"
                 )
-
-    # Coding techs need coding_mode (IDE) — only when they already declare consoles
-    # (avoids mass-failing older packs that still rely on LabRunner heuristics).
-    slug = str(data.get("slug") or path.parent.name)
-    is_academy = slug.startswith("academy-")
-    if consoles and (tech_dir in _CODING_TECHS or any(t in tech_field for t in _CODING_TECHS)):
-        if is_academy and not coding_mode and "coding" not in consoles:
-            errs.append(
-                "coding technology academy lab with consoles missing `coding_mode: true`"
-            )
 
     # Ansible labs should expose AWX companion when consoles declared
     if tech_dir in ("ansible",) or "ansible" in tech_field:

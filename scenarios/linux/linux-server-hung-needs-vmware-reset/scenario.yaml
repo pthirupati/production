@@ -2,51 +2,58 @@ title: Hung Server — Reset the VM in VMware to Recover the Terminal
 slug: linux-server-hung-needs-vmware-reset
 difficulty: medium
 category: Fix
-description: 'CONTEXT: A team operating Linux administration has raised a ticket for `Hung Server — Reset
-  the VM in VMware to Recover the Terminal`. A customer-facing workflow is degraded and the on-call engineer
-  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating Linux administration has raised a ticket for
+  `Hung Server — Reset the VM in VMware to Recover the Terminal`. A customer-facing
+  workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
-  lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
-  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture
+  is a single lab-primary node exposing terminal and config files under /etc and /var;
+  treat it as the production host for this incident. All tools run locally — no paid
+  APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: RHEL 9 server (web-prod-01), also present in the vCenter console. The
+  SYMPTOM / STARTING STATE: RHEL 9 server (web-prod-01), also present in the vCenter
+  console. The
 
-  guest is hung (no VMware Tools heartbeat) and nginx is failed. Commands you run in
+  guest is hung (no VMware Tools heartbeat) and nginx is failed. Commands you run
+  in
 
   the terminal cannot recover a hung kernel — the VM must be reset from VMware.
 
 
-  OBJECTIVE: Open the VMware console (toolbar link) for this server; Reset / Restart web-prod-01 from
-  the VMware Power menu (the guest is hung); Wait for the VM to come back and the guest to respond. Acceptance
-  criteria: the change is minimal and reversible, and success means `systemctl is-active nginx``` returns
-  active.
+  OBJECTIVE: Open the VMware console (toolbar link) for this server; Reset / Restart
+  web-prod-01 from the VMware Power menu (the guest is hung); Wait for the VM to come
+  back and the guest to respond. Acceptance criteria: the change is minimal and reversible,
+  and success means `systemctl is-active nginx``` returns active.
 
 
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
-  your work continuously against the objective — success means `systemctl is-active nginx``` returns active.
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it
+  and use the equivalent already on the host. Make the smallest configuration change
+  that moves the system toward the objective (edit the relevant terminal and config
+  files under /etc and /var), changing one thing at a time. Check your work continuously
+  against the objective — success means `systemctl is-active nginx``` returns active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active nginx`` returns active.
-  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
-  on a repeat check, not just once.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active nginx``
+  returns active. Capture the before/after output as evidence. Success criteria: the
+  objective''s healthy state holds on a repeat check, not just once.
 
 
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
+  ROLLBACK: If a change makes things worse, revert that single change immediately
+  (restore the original config file / undo the edit / restart the affected component)
+  and re-observe before trying another hypothesis. Never stack unverified changes.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
-initial_state: 'RHEL 9 server (web-prod-01), also present in the vCenter console. The
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
+initial_state: 'RHEL 9 server (web-prod-01), also present in the vCenter console.
+  The
 
-  guest is hung (no VMware Tools heartbeat) and nginx is failed. Commands you run in
+  guest is hung (no VMware Tools heartbeat) and nginx is failed. Commands you run
+  in
 
   the terminal cannot recover a hung kernel — the VM must be reset from VMware.
 
@@ -68,26 +75,27 @@ hints:
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: hung server — reset the VM in VMware to recover
-    the terminal is not behaving as the scenario objectives require. This lab is about hung server — reset
-    the VM in VMware to recover the terminal — how hung server — reset the VM in VMware to recover the
-    terminal behaves in a Linux administration environment. Read the objectives and the current state,
+    Do not touch anything yet. First observe the symptom: hung server — reset the
+    VM in VMware to recover the terminal is not behaving as the scenario objectives
+    require. This lab is about hung server — reset the VM in VMware to recover the
+    terminal — how hung server — reset the VM in VMware to recover the terminal behaves
+    in a Linux administration environment. Read the objectives and the current state,
     and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For hung server — reset the VM in VMware to recover the terminal
-    problems the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system
-    down to the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the
-    underlying misconfiguration you identified (not just the noisy log line), changing one thing at a
-    time.'
+    Work from evidence, not guesses. For hung server — reset the VM in VMware to recover
+    the terminal problems the reliable method is: (1) reproduce/observe the failure,
+    (2) narrow from the whole system down to the one component that owns the symptom,
+    (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Test the config to get the exact file and line: `nginx -t`. It prints the offending directive (e.g.
-    unknown directive "listn").'
+    Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
@@ -105,7 +113,8 @@ hints:
 
     2. Re-run `nginx -t` until it reports syntax is ok.
 
-    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect
+    HTTP 200).
 
 
     WHY: systemd will not start nginx until `nginx -t` passes.'
@@ -113,8 +122,8 @@ requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Critical
 technology: linux
-summary: Complete the hung server — reset the vm in vmware to recover the terminal linux lab and verify
-  success with the checker
+summary: Complete the hung server — reset the vm in vmware to recover the terminal
+  linux lab and verify success with the checker
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
@@ -148,18 +157,22 @@ environment:
 tasks:
 - id: task_1
   title: Hung Server — Reset the VM in VMware to Recover the Terminal
-  description: Restore healthy behavior for Hung Server — Reset the VM in VMware to Recover the Terminal
-    by investigating the failure, applying the smallest safe fix, and validating the outcome.
-  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Hung Server — Reset the VM in VMware to
+    Recover the Terminal by investigating the failure, applying the smallest safe
+    fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: service_active
     command: systemctl is-active nginx
     expected_status: active
-    error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
-      -u nginx -n 50`.
+    error_message: The nginx service is not active yet. Check `systemctl status nginx`
+      and `journalctl -u nginx -n 50`.
 solution:
-  summary: The root cause is an unhealthy `nginx` service; repair it and verify active state.
+  summary: The root cause is an unhealthy `nginx` service; repair it and verify active
+    state.
   files_changed: []
   commands_run:
   - systemctl is-active nginx
   reference_docs: linux-fundamentals
+hosted_as: vmware

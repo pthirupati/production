@@ -3,48 +3,52 @@ slug: terraform-vmware-vm-clone-from-template
 technology: terraform
 category: Fix
 difficulty: medium
-description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `Terraform → VMware: VM
-  Clone Plan Targets the Wrong`. A customer-facing workflow is degraded and the on-call engineer (you)
-  must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
-  underlying state is repaired.
+description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `Terraform
+  → VMware: VM Clone Plan Targets the Wrong`. A customer-facing workflow is degraded
+  and the on-call engineer (you) must diagnose and resolve it. Business impact: reduced
+  service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace. The architecture is a single
-  lab-primary node exposing HCL files, state, and plan/apply workflow; treat it as the production host
-  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace. The architecture
+  is a single lab-primary node exposing HCL files, state, and plan/apply workflow;
+  treat it as the production host for this incident. All tools run locally — no paid
+  APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: A Terraform workspace. /root/iac/vsphere-vm.tf points the vsphere_virtual_machine
+  SYMPTOM / STARTING STATE: A Terraform workspace. /root/iac/vsphere-vm.tf points
+  the vsphere_virtual_machine
 
   clone at non-existent datacenter/pool/datastore/template/network names, so
 
   `terraform plan` fails during data-source lookups against vCenter.
 
 
-  OBJECTIVE: Run terraform plan and read which vSphere data-source lookups fail; Correct /root/iac/vsphere-vm.tf
-  to reference the real datacenter, resource pool, datastore, template, and network; Confirm the config
-  is corrected so the clone would plan and apply against vCenter. Acceptance criteria: the change is minimal
-  and reversible, and success means `terraform validate` includes `Success`.
+  OBJECTIVE: Run terraform plan and read which vSphere data-source lookups fail; Correct
+  /root/iac/vsphere-vm.tf to reference the real datacenter, resource pool, datastore,
+  template, and network; Confirm the config is corrected so the clone would plan and
+  apply against vCenter. Acceptance criteria: the change is minimal and reversible,
+  and success means `terraform validate` includes `Success`.
 
 
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant HCL files, state, and plan/apply workflow), changing one thing at a time. Check your
-  work continuously against the objective — success means `terraform validate` includes `Success`.
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it
+  and use the equivalent already on the host. Make the smallest configuration change
+  that moves the system toward the objective (edit the relevant HCL files, state,
+  and plan/apply workflow), changing one thing at a time. Check your work continuously
+  against the objective — success means `terraform validate` includes `Success`.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `terraform validate` includes `Success`. Capture
-  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
-  check, not just once.
+  VERIFY: Re-run the same check the grader uses and confirm `terraform validate` includes
+  `Success`. Capture the before/after output as evidence. Success criteria: the objective''s
+  healthy state holds on a repeat check, not just once.
 
 
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
+  ROLLBACK: If a change makes things worse, revert that single change immediately
+  (restore the original config file / undo the edit / restart the affected component)
+  and re-observe before trying another hypothesis. Never stack unverified changes.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 initial_state: 'A Terraform workspace. /root/iac/vsphere-vm.tf points the vsphere_virtual_machine
 
   clone at non-existent datacenter/pool/datastore/template/network names, so
@@ -54,8 +58,8 @@ initial_state: 'A Terraform workspace. /root/iac/vsphere-vm.tf points the vspher
   '
 objectives:
 - Run terraform plan and read which vSphere data-source lookups fail
-- Correct /root/iac/vsphere-vm.tf to reference the real datacenter, resource pool, datastore, template,
-  and network
+- Correct /root/iac/vsphere-vm.tf to reference the real datacenter, resource pool,
+  datastore, template, and network
 - Confirm the config is corrected so the clone would plan and apply against vCenter
 lab_mode: simulation
 simulation_type: terraform
@@ -71,18 +75,20 @@ hints:
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: terraform → VMware is not behaving as the scenario
-    objectives require. This lab is about terraform → VMware — how terraform → VMware behaves in a Terraform
-    IaC environment. Read the objectives and the current state, and note precisely what looks wrong versus
-    healthy before you form any theory.'
+    Do not touch anything yet. First observe the symptom: terraform → VMware is not
+    behaving as the scenario objectives require. This lab is about terraform → VMware
+    — how terraform → VMware behaves in a Terraform IaC environment. Read the objectives
+    and the current state, and note precisely what looks wrong versus healthy before
+    you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For terraform → VMware problems the reliable method is: (1) reproduce/observe
-    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
-    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
-    the noisy log line), changing one thing at a time.'
+    Work from evidence, not guesses. For terraform → VMware problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system
+    down to the one component that owns the symptom, (3) change exactly one thing,
+    (4) re-check. Fix the underlying misconfiguration you identified (not just the
+    noisy log line), changing one thing at a time.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
@@ -109,8 +115,8 @@ hints:
 
 
     WHY: validate catches config errors before any apply.'
-summary: 'Complete the terraform → vmware: vm clone plan targets the wrong terraform lab and verify success
-  with the checker'
+summary: 'Complete the terraform → vmware: vm clone plan targets the wrong terraform
+  lab and verify success with the checker'
 estimated_minutes: 25
 xp_reward: 100
 prerequisites:
@@ -122,8 +128,8 @@ tags:
 linked_tutorial: terraform-fundamentals
 what_you_will_learn:
 - Run terraform plan and read which vSphere data-source lookups fail
-- Correct /root/iac/vsphere-vm.tf to reference the real datacenter, resource pool, datastore, template,
-  and network
+- Correct /root/iac/vsphere-vm.tf to reference the real datacenter, resource pool,
+  datastore, template, and network
 - Confirm the config is corrected so the clone would plan and apply against vCenter
 environment:
   nodes:
@@ -142,17 +148,22 @@ environment:
 tasks:
 - id: task_1
   title: 'Terraform → VMware: VM Clone Plan Targets the Wrong'
-  description: 'Restore healthy behavior for Terraform → VMware: VM Clone Plan Targets the Wrong by investigating
-    the failure, applying the smallest safe fix, and validating the outcome.'
-  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: 'Restore healthy behavior for Terraform → VMware: VM Clone Plan Targets
+    the Wrong by investigating the failure, applying the smallest safe fix, and validating
+    the outcome.'
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: command_output
     command: terraform validate
     expected_output: Success
-    error_message: Terraform configuration is invalid. Run terraform validate and fix reported errors.
+    error_message: Terraform configuration is invalid. Run terraform validate and
+      fix reported errors.
 solution:
-  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this terraform lab and apply the
+    minimal fix.
   files_changed: []
   commands_run:
   - terraform validate
   reference_docs: terraform-fundamentals
+hosted_as: vmware

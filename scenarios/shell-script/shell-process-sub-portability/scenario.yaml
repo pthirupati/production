@@ -4,110 +4,97 @@ technology: shell-script
 category: Fix
 difficulty: medium
 lab_mode: simulation
-simulation_type: generic
+simulation_type: shell
 time_limit: 1200
 max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: 'CONTEXT: A team operating shell scripting has raised a ticket for `Script Uses Process Substitution
-  Under sh`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
-  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
+description: 'CONTEXT: Complete the coding exercise for shell-process-sub-portability
+  in the browser IDE.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline bash lab environment. The architecture is a single
-  lab-primary node exposing scripts, cron, logs, and shellcheck; treat it as the production host for this
-  incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: FixitLab coding practice IDE — edit solution.js, Run visible tests,
+  then Check Solution.
 
 
-  SYMPTOM / STARTING STATE: An ops script using process substitution without bash.
+  SYMPTOM / STARTING STATE: Coding challenge in the browser IDE. The stub in solution.js
+  is incomplete so tests fail until you implement it.
 
 
-  OBJECTIVE: Confirm the issue: <(...) syntax error under sh; Apply the documented fix in /opt/scripts/diff-check.sh;
-  Verify the configuration is corrected. Acceptance criteria: the change is minimal and reversible, and
-  success means `check.sh` exits successfully.
+  OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
 
 
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant scripts, cron, logs, and shellcheck), changing one thing at a time. Check your work
-  continuously against the objective — success means `check.sh` exits successfully.
+  VERIFY: Check Solution passes all hidden tests.
 
-
-  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
-  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
-  check, not just once.
-
-
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
-
-
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
-initial_state: An ops script using process substitution without bash.
+  '
+initial_state: Coding challenge in the browser IDE. The stub in solution.js is incomplete
+  so tests fail until you implement it.
 objectives:
-- 'Confirm the issue: <(...) syntax error under sh'
-- Apply the documented fix in /opt/scripts/diff-check.sh
-- Verify the configuration is corrected
+- Complete the exercise in solution.js
+- Pass visible tests with Run / Preview
+- Pass Check Solution (hidden tests)
 hints:
 - order: 1
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: script uses process substitution under sh is
-    not behaving as the scenario objectives require. This lab is about script uses process substitution
-    under sh — how script uses process substitution under sh behaves in a shell scripting environment.
-    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
-    you form any theory.'
+    Do not touch anything yet. First observe the symptom: script uses process substitution
+    under sh is not behaving as the scenario objectives require. This lab is about
+    script uses process substitution under sh — how script uses process substitution
+    under sh behaves in a shell scripting environment. Read the objectives and the
+    current state, and note precisely what looks wrong versus healthy before you form
+    any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For script uses process substitution under sh problems the reliable
-    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
-    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
-    you identified (not just the noisy log line), changing one thing at a time.'
+    Work from evidence, not guesses. For script uses process substitution under sh
+    problems the reliable method is: (1) reproduce/observe the failure, (2) narrow
+    from the whole system down to the one component that owns the symptom, (3) change
+    exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified
+    (not just the noisy log line), changing one thing at a time.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
     1. Inspect the current state with scripts, cron, logs, and shellcheck.
 
-    2. Each command above tells you something specific — status/health, recent errors, and the effective
-    configuration. Read them in that order.
+    2. Each command above tells you something specific — status/health, recent errors,
+    and the effective configuration. Read them in that order.
 
     3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. From the evidence above, decide which single part of script uses process substitution under sh
-    is at fault.
+    1. From the evidence above, decide which single part of script uses process substitution
+    under sh is at fault.
 
-    2. Re-run the most relevant of scripts, cron, logs, and shellcheck focused on just that part to confirm
-    it.
+    2. Re-run the most relevant of scripts, cron, logs, and shellcheck focused on
+    just that part to confirm it.
 
-    3. State a one-line hypothesis: the smallest change that would move the state from ''script uses process
-    substitution under sh is not behaving as the scenario objectives require'' toward ''`check.sh` exits
-    successfully''.'
+    3. State a one-line hypothesis: the smallest change that would move the state
+    from ''script uses process substitution under sh is not behaving as the scenario
+    objectives require'' toward ''`check.sh` exits successfully''.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
-    you identified (not just the noisy log line), changing one thing at a time.
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing
+    at a time.
 
     2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
 
-    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not
+    stack changes.
 
 
-    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
-    is actually healthy.'
-summary: Complete the script uses process substitution under sh shell script lab and verify success with
-  the checker
+    WHY: the grader validates real system state, not marker files — a fix only counts
+    when the subsystem is actually healthy.'
+summary: Complete the script uses process substitution under sh shell script lab and
+  verify success with the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -140,17 +127,41 @@ environment:
 tasks:
 - id: task_1
   title: Script Uses Process Substitution Under sh
-  description: Restore healthy behavior for Script Uses Process Substitution Under sh by investigating
-    the failure, applying the smallest safe fix, and validating the outcome.
-  background: 'This shell script lab teaches systematic troubleshooting: observe, hypothesize, change,
-    verify.'
+  description: Implement the shell-process-sub-portability exercise in the browser
+    IDE and pass all tests.
+  background: 'This shell script lab teaches systematic troubleshooting: observe,
+    hypothesize, change, verify.'
   validation:
-    type: custom_script
-    script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    type: script
+    script: hidden_tests
+    error_message: Hidden tests still failing — keep iterating in the IDE.
 solution:
-  summary: Identify the misconfiguration affecting this shell script lab and apply the minimal fix.
-  files_changed: []
-  commands_run:
-  - bash check.sh
+  summary: Implement so visible and hidden tests pass in the coding IDE.
+  files_changed:
+  - solution.js
+  commands_run: []
   reference_docs: shell-script-fundamentals
+coding_mode: true
+coding_spec:
+  language: javascript
+  entrypoint: solution.js
+  kind: impl
+  instructions: 'Implement expandVar(template, value) replacing ''$X'' with value.
+    Variant 2.
+
+    Click Run to try it, then Check Solution to grade.
+
+    '
+  files:
+  - path: solution.js
+    content: "function expandVar(template, value) {\n  // TODO\n}\n"
+    readonly: false
+  visible_tests:
+  - name: basic
+    code: assert(expandVar('hi $X', 'Ada') === 'hi Ada');
+  hidden_tests:
+  - name: multi
+    code: assert(expandVar('$X-$X', 'a') === 'a-a');
+  - name: n
+    code: assert(expandVar('n$X', '2') === 'n2');
+  timeout: 8
