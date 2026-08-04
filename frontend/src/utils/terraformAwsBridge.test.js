@@ -200,16 +200,18 @@ resource "aws_key_pair" "ops" {
 })
 
 describe('detectCloudProvidersFromHcl', () => {
-  it('flags aws / azure / gcp from resource types', async () => {
+  it('flags aws / azure / gcp / maas / lxd from resource types', async () => {
     const { detectCloudProvidersFromHcl } = await import('./terraformAwsBridge.js')
     const links = detectCloudProvidersFromHcl({
       'main.tf': `
         resource "aws_instance" "a" {}
         resource "azurerm_linux_virtual_machine" "b" {}
         resource "google_compute_instance" "c" {}
+        resource "maas_machine" "gpu" {}
+        resource "lxd_instance" "batch" {}
       `,
     })
-    expect(links).toEqual({ aws: true, azure: true, gcp: true })
+    expect(links).toEqual({ aws: true, azure: true, gcp: true, maas: true, lxd: true })
   })
 
   it('returns empty when no cloud resources', async () => {
