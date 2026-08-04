@@ -7,7 +7,9 @@ those slugs from generated academy_service_presets / e2e fix maps.
 Usage:
   python3 scripts/migrate_academy_coding_labs.py [--dry-run] [--technology javascript|react|html|java|shell-script|nodejs]
   python3 scripts/migrate_academy_coding_labs.py --html-heroes [--dry-run]
-  python3 scripts/migrate_academy_coding_labs.py --heroes java|shell-script [--dry-run]
+
+Note: java/shell-script *heroes* stay simulation (marker/check.sh labs). Only academy-*
+packs and HTML heroes are Coding IDE targets.
 """
 from __future__ import annotations
 
@@ -830,23 +832,10 @@ def main() -> None:
         return
 
     if args.heroes:
-        tech = args.heroes
-        if tech not in HERO_TECHS:
-            raise SystemExit(f"--heroes expects one of {HERO_TECHS}")
-        count = 0
-        for i, folder in enumerate(sorted((SCEN / tech).iterdir()), start=1):
-            if not folder.is_dir() or folder.name.startswith("academy-"):
-                continue
-            yaml_path = folder / "scenario.yaml"
-            if not yaml_path.is_file():
-                continue
-            if patch_hero_yaml(yaml_path, tech, dry_run=args.dry_run, cycle=(i % 10) + 1):
-                migrated.add(folder.name)
-                count += 1
-        print(f"{tech} heroes: migrated {count} labs")
-        print(f"total migrated: {len(migrated)}")
-        print("done" + (" (dry-run)" if args.dry_run else ""))
-        return
+        raise SystemExit(
+            "--heroes for java/shell-script is disabled: those heroes are marker-based "
+            "simulation labs (check.sh + FIXED-OK). Use academy packs or --html-heroes only."
+        )
 
     techs = [args.technology] if args.technology else list(CODING_TECHS)
     for tech in techs:

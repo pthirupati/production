@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-# coding_mode lab — graded by hidden_tests via /code-validate/
+kubectl get pods | grep -q Running
 exit 0

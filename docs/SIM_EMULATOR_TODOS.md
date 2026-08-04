@@ -394,10 +394,10 @@ Learner-facing UI never says simulation/demo/mock.
 ### T1 — Environment resolver & hosting (wrong console / wrong host)
 243. [x] Backfill `hosted_as: vmware` on every `vmware_link` scenario YAML (not only nic-add-vmware-rescan)
 244. [x] PeopleSoft: `hosted_as` + PeopleSoft persona (never AWS DMI rotate) on all PS scenarios
-245. [ ] Harden `scripts/lint_scenarios.py` to **fail CI** on wrong host / missing coding_mode / unknown sim_type
+245. [x] Harden `scripts/lint_scenarios.py` to **fail CI** on wrong host / missing coding_mode / unknown sim_type — *academy coding packs + vmware_link/peoplesoft hosted_as*
 246. [ ] Ansible labs: always surface Open AWX companion when `simulation_type`/consoles include awx
 247. [ ] AWS labs: always surface Open AWS Console companion (not only terraform/hosted heuristics)
-248. [x] Coding techs (java, shell-script, html heroes, nodejs academy): reseed `coding_mode: true` + real `coding_spec.files` (~450 still terminal-only)
+248. [x] Coding techs: academy java/shell/nodejs + HTML heroes → `coding_mode` + `coding_spec` *(java/shell heroes remain simulation marker labs)*
 249. [x] HTML heroes: CodingIDE + live preview iframe (academy done; heroes still terminal)
 250. [ ] Cross-tech scenarios: assert each companion console link opens and shares session_id
 

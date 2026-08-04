@@ -2,32 +2,54 @@ title: Here-Doc Syntax Issue
 slug: shell-heredoc-broken
 difficulty: medium
 category: Build
-description: 'CONTEXT: Complete the coding exercise for heredoc-broken in the browser
-  IDE.
+description: 'CONTEXT: A team operating shell scripting has raised a ticket for `Here-Doc Syntax Issue`.
+  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: FixitLab coding practice IDE — edit solution.js, Run visible tests,
-  then Check Solution.
+  ENVIRONMENT: You are working in FixitLab''s offline bash lab environment. The architecture is a single
+  lab-primary node exposing scripts, cron, logs, and shellcheck; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Coding challenge in the browser IDE. The stub in solution.js
-  is incomplete so tests fail until you implement it.
+  SYMPTOM / STARTING STATE: RHEL 9 server. Running gen-config.sh produces an empty nginx.conf file. No
+  errors are printed because the heredoc silently consumes the issue.
 
 
-  OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
+  OBJECTIVE: Add bash -x tracing to understand what the heredoc is actually producing; Fix the delimiter
+  quoting, indentation, and pipe placement issues; Confirm the script generates the correct nginx.conf
+  with all variables expanded. Acceptance criteria: the change is minimal and reversible, and success
+  means `check.sh` exits successfully.
 
 
-  VERIFY: Check Solution passes all hidden tests.
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant scripts, cron, logs, and shellcheck), changing one thing at a time. Check your work
+  continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'RHEL 9 server. Running gen-config.sh produces an empty nginx.conf file. No errors
+  are printed because the heredoc silently consumes the issue.
 
   '
-initial_state: Coding challenge in the browser IDE. The stub in solution.js is incomplete
-  so tests fail until you implement it.
 objectives:
-- Complete the exercise in solution.js
-- Pass visible tests with Run / Preview
-- Pass Check Solution (hidden tests)
+- Add bash -x tracing to understand what the heredoc is actually producing
+- Fix the delimiter quoting, indentation, and pipe placement issues
+- Confirm the script generates the correct nginx.conf with all variables expanded
 lab_mode: simulation
-simulation_type: shell
+simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
@@ -36,26 +58,24 @@ hints:
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: Here-Doc syntax issue is
-    not behaving as the scenario objectives require. This lab is about Here-Doc syntax
-    issue — how Here-Doc syntax issue behaves in a shell scripting environment. Read
-    the objectives and the current state, and note precisely what looks wrong versus
-    healthy before you form any theory.'
+    Do not touch anything yet. First observe the symptom: Here-Doc syntax issue is not behaving as the
+    scenario objectives require. This lab is about Here-Doc syntax issue — how Here-Doc syntax issue behaves
+    in a shell scripting environment. Read the objectives and the current state, and note precisely what
+    looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For Here-Doc syntax issue problems the reliable
-    method is: (1) reproduce/observe the failure, (2) narrow from the whole system
-    down to the one component that owns the symptom, (3) change exactly one thing,
-    (4) re-check. Create the smallest working slice of Here-Doc syntax issue first,
-    validate it, then add the remaining pieces one at a time.'
+    Work from evidence, not guesses. For Here-Doc syntax issue problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Create the smallest working slice of Here-Doc syntax issue
+    first, validate it, then add the remaining pieces one at a time.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Test the config to get the exact file and line: `nginx -t`. It prints the offending
-    directive (e.g. unknown directive "listn").'
+    Test the config to get the exact file and line: `nginx -t`. It prints the offending directive (e.g.
+    unknown directive "listn").'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
@@ -73,8 +93,7 @@ hints:
 
     2. Re-run `nginx -t` until it reports syntax is ok.
 
-    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect
-    HTTP 200).
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
 
 
     WHY: systemd will not start nginx until `nginx -t` passes.'
@@ -82,8 +101,7 @@ requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
 technology: shell-script
-summary: Complete the here-doc syntax issue shell script lab and verify success with
-  the checker
+summary: Complete the here-doc syntax issue shell script lab and verify success with the checker
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
@@ -116,19 +134,19 @@ environment:
 tasks:
 - id: task_1
   title: Here-Doc Syntax Issue
-  description: Implement the heredoc-broken exercise in the browser IDE and pass all
-    tests.
-  background: 'This shell script lab teaches systematic troubleshooting: observe,
-    hypothesize, change, verify.'
+  description: Restore healthy behavior for Here-Doc Syntax Issue by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This shell script lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
   validation:
-    type: script
-    script: hidden_tests
-    error_message: Hidden tests still failing — keep iterating in the IDE.
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
 solution:
-  summary: Implement so visible and hidden tests pass in the coding IDE.
-  files_changed:
-  - solution.js
-  commands_run: []
+  summary: Identify the misconfiguration affecting this shell script lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
   reference_docs: shell-script-fundamentals
 guided_mode:
   enabled: true
@@ -154,27 +172,3 @@ guided_mode:
     expected_output: '`check.sh` exits successfully'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success
-coding_mode: true
-coding_spec:
-  language: javascript
-  entrypoint: solution.js
-  kind: impl
-  instructions: 'Implement expandVar(template, value) replacing ''$X'' with value.
-    Variant 3.
-
-    Click Run to try it, then Check Solution to grade.
-
-    '
-  files:
-  - path: solution.js
-    content: "function expandVar(template, value) {\n  // TODO\n}\n"
-    readonly: false
-  visible_tests:
-  - name: basic
-    code: assert(expandVar('hi $X', 'Ada') === 'hi Ada');
-  hidden_tests:
-  - name: multi
-    code: assert(expandVar('$X-$X', 'a') === 'a-a');
-  - name: n
-    code: assert(expandVar('n$X', '3') === 'n3');
-  timeout: 8
