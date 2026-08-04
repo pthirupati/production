@@ -308,6 +308,44 @@ export async function syncTerraformApplyToAzureGcp(resources, sessionId) {
   }
 }
 
+/**
+ * After terraform destroy (backend or IDE), tear down mirrored AWS GUI state and
+ * Azure/GCP portal resources for this session.
+ */
+export function syncTerraformDestroyToClouds(state, { sessionId } = {}) {
+  const files = state?.state?.files || state?.files || {}
+  const src = collectHcl(files)
+  const resources = src.trim() ? (parseHcl(src).resources || []) : []
+
+  // AWS Zustand mirror (lab-managed rows created by apply sync).
+  resetTerraformAwsLabState()
+
+  if (sessionId && resources.length) {
+    syncTerraformDestroyAzureGcp(resources, sessionId).catch(() => {})
+  }
+}
+
+/** Delete azurerm_* / google_* portal resources created by apply sync. */
+export async function syncTerraformDestroyAzureGcp(resources, sessionId) {
+  if (!sessionId || !resources?.length) return
+  for (const r of resources) {
+    const address = `${r.type}.${r.name}`
+    const attrs = r.attrs || {}
+    try {
+      if (r.type === 'azurerm_linux_virtual_machine' || r.type === 'azurerm_windows_virtual_machine'
+          || r.type === 'azurerm_virtual_machine') {
+        await azureApi.deleteVm(sessionId, attrs.name || r.name)
+        syncedAddresses.delete(`cloud:${address}`)
+      } else if (r.type === 'google_compute_instance') {
+        await gcpApi.deleteInstance(sessionId, attrs.name || r.name)
+        syncedAddresses.delete(`cloud:${address}`)
+      }
+    } catch {
+      // Non-fatal — backend destroy may already have removed them.
+    }
+  }
+}
+
 /** Addresses currently mirrored into the console — backs `terraform state list`. */
 export function terraformStateList() {
   return Array.from(syncedAddresses)

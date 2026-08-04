@@ -51,6 +51,9 @@ export const azureApi = {
   createVm(sessionId, payload = {}) {
     return azureApi.action(sessionId, 'create_vm', payload)
   },
+  deleteVm(sessionId, vmName) {
+    return azureApi.action(sessionId, 'delete_vm', { name: vmName, vm_name: vmName })
+  },
   createResourceGroup(sessionId, name, location = 'eastus') {
     return azureApi.action(sessionId, 'create_resource_group', { name, location })
   },

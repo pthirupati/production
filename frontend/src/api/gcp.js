@@ -51,6 +51,9 @@ export const gcpApi = {
   createInstance(sessionId, payload = {}) {
     return gcpApi.action(sessionId, 'create_instance', payload)
   },
+  deleteInstance(sessionId, name) {
+    return gcpApi.action(sessionId, 'delete_instance', { name, instance_name: name })
+  },
   addIamBinding(sessionId, member, role) {
     return gcpApi.action(sessionId, 'add_iam_binding', { member, role })
   },
