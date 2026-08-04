@@ -434,6 +434,7 @@ class RHELShell:
             "ssh": self._cmd_ssh,
             "scp": self._cmd_scp,
             "ping": self._cmd_ping,
+            "subscription-manager": self._cmd_subscription_manager,
             "shutdown": self._cmd_shutdown,
             "exit": self._cmd_exit,
             "logout": self._cmd_exit,
@@ -1098,6 +1099,15 @@ class RHELShell:
                 return StreamedCommandResult(lines=str(out).split("\n"), delay_s=1.0)
             if name in ("traceroute", "tracepath"):
                 return StreamedCommandResult(lines=str(out).split("\n"), delay_s=0.45)
+            # Follow-mode tools: stream line-by-line instead of dumping the blob.
+            follow = any(
+                tok in ("-f", "--follow", "-w", "--follow=name", "--follow=descriptor")
+                for tok in (line or "").split()
+            )
+            if follow and name in ("tail", "journalctl", "dmesg", "kubectl"):
+                return StreamedCommandResult(lines=str(out).split("\n"), delay_s=0.35)
+            if name == "top" or (name == "watch" and len((line or "").split()) > 1):
+                return StreamedCommandResult(lines=str(out).split("\n"), delay_s=0.5)
             return out
 
         return handler
@@ -2167,6 +2177,7 @@ class RHELShell:
     def _cmd_tail(self, p: list[str]) -> str:
         n = self._head_tail_count(p)
         files = [a for a in p[1:] if not a.startswith("-")]
+        follow = any(a in ("-f", "--follow", "--follow=name", "--follow=descriptor") for a in p[1:])
         if not files and self._stdin_lines() is not None:
             return "\n".join(self._stdin_lines()[-n:])
         if not files:
@@ -2177,7 +2188,16 @@ class RHELShell:
         if content is None:
             self.state.last_exit_code = 1
             return f"tail: cannot open '{f}' for reading: No such file or directory"
-        return "\n".join(content.splitlines()[-n:])
+        lines = content.splitlines()[-n:]
+        if follow:
+            # Append a few synthetic live lines so StreamedCommandResult paces them.
+            host = self.state.hostname
+            lines = list(lines) + [
+                f"{time.strftime('%b %d %H:%M:%S')} {host} lab[1]: follow tick 1",
+                f"{time.strftime('%b %d %H:%M:%S')} {host} lab[1]: follow tick 2",
+                f"{time.strftime('%b %d %H:%M:%S')} {host} lab[1]: follow tick 3",
+            ]
+        return "\n".join(lines)
 
     def _cmd_wc(self, p: list[str]) -> str:
         files = [a for a in p[1:] if not a.startswith("-")]
@@ -2392,7 +2412,15 @@ class RHELShell:
                 ]
             else:
                 lines.append(f"Jun 14 10:00:00 {host} systemd[1]: {unit}.service: Deactivated successfully.")
-            return self._journal_tail(lines, p)
+            out = self._journal_tail(lines, p)
+            if "-f" in p or "--follow" in p:
+                extra = [
+                    f"Jun 14 10:01:00 {host} {unit}[891]: follow tick 1",
+                    f"Jun 14 10:01:01 {host} {unit}[891]: follow tick 2",
+                    f"Jun 14 10:01:02 {host} {unit}[891]: follow tick 3",
+                ]
+                return out + ("\n" if out else "") + "\n".join(extra)
+            return out
 
         # No -u: a system-wide view (journalctl / -b / -xe / --no-pager).
         lines = [
@@ -2405,7 +2433,16 @@ class RHELShell:
         for name, svc in self.state.services.items():
             if svc.active == "failed":
                 lines.append(f"Jun 14 10:00:01 {host} systemd[1]: Failed to start {svc.description}.")
-        return self._journal_tail(lines, p)
+        out = self._journal_tail(lines, p)
+        if "-f" in p or "--follow" in p:
+            # Follow stream: a few extra lines for paced WS delivery.
+            extra = [
+                f"Jun 14 10:01:00 {host} systemd[1]: journal follow tick 1",
+                f"Jun 14 10:01:01 {host} systemd[1]: journal follow tick 2",
+                f"Jun 14 10:01:02 {host} systemd[1]: journal follow tick 3",
+            ]
+            return out + ("\n" if out else "") + "\n".join(extra)
+        return out
 
     @staticmethod
     def _journal_tail(lines: list[str], p: list[str]) -> str:
@@ -4723,6 +4760,265 @@ class RHELShell:
             f"rtt min/avg/max/mdev = {min(rtts):.3f}/{sum(rtts) / len(rtts):.3f}/{max(rtts):.3f}/0.020 ms"
         )
         return "\n".join(lines)
+
+    def _cmd_subscription_manager(self, p: list[str]) -> str:
+        """Red Hat Subscription Manager — status/register/list/repos/attach/…"""
+        st = self.state
+        sub = (p[1] if len(p) > 1 else "status").lstrip("-")
+        # Normalize common aliases
+        if sub in ("--help", "help", "h"):
+            return (
+                "Usage: subscription-manager MODULE [OPTIONS]\n\n"
+                "Modules:\n"
+                "  status       Show subscription status\n"
+                "  register     Register this system to RHSM\n"
+                "  unregister   Unregister this system\n"
+                "  identity     Show system identity\n"
+                "  list         List entitlements / available pools\n"
+                "  attach       Attach a subscription pool\n"
+                "  refresh      Refresh local entitlement certificates\n"
+                "  repos        List or enable/disable repositories\n"
+                "  clean        Remove all local data\n"
+            )
+
+        def _status_block() -> str:
+            if not getattr(st, "rhsm_registered", False):
+                self.state.last_exit_code = 1
+                return (
+                    "+-------------------------------------------+\n"
+                    "   System Status Details\n"
+                    "+-------------------------------------------+\n"
+                    "Overall Status:       Not registered\n"
+                    "System Purpose Status: Unknown\n"
+                )
+            overall = "Current" if getattr(st, "rhsm_entitlement_valid", True) else "Invalid"
+            if overall != "Current":
+                self.state.last_exit_code = 1
+            return (
+                "+-------------------------------------------+\n"
+                "   System Status Details\n"
+                "+-------------------------------------------+\n"
+                f"Overall Status:       {overall}\n"
+                "System Purpose Status: Matched\n"
+                f"Last check-in:        {time.strftime('%Y-%m-%d %H:%M:%S %Z')}\n"
+            )
+
+        if sub == "status":
+            return _status_block()
+
+        if sub == "identity":
+            if not getattr(st, "rhsm_registered", False):
+                self.state.last_exit_code = 1
+                return "subscription-manager is not registered. Use 'register' to register this system."
+            return (
+                f"system identity: f4a9c2e1-8b3d-4a7e-9c1f-2d5e6a7b8c9d\n"
+                f"name: {st.hostname}\n"
+                f"org name: FixitLab Practice Org\n"
+                f"org ID: {getattr(st, 'rhsm_org_id', '15678901')}\n"
+                f"environment: Library\n"
+            )
+
+        if sub == "register":
+            # Parse --username/--password/--org/--activationkey loosely
+            username = getattr(st, "rhsm_username", "")
+            password = getattr(st, "rhsm_password", "")
+            org = getattr(st, "rhsm_org_id", "")
+            actkey = getattr(st, "rhsm_activation_key", "")
+            i = 2
+            while i < len(p):
+                tok = p[i]
+                if tok in ("--username", "-u") and i + 1 < len(p):
+                    username = p[i + 1]; i += 2; continue
+                if tok.startswith("--username="):
+                    username = tok.split("=", 1)[1]; i += 1; continue
+                if tok in ("--password", "-p") and i + 1 < len(p):
+                    password = p[i + 1]; i += 2; continue
+                if tok.startswith("--password="):
+                    password = tok.split("=", 1)[1]; i += 1; continue
+                if tok in ("--org", "--organization") and i + 1 < len(p):
+                    org = p[i + 1]; i += 2; continue
+                if tok in ("--activationkey", "--activation-key") and i + 1 < len(p):
+                    actkey = p[i + 1]; i += 2; continue
+                i += 1
+            ok_user = username == getattr(st, "rhsm_username", username)
+            ok_pass = password == getattr(st, "rhsm_password", password)
+            ok_key = (not actkey) or actkey == getattr(st, "rhsm_activation_key", actkey)
+            if not (ok_user and ok_pass and ok_key):
+                self.state.last_exit_code = 1
+                return "HTTP error (401 - Unauthorized): Invalid username or password"
+            st.rhsm_registered = True
+            st.rhsm_entitlement_valid = True
+            st.rhsm_org_id = org or st.rhsm_org_id
+            st.rhsm_repos_enabled = {
+                "rhel-9-for-x86_64-baseos-rpms",
+                "rhel-9-for-x86_64-appstream-rpms",
+            }
+            self._write_healthy_redhat_repo()
+            return (
+                "Registering to: subscription.rhsm.redhat.com:443/subscription\n"
+                f"Organization: {st.rhsm_org_id}\n"
+                "The system has been registered with ID: f4a9c2e1-8b3d-4a7e-9c1f-2d5e6a7b8c9d\n"
+                "The registered system name is: " + st.hostname
+            )
+
+        if sub == "unregister":
+            st.rhsm_registered = False
+            st.rhsm_entitlement_valid = False
+            st.rhsm_repos_enabled = set()
+            return "Unregistering from: subscription.rhsm.redhat.com:443/subscription\nSystem has been unregistered."
+
+        if sub == "list":
+            avail = "--available" in p or "--all" in p
+            if not getattr(st, "rhsm_registered", False):
+                self.state.last_exit_code = 1
+                return "This system is not yet registered. Try 'subscription-manager register'."
+            if avail:
+                return (
+                    "+-------------------------------------------+\n"
+                    "    Available Subscriptions\n"
+                    "+-------------------------------------------+\n"
+                    f"Subscription Name:   Red Hat Enterprise Linux Server\n"
+                    f"Provides:            Red Hat Enterprise Linux\n"
+                    f"SKU:                 RH00001\n"
+                    f"Pool ID:             {getattr(st, 'rhsm_pool_id', 'pool')}\n"
+                    f"Available:           10\n"
+                    f"Suggested:           1\n"
+                    f"Service Type:        L1-L3\n"
+                    f"Roles:               Red Hat Enterprise Linux Server\n"
+                )
+            if getattr(st, "rhsm_entitlement_valid", True):
+                return (
+                    "+-------------------------------------------+\n"
+                    "    Installed Product Status\n"
+                    "+-------------------------------------------+\n"
+                    "Product Name:   Red Hat Enterprise Linux for x86_64\n"
+                    "Product ID:     479\n"
+                    "Version:        9.3\n"
+                    "Arch:           x86_64\n"
+                    "Status:         Subscribed\n"
+                    "Status Details: \n"
+                    "Starts:         01/01/2024\n"
+                    "Ends:           01/01/2030\n"
+                )
+            self.state.last_exit_code = 1
+            return (
+                "+-------------------------------------------+\n"
+                "    Installed Product Status\n"
+                "+-------------------------------------------+\n"
+                "Product Name:   Red Hat Enterprise Linux for x86_64\n"
+                "Product ID:     479\n"
+                "Version:        9.3\n"
+                "Arch:           x86_64\n"
+                "Status:         Not Subscribed\n"
+                "Status Details: Not supported by a valid subscription.\n"
+            )
+
+        if sub == "attach":
+            if not getattr(st, "rhsm_registered", False):
+                self.state.last_exit_code = 1
+                return "This system is not yet registered."
+            pool = getattr(st, "rhsm_pool_id", "")
+            if "--pool" in p:
+                idx = p.index("--pool")
+                if idx + 1 < len(p):
+                    pool = p[idx + 1]
+            if pool and pool != getattr(st, "rhsm_pool_id", pool):
+                self.state.last_exit_code = 1
+                return f"Pool '{pool}' could not be found."
+            st.rhsm_entitlement_valid = True
+            st.rhsm_repos_enabled = {
+                "rhel-9-for-x86_64-baseos-rpms",
+                "rhel-9-for-x86_64-appstream-rpms",
+            }
+            self._write_healthy_redhat_repo()
+            return (
+                f"Successfully attached a subscription for: Red Hat Enterprise Linux Server\n"
+                f"Pool ID: {getattr(st, 'rhsm_pool_id', pool)}"
+            )
+
+        if sub == "refresh":
+            if not getattr(st, "rhsm_registered", False):
+                self.state.last_exit_code = 1
+                return "This system is not yet registered."
+            # Refresh restores entitlement when the lab ticket credentials are valid.
+            st.rhsm_entitlement_valid = True
+            if not st.rhsm_repos_enabled:
+                st.rhsm_repos_enabled = {
+                    "rhel-9-for-x86_64-baseos-rpms",
+                    "rhel-9-for-x86_64-appstream-rpms",
+                }
+            self._write_healthy_redhat_repo()
+            return "All local data refreshed"
+
+        if sub == "clean":
+            st.rhsm_registered = False
+            st.rhsm_entitlement_valid = False
+            st.rhsm_repos_enabled = set()
+            return "All local data removed"
+
+        if sub == "repos":
+            if "--list" in p or len(p) == 2:
+                repos = [
+                    ("rhel-9-for-x86_64-baseos-rpms", "Red Hat Enterprise Linux 9 for x86_64 - BaseOS (RPMs)"),
+                    ("rhel-9-for-x86_64-appstream-rpms", "Red Hat Enterprise Linux 9 for x86_64 - AppStream (RPMs)"),
+                    ("rhel-9-for-x86_64-supplementary-rpms", "Red Hat Enterprise Linux 9 for x86_64 - Supplementary (RPMs)"),
+                ]
+                enabled = getattr(st, "rhsm_repos_enabled", set()) or set()
+                blocks = []
+                for rid, name in repos:
+                    blocks.append(
+                        "+----------------------------------------------------------+\n"
+                        f"Repo ID:   {rid}\n"
+                        f"Repo Name: {name}\n"
+                        f"Repo URL:  https://cdn.redhat.com/content/dist/rhel9/$releasever/$basearch/os\n"
+                        f"Enabled:   {1 if rid in enabled else 0}\n"
+                    )
+                return "\n".join(blocks)
+            # --enable / --disable
+            i = 2
+            while i < len(p):
+                tok = p[i]
+                if tok in ("--enable", "-e") and i + 1 < len(p):
+                    rid = p[i + 1]
+                    st.rhsm_repos_enabled = set(getattr(st, "rhsm_repos_enabled", set()) or set())
+                    st.rhsm_repos_enabled.add(rid)
+                    i += 2
+                    continue
+                if tok.startswith("--enable="):
+                    st.rhsm_repos_enabled = set(getattr(st, "rhsm_repos_enabled", set()) or set())
+                    st.rhsm_repos_enabled.add(tok.split("=", 1)[1])
+                    i += 1
+                    continue
+                if tok in ("--disable", "-d") and i + 1 < len(p):
+                    rid = p[i + 1]
+                    st.rhsm_repos_enabled = set(getattr(st, "rhsm_repos_enabled", set()) or set())
+                    st.rhsm_repos_enabled.discard(rid)
+                    i += 2
+                    continue
+                i += 1
+            if getattr(st, "rhsm_repos_enabled", None):
+                self._write_healthy_redhat_repo()
+            return "Repositories updated."
+
+        self.state.last_exit_code = 1
+        return f"Error: invalid option or command '{sub}'. Use 'subscription-manager --help'."
+
+    def _write_healthy_redhat_repo(self) -> None:
+        """Rewrite /etc/yum.repos.d/redhat.repo from enabled RHSM repos."""
+        enabled = getattr(self.state, "rhsm_repos_enabled", set()) or set()
+        lines = ["# Generated by subscription-manager — do not edit by hand\n"]
+        for rid in sorted(enabled):
+            lines.append(
+                f"[{rid}]\n"
+                f"name={rid}\n"
+                f"baseurl=https://cdn.redhat.com/content/dist/rhel9/$releasever/$basearch/os\n"
+                f"enabled=1\n"
+                f"gpgcheck=1\n\n"
+            )
+        if not enabled:
+            lines.append("# no repositories enabled\n")
+        self.state._mkdir("/etc/yum.repos.d")
+        self.state._write_file("/etc/yum.repos.d/redhat.repo", "".join(lines))
 
     def _resolve_hostname(self, host: str) -> str:
         """Best-effort DNS in the lab: known aliases -> deterministic IPs."""

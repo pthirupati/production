@@ -395,16 +395,16 @@ Learner-facing UI never says simulation/demo/mock.
 243. [x] Backfill `hosted_as: vmware` on every `vmware_link` scenario YAML (not only nic-add-vmware-rescan)
 244. [x] PeopleSoft: `hosted_as` + PeopleSoft persona (never AWS DMI rotate) on all PS scenarios
 245. [x] Harden `scripts/lint_scenarios.py` to **fail CI** on wrong host / missing coding_mode / unknown sim_type — *academy coding packs + vmware_link/peoplesoft hosted_as*
-246. [ ] Ansible labs: always surface Open AWX companion when `simulation_type`/consoles include awx
+246. [~] Ansible labs: always surface Open AWX companion when `simulation_type`/consoles include awx — *LabRunner shows for ansible + ai-infra; YAML consoles backfill still open*
 247. [ ] AWS labs: always surface Open AWS Console companion (not only terraform/hosted heuristics)
 248. [x] Coding techs: academy java/shell/nodejs/python + HTML heroes → `coding_mode` + `coding_spec` *(java/shell heroes remain simulation marker labs; typescript still pending)*
 249. [x] HTML heroes: CodingIDE + live preview iframe (academy done; heroes still terminal)
 250. [ ] Cross-tech scenarios: assert each companion console link opens and shares session_id
 
 ### T2 — Terminal realism (paced I/O)
-251. [ ] Audit all instant multi-line commands (`ping`, `tail -f`, `journalctl -f`, `kubectl logs -f`, `dmesg -w`, `nvidia-smi -l`, `top`) — must stream line-by-line
-252. [ ] `subscription-manager` RHEL commands: status/register/list/repos + broken entitlement preset + Jira credential hint
-253. [ ] RHEL repos/subscription credentials surfaced in Jira ticket comments for labs that need them
+251. [~] Audit all instant multi-line commands (`ping`, `tail -f`, `journalctl -f`, `kubectl logs -f`, `dmesg -w`, `nvidia-smi -l`, `top`) — *ping/journalctl/tail/top/watch paced; kubectl logs -f still open*
+252. [x] `subscription-manager` RHEL commands: status/register/list/repos + broken entitlement preset + Jira credential hint
+253. [x] RHEL repos/subscription credentials surfaced in Jira ticket comments for labs that need them
 
 ### T3 — Terraform / cloud bridge remaining
 254. [x] Terraform `vsphere_virtual_machine` → VMware `create_vm` + Open VMware link
@@ -452,7 +452,7 @@ Learner-facing UI never says simulation/demo/mock.
 288. [ ] P2.5 resume score tips
 
 ### T8 — Jira / collaboration
-289. [ ] Coach reply when `@…team` parse fails (TODO 137)
+289. [x] Coach reply when `@…team` parse fails (TODO 137) — *near-miss mention coach*
 290. [ ] E2E: mention → bot → disk appears in session `lsblk`
 291. [ ] Teams channel bot parity
 
@@ -471,6 +471,34 @@ Learner-facing UI never says simulation/demo/mock.
 301. [ ] End-to-end commission → burn-in → production handoff project
 302. [ ] CI lint: ai-infra scenarios never host as wrong cloud without `hosted_as`
 
+### T11 — Verified live / remaining learner blockers (Aug 2026 deep check)
+303. [x] **AI Infra technology live on prod API** (`/api/technologies/` → `ai-infra`, 150 scenarios) — if UI still hides it, hard-refresh / clear CDN; catalog + TechIcon already wired
+304. [x] `subscription-manager` status/register/list/repos/attach/refresh/clean + broken entitlement preset + Jira RHSM credentials
+305. [x] Paced streams: `ping` (already) + `journalctl -f` / `tail -f` / `top` / `watch` via StreamedCommandResult
+306. [x] Open AWX companion for `ai-infra` + `consoles` include awx (ansible tech already)
+307. [x] Jira coach when @mention near-miss fails parse (`@team storage`, typos)
+308. [ ] AWS console ErrorBoundary: capture production stack from returning-user localStorage (reproduce harness exists — pin remaining throw)
+309. [ ] Datacenter twin ErrorBoundary: same chunk-recovery + store-reset path as AWS
+310. [ ] Ansible YAML backfill: `consoles: [terminal, awx]` or `awx_link: true` on all ansible heroes (not only academy `simulation_type: ansible`)
+311. [ ] AWS companion link on every AWS-tech scenario (not only terraform/hosted heuristics)
+312. [ ] TypeScript coding tech tree (missing entirely) + academy coding_mode pack
+313. [ ] Packer CodingIDE / workspace for image-factory scenarios (ai-infra)
+314. [ ] Terraform destroy → delete mirrored cloud/VMware resources
+315. [ ] MAAS UI region/rack/images panes pixel surface
+316. [ ] VyOS firewall/NAT/VPN/VRRP CLI + pixel appliance UI
+317. [ ] Steam DC: reception → security → staging → repair bay walkable stubs
+318. [ ] IDE polish: file tree, tabs, run terminal panel, theme parity for Java/JS/React/HTML/Python/Shell/Node
+319. [ ] GitOps: GitHub PR approve + Flux/Argo sync health end-to-end
+320. [ ] Windows Simulator contrast pass (no white-on-white)
+321. [ ] PeopleSoft app-server persona verification E2E (not AWS DMI)
+322. [ ] Interview P2.1 voice loop + P2.R6 two-way framing UI
+323. [ ] E2E: `@storage team` → disk in `lsblk` (disk E2E)
+324. [ ] Learning journey / career track row for AI Infra on `/technologies/ai-infra`
+325. [ ] ai-infra scenario count growth: VyOS + Packer + MAAS + DCOps RMA heroes beyond current 150
+326. [ ] Cross-tech companion session_id share assert in CI
+327. [ ] Dead-link crawl CI for every console route
+328. [ ] Per-tech 20-pack tracker dashboard (mark progress on 273–283)
+
 ---
 
 ## Execution order (updated)
@@ -481,7 +509,9 @@ Learner-facing UI never says simulation/demo/mock.
 4. Jira mentions + contrast (137–138)
 5. **Merged PR #127–#132** AI Infra + AWX/Packer + GPU matrix + TF cloud + load harden
 6. **This wave:** TF→VMware + VyOS commit/rollback + AI Infra catalog visibility + **prod deploy seed**
-7. ~~Coding IDE reseed (java/shell/html/nodejs) + env-resolver CI hard-fail (243–250)~~
-8. AI Infra depth: MAAS UI, Packer GH Actions, DCOps RMA, Steam DC stubs (259–272, 296–302)
-9. Interview realism P2 leftovers (284–288)
-10. Per-tech 20-packs + unified bus finish (273–283, 292–295)
+7. ~~Coding IDE reseed (java/shell/html/nodejs) + env-resolver CI hard-fail (243–250)~~ **merged #135**
+8. **Now:** subscription-manager + AWX ai-infra link + mention coach + follow streams (304–307)
+9. AWS/DC ErrorBoundary pin (308–309) + ansible consoles backfill (310)
+10. AI Infra depth: MAAS UI, Packer IDE, DCOps RMA, Steam DC stubs (315–317, 296–302)
+11. Interview realism P2 leftovers (322, 284–288)
+12. Per-tech 20-packs + unified bus finish (273–283, 292–295)

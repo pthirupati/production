@@ -194,8 +194,21 @@ def _lab_tools_for_scenario(scenario) -> str:
             "- **AWS console** — EC2 / VPC / SG / EBS; SSH via Instance Connect "
             "(security groups must allow port 22)."
         )
-    if any(k in blob for k in ("awx", "ansible", "tower")):
+    if any(k in blob for k in ("awx", "ansible", "tower", "ai-infra")):
         lines.append("- **AWX GUI** — job templates, inventories, credentials; Terminal for the control node.")
+    if any(k in blob for k in ("rhel", "redhat", "subscription-manager", "rhsm")):
+        # Credentials for subscription-manager register/refresh (learner-facing ticket).
+        lines.append(
+            "- **Red Hat Subscription Manager** — use these practice credentials on the lab host:\n"
+            "  - Username: `lab-admin@fixitlab.internal`\n"
+            "  - Password: `RedHatLab!Practice2024`\n"
+            "  - Org ID: `15678901`\n"
+            "  - Activation key: `lab-rhel9-prod`\n"
+            "  - Pool ID: `8a85f9817a3c4e2f017a3c5b9d0e0001`\n"
+            "  Typical fix: `subscription-manager refresh` or "
+            "`subscription-manager register --username … --password … --org …` "
+            "then `subscription-manager attach --pool …` and `subscription-manager repos --list`."
+        )
     if any(k in blob for k in ("grafana", "prometheus", "monitor", "alertmanager")):
         lines.append("- **Monitoring GUI** — Grafana / Prometheus dashboards; Terminal for scrape targets.")
     if any(k in blob for k in ("k8s", "kubernetes", "openshift", "gpu")):
