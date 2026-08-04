@@ -96,6 +96,10 @@ objectives:
 - Re-run the playbook and confirm web2 shows ok/changed with failed=0
 requires_companion_hosts: false
 simulation_type: ansible
+awx_link: true
+consoles:
+  - terminal
+  - awx
 slug: sim-ansible-playbook-fail
 time_limit: 900
 title: Ansible Playbook Failure

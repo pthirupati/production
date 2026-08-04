@@ -8,6 +8,10 @@ time_limit: 900
 max_score: 100
 lab_mode: simulation
 simulation_type: ansible-awx
+awx_link: true
+consoles:
+  - terminal
+  - awx
 infrastructure_type: simulation
 is_free: false
 description: 'CONTEXT: A team operating Ansible automation has raised a ticket for `Create AWX Job Template

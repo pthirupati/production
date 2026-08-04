@@ -251,11 +251,14 @@ def _env_resolver_errors(data: dict, path: Path) -> list[str]:
 
     # Ansible labs should expose AWX companion when consoles declared
     if tech_dir in ("ansible",) or "ansible" in tech_field:
+        if not data.get("awx_link") and "awx" not in consoles and "ansible" not in consoles:
+            if slug.startswith("academy-") or consoles:
+                errs.append("ansible lab missing `awx_link: true` or consoles including `awx`")
         if consoles and "awx" not in consoles and "ansible" not in consoles:
             errs.append("ansible lab declares consoles but omits `awx`")
 
     # AWS sim without aws console when consoles list present
-    if sim == "aws" and consoles and "aws" not in consoles:
+    if sim == "aws" and consoles and "aws" not in consoless:
         errs.append("simulation_type=aws but consoles omit `aws`")
 
     return errs

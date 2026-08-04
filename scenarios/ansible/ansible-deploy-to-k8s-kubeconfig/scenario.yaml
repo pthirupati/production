@@ -61,6 +61,10 @@ objectives:
 - Confirm the playbook is corrected so `ansible-playbook k8s-deploy.yml` would apply to the cluster
 lab_mode: simulation
 simulation_type: ansible
+awx_link: true
+consoles:
+  - terminal
+  - awx
 cross_technology: true
 time_limit: 1200
 max_score: 100
