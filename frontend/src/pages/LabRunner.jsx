@@ -1499,7 +1499,8 @@ export default function LabRunner() {
         || _awxHay.includes('automation controller')
       ))
     ))
-  )  const isTerraformSimLab = !isCrossTech && (
+  )
+  const isTerraformSimLab = !isCrossTech && (
     consolesKind === 'terraform' || (!consolesKind && isTerraformLab(scenario))
   )
   // AWS console heroes (aws-/ec2-/…) use the AWS Console as primary UI.
