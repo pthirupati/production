@@ -16,8 +16,11 @@ export const baremetalApi = {
   commission(sessionId, machineId) {
     return baremetalApi.action(sessionId, 'maas_commission', { machine_id: machineId })
   },
-  deploy(sessionId, machineId) {
-    return baremetalApi.action(sessionId, 'maas_deploy', { machine_id: machineId })
+  deploy(sessionId, machineId, opts = {}) {
+    const payload = { machine_id: machineId }
+    if (opts.boot_resource) payload.boot_resource = opts.boot_resource
+    if (opts.distro_series) payload.distro_series = opts.distro_series
+    return baremetalApi.action(sessionId, 'maas_deploy', payload)
   },
   power(sessionId, machineId, power) {
     return baremetalApi.action(sessionId, 'maas_power', { machine_id: machineId, power })

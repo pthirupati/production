@@ -645,7 +645,7 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 450. [ ] Datacenter: ambient volume slider in chrome (TODO 353)
 451. [ ] Datacenter: server drawer z-index must not bury Walk/FPS twin toolbar
 452. [ ] LabRunner sidebar z-[75] must not paint over DC companion z-[60]
-453. [ ] MAAS deploy picker: select custom/{sku}-jammy boot resource in GUI + CLI maas_deploy
+453. [~] MAAS deploy picker: select custom/{sku}-jammy boot resource in GUI + CLI maas_deploy — *engine+Images select in #154*
 454. [ ] Packer scenarios: set consoles: [packer, baremetal, terminal] (not heuristic-only)
 455. [ ] libguestfs handlers: guestfish / virt-customize / virt-inspect in simulation_modules
 456. [ ] Scenario hero: ai-infra-packer-gpu-image-factory (align project_data_extra AII4)
