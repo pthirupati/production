@@ -482,7 +482,7 @@ Learner-facing UI never says simulation/demo/mock.
 310. [x] Ansible YAML backfill: `consoles: [terminal, awx]` or `awx_link: true` on all ansible heroes (not only academy `simulation_type: ansible`)
 311. [x] AWS companion link on every AWS-tech scenario (not only terraform/hosted heuristics)
 312. [ ] TypeScript coding tech tree (missing entirely) + academy coding_mode pack
-313. [ ] Packer CodingIDE / workspace for image-factory scenarios (ai-infra)
+313. [x] Packer CodingIDE / workspace for image-factory scenarios (ai-infra)
 314. [x] Terraform destroy → delete mirrored cloud/VMware resources
 315. [ ] MAAS UI region/rack/images panes pixel surface
 316. [ ] VyOS firewall/NAT/VPN/VRRP CLI + pixel appliance UI

@@ -23,6 +23,7 @@ export const LazyNmapSimulator = lazyWithRetry(() => import('../nmap/NmapSimulat
 export const LazyWiresharkSimulator = lazyWithRetry(() => import('../wireshark/WiresharkSimulator'))
 export const LazyCicdPipelineSim = lazyWithRetry(() => import('../devops/CicdPipelineSim'))
 export const LazyCodingIDE = lazyWithRetry(() => import('../ide/CodingIDE'))
+export const LazyPackerWorkspaceIde = lazyWithRetry(() => import('../packer/PackerWorkspaceIde'))
 export const LazyPromptPlayground = lazyWithRetry(() => import('../promptlab/PromptPlayground'))
 export const LazyCommvaultSimulator = lazyWithRetry(() => import('../commvault/CommvaultSimulator'))
 export const LazyNetAppSimulator = lazyWithRetry(() => import('../netapp/NetAppSimulator'))
