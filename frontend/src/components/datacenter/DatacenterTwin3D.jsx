@@ -148,20 +148,38 @@ function CorridorShell() {
   )
 }
 
-/** Thermal aisle haze — intensity follows CRAC stress. */
-function ThermalHaze({ stress = 0 }) {
+/** Thermal aisle haze — CRAC stress + open ticket severity (Steam heat overlay). */
+function ThermalHaze({ stress = 0, ticketHeat = 0 }) {
   const ref = useRef()
+  const combined = Math.min(1, stress + ticketHeat * 0.55)
   useFrame(({ clock }) => {
     if (!ref.current) return
-    const pulse = 0.04 + stress * 0.12 + Math.sin(clock.elapsedTime * 1.4) * 0.015
+    const pulse = 0.04 + combined * 0.14 + Math.sin(clock.elapsedTime * 1.4) * 0.015
     ref.current.material.opacity = Math.max(0.02, pulse)
+    const hot = ticketHeat > 0.5
+    ref.current.material.color.set(hot ? '#ef4444' : '#f97316')
   })
-  if (stress < 0.05) return null
+  if (combined < 0.05) return null
   return (
-    <mesh ref={ref} position={[1.2, 1.1, -2.6]} rotation={[-0.08, 0, 0]}>
-      <planeGeometry args={[10, 2.4]} />
-      <meshBasicMaterial color="#f97316" transparent opacity={0.08} depthWrite={false} side={THREE.DoubleSide} />
-    </mesh>
+    <group>
+      <mesh ref={ref} position={[1.2, 1.1, -2.6]} rotation={[-0.08, 0, 0]}>
+        <planeGeometry args={[10, 2.4]} />
+        <meshBasicMaterial color="#f97316" transparent opacity={0.08} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
+      {/* Per-aisle heat ribbons — stronger when critical tickets are open */}
+      {[-1.6, -3.8].map((z, i) => (
+        <mesh key={z} position={[0.2, 0.9 + i * 0.05, z]} rotation={[-Math.PI / 2.4, 0, 0]}>
+          <planeGeometry args={[7.5, 1.1]} />
+          <meshBasicMaterial
+            color={ticketHeat > 0.5 ? '#dc2626' : '#fb923c'}
+            transparent
+            opacity={0.03 + combined * 0.1}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      ))}
+    </group>
   )
 }
 
@@ -889,7 +907,7 @@ function CableTray() {
 function SceneContent({
   racks, serversByRack, network, cooling, pdus, selectedId, expandedRack,
   onSelectServer, onSelectRack, onOpenBmc, onUnplugCable, onPlugCable, physicsEnabled, onFps, animBoost, intro,
-  walkMode = false,
+  walkMode = false, tickets = [],
 }) {
   const thermalStress = useMemo(() => {
     const units = cooling || []
@@ -898,6 +916,20 @@ function SceneContent({
     const hot = units.filter((c) => Number(c.temp_c) > 28).length
     return Math.min(1, failed / units.length + hot * 0.15)
   }, [cooling])
+
+  const ticketHeat = useMemo(() => {
+    const open = (tickets || []).filter((t) => !['closed', 'resolved'].includes((t.status || '').toLowerCase()))
+    if (!open.length) return 0
+    let score = 0
+    open.forEach((t) => {
+      const p = (t.priority || '').toLowerCase()
+      const blob = `${t.summary || ''} ${t.component || ''} ${t.title || ''}`.toLowerCase()
+      if (p === 'critical' || /thermal|overheat|hot.?aisle|gpu/.test(blob)) score += 0.45
+      else if (p === 'high') score += 0.25
+      else score += 0.1
+    })
+    return Math.min(1, score)
+  }, [tickets])
 
   const switchCount = (network?.switches || []).length
   const mdfPos = useMemo(() => new THREE.Vector3(5.5, 1.05, -1.2), [])
@@ -996,7 +1028,7 @@ function SceneContent({
       <CableTray />
       <HotAisleGlow z={-1.6} />
       <HotAisleGlow z={-3.8} />
-      <ThermalHaze stress={thermalStress} />
+      <ThermalHaze stress={thermalStress} ticketHeat={ticketHeat} />
       {animBoost > 0 && (
         <AirflowParticles
           count={Math.round(220 * animBoost * (1 + thermalStress * 1.4))}
@@ -1082,6 +1114,7 @@ export default function DatacenterTwin3D({
   network,
   cooling = [],
   pdus = [],
+  tickets = [],
   selectedServerId,
   expandedRack,
   onSelectServer,
@@ -1178,6 +1211,7 @@ export default function DatacenterTwin3D({
                 animBoost={animBoost}
                 intro={intro}
                 walkMode={walkMode}
+                tickets={tickets}
               />
             </Physics>
           </Canvas>
