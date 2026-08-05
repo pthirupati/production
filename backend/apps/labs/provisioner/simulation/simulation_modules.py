@@ -2056,12 +2056,14 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
         slug = (engine.scenario_slug or "").lower()
         vyos_lab = any(k in slug for k in ("vyos", "ai-infra", "pxe", "maas", "underlay", "bgp"))
         vyos_cmds = (
-            low in ("configure", "commit", "rollback", "exit")
+            low in ("configure", "commit", "rollback", "exit", "compare")
             or low.startswith("configure ")
             or low.startswith("commit ")
             or low.startswith("rollback")
             or low.startswith("set ")
             or low.startswith("delete ")
+            or low.startswith("compare")
+            or low.startswith("show system commit")
             or low.startswith("show conf")
             or low.startswith("show configuration")
             or low.startswith("show ip bgp")
@@ -2077,6 +2079,10 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                 return net.vyos_enter_configure()
             if low == "exit" and net.vyos_configure_mode:
                 return net.vyos_exit_configure()
+            if low == "compare" or low.startswith("compare"):
+                return net.vyos_compare()
+            if low.startswith("show system commit"):
+                return net.vyos_show_history()
             if low == "commit" or low.startswith("commit "):
                 return net.vyos_commit()
             if low.startswith("rollback"):

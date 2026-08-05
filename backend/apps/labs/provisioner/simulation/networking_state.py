@@ -95,7 +95,7 @@ class NetworkingState:
     # ── VyOS commit / rollback ─────────────────────────────────────────────
     def vyos_enter_configure(self) -> str:
         self.vyos_configure_mode = True
-        self.vyos_candidate = self.vyos_running
+        self.vyos_candidate = copy.deepcopy(self.vyos_running) if not isinstance(self.vyos_running, str) else self.vyos_running
         return "[edit]"
 
     def vyos_exit_configure(self) -> str:
@@ -145,6 +145,27 @@ class NetworkingState:
         self.vyos_candidate = self.vyos_candidate.replace(marker, "")
         return ""
 
+    def vyos_compare(self) -> str:
+        """Diff candidate vs running — mirrors VyOS `compare` in configure mode."""
+        if not self.vyos_configure_mode:
+            return "Error: configuration path is not open — run 'configure' first"
+        if self.vyos_candidate == self.vyos_running:
+            return "No changes between working and active configurations"
+        run_lines = self.vyos_running.splitlines()
+        cand_lines = self.vyos_candidate.splitlines()
+        run_set = set(run_lines)
+        cand_set = set(cand_lines)
+        added = [ln for ln in cand_lines if ln not in run_set and ln.strip()]
+        removed = [ln for ln in run_lines if ln not in cand_set and ln.strip()]
+        out = ["[edit]", ""]
+        for ln in removed:
+            out.append(f"- {ln}")
+        for ln in added:
+            out.append(f"+ {ln}")
+        if len(out) == 2:
+            out.append("(whitespace-only changes)")
+        return "\n".join(out)
+
     def vyos_commit(self) -> str:
         if not self.vyos_configure_mode:
             return "Error: configuration path is not open — run 'configure' first"
@@ -170,7 +191,19 @@ class NetworkingState:
         restored = self.vyos_history[idx]
         self.vyos_candidate = restored
         self.vyos_running = restored
+        # Trim history past the restored point so a second rollback goes further back.
+        self.vyos_history = self.vyos_history[: idx + 1] if idx > 0 else []
         return f"[edit]\nRollback complete — restored revision -{steps}."
 
     def vyos_show_config(self, *, candidate: bool = False) -> str:
         return self.vyos_candidate if candidate else self.vyos_running
+
+    def vyos_show_history(self) -> str:
+        if not self.vyos_history:
+            return "No commits in revision history"
+        lines = ["Revision history (newest last):"]
+        for i, snap in enumerate(self.vyos_history, 1):
+            preview = next((ln.strip() for ln in snap.splitlines() if ln.strip().startswith("#")), "config")
+            lines.append(f"  {i}: {preview[:72]}")
+        lines.append(f"  {len(self.vyos_history) + 1}: [running]")
+        return "\n".join(lines)
