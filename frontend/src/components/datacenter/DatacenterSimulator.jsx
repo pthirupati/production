@@ -26,6 +26,7 @@ import {
 } from './OpsPhysicsPanels'
 import '../../styles/sim-products.css'
 import './DatacenterSimulator.css'
+import DcAmbientAudio from './DcAmbientAudio'
 
 const LazyDatacenterTwin3D = lazyWithRetry(() => import('./DatacenterTwin3D'))
 
@@ -411,21 +412,30 @@ export default function DatacenterSimulator({
                 type="button"
                 className={`dc-btn-outline dc-btn-xs ${floorView === '2d' ? 'dc-view-active' : ''}`}
                 onClick={() => setFloorView('2d')}
+                title="Isometric 2D floor (default — safest)"
               >
-                <Move size={11} /> 2D
+                <Move size={11} /> 2D floor
               </button>
               <button
                 type="button"
                 className={`dc-btn-outline dc-btn-xs ${floorView === '3d' ? 'dc-view-active' : ''}`}
                 onClick={() => setFloorView('3d')}
+                title="Enter animated 3D hall — chrome stays available; falls back to 2D on GPU errors"
               >
-                <Box size={11} /> 3D
+                <Box size={11} /> Enter hall (3D)
               </button>
             </span>
           )}
+          <DcAmbientAudio
+            enabled
+            alert={Boolean(
+              (st?.tickets || []).some((t) => /thermal|overheat|hot.?aisle/i.test(`${t?.title || ''} ${t?.status || ''}`))
+              || cooling.some((c) => Number(c?.temp_c) >= 27),
+            )}
+          />
           {currentRoom.type === 'data_hall' && floorView === '3d'
-            ? <><Box size={12} /> Orbit · click chassis</>
-            : <><Move size={12} /> Drag floor to pan</>}
+            ? <><Box size={12} /> Orbit · click chassis · Esc via 2D floor</>
+            : <><Move size={12} /> Drag floor to pan · Enter hall for Steam-class twin</>}
         </div>
       </div>
 

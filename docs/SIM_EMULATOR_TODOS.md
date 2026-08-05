@@ -525,8 +525,14 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 343. [ ] Default entry: optional "Enter facility" cinematic (camera truck through security → reception → hall)
 344. [ ] First-person / badge-walk mode (even low-poly) for campus rooms — not orbit-only
 345. [ ] 3D corridor meshes linking reception → staging → data-hall → MDF (progressive; ErrorBoundary)
+<<<<<<< HEAD
 346. [~] Keep 2D floor default; "Enter hall (3D)" CTA with chrome intact + dedicated R3F ErrorBoundary — *#147*
 347. [~] Ambient CRAC/PDU/fan audio bed + thermal alarm stinger tied to DC tickets — *#147*348. [ ] LED blink / fan spin / thermal aisle haze volume FX (extend Q 180–185)
+=======
+346. [~] Keep 2D floor default; "Enter hall (3D)" CTA with chrome intact + dedicated R3F ErrorBoundary — *CTA + Twin3DSafe*
+347. [~] Ambient CRAC/PDU/fan audio bed + thermal alarm stinger tied to DC tickets — *procedural Web Audio + mute*
+348. [ ] LED blink / fan spin / thermal aisle haze volume FX (extend Q 180–185)
+>>>>>>> 975faff57 (Add Steam DC Enter-hall CTA and procedural facility ambience.)
 349. [ ] Cable bend + port LED realism on ToR / MDF trunks
 350. [ ] Full FRU RMA loop: locate → order → dock receive → repair bay swap → burn-in → close ticket
 351. [ ] Parts warehouse ↔ dock ↔ repair bay inventory sync with Jira FRU tickets
