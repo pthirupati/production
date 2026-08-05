@@ -2681,8 +2681,33 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 }
         _twin_journal(state, "burnin_ops", {"op": op, "machine_id": mid})
         _event(state, f"Burn-in: {msg}", "info")
+        # FRU RMA close: soak pass or release auto-resolves awaiting_parts / assigned
+        # tickets for that asset (Steam-class locate → dock → repair → burn-in → close).
+        closed = []
+        if op in ("soak", "release") and mid:
+            mrow = next((x for x in (bi.get("machines") or []) if x.get("id") == mid), None)
+            if mrow and (mrow.get("result") == "pass" or mrow.get("released")):
+                from apps.vmware_sim.datacenter_physics_ops import advance_ticket
+                for t in state.get("tickets") or []:
+                    if t.get("asset_id") != mid:
+                        continue
+                    if (t.get("status") or "") in ("closed", "resolved"):
+                        continue
+                    if (t.get("status") or "") in ("awaiting_parts", "assigned", "open", "scheduled") or t.get("type") == "rma":
+                        try:
+                            if t.get("status") != "resolved":
+                                advance_ticket(t, "resolve")
+                            advance_ticket(t, "close")
+                            closed.append(t.get("id"))
+                        except ValueError:
+                            pass
+                if closed:
+                    _event(state, f"Burn-in closed ticket(s) {', '.join(closed)}", "success")
         _save(session_id, entry)
-        return {"ok": True, "message": msg, "burnin": bi, "console": state.get("console")}
+        out = {"ok": True, "message": msg, "burnin": bi, "console": state.get("console")}
+        if closed:
+            out["tickets_closed"] = closed
+        return out
 
     if action == "exporter_ops":
         from apps.vmware_sim.datacenter_phase12 import build_exporters, exporter_op

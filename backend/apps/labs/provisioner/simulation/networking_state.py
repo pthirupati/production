@@ -135,6 +135,12 @@ class NetworkingState:
                         "state": "Idle",
                         "prefixes": 0,
                     })
+        if "firewall" in low or "firewall name" in low:
+            # Track firewall rule markers so show/commit labs can verify PXE allow.
+            if not hasattr(self, "vyos_firewall_rules"):
+                self.vyos_firewall_rules = []
+            if path not in self.vyos_firewall_rules:
+                self.vyos_firewall_rules.append(path)
         return ""
 
     def vyos_delete(self, path: str) -> str:

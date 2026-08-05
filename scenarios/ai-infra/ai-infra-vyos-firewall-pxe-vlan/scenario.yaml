@@ -1,0 +1,53 @@
+title: 'VyOS: Firewall Allow MAAS PXE Helper VLAN'
+slug: ai-infra-vyos-firewall-pxe-vlan
+technology: AI Infrastructure Engineering
+category: Operate
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: Networking / Bare Metal / DCOps — MAAS PXE enlist stalls because the
+  VyOS firewall on the PXE helper VLAN drops TFTP/DHCP/HTTP. AI Infra Engineering owns the
+  underlay firewall that Bare Metal enlist depends on.
+
+
+  ENVIRONMENT: Lab Terminal VyOS CLI (configure / set / compare / commit / rollback) + Bare Metal.
+
+
+  SYMPTOM: New machines never appear; packet captures show drops on the helper VLAN.
+
+
+  OBJECTIVE: Enter configure; add firewall name rules allowing PXE helper traffic; compare;
+  commit; verify enlist path; FIXED-OK.'
+objectives:
+- Add VyOS firewall allow for PXE helper VLAN
+- Commit cleanly without breaking underlay
+- Confirm MAAS enlist path recovers
+initial_state: VyOS firewall drops PXE helper VLAN; MAAS enlist stalled.
+hints:
+- order: 1
+  cost: 0
+  content: From Lab Terminal run show configuration commands and note missing firewall allow for the PXE VLAN.
+- order: 2
+  cost: 20
+  content: configure; set firewall name PXE-HELPER rule … action accept for DHCP/TFTP/HTTP; compare carefully.
+- order: 3
+  cost: 45
+  content: commit; if enlist still fails use rollback 1, re-apply, then FIXED-OK once MAAS sees New nodes.
+consoles:
+- terminal
+- baremetal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - terminal
+  - baremetal

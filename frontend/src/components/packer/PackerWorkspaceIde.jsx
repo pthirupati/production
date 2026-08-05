@@ -165,6 +165,7 @@ export default function PackerWorkspaceIde({
 
   const detectSku = useCallback(() => {
     const blob = `${mainFile}\n${files[mainFile] || ''}\n${scenario?.slug || ''}`.toLowerCase()
+    if (blob.includes('rhel')) return 'rhel-gpu'
     for (const key of ['b300', 'h200', 'h100', 'a100', 'mi300']) {
       if (blob.includes(key)) return key
     }
@@ -185,12 +186,14 @@ export default function PackerWorkspaceIde({
 
   const publishToMaas = useCallback(async () => {
     const sku = detectSku()
+    const bootResource = sku === 'rhel-gpu' ? 'custom/rhel-gpu' : `custom/${sku}-jammy`
     try {
       const res = await baremetalApi.publishBootResource(sessionId, {
         sku,
+        boot_resource: bootResource,
         source: `packer output-gpu-${sku}/`,
       })
-      const name = res?.boot_resource?.name || `custom/${sku}-jammy`
+      const name = res?.boot_resource?.name || bootResource
       setOutput((prev) => `${prev ? `${prev}\n` : ''}Published ${name} → MAAS Images (boot-resources). Open MAAS → Images to deploy.`)
       toast.success(`Published ${name} to MAAS`)
       try {

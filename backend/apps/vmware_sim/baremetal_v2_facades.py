@@ -129,6 +129,10 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         sku = (payload.get("sku") or payload.get("name") or "h100").strip().lower()
         sku = sku.replace("custom/", "").replace("-jammy", "")
         name = (payload.get("boot_resource") or f"custom/{sku}-jammy").strip()
+        # RHEL ImageDev factory publishes custom/rhel-gpu (not *-jammy).
+        if sku in ("rhel-gpu", "rhel") and "boot_resource" not in payload and "name" not in payload:
+            name = "custom/rhel-gpu"
+            sku = "rhel-gpu"
         arch = (payload.get("architecture") or "amd64/generic").strip()
         resources = maas.setdefault("boot_resources", [])
         existing = next((r for r in resources if r.get("name") == name), None)

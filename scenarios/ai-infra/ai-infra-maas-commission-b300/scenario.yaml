@@ -1,0 +1,55 @@
+title: 'MAAS Commission B300 Node for Inference Cluster'
+slug: ai-infra-maas-commission-b300
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: PSINFRA / Bare Metal ticket — commission an NVIDIA B300 (Blackwell)
+  node into the inference cluster via MAAS. AI Infra Engineering owns MAAS enlist /
+  commission / deploy for GPU SKUs (H100/H200/B300/AMD), not the application GPU course.
+
+
+  ENVIRONMENT: Bare Metal (MAAS) console + Lab Terminal. Datacenter twin available for
+  rack / BMC context. Prefer ImageDev custom boot resource when published.
+
+
+  SYMPTOM: Node is New; BMC reachable; PXE path ready. Commission and verify nvidia-smi
+  sees B300 GPUs.
+
+
+  OBJECTIVE: Commission in MAAS; Deploy with appropriate image; confirm B300 via nvidia-smi -L;
+  mark FIXED-OK.'
+objectives:
+- Commission B300 node in MAAS
+- Deploy and verify GPU visibility
+- Confirm nvidia-smi reports B300
+initial_state: B300 node New in MAAS; not commissioned.
+hints:
+- order: 1
+  cost: 0
+  content: Open Bare Metal → Machines. Find the New B300 node and run Commission before Deploy.
+- order: 2
+  cost: 20
+  content: When status is Ready, Deploy and prefer a custom/B300 ImageDev boot resource if listed.
+- order: 3
+  cost: 45
+  content: On Lab Terminal run nvidia-smi -L, confirm NVIDIA B300 lines, then leave FIXED-OK.
+consoles:
+- baremetal
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-b300
+  role: primary
+  hostname: gpu-node-b300
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal

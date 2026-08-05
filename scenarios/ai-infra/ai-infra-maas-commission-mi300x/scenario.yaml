@@ -1,0 +1,54 @@
+title: 'MAAS Commission MI300X Node for ROCm Training'
+slug: ai-infra-maas-commission-mi300x
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: PSINFRA / Bare Metal ticket — commission an AMD Instinct MI300X
+  node into the ROCm training rack via MAAS. AI Infra Engineering owns MAAS enlist /
+  commission / deploy for AMD GPU SKUs; this is not the application GPU course.
+
+
+  ENVIRONMENT: Bare Metal (MAAS) console + Lab Terminal. Use rocm-smi / amd-smi (not nvidia-smi)
+  after Deploy. Datacenter twin for rack / BMC context.
+
+
+  SYMPTOM: Node is New; BMC reachable; PXE path ready. Commission and verify MI300X visibility.
+
+
+  OBJECTIVE: Commission in MAAS; Deploy ROCm-capable image; confirm MI300X via rocm-smi;
+  mark FIXED-OK.'
+objectives:
+- Commission MI300X node in MAAS
+- Deploy and verify ROCm GPU visibility
+- Confirm rocm-smi reports Instinct MI300X
+initial_state: MI300X node New in MAAS; not commissioned.
+hints:
+- order: 1
+  cost: 0
+  content: Open Bare Metal → Machines. Commission the New MI300X node before attempting Deploy.
+- order: 2
+  cost: 20
+  content: When Ready, Deploy with the ImageDev ROCm / MI300 boot resource if published in Images.
+- order: 3
+  cost: 45
+  content: On Lab Terminal run rocm-smi (or amd-smi); confirm Instinct MI300X, then FIXED-OK.
+consoles:
+- baremetal
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-mi300x
+  role: primary
+  hostname: gpu-node-mi300x
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal
