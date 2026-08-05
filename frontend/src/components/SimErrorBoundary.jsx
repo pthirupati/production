@@ -79,11 +79,18 @@ export default class SimErrorBoundary extends Component {
               {this.props.title || 'Lab environment error'}
             </h2>
             <p className="text-sm text-surface-400 max-w-md">
-              {this.props.message || 'Something went wrong loading this lab environment. Try resetting or reload the page.'}
+              {this.isChunkError
+                ? 'This page loaded an outdated lab console after an update. Hard-refresh is required — Reset saved state will not fix a missing script.'
+                : (this.props.message || 'Something went wrong loading this lab environment. Try resetting or reload the page.')}
             </p>
-            {(this.props.name === 'aws' || this.props.name === 'terraform') && (
+            {(this.props.name === 'aws' || this.props.name === 'terraform') && !this.isChunkError && (
               <p className="text-xs text-surface-500 max-w-md mt-2">
-                AWS labs often fail after an update if an old console cache remains. Use <strong className="text-surface-300">Reset saved state</strong>, then reopen the lab.
+                AWS labs can fail after an update if an old console cache remains. Use <strong className="text-surface-300">Reset saved state</strong>, then reopen the lab.
+              </p>
+            )}
+            {this.isChunkError && (
+              <p className="text-xs text-amber-300/90 max-w-md mt-2">
+                Tip: click <strong className="text-surface-200">Reload page</strong> (clears the one-shot reload guard). If it still fails, hard-refresh the browser (Cmd/Ctrl+Shift+R).
               </p>
             )}
           </div>
@@ -93,9 +100,9 @@ export default class SimErrorBoundary extends Component {
               onClick={this.handleReset}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-accent-cyan/40 text-accent-cyan text-sm hover:bg-accent-cyan/10"
             >
-              <RefreshCw size={14} /> Try again
+              <RefreshCw size={14} /> {this.isChunkError ? 'Reload for update' : 'Try again'}
             </button>
-            {(this.props.resetStorageKey || this.props.onResetStorage) && (
+            {!this.isChunkError && (this.props.resetStorageKey || this.props.onResetStorage) && (
               <button
                 type="button"
                 onClick={this.handleResetStorage}

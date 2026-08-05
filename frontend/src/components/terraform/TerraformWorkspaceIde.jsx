@@ -214,6 +214,22 @@ export default function TerraformWorkspaceIde({
     ...(tf.cloud_links || {}),
   }
   const openCloud = (key) => {
+    // Prefer full overlay popups (with lab chrome) over cramming consoles into
+    // the IDE bottom panel — LabRunner listens for fixitlab:open-companion.
+    if (typeof window !== 'undefined') {
+      if (key === 'aws') {
+        window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind: 'aws' } }))
+        return
+      }
+      if (key === 'azure') {
+        window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind: 'azure' } }))
+        return
+      }
+      if (key === 'gcp') {
+        window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind: 'gcp' } }))
+        return
+      }
+    }
     if (key === 'aws') setBottomTab('console')
     else if (key === 'azure') setBottomTab('azure')
     else if (key === 'gcp') setBottomTab('gcp')
