@@ -1,6 +1,4 @@
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { lazyWithRetry } from '../../utils/lazyWithRetry'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { terraformApi } from '../../api/terraform'
 import toast from 'react-hot-toast'
 import { useConfirm } from '../../hooks/useConfirm'
@@ -13,17 +11,34 @@ import { LabChromeControls } from '../lab/LabChromeBar'
 import { syncTerraformApplyToAwsConsole, syncTerraformDestroyToClouds, detectCloudProvidersFromHcl } from '../../utils/terraformAwsBridge'
 import { useAwsStore } from '../aws/store/awsStore'
 import {
-  FileCode, FolderOpen, Play, Plus, Trash2, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History, ExternalLink, LayoutDashboard,
+  FileCode, FolderOpen, Folder, Play, Plus, Trash2, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History, ExternalLink, ChevronRight, ChevronDown, Palette,
 } from 'lucide-react'
 import '../../styles/vscode-workbench.css'
 
-// Full AWS console, embedded read-only-router style so the terraform lab can show
-// exactly the resources `terraform apply` created without leaving the IDE.
-const AwsConsole = lazyWithRetry(() => import('../aws/AwsConsole'))
-const AzureConsole = lazyWithRetry(() => import('../azure/AzureConsole'))
-const GcpConsole = lazyWithRetry(() => import('../gcp/GcpConsole'))
-
 const DEFAULT_FILES = ['main.tf', 'variables.tf', 'outputs.tf']
+const IDE_THEMES = [
+  { id: 'vscode', label: 'Dark+' },
+  { id: 'light', label: 'Light+' },
+  { id: 'hc', label: 'High Contrast' },
+]
+
+/** Build a nested folder tree from flat path→content map. */
+function buildFileTree(fileMap) {
+  const root = { name: '', children: {}, files: [] }
+  Object.keys(fileMap || {}).sort().forEach((path) => {
+    const parts = path.split('/').filter(Boolean)
+    let node = root
+    parts.forEach((part, i) => {
+      if (i === parts.length - 1) {
+        node.files.push(path)
+      } else {
+        if (!node.children[part]) node.children[part] = { name: part, children: {}, files: [] }
+        node = node.children[part]
+      }
+    })
+  })
+  return root
+}
 
 /** VS Code–style Terraform workspace — files, init/plan/apply, scenario-driven output. */
 export default function TerraformWorkspaceIde({
@@ -47,6 +62,10 @@ export default function TerraformWorkspaceIde({
   const [dirty, setDirty] = useState(false)
   const [showTerminal, setShowTerminal] = useState(!standalone)
   const [terminalReady, setTerminalReady] = useState({})
+  const [ideTheme, setIdeTheme] = useState(() => {
+    try { return sessionStorage.getItem('fixitlab-tf-ide-theme') || 'vscode' } catch { return 'vscode' }
+  })
+  const [expandedDirs, setExpandedDirs] = useState(() => new Set(['modules', 'modules/vpc', 'env']))
   const saveTimer = useRef(null)
   const filesRef = useRef({})
   const terminalRef = useRef(null)
@@ -120,6 +139,8 @@ export default function TerraformWorkspaceIde({
   }, [sessionId, activeFile, setState])
 
   const fileList = Object.keys(files).length ? Object.keys(files).sort() : DEFAULT_FILES
+  const fileTree = buildFileTree(Object.keys(files).length ? files : Object.fromEntries(DEFAULT_FILES.map((f) => [f, ''])))
+  const breadcrumbParts = (activeFile || 'main.tf').split('/')
 
   const handleFileChange = (content) => {
     const next = { ...filesRef.current, [activeFile]: content }
@@ -144,7 +165,7 @@ export default function TerraformWorkspaceIde({
         setOutput(res?.output || res?.plan?.summary || JSON.stringify(res?.plan || res, null, 2) || '')
         if (action === `${actionPrefix}_apply` || action === 'terraform_apply') {
           syncTerraformApplyToAwsConsole(res?.state ? { state: res.state } : state, { sessionId })
-          toast.success('Resources mirrored to cloud consoles — open AWS / Azure / GCP tabs to verify.', { duration: 3500 })
+          toast.success('Resources mirrored — open AWS / Azure / GCP overlays to verify.', { duration: 3500 })
         }
         if (action === `${actionPrefix}_destroy` || action === 'terraform_destroy') {
           syncTerraformDestroyToClouds(res?.state ? { state: res.state } : { state: { ...(state?.state || {}), files } }, { sessionId })
@@ -213,31 +234,121 @@ export default function TerraformWorkspaceIde({
     ...(detectCloudProvidersFromHcl(files) || {}),
     ...(tf.cloud_links || {}),
   }
+  useEffect(() => {
+    try { sessionStorage.setItem('fixitlab-tf-ide-theme', ideTheme) } catch { /* */ }
+  }, [ideTheme])
+
   const openCloud = (key) => {
     // Prefer full overlay popups (with lab chrome) over cramming consoles into
     // the IDE bottom panel — LabRunner listens for fixitlab:open-companion.
     if (typeof window !== 'undefined') {
       if (key === 'aws') {
         window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind: 'aws' } }))
+        toast.success('Opening AWS console overlay', { duration: 1200 })
         return
       }
       if (key === 'azure') {
         window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind: 'azure' } }))
+        toast.success('Opening Azure portal overlay', { duration: 1200 })
         return
       }
       if (key === 'gcp') {
         window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind: 'gcp' } }))
+        toast.success('Opening GCP console overlay', { duration: 1200 })
         return
       }
     }
-    if (key === 'aws') setBottomTab('console')
-    else if (key === 'azure') setBottomTab('azure')
-    else if (key === 'gcp') setBottomTab('gcp')
-    else if (key === 'vmware' && sessionId) {
+    if (key === 'vmware' && sessionId) {
       window.open(`/vmware/${sessionId}?scenario=${scenario?.slug || ''}`, '_blank', 'noopener,noreferrer')
     } else if ((key === 'maas' || key === 'lxd' || key === 'baremetal') && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind: 'baremetal' } }))
     }
+  }
+
+  const toggleDir = (path) => {
+    setExpandedDirs((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
+  const createPath = (kind) => {
+    const hint = kind === 'folder' ? 'modules/network' : 'modules/vpc/main.tf'
+    const name = window.prompt(kind === 'folder' ? 'New folder path:' : 'New file path (.tf):', hint)
+    if (!name?.trim()) return
+    const path = name.trim().replace(/^\/+/, '')
+    if (kind === 'folder') {
+      const keep = `${path.replace(/\/$/, '')}/.keep`
+      const next = { ...filesRef.current, [keep]: '' }
+      filesRef.current = next
+      setFiles(next)
+      setExpandedDirs((prev) => new Set([...prev, path]))
+      setDirty(true)
+      persistFiles(next, activeFile)
+      return
+    }
+    if (!path.endsWith('.tf') && !path.endsWith('.tfvars') && !path.endsWith('.hcl')) {
+      toast.error('Use a .tf / .tfvars / .hcl path')
+      return
+    }
+    const next = {
+      ...filesRef.current,
+      [path]: path.endsWith('.tfvars') ? '# variables\n' : '# New configuration\n',
+    }
+    filesRef.current = next
+    setFiles(next)
+    setActiveFile(path)
+    setDirty(true)
+    const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
+    if (parent) setExpandedDirs((prev) => new Set([...prev, ...parent.split('/').map((_, i, a) => a.slice(0, i + 1).join('/'))]))
+    persistFiles(next, path)
+  }
+
+  const renderTree = (node, prefix = '') => {
+    const dirNames = Object.keys(node.children || {}).sort()
+    const items = []
+    dirNames.forEach((dir) => {
+      const path = prefix ? `${prefix}/${dir}` : dir
+      const open = expandedDirs.has(path)
+      items.push(
+        <div key={`d-${path}`}>
+          <button
+            type="button"
+            className="vsc-tree-row"
+            onClick={() => toggleDir(path)}
+          >
+            {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            {open ? <FolderOpen size={13} className="text-amber-400/90" /> : <Folder size={13} className="text-amber-400/70" />}
+            <span className="truncate">{dir}</span>
+          </button>
+          {open && (
+            <div className="vsc-tree-children">
+              {renderTree(node.children[dir], path)}
+            </div>
+          )}
+        </div>,
+      )
+    })
+    ;(node.files || []).forEach((f) => {
+      const base = f.split('/').pop()
+      items.push(
+        <div key={f} className="flex items-center gap-0.5 w-full group">
+          <VscFileItem active={activeFile === f} onClick={() => setActiveFile(f)} className="flex-1 min-w-0 vsc-tree-file">
+            <FileCode size={13} className="shrink-0 opacity-70" />
+            <span className="truncate">{base}</span>
+            {dirty && activeFile === f && <span className="ml-auto text-[10px] text-amber-400">●</span>}
+          </VscFileItem>
+          {!DEFAULT_FILES.includes(f) && (
+            <button type="button" onClick={() => deleteFile(f)} className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-300" title="Delete">
+              <Trash2 size={11} />
+            </button>
+          )}
+        </div>,
+      )
+    })
+    return items
   }
 
   const bottomContent = () => {
@@ -268,11 +379,11 @@ export default function TerraformWorkspaceIde({
         <div className="h-full min-h-[200px] flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2 shrink-0 px-1">
             <p className="text-[10px] text-[var(--vsc-muted)]">
-              AWS CloudShell — <code className="text-violet-300">terraform apply</code> the files in this editor, then verify with <code className="text-orange-300">aws ec2 describe-instances</code>. Same store as the AWS Console.
+              AWS CloudShell — <code className="text-violet-300">terraform apply</code> then verify with AWS CLI. Full console opens as an overlay.
             </p>
             <button
               type="button"
-              onClick={() => setBottomTab('console')}
+              onClick={() => openCloud('aws')}
               className="vsc-btn text-[10px] inline-flex items-center gap-1"
               style={{ borderColor: '#ff9900', color: '#ff9900' }}
             >
@@ -282,37 +393,6 @@ export default function TerraformWorkspaceIde({
           <div className="flex-1 min-h-[180px] rounded border border-[var(--vsc-border)] overflow-hidden">
             <TerraformAwsTerminal filesRef={filesRef} />
           </div>
-        </div>
-      )
-    }
-    if (bottomTab === 'console') {
-      return (
-        <div className="h-full min-h-[220px] rounded border border-[var(--vsc-border)] overflow-hidden aws-embedded-host">
-          <Suspense fallback={<div className="p-4 text-xs text-[var(--vsc-muted)]">Loading AWS Console…</div>}>
-            <MemoryRouter initialEntries={['/aws-sim/ec2/instances']}>
-              <Routes>
-                <Route path="/aws-sim/*" element={<AwsConsole embedded />} />
-              </Routes>
-            </MemoryRouter>
-          </Suspense>
-        </div>
-      )
-    }
-    if (bottomTab === 'azure') {
-      return (
-        <div className="h-full min-h-[220px] rounded border border-[var(--vsc-border)] overflow-hidden">
-          <Suspense fallback={<div className="p-4 text-xs text-[var(--vsc-muted)]">Loading Azure Portal…</div>}>
-            <AzureConsole embedded sessionId={sessionId} scenario={scenario} />
-          </Suspense>
-        </div>
-      )
-    }
-    if (bottomTab === 'gcp') {
-      return (
-        <div className="h-full min-h-[220px] rounded border border-[var(--vsc-border)] overflow-hidden">
-          <Suspense fallback={<div className="p-4 text-xs text-[var(--vsc-muted)]">Loading Google Cloud Console…</div>}>
-            <GcpConsole embedded sessionId={sessionId} scenario={scenario} />
-          </Suspense>
         </div>
       )
     }
@@ -354,17 +434,33 @@ export default function TerraformWorkspaceIde({
     <>
     <VsCodeWorkbench
       accent={profile.accent}
+      theme={ideTheme}
       className="flex-1 min-h-0"
       sidebarMobile={standalone ? 'horizontal' : 'hidden'}
       title={`${profile.label} Workspace`}
       subtitle={scenario?.title || goal.title || 'IaC IDE'}
+      toolbar={(
+        <div className="flex items-center gap-1.5">
+          <Palette size={12} className="text-[var(--vsc-muted)]" />
+          <select
+            className="vsc-btn text-[10px] py-0.5"
+            value={ideTheme}
+            onChange={(e) => setIdeTheme(e.target.value)}
+            title="IDE color theme"
+          >
+            {IDE_THEMES.map((t) => (
+              <option key={t.id} value={t.id}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
       activityBar={(
         <div className="vsc-activity-bar hidden sm:flex">
           <VscActivityButton active title="Explorer"><Files size={22} /></VscActivityButton>
           <VscActivityButton active={bottomTab === 'aws'} onClick={() => setBottomTab('aws')} title="AWS CLI"><CloudCog size={22} /></VscActivityButton>
-          <VscActivityButton active={bottomTab === 'console'} onClick={() => setBottomTab('console')} title="AWS Console"><LayoutDashboard size={22} /></VscActivityButton>
-          <VscActivityButton active={bottomTab === 'azure'} onClick={() => setBottomTab('azure')} title="Azure Portal"><CloudCog size={22} /></VscActivityButton>
-          <VscActivityButton active={bottomTab === 'gcp'} onClick={() => setBottomTab('gcp')} title="Google Cloud Console"><CloudCog size={22} /></VscActivityButton>
+          {cloudLinks.aws && (
+            <VscActivityButton onClick={() => openCloud('aws')} title="AWS Console overlay"><ExternalLink size={22} /></VscActivityButton>
+          )}
           {canTerminal && (
             <VscActivityButton active={bottomTab === 'terminal'} onClick={() => { setBottomTab('terminal'); setShowTerminal(true) }} title="Terminal"><Terminal size={22} /></VscActivityButton>
           )}
@@ -373,40 +469,34 @@ export default function TerraformWorkspaceIde({
       sidebarHeader={(
         <>
           <span className="flex items-center gap-1"><FolderOpen size={11} /> {profile.explorerLabel}</span>
-          <button type="button" onClick={() => {
-            const name = window.prompt('New .tf file:', 'custom.tf')
-            if (!name?.endsWith('.tf')) return
-            const next = { ...filesRef.current, [name]: '# New configuration\nresource "null_resource" "example" {}\n' }
-            filesRef.current = next
-            setFiles(next)
-            setActiveFile(name)
-            setDirty(true)
-            persistFiles(next, name)
-          }} className="text-[var(--vsc-accent)]" title="New file"><Plus size={12} /></button>
+          <span className="flex items-center gap-1 ml-auto">
+            <button type="button" onClick={() => createPath('folder')} className="text-[var(--vsc-accent)]" title="New folder"><Folder size={12} /></button>
+            <button type="button" onClick={() => createPath('file')} className="text-[var(--vsc-accent)]" title="New file"><Plus size={12} /></button>
+          </span>
         </>
       )}
-      sidebar={fileList.map((f) => (
-        <div key={f} className="flex items-center gap-0.5 w-full group">
-          <VscFileItem active={activeFile === f} onClick={() => setActiveFile(f)} className="flex-1 min-w-0">
-            <FileCode size={13} className="shrink-0 opacity-70" />
-            <span className="truncate">{f}</span>
-            {dirty && activeFile === f && <span className="ml-auto text-[10px] text-amber-400">●</span>}
-          </VscFileItem>
-          {standalone && !DEFAULT_FILES.includes(f) && (
-            <button type="button" onClick={() => deleteFile(f)} className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-300" title="Delete">
-              <Trash2 size={11} />
-            </button>
-          )}
+      sidebar={(
+        <div className="vsc-file-tree">
+          {renderTree(fileTree)}
         </div>
-      ))}
+      )}
       editorTabs={fileList.map((f) => (
         <VscEditorTab key={f} active={activeFile === f} onClick={() => setActiveFile(f)}>
-          <FileCode size={12} /> {f}{dirty && activeFile === f ? ' ●' : ''}
+          <FileCode size={12} /> {f.split('/').pop()}{dirty && activeFile === f ? ' ●' : ''}
         </VscEditorTab>
       ))}
       editorToolbar={(
         <>
-          {!standalone && [`${cli} init`, `${cli} plan`, `${cli} apply -auto-approve`, `${cli} destroy -auto-approve`].map((cmd) => (
+          <div className="vsc-breadcrumb flex items-center gap-0.5 text-[10px] text-[var(--vsc-muted)] mr-2 max-w-[40%] truncate">
+            <FolderOpen size={11} />
+            {breadcrumbParts.map((part, i) => (
+              <span key={`${part}-${i}`} className="inline-flex items-center gap-0.5">
+                {i > 0 && <ChevronRight size={10} />}
+                <span className={i === breadcrumbParts.length - 1 ? 'text-[var(--vsc-text)]' : ''}>{part}</span>
+              </span>
+            ))}
+          </div>
+          {!standalone && [`${cli} init`, `${cli} plan`, `${cli} apply -auto-approve`, `${cli} destroy -auto-approve`, `${cli} fmt`].map((cmd) => (
             <button key={cmd} type="button" onClick={() => sendToTerminal(cmd)} className="vsc-btn"
               title={terminalReady[terminalHost] ? `Run: ${cmd}` : 'Opens the terminal and runs once connected'}>
               <Terminal size={11} /> {cmd}
@@ -469,9 +559,6 @@ export default function TerraformWorkspaceIde({
             <VscPanelTab active={bottomTab === 'output'} onClick={() => setBottomTab('output')}>{profile.label} Output</VscPanelTab>
             <VscPanelTab active={bottomTab === 'events'} onClick={() => setBottomTab('events')}><History size={11} /> Events</VscPanelTab>
             <VscPanelTab active={bottomTab === 'aws'} onClick={() => setBottomTab('aws')}>AWS CLI</VscPanelTab>
-            <VscPanelTab active={bottomTab === 'console'} onClick={() => setBottomTab('console')}><LayoutDashboard size={11} /> AWS Console</VscPanelTab>
-            <VscPanelTab active={bottomTab === 'azure'} onClick={() => setBottomTab('azure')}>Azure</VscPanelTab>
-            <VscPanelTab active={bottomTab === 'gcp'} onClick={() => setBottomTab('gcp')}>GCP</VscPanelTab>
             {canTerminal && showTerminal && (
               <VscPanelTab active={bottomTab === 'terminal'} onClick={() => setBottomTab('terminal')}>Terminal</VscPanelTab>
             )}
@@ -481,7 +568,7 @@ export default function TerraformWorkspaceIde({
       }}
       statusBar={{
         left: activeFile,
-        center: `${profile.label} · HCL · ${tf.initialized ? 'initialized' : 'not initialized'}`,
+        center: `${profile.label} · HCL · ${tf.initialized ? 'initialized' : 'not initialized'} · ${ideTheme}`,
         right: (
           <>
             <span>{dirty ? '● Modified' : 'Saved'}</span>
