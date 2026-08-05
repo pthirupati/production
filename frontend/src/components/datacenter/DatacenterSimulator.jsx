@@ -212,9 +212,9 @@ export default function DatacenterSimulator({
 
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
-    onBackToTerminal: embedded ? (onToggleTerminal || undefined) : onExit,
+    onBackToTerminal: onExit || onToggleTerminal,
     hintsLabel, checkDisabled, extendDisabled,
-    backLabel: simTerminalOpen ? 'Hide terminal' : 'Terminal',
+    backLabel: simTerminalOpen ? 'Hide terminal' : (onExit ? 'Close' : 'Terminal'),
     vmwareHref,
   }
 

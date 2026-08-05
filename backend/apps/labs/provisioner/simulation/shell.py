@@ -39,6 +39,9 @@ class StreamedCommandResult:
     def __str__(self) -> str:
         return "\n".join(self.lines)
 
+    def __contains__(self, item: object) -> bool:
+        return item in str(self)
+
 
 class SimulationStreamHolder:
     """Mimics ExecStreamHolder for WebSocket terminal consumer."""

@@ -1529,7 +1529,15 @@ export default function LabRunner() {
     || (techSlugLc === 'ai-infra' && /packer|image[-_]?factory|imagedev|libguestfs|cloud-init|e2e-image/.test(_packerHay))
     || /packer|image[-_]?factory/.test(_packerHay)
   )
-  const isBaremetalGuiLab = !isCrossTech && (
+  // VyOS labs grade via the router CLI in Lab Terminal — do NOT make MAAS the
+  // primary GUI (simulation_type is often baremetal for PXE underlay). MAAS/LXD/
+  // AWX/DC stay companion overlays with full lab chrome.
+  const isVyosLab = (
+    consolesInclude(scenario?.consoles, 'vyos')
+    || /(?:^|[-_/])vyos(?:[-_/]|$)/i.test(scenario?.slug || '')
+    || /\bvyos\b/i.test(`${scenario?.title || ''} ${scenario?.topic || ''}`)
+  )
+  const isBaremetalGuiLab = !isCrossTech && !isVyosLab && (
     consolesKind === 'baremetal'
     || (!consolesKind && (
       scenario?.simulation_type === 'baremetal'
@@ -1672,7 +1680,7 @@ export default function LabRunner() {
     showMonitoringSim || showNmapSim || showWiresharkSim
     || showDataDashboardSim || showAgentSim || showWindowsSim || showPeopleSoftSim
     || showAwxSim || showBaremetalSim || showTerraformSim || showAwsSim || showCicdSim
-    || showDatacenterSim || showPackerSim
+    || showDatacenterSim || showPackerSim || showAzureSim || showGcpSim
   )
   const primarySimKind = isAwsLab ? 'aws'
     : isK8sLab ? 'k8s'
@@ -1708,6 +1716,9 @@ export default function LabRunner() {
     checkDisabled: validating || solved,
     extendDisabled: extending || extensionsUsed >= 2,
   }
+  // Companion overlays must sit above the lab sidebar (z-70) and keep Close +
+  // Hints/Check/+30m/Stop — never pass embedded=true (that hid chrome).
+  const companionOverlayClass = 'fixed inset-0 z-[80] bg-surface-950 flex flex-col min-h-0'
   const isCrossTechMonitoring = isCrossTech && (
     ['grafana', 'prometheus'].includes(scenario?.technology?.slug)
     || /monitor|grafana|prometheus/.test((scenario?.slug || '').toLowerCase())
@@ -1796,11 +1807,12 @@ export default function LabRunner() {
     || scenario?.aws_link === true
     || consolesInclude(scenario?.consoles, 'aws')
   )
-  // Terraform (and ai-infra) apply can enlist MAAS / create LXD — surface companion console.
+  // Terraform / ai-infra / VyOS apply can enlist MAAS / create LXD — surface companion.
   const showHostedBaremetalLink = !isBaremetalGuiLab && (
     techSlugLc === 'terraform'
     || isTerraformSimLab
     || techSlugLc === 'ai-infra'
+    || isVyosLab
     || scenario?.baremetal_link === true
     || consolesInclude(scenario?.consoles, 'baremetal')
     || consolesInclude(scenario?.consoles, 'maas')
@@ -2142,7 +2154,7 @@ export default function LabRunner() {
         )}
         <div className={`${
           isMobile
-            ? `fixed inset-y-0 left-0 ${simOverlayOpen && sidebarOpen ? 'z-[75]' : 'z-40'} w-80 max-w-[85vw] transform transition-transform ${sidebarOpen && !terminalFullscreen ? 'translate-x-0' : '-translate-x-full'}`
+            ? `fixed inset-y-0 left-0 ${simOverlayOpen && sidebarOpen ? 'z-[70]' : 'z-40'} w-80 max-w-[85vw] transform transition-transform ${sidebarOpen && !terminalFullscreen ? 'translate-x-0' : '-translate-x-full'}`
             : `${sidebarOpen && !terminalFullscreen ? 'w-80' : 'w-0'} transition-all duration-300`
         } overflow-hidden border-r border-surface-700/50 bg-surface-900 shrink-0`}
         >
@@ -2807,6 +2819,23 @@ export default function LabRunner() {
                   <ExternalLink size={12} /> Open Bare Metal
                 </button>
               )}
+              {isVyosLab && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBaremetalSim(false)
+                    setShowAwxSim(false)
+                    setShowDatacenterSim(false)
+                    setSimTerminalOpen(true)
+                    setSidebarOpen(false)
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
+                  style={{ borderColor: 'rgba(234,179,8,.45)', color: '#facc15', background: 'rgba(234,179,8,.12)' }}
+                  title="VyOS router CLI — configure in Lab Terminal (configure / commit / show)"
+                >
+                  <Terminal size={12} /> Open VyOS
+                </button>
+              )}
               {isPackerLab && (
                 <button
                   type="button"
@@ -3184,6 +3213,23 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open Bare Metal
             </button>
           )}
+          {isVyosLab && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowBaremetalSim(false)
+                setShowAwxSim(false)
+                setShowDatacenterSim(false)
+                setSimTerminalOpen(true)
+                setSidebarOpen(false)
+              }}
+              title="VyOS router CLI — configure in Lab Terminal (configure / commit / show)"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(234,179,8,.45)', color: '#facc15', background: 'rgba(234,179,8,.12)' }}
+            >
+              <Terminal size={12} /> Open VyOS
+            </button>
+          )}
           {isSimulationLab && (
             <>
               <SimLabQuickActions
@@ -3478,7 +3524,7 @@ export default function LabRunner() {
           PromQL here, applies the documented config fix in the terminal, then
           runs Check Solution (which grades via check.sh, never auto-passes). */}
       {(isMonitoringLab || (isCrossTechMonitoring && !isCrossTechMonitoringSplit)) && !isSimPrimaryLab && showMonitoringSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950">
+        <div className={companionOverlayClass}>
           <div className="h-full overflow-auto">
             <LazySimPanel
               Sim={LazyMonitoringSimulator}
@@ -3486,7 +3532,9 @@ export default function LabRunner() {
               sessionId={sessionId}
               scenario={scenario}
               flavor={monitoringFlavor}
-              onExit={() => setShowMonitoringSim(false)}
+              embedded={false}
+            onExit={() => setShowMonitoringSim(false)}
+            onToggleTerminal={() => setShowMonitoringSim(false)}
               {...simChromeProps}
             />
           </div>
@@ -3497,9 +3545,11 @@ export default function LabRunner() {
           crafts scans (targets + flags), reads back discovered hosts/ports/
           versions/OS, then runs Check Solution (graded via the engine). */}
       {isNmapLab && !isSimPrimaryLab && showNmapSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950">
+        <div className={companionOverlayClass}>
           <div className="h-full overflow-auto">
-            <LazySimPanel Sim={LazyNmapSimulator} label="nmap" sessionId={sessionId} scenario={scenario} onExit={() => setShowNmapSim(false)} {...simChromeProps} />
+            <LazySimPanel Sim={LazyNmapSimulator} label="nmap" sessionId={sessionId} scenario={scenario} embedded={false}
+            onExit={() => setShowNmapSim(false)}
+            onToggleTerminal={() => setShowNmapSim(false)} {...simChromeProps} />
           </div>
         </div>
       )}
@@ -3508,9 +3558,11 @@ export default function LabRunner() {
           learner sets capture/display filters, follows TCP streams, marks
           packets, then runs Check Solution (graded via the engine). */}
       {isWiresharkLab && !isSimPrimaryLab && showWiresharkSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950">
+        <div className={companionOverlayClass}>
           <div className="h-full overflow-auto">
-            <LazySimPanel Sim={LazyWiresharkSimulator} label="wireshark" sessionId={sessionId} scenario={scenario} onExit={() => setShowWiresharkSim(false)} {...simChromeProps} />
+            <LazySimPanel Sim={LazyWiresharkSimulator} label="wireshark" sessionId={sessionId} scenario={scenario} embedded={false}
+            onExit={() => setShowWiresharkSim(false)}
+            onToggleTerminal={() => setShowWiresharkSim(false)} {...simChromeProps} />
           </div>
         </div>
       )}
@@ -3520,9 +3572,11 @@ export default function LabRunner() {
           sees the engine-computed series rendered as a chart + table, then runs
           Check Solution (graded via validate_datascience_lab). */}
       {isDataDashboardLab && !isSimPrimaryLab && showDataDashboardSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950">
+        <div className={companionOverlayClass}>
           <div className="h-full overflow-auto">
-            <LazySimPanel Sim={LazyDataDashboardSimulator} label="data dashboard" sessionId={sessionId} scenario={scenario} onExit={() => setShowDataDashboardSim(false)} {...simChromeProps} />
+            <LazySimPanel Sim={LazyDataDashboardSimulator} label="data dashboard" sessionId={sessionId} scenario={scenario} embedded={false}
+            onExit={() => setShowDataDashboardSim(false)}
+            onToggleTerminal={() => setShowDataDashboardSim(false)} {...simChromeProps} />
           </div>
         </div>
       )}
@@ -3533,9 +3587,11 @@ export default function LabRunner() {
           trace + final output, then runs Check Solution (graded via
           validate_aiml_lab on the engine). */}
       {isAgentLab && !isSimPrimaryLab && showAgentSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950">
+        <div className={companionOverlayClass}>
           <div className="h-full overflow-auto">
-            <LazySimPanel Sim={LazyAgentWorkflowSimulator} label="AI agent" sessionId={sessionId} scenario={scenario} onExit={() => setShowAgentSim(false)} {...simChromeProps} />
+            <LazySimPanel Sim={LazyAgentWorkflowSimulator} label="AI agent" sessionId={sessionId} scenario={scenario} embedded={false}
+            onExit={() => setShowAgentSim(false)}
+            onToggleTerminal={() => setShowAgentSim(false)} {...simChromeProps} />
           </div>
         </div>
       )}
@@ -3545,57 +3601,69 @@ export default function LabRunner() {
           Computers / Windows Update / Services to perform the fix, then runs
           Check Solution (graded via validate_windows_lab on the engine). */}
       {isWindowsGuiLab && !isSimPrimaryLab && showWindowsSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950">
+        <div className={companionOverlayClass}>
           <div className="h-full overflow-auto">
-            <LazySimPanel Sim={LazyWindowsServerSimulator} label="Windows Server" sessionId={sessionId} scenario={scenario} onExit={() => setShowWindowsSim(false)} {...simChromeProps} />
+            <LazySimPanel Sim={LazyWindowsServerSimulator} label="Windows Server" sessionId={sessionId} scenario={scenario} embedded={false}
+            onExit={() => setShowWindowsSim(false)}
+            onToggleTerminal={() => setShowWindowsSim(false)} {...simChromeProps} />
           </div>
         </div>
       )}
 
       {isPeopleSoftLab && !isSimPrimaryLab && showPeopleSoftSim && (
-        <div className="fixed inset-0 z-[60]">
-          <LazySimPanel Sim={LazyPeopleSoftSimulator} label="PeopleSoft" sessionId={sessionId} scenario={scenario} onExit={() => setShowPeopleSoftSim(false)} {...simChromeProps} />
+        <div className={companionOverlayClass}>
+          <LazySimPanel Sim={LazyPeopleSoftSimulator} label="PeopleSoft" sessionId={sessionId} scenario={scenario} embedded={false}
+            onExit={() => setShowPeopleSoftSim(false)}
+            onToggleTerminal={() => setShowPeopleSoftSim(false)} {...simChromeProps} />
         </div>
       )}
 
       {showAwxSim && (showAwxLink || isAwxLab) && (
-        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+        <div className={companionOverlayClass}>
           <LazySimPanel
             Sim={LazyAwxSimulator}
             label="AWX"
             sessionId={sessionId}
             scenario={scenario}
+            embedded={false}
             onExit={() => setShowAwxSim(false)}
+            onToggleTerminal={() => setShowAwxSim(false)}
             {...simChromeProps}
           />
         </div>
       )}
 
       {isBaremetalGuiLab && !isSimPrimaryLab && showBaremetalSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
-          <LazySimPanel Sim={LazyBaremetalSimulator} label="bare metal" sessionId={sessionId} scenario={scenario} onExit={() => setShowBaremetalSim(false)} {...simChromeProps} />
+        <div className={companionOverlayClass}>
+          <LazySimPanel Sim={LazyBaremetalSimulator} label="bare metal" sessionId={sessionId} scenario={scenario} embedded={false}
+            onExit={() => setShowBaremetalSim(false)}
+            onToggleTerminal={() => setShowBaremetalSim(false)} {...simChromeProps} />
         </div>
       )}
       {showHostedBaremetalLink && showBaremetalSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
-          <LazySimPanel Sim={LazyBaremetalSimulator} label="bare metal" sessionId={sessionId} scenario={scenario} onExit={() => setShowBaremetalSim(false)} {...simChromeProps} />
+        <div className={companionOverlayClass}>
+          <LazySimPanel Sim={LazyBaremetalSimulator} label="bare metal" sessionId={sessionId} scenario={scenario} embedded={false}
+            onExit={() => setShowBaremetalSim(false)}
+            onToggleTerminal={() => setShowBaremetalSim(false)} {...simChromeProps} />
         </div>
       )}
       {showDatacenterLink && showDatacenterSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+        <div className={companionOverlayClass}>
           <LazySimPanel
             Sim={LazyDatacenterSimulator}
             label="datacenter"
             sessionId={sessionId}
             scenario={scenario}
+            embedded={false}
             onExit={() => setShowDatacenterSim(false)}
+            onToggleTerminal={() => setShowDatacenterSim(false)}
             {...simChromeProps}
           />
         </div>
       )}
 
       {isTerraformSimLab && !isSimPrimaryLab && showTerraformSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+        <div className={companionOverlayClass}>
           <LazySimPanel
             Sim={LazyTerraformSimulator}
             name="terraform"
@@ -3608,14 +3676,16 @@ export default function LabRunner() {
             terminalHost={terminalHost}
             blockedCommands={blockedCmds}
             isMobile={isMobile}
+            embedded={false}
             onExit={() => setShowTerraformSim(false)}
+            onToggleTerminal={() => setShowTerraformSim(false)}
             {...simChromeProps}
           />
         </div>
       )}
 
       {isPackerLab && showPackerSim && (
-        <Suspense fallback={<div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center text-sm text-sky-200">Loading Packer workspace…</div>}>
+        <Suspense fallback={<div className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center text-sm text-sky-200">Loading Packer workspace…</div>}>
           <LazyPackerWorkspaceIde
             sessionId={sessionId}
             scenario={scenario}
@@ -3632,7 +3702,7 @@ export default function LabRunner() {
 
       {/* Single AWS companion mount — terraform labs already set showHostedAwsLink. */}
       {(showHostedAwsLink || isTerraformSimLab) && showAwsSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+        <div className={companionOverlayClass}>
           <LazySimPanel
             Sim={LazyAwsLabOverlay}
             name="aws"
@@ -3652,39 +3722,45 @@ export default function LabRunner() {
       )}
 
       {(isTerraformSimLab || showHostedAzureLink) && showAzureSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+        <div className={companionOverlayClass}>
           <LazySimPanel
             Sim={LazyAzureConsole}
             label="Azure Portal"
             sessionId={sessionId}
             scenario={scenario}
+            embedded={false}
             onExit={() => setShowAzureSim(false)}
+            onToggleTerminal={() => setShowAzureSim(false)}
             {...simChromeProps}
           />
         </div>
       )}
 
       {(isTerraformSimLab || showHostedGcpLink) && showGcpSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+        <div className={companionOverlayClass}>
           <LazySimPanel
             Sim={LazyGcpConsole}
             label="GCP Console"
             sessionId={sessionId}
             scenario={scenario}
+            embedded={false}
             onExit={() => setShowGcpSim(false)}
+            onToggleTerminal={() => setShowGcpSim(false)}
             {...simChromeProps}
           />
         </div>
       )}
 
       {isDevOpsPipelineLab && !isSimPrimaryLab && showCicdSim && (
-        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+        <div className={companionOverlayClass}>
           <LazySimPanel
             Sim={LazyCicdPipelineSim}
             label="CI/CD pipeline"
             sessionId={sessionId}
             scenario={scenario}
+            embedded={false}
             onExit={() => setShowCicdSim(false)}
+            onToggleTerminal={() => setShowCicdSim(false)}
             vmwareHref={showSimVmwareLink ? vmwareServerHref : null}
             {...simChromeProps}
           />

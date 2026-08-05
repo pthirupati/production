@@ -58,6 +58,7 @@ function ProgressBar({ pct, label }) {
 export default function BaremetalSimulator({
   sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
   hintsLabel, checkDisabled, extendDisabled, embedded = false,
+  onToggleTerminal, simTerminalOpen = false, vmwareHref,
 }) {
   const [state, setState] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -148,10 +149,14 @@ export default function BaremetalSimulator({
     } finally { setBusy(false) }
   }
 
+  // Companions pass onExit; primary embeds pass onToggleTerminal. Never drop
+  // Close just because embedded=true — that hid lab chrome on Open MAAS overlays.
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
-    onBackToTerminal: embedded ? undefined : onExit,
+    onBackToTerminal: onExit || onToggleTerminal,
     hintsLabel, checkDisabled, extendDisabled,
+    backLabel: simTerminalOpen ? 'Hide terminal' : (onExit ? 'Close' : 'Terminal'),
+    vmwareHref,
   }
 
   if (!loading && state && !loggedIn) {
