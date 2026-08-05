@@ -41,31 +41,179 @@ function FpsMeter({ onFps }) {
 }
 
 /** Dolly + orbit settle when the 3D twin mounts. */
-function CameraIntro({ enabled }) {
+function CameraIntro({ enabled, cinematic = false }) {
   const { camera } = useThree()
   const controls = useThree((s) => s.controls)
   const t0 = useRef(null)
   const done = useRef(false)
-  const from = useMemo(() => new THREE.Vector3(12, 9, 14), [])
-  const to = useMemo(() => new THREE.Vector3(6, 5, 7), [])
+  // Cinematic: security desk → corridor → cold aisle settle (Steam-style enter)
+  const from = useMemo(
+    () => (cinematic ? new THREE.Vector3(-8.5, 1.6, 6.5) : new THREE.Vector3(12, 9, 14)),
+    [cinematic],
+  )
+  const mid = useMemo(() => new THREE.Vector3(-2.5, 1.55, 2.2), [])
+  const to = useMemo(
+    () => (cinematic ? new THREE.Vector3(5.2, 1.55, 4.5) : new THREE.Vector3(6, 5, 7)),
+    [cinematic],
+  )
   const look = useMemo(() => new THREE.Vector3(1, 0.8, -1.5), [])
+  const lookMid = useMemo(() => new THREE.Vector3(-1, 1.1, -0.5), [])
 
   useEffect(() => {
     if (!enabled) return
     t0.current = performance.now()
     done.current = false
     camera.position.copy(from)
-    camera.lookAt(look)
-  }, [enabled, camera, from, look])
+    camera.lookAt(cinematic ? lookMid : look)
+  }, [enabled, camera, from, look, lookMid, cinematic])
 
   useFrame(() => {
     if (!enabled || done.current || t0.current == null) return
-    const u = Math.min(1, (performance.now() - t0.current) / 2200)
+    const dur = cinematic ? 4200 : 2200
+    const u = Math.min(1, (performance.now() - t0.current) / dur)
     const e = 1 - (1 - u) ** 3
-    camera.position.lerpVectors(from, to, e)
-    camera.lookAt(look)
+    if (cinematic) {
+      if (u < 0.45) {
+        const t = e / 0.45
+        camera.position.lerpVectors(from, mid, Math.min(1, t))
+        camera.lookAt(lookMid)
+      } else {
+        const t = (e - 0.45) / 0.55
+        camera.position.lerpVectors(mid, to, Math.min(1, t))
+        camera.lookAt(look)
+      }
+    } else {
+      camera.position.lerpVectors(from, to, e)
+      camera.lookAt(look)
+    }
     if (controls?.target) controls.target.lerp(look, 0.08)
     if (u >= 1) done.current = true
+  })
+  return null
+}
+
+/** Corridor walls: reception → staging → data hall → MDF (low-poly Steam layout). */
+function CorridorShell() {
+  const wall = '#1e293b'
+  const trim = '#334155'
+  return (
+    <group>
+      {/* Reception / badge desk zone */}
+      <mesh position={[-7.2, 1.1, 5.2]} castShadow receiveShadow>
+        <boxGeometry args={[3.2, 2.2, 0.12]} />
+        <meshStandardMaterial color={wall} roughness={0.85} />
+      </mesh>
+      <mesh position={[-5.5, 0.55, 4.0]} castShadow>
+        <boxGeometry args={[1.4, 1.1, 0.55]} />
+        <meshStandardMaterial color="#0f172a" metalness={0.35} roughness={0.5} />
+      </mesh>
+      <Html position={[-5.5, 1.35, 4.0]} center distanceFactor={10} style={{ pointerEvents: 'none' }}>
+        <div className="dc-3d-label">Reception · badge</div>
+      </Html>
+
+      {/* Corridor side walls */}
+      <mesh position={[-3.8, 1.15, 2.4]} receiveShadow>
+        <boxGeometry args={[0.12, 2.3, 5.5]} />
+        <meshStandardMaterial color={wall} roughness={0.9} />
+      </mesh>
+      <mesh position={[0.2, 1.15, 3.6]} receiveShadow>
+        <boxGeometry args={[7.5, 2.3, 0.12]} />
+        <meshStandardMaterial color={trim} roughness={0.88} />
+      </mesh>
+
+      {/* Staging / dock stub */}
+      <mesh position={[-6.0, 0.08, 1.5]} receiveShadow>
+        <boxGeometry args={[2.4, 0.06, 2.0]} />
+        <meshStandardMaterial color="#3f3f46" metalness={0.2} roughness={0.7} />
+      </mesh>
+      <Html position={[-6.0, 1.4, 1.5]} center distanceFactor={12} style={{ pointerEvents: 'none' }}>
+        <div className="dc-3d-label">Staging / dock</div>
+      </Html>
+
+      {/* MDF cage glass */}
+      <mesh position={[6.4, 1.2, -1.2]} castShadow>
+        <boxGeometry args={[1.8, 2.4, 2.2]} />
+        <meshStandardMaterial color="#0ea5e9" transparent opacity={0.12} metalness={0.6} roughness={0.2} />
+      </mesh>
+      <Html position={[6.4, 2.55, -1.2]} center distanceFactor={10} style={{ pointerEvents: 'none' }}>
+        <div className="dc-3d-label dc-3d-label-hot">MDF cage</div>
+      </Html>
+
+      {/* Ceiling soffit over corridor */}
+      <mesh position={[-2.5, 2.35, 2.5]}>
+        <boxGeometry args={[8, 0.08, 3.2]} />
+        <meshStandardMaterial color="#0f172a" />
+      </mesh>
+    </group>
+  )
+}
+
+/** Thermal aisle haze — intensity follows CRAC stress. */
+function ThermalHaze({ stress = 0 }) {
+  const ref = useRef()
+  useFrame(({ clock }) => {
+    if (!ref.current) return
+    const pulse = 0.04 + stress * 0.12 + Math.sin(clock.elapsedTime * 1.4) * 0.015
+    ref.current.material.opacity = Math.max(0.02, pulse)
+  })
+  if (stress < 0.05) return null
+  return (
+    <mesh ref={ref} position={[1.2, 1.1, -2.6]} rotation={[-0.08, 0, 0]}>
+      <planeGeometry args={[10, 2.4]} />
+      <meshBasicMaterial color="#f97316" transparent opacity={0.08} depthWrite={false} side={THREE.DoubleSide} />
+    </mesh>
+  )
+}
+
+/** First-person hall walk (WASD + mouse look). Orbit disabled while active. */
+function WalkController({ enabled }) {
+  const { camera, gl } = useThree()
+  const keys = useRef({})
+  const yaw = useRef(0)
+  const pitch = useRef(-0.12)
+  const pos = useRef(new THREE.Vector3(5.2, 1.55, 4.5))
+
+  useEffect(() => {
+    if (!enabled) return undefined
+    const down = (e) => { keys.current[e.code] = true }
+    const up = (e) => { keys.current[e.code] = false }
+    const move = (e) => {
+      if (document.pointerLockElement !== gl.domElement) return
+      yaw.current -= e.movementX * 0.0022
+      pitch.current = Math.max(-1.2, Math.min(1.2, pitch.current - e.movementY * 0.0022))
+    }
+    const click = () => { gl.domElement.requestPointerLock?.() }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    window.addEventListener('mousemove', move)
+    gl.domElement.addEventListener('click', click)
+    camera.position.copy(pos.current)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+      window.removeEventListener('mousemove', move)
+      gl.domElement.removeEventListener('click', click)
+      try { document.exitPointerLock?.() } catch { /* */ }
+    }
+  }, [enabled, camera, gl])
+
+  useFrame((_, dt) => {
+    if (!enabled) return
+    const speed = (keys.current.ShiftLeft ? 4.2 : 2.4) * dt
+    const forward = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current))
+    const right = new THREE.Vector3(Math.cos(yaw.current), 0, -Math.sin(yaw.current))
+    if (keys.current.KeyW || keys.current.ArrowUp) pos.current.addScaledVector(forward, speed)
+    if (keys.current.KeyS || keys.current.ArrowDown) pos.current.addScaledVector(forward, -speed)
+    if (keys.current.KeyA || keys.current.ArrowLeft) pos.current.addScaledVector(right, -speed)
+    if (keys.current.KeyD || keys.current.ArrowRight) pos.current.addScaledVector(right, speed)
+    // Soft bounds inside hall + corridor
+    pos.current.x = Math.max(-8.5, Math.min(7.5, pos.current.x))
+    pos.current.z = Math.max(-5.5, Math.min(6.5, pos.current.z))
+    pos.current.y = 1.55
+    camera.position.copy(pos.current)
+    camera.rotation.order = 'YXZ'
+    camera.rotation.y = yaw.current
+    camera.rotation.x = pitch.current
   })
   return null
 }
@@ -698,6 +846,7 @@ function CableTray() {
 function SceneContent({
   racks, serversByRack, network, cooling, pdus, selectedId, expandedRack,
   onSelectServer, onSelectRack, onOpenBmc, onUnplugCable, onPlugCable, physicsEnabled, onFps, animBoost, intro,
+  walkMode = false,
 }) {
   const thermalStress = useMemo(() => {
     const units = cooling || []
@@ -789,7 +938,8 @@ function SceneContent({
   return (
     <>
       <FpsMeter onFps={onFps} />
-      <CameraIntro enabled={intro} />
+      {!walkMode && <CameraIntro enabled={intro} cinematic />}
+      <WalkController enabled={walkMode} />
       <color attach="background" args={['#0b0e14']} />
       <fog attach="fog" args={['#0b0e14', 12, 32]} />
       <ambientLight intensity={0.28} />
@@ -798,10 +948,12 @@ function SceneContent({
       <PulsingLight />
       <Environment preset="warehouse" />
       <Floor />
+      <CorridorShell />
       <CeilingLights />
       <CableTray />
       <HotAisleGlow z={-1.6} />
       <HotAisleGlow z={-3.8} />
+      <ThermalHaze stress={thermalStress} />
       {animBoost > 0 && (
         <AirflowParticles
           count={Math.round(140 * animBoost * (1 + thermalStress))}
@@ -851,15 +1003,17 @@ function SceneContent({
       {physicsEnabled && <CablePhysicsBits anchors={cableAnchors} />}
 
       <ContactShadows position={[0, 0.01, 0]} opacity={0.45} scale={22} blur={2.2} far={8} />
-      <OrbitControls
-        makeDefault
-        enableDamping
-        dampingFactor={0.08}
-        maxPolarAngle={Math.PI * 0.48}
-        minDistance={3}
-        maxDistance={18}
-        target={[1, 0.8, -1.5]}
-      />
+      {!walkMode && (
+        <OrbitControls
+          makeDefault
+          enableDamping
+          dampingFactor={0.08}
+          maxPolarAngle={Math.PI * 0.48}
+          minDistance={3}
+          maxDistance={18}
+          target={[1, 0.8, -1.5]}
+        />
+      )}
     </>
   )
 }
@@ -890,13 +1044,14 @@ export default function DatacenterTwin3D({
   const [physicsEnabled, setPhysicsEnabled] = useState(true)
   const [animBoost, setAnimBoost] = useState(1)
   const [intro, setIntro] = useState(true)
+  const [walkMode, setWalkMode] = useState(false)
   const [fps, setFps] = useState(0)
 
   useEffect(() => {
-    if (!intro) return undefined
-    const id = setTimeout(() => setIntro(false), 2400)
+    if (!intro || walkMode) return undefined
+    const id = setTimeout(() => setIntro(false), 4400)
     return () => clearTimeout(id)
-  }, [intro])
+  }, [intro, walkMode])
 
   return (
     <motion.div
@@ -923,11 +1078,23 @@ export default function DatacenterTwin3D({
           />
           Motions
         </label>
-        <button type="button" className="dc-btn-outline dc-btn-xs" onClick={() => setIntro(true)}>
-          Replay intro
+        <label className="dc-3d-toggle">
+          <input
+            type="checkbox"
+            checked={walkMode}
+            onChange={(e) => {
+              const on = e.target.checked
+              setWalkMode(on)
+              if (on) setIntro(false)
+            }}
+          />
+          Walk (WASD)
+        </label>
+        <button type="button" className="dc-btn-outline dc-btn-xs" onClick={() => { setWalkMode(false); setIntro(true) }}>
+          Replay enter
         </button>
         <span className="dc-muted">
-          ~{fps || '—'} FPS · drag NIC connectors to unplug · drag loose ends onto ports to plug · double-click chassis → BMC
+          ~{fps || '—'} FPS · {walkMode ? 'click canvas to look · WASD move · Shift sprint' : 'drag NIC connectors · double-click chassis → BMC'}
         </span>
       </div>
       <div className="dc-3d-canvas-wrap">
@@ -956,6 +1123,7 @@ export default function DatacenterTwin3D({
                 onFps={setFps}
                 animBoost={animBoost}
                 intro={intro}
+                walkMode={walkMode}
               />
             </Physics>
           </Canvas>
