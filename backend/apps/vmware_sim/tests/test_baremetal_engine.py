@@ -304,3 +304,151 @@ class BaremetalLifecycleTests(TestCase):
             res = bm.apply_action(sid, "maas_deploy", {"machine_id": 2, "boot_resource": "custom/missing-jammy"})
             self.assertFalse(res["ok"])
             self.assertIn("not found", (res.get("error") or "").lower())
+
+    # ── Canonical-like MAAS fields + infra ─────────────────────────────────
+    def test_machines_have_canonical_detail_fields(self):
+        sid = self._session("maas-commission")
+        m = self._machine(sid, 1)
+        for key in (
+            "owner", "pool", "zone", "locked", "tags", "fabric", "domain",
+            "power_type", "bmc_address", "bmc_user", "disk_count", "storage_gb",
+            "pci_devices", "usb_devices", "events", "commissioning_results",
+            "test_results", "storage_layout",
+        ):
+            self.assertIn(key, m)
+        self.assertEqual(m["pool"], "default")
+        self.assertEqual(m["zone"], "default")
+        self.assertFalse(m["locked"])
+        self.assertEqual(m["storage_layout"], "flat")
+        iface = m["interfaces"][0]
+        self.assertIn("fabric", iface)
+        self.assertIn("subnet", iface)
+        self.assertIn("ip_mode", iface)
+        self.assertIn("link_speed", iface)
+        # Ready GPU node should already have PCI GPUs from seed.
+        gpus = [p for p in m["pci_devices"] if p.get("type") == "gpu"]
+        self.assertEqual(len(gpus), 8)
+
+    def test_infra_seeded_on_get_state(self):
+        sid = self._session("maas-commission")
+        maas = bm.get_state(sid)["state"]["maas"]
+        for key in (
+            "controllers", "domains", "zones", "resource_pools",
+            "devices", "dhcp", "settings", "users",
+        ):
+            self.assertIn(key, maas)
+            self.assertTrue(maas[key])
+        self.assertTrue(any(c.get("type") == "region" for c in maas["controllers"]))
+        self.assertTrue(any(c.get("type") == "rack" for c in maas["controllers"]))
+        self.assertIn("regiond", maas["controllers"][0]["services"])
+        self.assertEqual(maas["settings"]["maas_name"], "fixitlab")
+
+    def test_commission_fills_gpu_pci_and_results(self):
+        sid = self._session("maas-commission")
+        base = 7_000_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+            mid_commission = self._machine(sid, 2)
+            self.assertEqual(mid_commission["pci_devices"], [])
+        with mock.patch.object(bm, "_now", return_value=base + bm.COMMISSION_SECONDS + 1):
+            m = self._machine(sid, 2)
+        self.assertEqual(m["status"], "Ready")
+        gpus = [p for p in m["pci_devices"] if p.get("type") == "gpu"]
+        self.assertEqual(len(gpus), 8)
+        self.assertTrue(m["commissioning_results"])
+        self.assertTrue(all(r["status"] == "passed" for r in m["commissioning_results"]))
+        events = " ".join(e["message"] for e in m["events"])
+        self.assertIn("Ready", events)
+
+    def test_deploy_logs_allocated_then_deploying(self):
+        sid = self._session("maas-commission")
+        base = 8_000_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+        with mock.patch.object(bm, "_now", return_value=base + bm.COMMISSION_SECONDS + 1):
+            self.assertEqual(self._machine(sid, 2)["status"], "Ready")
+            t_deploy = base + bm.COMMISSION_SECONDS + 1
+        with mock.patch.object(bm, "_now", return_value=t_deploy):
+            res = bm.apply_action(sid, "maas_deploy", {"machine_id": 2})
+            self.assertTrue(res["ok"], res)
+            m = self._machine(sid, 2)
+            self.assertEqual(m["status"], "Deploying")
+            log = " ".join(e["message"] for e in m["log"])
+            self.assertIn("allocated", log.lower())
+            events = " ".join(e["message"] for e in m["events"])
+            self.assertIn("Allocated", events)
+            self.assertIn("Deploying", events)
+        # Deploy steps include DHCP / TFTP / Curtin.
+        with mock.patch.object(bm, "_now", return_value=t_deploy + bm.DEPLOY_SECONDS + 1):
+            m = self._machine(sid, 2)
+            self.assertEqual(m["status"], "Deployed")
+            log = " ".join(e["message"] for e in m["log"])
+            self.assertIn("DHCP", log)
+            self.assertIn("TFTP", log)
+            self.assertIn("Curtin", log)
+
+    def test_release_deployed_to_ready(self):
+        sid = self._session("maas-commission")
+        # Machine 3 starts Deployed.
+        base = 10_000_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            res = bm.apply_action(sid, "maas_release", {"machine_id": 3})
+            self.assertTrue(res["ok"], res)
+            m = self._machine(sid, 3)
+            self.assertEqual(m["status"], "Releasing")
+        with mock.patch.object(bm, "_now", return_value=base + bm.RELEASE_SECONDS + 1):
+            m = self._machine(sid, 3)
+            self.assertEqual(m["status"], "Ready")
+            self.assertEqual(m.get("os") or "", "")
+
+    def test_abort_commissioning_to_failed(self):
+        sid = self._session("maas-commission")
+        base = 11_000_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+            res = bm.apply_action(sid, "maas_abort", {"machine_id": 2})
+            self.assertTrue(res["ok"], res)
+            m = self._machine(sid, 2)
+            self.assertEqual(m["status"], "Failed commissioning")
+            self.assertIsNone(m.get("phase_started_at"))
+
+    def test_lock_blocks_deploy(self):
+        sid = self._session("maas-commission")
+        base = 12_000_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+        with mock.patch.object(bm, "_now", return_value=base + bm.COMMISSION_SECONDS + 1):
+            self.assertEqual(self._machine(sid, 2)["status"], "Ready")
+            t_deploy = base + bm.COMMISSION_SECONDS + 1
+        with mock.patch.object(bm, "_now", return_value=t_deploy):
+            lock = bm.apply_action(sid, "maas_lock", {"machine_id": 2})
+            self.assertTrue(lock["ok"], lock)
+            self.assertTrue(self._machine(sid, 2)["locked"])
+            res = bm.apply_action(sid, "maas_deploy", {"machine_id": 2})
+            self.assertFalse(res["ok"])
+            unlock = bm.apply_action(sid, "maas_unlock", {"machine_id": 2})
+            self.assertTrue(unlock["ok"], unlock)
+            self.assertFalse(self._machine(sid, 2)["locked"])
+            res2 = bm.apply_action(sid, "maas_deploy", {"machine_id": 2})
+            self.assertTrue(res2["ok"], res2)
+
+    def test_apply_storage_layout_lvm_and_raid10(self):
+        sid = self._session("maas-commission")
+        res = bm.apply_action(sid, "maas_apply_storage_layout", {"machine_id": 1, "layout": "lvm"})
+        self.assertTrue(res["ok"], res)
+        m = self._machine(sid, 1)
+        self.assertEqual(m["storage_layout"], "lvm")
+        self.assertTrue(all(d.get("role") == "lvm-pv" for d in m["storage"]))
+        res = bm.apply_action(sid, "maas_apply_storage_layout", {"machine_id": 1, "layout": "raid10"})
+        self.assertTrue(res["ok"], res)
+        m = self._machine(sid, 1)
+        self.assertEqual(m["storage_layout"], "raid10")
+        self.assertGreaterEqual(len(m["storage"]), 4)
+        self.assertTrue(all(d.get("raid") == "raid10" for d in m["storage"]))
+
+    def test_lifecycle_includes_extended_statuses(self):
+        for status in (
+            "Releasing", "Broken", "Testing", "Rescue mode",
+            "Failed commissioning", "Failed deployment",
+        ):
+            self.assertIn(status, bm.LIFECYCLE)

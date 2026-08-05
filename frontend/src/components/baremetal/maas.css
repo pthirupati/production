@@ -1,0 +1,811 @@
+/* Canonical MAAS 3.x–inspired chrome for FixitLab Bare Metal console */
+@import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&family=Ubuntu+Mono:wght@400;700&display=swap');
+
+:root {
+  --maas-aubergine: #77216f;
+  --maas-aubergine-dark: #2c001e;
+  --maas-orange: #e95420;
+  --maas-warm-grey: #aea79f;
+  --maas-cool-grey: #333333;
+  --maas-light: #f7f7f7;
+  --maas-white: #ffffff;
+  --maas-border: #cdcdcd;
+  --maas-border-light: #e5e5e5;
+  --maas-link: #0066cc;
+  --maas-ready: #0e8420;
+  --maas-failed: #c7162b;
+  --maas-transient: #24598f;
+  --maas-nav-bg: #f5f5f5;
+  --maas-nav-active: #fff;
+  --maas-header-h: 48px;
+  --maas-font: 'Ubuntu', 'Ubuntu Regular', system-ui, sans-serif;
+  --maas-mono: 'Ubuntu Mono', 'Courier New', monospace;
+}
+
+.maas-app {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  font-family: var(--maas-font);
+  color: var(--maas-cool-grey);
+  background: var(--maas-light);
+}
+
+.maas-app *,
+.maas-app *::before,
+.maas-app *::after {
+  box-sizing: border-box;
+}
+
+/* ── Dark top bar ─────────────────────────────────────────── */
+.maas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--maas-header-h);
+  min-height: var(--maas-header-h);
+  padding: 0 1rem;
+  background: var(--maas-aubergine-dark);
+  color: #fff;
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.maas-wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 500;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-decoration: none;
+}
+
+.maas-wordmark-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 2px;
+  background: var(--maas-orange);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.maas-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.maas-header-user {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.maas-header-user::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #0e8420;
+}
+
+/* ── Shell with sidenav ───────────────────────────────────── */
+.maas-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.maas-sidenav {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--maas-nav-bg);
+  border-right: 1px solid var(--maas-border);
+  overflow-y: auto;
+  padding: 0.5rem 0;
+}
+
+.maas-sidenav-section {
+  margin-top: 0.75rem;
+  padding: 0.35rem 1rem 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #666;
+}
+
+.maas-sidenav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.45rem 1rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--maas-cool-grey);
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.maas-sidenav-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.maas-sidenav-item.is-active {
+  background: var(--maas-nav-active);
+  border-left-color: var(--maas-orange);
+  font-weight: 500;
+  color: #000;
+}
+
+.maas-sidenav-item svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+.maas-main {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  background: var(--maas-white);
+  padding: 1.25rem 1.5rem 2rem;
+}
+
+.maas-page-title {
+  font-size: 1.5rem;
+  font-weight: 300;
+  margin: 0 0 0.25rem;
+  color: #111;
+}
+
+.maas-page-sub {
+  font-size: 0.8rem;
+  color: #666;
+  margin: 0 0 1rem;
+}
+
+.maas-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.maas-toolbar-spacer {
+  flex: 1;
+}
+
+/* ── Buttons ──────────────────────────────────────────────── */
+.maas-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  font-family: inherit;
+  font-weight: 400;
+  border: 1px solid var(--maas-border);
+  border-radius: 2px;
+  background: #fff;
+  color: var(--maas-cool-grey);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.maas-btn:hover:not(:disabled) {
+  background: #f2f2f2;
+}
+
+.maas-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.maas-btn-positive {
+  background: var(--maas-aubergine);
+  border-color: var(--maas-aubergine);
+  color: #fff;
+}
+
+.maas-btn-positive:hover:not(:disabled) {
+  background: #5e1a58;
+}
+
+.maas-btn-negative {
+  background: var(--maas-failed);
+  border-color: var(--maas-failed);
+  color: #fff;
+}
+
+.maas-btn-negative:hover:not(:disabled) {
+  background: #a41224;
+}
+
+.maas-btn-brand {
+  background: var(--maas-orange);
+  border-color: var(--maas-orange);
+  color: #fff;
+}
+
+.maas-btn-brand:hover:not(:disabled) {
+  background: #c74613;
+}
+
+.maas-btn-sm {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.75rem;
+}
+
+.maas-link-btn {
+  background: none;
+  border: none;
+  color: var(--maas-link);
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.maas-link-btn:hover {
+  text-decoration: underline;
+}
+
+/* ── Forms ────────────────────────────────────────────────── */
+.maas-input,
+.maas-select,
+.maas-textarea {
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--maas-border);
+  border-radius: 2px;
+  background: #fff;
+  color: var(--maas-cool-grey);
+  min-width: 0;
+}
+
+.maas-input:focus,
+.maas-select:focus,
+.maas-textarea:focus {
+  outline: 2px solid rgba(119, 33, 111, 0.35);
+  outline-offset: 1px;
+  border-color: var(--maas-aubergine);
+}
+
+.maas-search {
+  min-width: 220px;
+  flex: 1;
+  max-width: 420px;
+}
+
+.maas-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #555;
+}
+
+/* ── Status badges ────────────────────────────────────────── */
+.maas-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.15rem 0.45rem;
+  border-radius: 2px;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.maas-badge-ready,
+.maas-badge-deployed {
+  color: var(--maas-ready);
+  background: rgba(14, 132, 32, 0.1);
+}
+
+.maas-badge-failed,
+.maas-badge-broken {
+  color: var(--maas-failed);
+  background: rgba(199, 22, 43, 0.1);
+}
+
+.maas-badge-transient {
+  color: var(--maas-transient);
+  background: rgba(36, 89, 143, 0.1);
+}
+
+.maas-badge-neutral {
+  color: #666;
+  background: #eee;
+}
+
+.maas-badge-allocated {
+  color: var(--maas-aubergine);
+  background: rgba(119, 33, 111, 0.1);
+}
+
+.maas-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: maas-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes maas-spin {
+  to { transform: rotate(360deg); }
+}
+
+.maas-power-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.maas-power-on { color: var(--maas-ready); }
+.maas-power-off { color: #888; }
+.maas-power-unknown { color: var(--maas-failed); }
+
+/* ── Filter chips ─────────────────────────────────────────── */
+.maas-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.maas-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  border: 1px solid var(--maas-border);
+  border-radius: 12px;
+  background: #fff;
+  color: #555;
+  cursor: pointer;
+}
+
+.maas-chip.is-active {
+  background: var(--maas-aubergine);
+  border-color: var(--maas-aubergine);
+  color: #fff;
+}
+
+.maas-chip-menu {
+  position: relative;
+}
+
+.maas-chip-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.25rem;
+  min-width: 160px;
+  max-height: 220px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--maas-border);
+  border-radius: 2px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 30;
+  padding: 0.25rem 0;
+}
+
+.maas-chip-dropdown button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-family: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--maas-cool-grey);
+}
+
+.maas-chip-dropdown button:hover {
+  background: #f5f5f5;
+}
+
+/* ── Bulk action bar ──────────────────────────────────────── */
+.maas-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.75rem;
+  margin-bottom: 0.5rem;
+  background: #f0e6ef;
+  border: 1px solid #d4b8d1;
+  border-radius: 2px;
+  font-size: 0.8rem;
+}
+
+.maas-bulk-count {
+  font-weight: 500;
+  margin-right: 0.35rem;
+  color: var(--maas-aubergine);
+}
+
+/* ── Tables ───────────────────────────────────────────────── */
+.maas-table-wrap {
+  border: 1px solid var(--maas-border);
+  border-radius: 2px;
+  overflow: auto;
+  max-height: calc(100vh - 280px);
+  background: #fff;
+}
+
+.maas-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.maas-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #f7f7f7;
+  border-bottom: 1px solid var(--maas-border);
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  font-weight: 500;
+  color: #555;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.maas-table thead th:hover {
+  color: #111;
+}
+
+.maas-table thead th.no-sort {
+  cursor: default;
+}
+
+.maas-table tbody td {
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid var(--maas-border-light);
+  vertical-align: middle;
+}
+
+.maas-table tbody tr:hover {
+  background: #faf8fa;
+}
+
+.maas-table tbody tr.is-selected {
+  background: rgba(119, 33, 111, 0.06);
+}
+
+.maas-table .mono {
+  font-family: var(--maas-mono);
+  font-size: 0.78rem;
+}
+
+.maas-group-row td {
+  background: #f0f0f0;
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: #555;
+  padding: 0.4rem 0.65rem;
+}
+
+.maas-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.maas-tag {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.35rem;
+  background: #eee;
+  border-radius: 2px;
+  color: #444;
+}
+
+/* ── Pagination ───────────────────────────────────────────── */
+.maas-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.maas-pagination-btns {
+  display: flex;
+  gap: 0.35rem;
+}
+
+/* ── Tabs ─────────────────────────────────────────────────── */
+.maas-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border-bottom: 1px solid var(--maas-border);
+  margin-bottom: 1rem;
+}
+
+.maas-tab {
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #666;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+
+.maas-tab:hover {
+  color: #111;
+}
+
+.maas-tab.is-active {
+  color: var(--maas-aubergine);
+  border-bottom-color: var(--maas-orange);
+  font-weight: 500;
+}
+
+/* ── Cards / panels ───────────────────────────────────────── */
+.maas-card {
+  background: #fff;
+  border: 1px solid var(--maas-border);
+  border-radius: 2px;
+  margin-bottom: 1rem;
+}
+
+.maas-card-head {
+  padding: 0.65rem 1rem;
+  font-weight: 500;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--maas-border-light);
+  background: #fafafa;
+}
+
+.maas-card-body {
+  padding: 1rem;
+}
+
+.maas-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 2px;
+  margin-bottom: 1rem;
+  border: 1px solid var(--maas-border);
+  background: #faf8fa;
+}
+
+.maas-banner-ready { border-left: 4px solid var(--maas-ready); }
+.maas-banner-failed { border-left: 4px solid var(--maas-failed); }
+.maas-banner-transient { border-left: 4px solid var(--maas-transient); }
+.maas-banner-neutral { border-left: 4px solid var(--maas-aubergine); }
+
+.maas-kv {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 0.35rem 1rem;
+  font-size: 0.85rem;
+}
+
+.maas-kv dt {
+  color: #666;
+  font-weight: 400;
+}
+
+.maas-kv dd {
+  margin: 0;
+  color: #111;
+}
+
+.maas-progress {
+  margin-top: 0.5rem;
+}
+
+.maas-progress-track {
+  height: 6px;
+  background: #e5e5e5;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.maas-progress-fill {
+  height: 100%;
+  background: var(--maas-transient);
+  transition: width 0.4s ease;
+}
+
+.maas-log {
+  background: #111;
+  color: #e8e8e8;
+  font-family: var(--maas-mono);
+  font-size: 0.75rem;
+  padding: 0.75rem 1rem;
+  max-height: 280px;
+  overflow: auto;
+  border-radius: 0 0 2px 2px;
+  line-height: 1.45;
+}
+
+.maas-log-time {
+  color: #888;
+  margin-right: 0.5rem;
+}
+
+/* ── Dialogs ──────────────────────────────────────────────── */
+.maas-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.maas-dialog {
+  background: #fff;
+  border-radius: 2px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.maas-dialog-head {
+  padding: 0.85rem 1.15rem;
+  font-weight: 500;
+  border-bottom: 1px solid var(--maas-border);
+  background: #fafafa;
+}
+
+.maas-dialog-body {
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.maas-dialog-foot {
+  padding: 0.75rem 1.15rem;
+  border-top: 1px solid var(--maas-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* ── Login ────────────────────────────────────────────────── */
+.maas-login-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #2c001e 0%, #4a0d3a 45%, #77216f 100%);
+  padding: 1.5rem;
+}
+
+.maas-login-card {
+  width: 100%;
+  max-width: 380px;
+  background: #fff;
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.maas-login-head {
+  background: var(--maas-aubergine-dark);
+  color: #fff;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.maas-login-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.maas-login-body p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.maas-goal-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  background: #fff8e6;
+  border-bottom: 1px solid #f0d78c;
+  color: #5c4800;
+  flex-shrink: 0;
+}
+
+.maas-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.maas-health-ok { color: var(--maas-ready); }
+.maas-health-degraded { color: #b36b00; }
+.maas-health-down { color: var(--maas-failed); }
+
+.maas-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.85rem;
+}
+
+.maas-subnet-tree {
+  font-size: 0.85rem;
+}
+
+.maas-subnet-fabric {
+  font-weight: 500;
+  margin: 0.75rem 0 0.35rem;
+  color: #111;
+}
+
+.maas-subnet-vlan {
+  margin-left: 1rem;
+  padding: 0.25rem 0;
+  color: #555;
+}
+
+.maas-subnet-cidr {
+  margin-left: 2rem;
+  font-family: var(--maas-mono);
+  font-size: 0.8rem;
+  padding: 0.15rem 0;
+}
+
+/* Defer legacy bm-* to MAAS palette when nested */
+.bm-shell.maas-app,
+.maas-app.bm-shell {
+  background: var(--maas-light);
+  color: var(--maas-cool-grey);
+}

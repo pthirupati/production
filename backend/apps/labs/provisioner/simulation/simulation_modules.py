@@ -2097,6 +2097,51 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
             or ""
         )
 
+    def _sync_maas_from_gui() -> None:
+        """Prefer the MAAS console session inventory when this lab has one."""
+        sid = _session_id()
+        if not sid:
+            return
+        try:
+            from apps.vmware_sim import baremetal_engine as bm
+            data = bm.get_state(sid, engine.scenario_slug or "")
+            machines = (data.get("state") or {}).get("maas", {}).get("machines") or []
+            if machines:
+                engine._maas_machines = [
+                    {
+                        "name": m.get("hostname") or m.get("name") or f"node-{m.get('id')}",
+                        "status": m.get("status") or "New",
+                        "power": m.get("power") or "off",
+                        "arch": m.get("arch") or "amd64/generic",
+                        "zone": m.get("zone") or "default",
+                        "pool": m.get("pool") or "default",
+                        "ip": m.get("ip") or "-",
+                        "id": m.get("id"),
+                    }
+                    for m in machines
+                ]
+            br = (data.get("state") or {}).get("maas", {}).get("boot_resources") or []
+            if br:
+                engine._maas_boot_resources = [
+                    (r.get("name") if isinstance(r, dict) else str(r)) for r in br
+                ]
+        except Exception:
+            pass
+
+    def _apply_maas_gui_action(action: str, payload: dict) -> dict | None:
+        sid = _session_id()
+        if not sid:
+            return None
+        try:
+            from apps.vmware_sim import baremetal_engine as bm
+            # Ensure a signed-in console session exists for CLI parity.
+            st = bm.get_state(sid, engine.scenario_slug or "")
+            if not (st.get("state") or {}).get("session", {}).get("logged_in"):
+                bm.apply_action(sid, "login", {"user": "admin"})
+            return bm.apply_action(sid, action, payload)
+        except Exception:
+            return None
+
     def _mirror_maas(machine: dict) -> None:
         """S1: commission/deploy → unified asset registry."""
         sid = _session_id()
@@ -2261,9 +2306,11 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
         if "esxcli" in low:
             return "Host CPU: Intel Xeon Gold 6248R\nMemory: 256 GB"
         if low.startswith("maas"):
+            _sync_maas_from_gui()
             machines = engine._maas_machines
             # `maas admin machines read` / `maas login` / commission / deploy
             if "login" in low:
+                _apply_maas_gui_action("login", {"user": "admin"})
                 return "Logged into MAAS at http://10.64.1.2:5240/MAAS/ (user: admin)"
             if "machines" in low and ("read" in low or "list" in low):
                 rows = [
@@ -2279,20 +2326,23 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
             if "commission" in low:
                 target = None
                 for tok in parts:
-                    if tok.startswith("gpu-node") or tok.startswith("node-"):
+                    if tok.startswith("gpu-node") or tok.startswith("node-") or tok.startswith("storage-"):
                         target = tok
                         break
                 for m in machines:
                     if target and m["name"] != target:
                         continue
-                    if m["status"] in ("New", "Failed commissioning", "Ready"):
-                        m["status"] = "Commissioning"
-                        m["power"] = "on"
+                    if m["status"] in ("New", "Failed commissioning", "Failed", "Ready", "Broken"):
+                        mid = m.get("id")
+                        gui = _apply_maas_gui_action("maas_commission", {"machine_id": mid}) if mid else None
+                        if gui and gui.get("ok"):
+                            _sync_maas_from_gui()
+                        else:
+                            m["status"] = "Ready"
+                            m["power"] = "on"
+                            _mirror_maas(m)
                         name = m["name"]
-                        # Simulate quick transition for lab UX
-                        m["status"] = "Ready"
                         from .shell import StreamedCommandResult
-                        _mirror_maas(m)
                         return StreamedCommandResult(
                             lines=[
                                 f"Commissioning started for {name}…",
@@ -2310,11 +2360,20 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                 return "No matching machine available to commission."
             if "deploy" in low:
                 for m in machines:
-                    if m["status"] == "Ready":
-                        m["status"] = "Deployed"
-                        m["ip"] = m["ip"] if m["ip"] != "-" else "10.64.12.40"
+                    if m["status"] in ("Ready", "Allocated"):
+                        mid = m.get("id")
+                        gui = _apply_maas_gui_action("maas_deploy", {"machine_id": mid}) if mid else None
+                        if gui and gui.get("ok"):
+                            _sync_maas_from_gui()
+                            # For CLI UX, advance to Deployed for immediate feedback
+                            # while GUI continues wall-clock Deploying when polled.
+                            m["status"] = "Deployed"
+                            m["ip"] = m["ip"] if m["ip"] not in ("-", "", None) else "10.64.12.40"
+                        else:
+                            m["status"] = "Deployed"
+                            m["ip"] = m["ip"] if m["ip"] != "-" else "10.64.12.40"
+                            _mirror_maas(m)
                         from .shell import StreamedCommandResult
-                        _mirror_maas(m)
                         return StreamedCommandResult(
                             lines=[
                                 f"Deploying Ubuntu 22.04 LTS to {m['name']} "
@@ -2332,8 +2391,13 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
             if "release" in low:
                 for m in machines:
                     if m["status"] == "Deployed":
-                        m["status"] = "Ready"
-                        _mirror_maas(m)
+                        mid = m.get("id")
+                        gui = _apply_maas_gui_action("maas_release", {"machine_id": mid}) if mid else None
+                        if not (gui and gui.get("ok")):
+                            m["status"] = "Ready"
+                            _mirror_maas(m)
+                        else:
+                            _sync_maas_from_gui()
                         return f"Released {m['name']} → Ready"
                 return "No Deployed machine to release."
             if "power" in low:
@@ -2341,14 +2405,19 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                 for m in machines:
                     if action == "status":
                         return "\n".join(f"{x['name']}: power {x['power']}" for x in machines)
+                    mid = m.get("id")
+                    if mid:
+                        _apply_maas_gui_action("maas_power", {"machine_id": mid, "power": action})
                     m["power"] = action
+                _sync_maas_from_gui()
                 return f"Power {action} requested for matching machines."
             if "boot-resources" in low or ("boot" in low and "resource" in low):
+                _sync_maas_from_gui()
                 resources = list(getattr(engine, "_maas_boot_resources", None) or ["ubuntu/jammy", "ubuntu/noble"])
                 rows = ["id  name              architecture  type"]
                 for i, name in enumerate(resources, start=1):
-                    kind = "Uploaded" if name.startswith("custom/") else "Synced"
-                    rows.append(f"{i:<3} {name:<17} amd64/generic  {kind}")
+                    kind = "Uploaded" if str(name).startswith("custom/") else "Synced"
+                    rows.append(f"{i:<3} {str(name):<17} amd64/generic  {kind}")
                 return "\n".join(rows)
             return (
                 "usage: maas <profile> machines read|commission|deploy|release\n"
