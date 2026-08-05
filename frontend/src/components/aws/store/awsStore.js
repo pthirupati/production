@@ -582,7 +582,8 @@ function removeGeneric(s, service, resource, id) {
  * A returning user's own resources survive; new v3 fields appear seeded.
  * Pure + defensive so the persist merge() can call it inside a try/catch.
  */
-function mergePersistedAws(persisted, current) {
+/** Exported for unit tests — keep chrome string[] and drop corrupt resource rows. */
+export function mergePersistedAws(persisted, current) {
   const seed = seedState()
   const p = persisted && typeof persisted === 'object' && !Array.isArray(persisted) ? persisted : {}
   const merged = { ...current, ...p, flash: [] }
@@ -595,9 +596,17 @@ function mergePersistedAws(persisted, current) {
     : seed.currentPrincipal
   merged.settings = { ...seed.settings, ...(p.settings && typeof p.settings === 'object' ? p.settings : {}) }
   const objectKeys = new Set(['account', 'region', 'darkMode', 'flash', 'genericResources', 'currentPrincipal', 'settings'])
+  // Chrome lists are string[] — do not object-filter them away (empty home widgets).
+  const stringArrayKeys = new Set(['favorites', 'recentServices', 'homeWidgets'])
   for (const key of Object.keys(seed)) {
     if (objectKeys.has(key)) continue
     if (Array.isArray(seed[key])) {
+      if (stringArrayKeys.has(key)) {
+        merged[key] = Array.isArray(p[key])
+          ? p[key].filter((row) => typeof row === 'string' && row.length > 0)
+          : seed[key]
+        continue
+      }
       // Drop null/non-object rows from corrupt localStorage blobs so scoped()/
       // TopNav alarms.filter never throw on mount (BUG A / Lab environment error).
       merged[key] = Array.isArray(p[key])
@@ -611,7 +620,21 @@ function mergePersistedAws(persisted, current) {
     const g = { ...seed.genericResources }
     for (const svc of Object.keys(p.genericResources)) {
       const pv = p.genericResources[svc]
-      g[svc] = { ...(seed.genericResources[svc] || {}), ...(pv && typeof pv === 'object' ? pv : {}) }
+      if (!pv || typeof pv !== 'object' || Array.isArray(pv)) {
+        g[svc] = seed.genericResources[svc] || {}
+        continue
+      }
+      const base = { ...(seed.genericResources[svc] || {}) }
+      for (const [rk, rv] of Object.entries(pv)) {
+        if (Array.isArray(rv)) {
+          base[rk] = rv.filter((row) => row != null && typeof row === 'object')
+        } else if (rv != null && typeof rv === 'object') {
+          base[rk] = { ...(base[rk] || {}), ...rv }
+        } else {
+          base[rk] = rv
+        }
+      }
+      g[svc] = base
     }
     merged.genericResources = g
   } else {
@@ -2218,7 +2241,7 @@ export const useAwsStore = create(
     {
       name: 'fixitlab-aws-sim',
       storage: userScopedAwsStorage,
-      version: 3,
+      version: 4,
       // v2 -> v3: new fields get their seeded defaults via merge(); nothing to
       // strip. Provide migrate so zustand does not discard the older payload.
       // Coerce anything that is not a plain object (null / primitive / array

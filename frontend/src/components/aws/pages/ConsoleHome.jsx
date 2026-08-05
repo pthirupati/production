@@ -47,9 +47,9 @@ const CATALOG_BY_KEY = Object.fromEntries(WIDGET_CATALOG.map((w) => [w.key, w]))
 export default function ConsoleHome() {
   const navigate = useNavigate()
   const region = useAwsStore((s) => s.region)
-  const instances = useAwsStore((s) => s.instances)
-  const buckets = useAwsStore((s) => s.s3Buckets)
-  const alarms = useAwsStore((s) => s.cwAlarms)
+  const instances = useAwsStore((s) => s.instances) || []
+  const buckets = useAwsStore((s) => s.s3Buckets) || []
+  const alarms = useAwsStore((s) => s.cwAlarms) || []
   const recentServices = useAwsStore((s) => s.recentServices) || []
   const homeWidgets = useAwsStore((s) => s.homeWidgets) || []
   const setHomeWidgets = useAwsStore((s) => s.setHomeWidgets)
