@@ -180,6 +180,8 @@ class TeamReplyDeliveryTests(TestCase):
 
         engine = UnifiedSimulationEngine(scenario_slug="sim-rhel-lvm-extend", simulation_type="rhel")
         engine.shell.state.storage_disk_provisioned = False
+        # Pending disk must be hidden before the Storage Team reply.
+        self.assertNotIn("sdb", engine.shell.run("lsblk"))
         self.session.simulation_snapshot = snapshot_engine(engine)
         self.session.save(update_fields=["simulation_snapshot"])
         shell_mod._SIM_SESSIONS.clear()
@@ -192,6 +194,23 @@ class TeamReplyDeliveryTests(TestCase):
         self.session.refresh_from_db()
         restored = restore_engine(self.session.simulation_snapshot)
         self.assertTrue(restored.shell.state.storage_disk_provisioned)
+        # TODO 290/323: bot reply advertises `lsblk` — disk must appear there.
+        self.assertIn("sdb", restored.shell.run("lsblk"))
+
+    def test_storage_disk_added_reveals_hidden_device_for_lsblk(self):
+        """Direct ops action: hidden /dev/sdb becomes visible to lsblk."""
+        from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
+        from apps.labs.provisioner.simulation.ops_state import apply_team_ops_action
+
+        engine = UnifiedSimulationEngine(scenario_slug="sim-rhel-lvm-extend", simulation_type="rhel")
+        st = engine.shell.state
+        self.assertFalse(st.storage_disk_provisioned)
+        self.assertNotIn("sdb", engine.shell.run("lsblk"))
+        apply_team_ops_action(engine, "storage_disk_added", "sim-rhel-lvm-extend")
+        self.assertTrue(st.storage_disk_provisioned)
+        self.assertIn("sdb", engine.shell.run("lsblk"))
+        self.assertNotIn("/dev/sdb", st.hidden_block_devices)
+        self.assertIn("/dev/sdb", st.block_devices)
 
     def test_live_engine_path_does_not_clobber_web_worker_snapshot(self):
         """When the engine IS live in-process (gunicorn sync fallback), we must

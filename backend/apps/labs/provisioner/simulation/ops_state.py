@@ -129,6 +129,19 @@ def apply_team_ops_action(engine: UnifiedSimulationEngine | None, action: str, s
         dev = state.pending_storage_device or "/dev/sdb"
         state.storage_disk_provisioned = True
         state.lvm.provision_disk(dev)
+        # Bot reply tells the learner to run `lsblk` — promote the pending
+        # device out of hidden inventory so it shows immediately (TODO 290/323).
+        hidden = getattr(state, "hidden_block_devices", None) or {}
+        blocks = getattr(state, "block_devices", None)
+        if isinstance(hidden, dict) and dev in hidden:
+            disk = hidden.pop(dev)
+            disk.present = True
+            if isinstance(blocks, dict):
+                blocks[dev] = disk
+        elif isinstance(blocks, dict) and dev in blocks:
+            blocks[dev].present = True
+        elif hasattr(state, "add_block_device"):
+            state.add_block_device(dev, "50G", "disk", present=True)
     elif action == "network_nic_added":
         state.network_nic_provisioned = True
         cfg = state.pending_nic_config or "10.0.0.20/24"
