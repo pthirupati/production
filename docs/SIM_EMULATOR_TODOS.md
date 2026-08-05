@@ -453,7 +453,7 @@ Learner-facing UI never says simulation/demo/mock.
 
 ### T8 — Jira / collaboration
 289. [x] Coach reply when `@…team` parse fails (TODO 137) — *near-miss mention coach*
-290. [ ] E2E: mention → bot → disk appears in session `lsblk`
+290. [x] E2E: mention → bot → disk appears in session `lsblk`
 291. [ ] Teams channel bot parity
 
 ### T9 — Unified state bus remaining
@@ -492,7 +492,7 @@ Learner-facing UI never says simulation/demo/mock.
 320. [ ] Windows Simulator contrast pass (no white-on-white)
 321. [ ] PeopleSoft app-server persona verification E2E (not AWS DMI)
 322. [ ] Interview P2.1 voice loop + P2.R6 two-way framing UI
-323. [ ] E2E: `@storage team` → disk in `lsblk` (disk E2E)
+323. [x] E2E: `@storage team` → disk in `lsblk` (disk E2E)
 324. [ ] Learning journey / career track row for AI Infra on `/technologies/ai-infra`
 325. [ ] ai-infra scenario count growth: VyOS + Packer + MAAS + DCOps RMA heroes beyond current 150
 326. [ ] Cross-tech companion session_id share assert in CI
