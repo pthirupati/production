@@ -182,8 +182,44 @@ _DEPLOY_STEPS = [
     (40, "Writing OS image to root disk (curtin)"),
     (70, "Installing cloud-init and initial packages"),
     (90, "Configuring bootloader and rebooting into deployed OS"),
-    (100, "Deployment complete — Ubuntu 22.04 LTS"),
+    (100, "Deployment complete"),
 ]
+
+
+def _boot_resource_os_label(resource: dict | None) -> str:
+    """Human OS string for a MAAS boot resource (custom Packer images included)."""
+    if not resource:
+        return "Ubuntu 22.04 LTS"
+    name = (resource.get("name") or "").strip()
+    if resource.get("os_title"):
+        return str(resource["os_title"])
+    if name.startswith("custom/"):
+        sku = name.replace("custom/", "").replace("-jammy", "").upper()
+        return f"{name} (Jammy GPU {sku})" if sku else name
+    if "noble" in name:
+        return "Ubuntu 24.04 LTS"
+    if "jammy" in name or name.startswith("ubuntu/"):
+        return "Ubuntu 22.04 LTS"
+    return name or "Ubuntu 22.04 LTS"
+
+
+def _resolve_boot_resource(state: dict, name: str | None) -> dict | None:
+    resources = (state.get("maas") or {}).get("boot_resources") or []
+    want = (name or "").strip()
+    if want:
+        for r in resources:
+            if (r.get("name") or "").strip() == want:
+                return r
+        # Allow short sku form: h100 → custom/h100-jammy
+        short = want.replace("custom/", "").replace("-jammy", "")
+        for r in resources:
+            rn = (r.get("name") or "")
+            if rn == f"custom/{short}-jammy" or r.get("sku") == short:
+                return r
+    for r in resources:
+        if "ubuntu/jammy" in (r.get("name") or ""):
+            return r
+    return resources[0] if resources else None
 
 
 def _advance_machine(m: dict, now: float, *, session_id: str = "") -> None:
@@ -219,7 +255,8 @@ def _advance_machine(m: dict, now: float, *, session_id: str = "") -> None:
         elif status == "Deploying":
             m["status"] = "Deployed"
             m["power"] = "on"
-            m["os"] = "Ubuntu 22.04 LTS"
+            m["os"] = m.get("pending_os") or m.get("os") or "Ubuntu 22.04 LTS"
+            m.pop("pending_os", None)
         # S1: Ready/Deployed → unified asset registry (same session as AWX/DC).
         if session_id:
             try:
@@ -328,14 +365,32 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": f"Machine {mid} not found"}
         if m.get("status") not in ("Ready", "Allocated"):
             return {"ok": False, "error": f"Machine {mid} must be Ready before deploy (is {m.get('status')})"}
+        br_name = (
+            payload.get("boot_resource")
+            or payload.get("distro_series")
+            or payload.get("os")
+            or ""
+        )
+        resource = _resolve_boot_resource(state, br_name)
+        if br_name and resource is None:
+            return {"ok": False, "error": f"Boot resource {br_name!r} not found — publish/import it under Images first"}
+        if resource is None:
+            resource = {"name": "ubuntu/jammy", "architecture": "amd64/generic"}
+        os_label = _boot_resource_os_label(resource)
         m["status"] = "Deploying"
         m["progress"] = 0
         m["phase_started_at"] = _now()
         m["phase_duration"] = DEPLOY_SECONDS
-        _log(m, "Deployment started — allocating machine")
-        state["events"].insert(0, {"time": _now_iso(), "message": f"Machine {mid} deployment started", "severity": "info"})
+        m["boot_resource"] = resource.get("name")
+        m["pending_os"] = os_label
+        _log(m, f"Deployment started — allocating machine with {resource.get('name')}")
+        state["events"].insert(0, {
+            "time": _now_iso(),
+            "message": f"Machine {mid} deploying {resource.get('name')}",
+            "severity": "info",
+        })
         _save(session_id, entry)
-        return {"ok": True, "message": "Deploy started"}
+        return {"ok": True, "message": f"Deploy started ({resource.get('name')})", "boot_resource": resource.get("name")}
 
     if action == "maas_power":
         mid = int(payload.get("machine_id") or 2)

@@ -93,11 +93,13 @@ export default function AwxSimulator({
     const t = setInterval(() => { refreshRef.current?.() }, 1200)
     return () => clearInterval(t)
   }, [loggedIn, hasLiveJob])
+  // Companions pass onExit; primary embeds pass onToggleTerminal. Never drop
+  // Back just because embedded=true — that was hiding Close on Open AWX overlays.
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
-    onBackToTerminal: embedded ? (onToggleTerminal || undefined) : onExit,
+    onBackToTerminal: onExit || onToggleTerminal,
     hintsLabel, checkDisabled, extendDisabled,
-    backLabel: simTerminalOpen ? 'Hide terminal' : 'Terminal',
+    backLabel: simTerminalOpen ? 'Hide terminal' : (onExit ? 'Close' : 'Terminal'),
     vmwareHref,
   }
 

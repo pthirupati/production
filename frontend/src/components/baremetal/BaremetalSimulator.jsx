@@ -65,6 +65,7 @@ export default function BaremetalSimulator({
   const [busy, setBusy] = useState(false)
   const [detailId, setDetailId] = useState(null)
   const [listQ, setListQ] = useState('')
+  const [deployImage, setDeployImage] = useState('')
   const slug = scenario?.slug || ''
   const pollRef = useRef(null)
 
@@ -89,6 +90,16 @@ export default function BaremetalSimulator({
   const goal = st?.goal || {}
   const broken = st?.broken || {}
   const machines = useMemo(() => st.maas?.machines || [], [st.maas])
+  const bootResources = useMemo(() => st.maas?.boot_resources || [], [st.maas])
+  useEffect(() => {
+    if (!bootResources.length) return undefined
+    if (deployImage && bootResources.some((r) => r.name === deployImage)) return undefined
+    const prefer = bootResources.find((r) => (r.name || '').startsWith('custom/'))
+      || bootResources.find((r) => r.name === 'ubuntu/jammy')
+      || bootResources[0]
+    if (prefer?.name) setDeployImage(prefer.name)
+    return undefined
+  }, [bootResources, deployImage])
   const listNeedle = listQ.trim().toLowerCase()
   const filteredMachines = useMemo(() => {
     if (!listNeedle) return machines
@@ -204,9 +215,15 @@ export default function BaremetalSimulator({
             <NodeDetail
               machine={detailMachine}
               busy={busy}
+              bootResources={bootResources}
+              deployImage={deployImage}
+              onDeployImageChange={setDeployImage}
               onBack={() => setDetailId(null)}
               onCommission={() => run(() => baremetalApi.commission(sessionId, detailMachine.id), 'Commissioning started')}
-              onDeploy={() => run(() => baremetalApi.deploy(sessionId, detailMachine.id), 'Deploy started')}
+              onDeploy={() => run(
+                () => baremetalApi.deploy(sessionId, detailMachine.id, { boot_resource: deployImage || undefined }),
+                'Deploy started',
+              )}
               onPower={(power) => run(() => baremetalApi.power(sessionId, detailMachine.id, power), 'Power toggled')}
             />
           )}
@@ -216,6 +233,20 @@ export default function BaremetalSimulator({
               <div className="flex justify-between items-center gap-3 flex-wrap">
                 <h2 className="text-lg font-semibold">MAAS Machines</h2>
                 <div className="flex items-center gap-2 flex-wrap">
+                  <label className="text-[10px] text-slate-500 flex items-center gap-1">
+                    Image
+                    <select
+                      value={deployImage}
+                      onChange={(e) => setDeployImage(e.target.value)}
+                      className="text-xs border px-2 py-1.5 rounded bg-white min-w-[160px]"
+                      title="Boot resource for Deploy"
+                    >
+                      {bootResources.map((r) => (
+                        <option key={r.name} value={r.name}>{r.name}</option>
+                      ))}
+                      {!bootResources.length && <option value="">ubuntu/jammy</option>}
+                    </select>
+                  </label>
                   <input
                     type="search"
                     value={listQ}
@@ -235,7 +266,7 @@ export default function BaremetalSimulator({
                       <div className="font-medium flex items-center gap-2">
                         {m.hostname} <StatusBadge status={m.status} />
                       </div>
-                      <div className="text-xs text-slate-500">{m.ip || 'no IP'} · power {m.power} · {m.arch || 'amd64'}{(m.tags || []).length ? ` · ${(m.tags || []).join(', ')}` : ''}</div>
+                      <div className="text-xs text-slate-500">{m.ip || 'no IP'} · power {m.power} · {m.arch || 'amd64'}{(m.tags || []).length ? ` · ${(m.tags || []).join(', ')}` : ''}{m.os ? ` · ${m.os}` : ''}{m.boot_resource ? ` · ${m.boot_resource}` : ''}</div>
                     </button>
                     <div className="flex gap-2 items-center">
                       {(m.status === 'Failed' || m.status === 'New') && (
@@ -243,7 +274,7 @@ export default function BaremetalSimulator({
                           className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>Commission</button>
                       )}
                       {(m.status === 'Ready' || m.status === 'Allocated') && (
-                        <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'maas_deploy', { machine_id: m.id }), 'Deploy started')}
+                        <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'maas_deploy', { machine_id: m.id, boot_resource: deployImage || undefined }), 'Deploy started')}
                           className="px-3 py-1.5 rounded border text-sm flex items-center gap-1"><Rocket size={13} /> Deploy</button>
                       )}
                       <button disabled={busy} onClick={() => run(() => baremetalApi.tagMachine(sessionId, m.hostname, 'lab'), 'Tagged')}
@@ -448,15 +479,33 @@ export default function BaremetalSimulator({
   )
 }
 
-function NodeDetail({ machine, busy, onBack, onCommission, onDeploy, onPower }) {
+function NodeDetail({
+  machine, busy, onBack, onCommission, onDeploy, onPower,
+  bootResources = [], deployImage = '', onDeployImageChange,
+}) {
   const m = machine
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <button onClick={onBack} className="text-sm flex items-center gap-1 text-slate-600 hover:text-slate-900">
           <ChevronLeft size={16} /> Back to machines
         </button>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center flex-wrap">
+          {(m.status === 'Ready' || m.status === 'Allocated') && (
+            <label className="text-[10px] text-slate-500 flex items-center gap-1">
+              Image
+              <select
+                value={deployImage}
+                onChange={(e) => onDeployImageChange?.(e.target.value)}
+                className="text-xs border px-2 py-1.5 rounded bg-white min-w-[160px]"
+              >
+                {bootResources.map((r) => (
+                  <option key={r.name} value={r.name}>{r.name}</option>
+                ))}
+                {!bootResources.length && <option value="">ubuntu/jammy</option>}
+              </select>
+            </label>
+          )}
           {(m.status === 'Failed' || m.status === 'New') && (
             <button disabled={busy} onClick={onCommission}
               className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>Commission</button>
@@ -483,7 +532,11 @@ function NodeDetail({ machine, busy, onBack, onCommission, onDeploy, onPower }) 
         {TRANSIENT.has(m.status) && (
           <ProgressBar pct={m.progress} label={m.status === 'Commissioning' ? 'Commissioning' : 'Deploying'} />
         )}
-        {m.os && <div className="text-xs text-slate-500 mt-2">OS: {m.os} · IP {m.ip || '—'}</div>}
+        {(m.os || m.boot_resource) && (
+          <div className="text-xs text-slate-500 mt-2">
+            OS: {m.os || '—'}{m.boot_resource ? ` · image ${m.boot_resource}` : ''} · IP {m.ip || '—'}
+          </div>
+        )}
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">

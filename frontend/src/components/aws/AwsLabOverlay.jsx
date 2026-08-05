@@ -77,7 +77,7 @@ export default function AwsLabOverlay({
         subtitle={scenario?.title || scenario?.slug || ''}
         accent="#ff9900"
         className="lab-chrome-bar !bg-[#232f3e] !border-b-[#37475a]"
-        onExit={onToggleTerminal}
+        onExit={onExit || onToggleTerminal}
         onHints={onHints}
         onCheck={onCheck}
         onExtend={onExtend}
@@ -85,7 +85,7 @@ export default function AwsLabOverlay({
         hintsLabel={hintsLabel}
         checkDisabled={checkDisabled}
         extendDisabled={extendDisabled}
-        backLabel="Terminal"
+        backLabel={onExit ? 'Close' : 'Terminal'}
         vmwareHref={vmwareHref}
       />
       <div className="flex-1 min-h-0 overflow-hidden aws-embedded-host h-full w-full">

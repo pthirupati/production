@@ -458,6 +458,7 @@ export default function DatacenterSimulator({
               network={network}
               cooling={cooling}
               pdus={pdus.length ? pdus : (powerChain.rack_pdus || [])}
+              tickets={st?.tickets || []}
               selectedServerId={selectedServerId}
               expandedRack={expandedRack}
               onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}
@@ -636,6 +637,7 @@ export default function DatacenterSimulator({
             access={accessControl}
             rooms={rooms}
             busy={busy}
+            selectedServerId={selectedServerId}
             onEnterRoom={enterRoom}
             onOp={(op, extra) => {
               if (op === 'badge_in') {
@@ -864,6 +866,7 @@ export default function DatacenterSimulator({
             access={accessControl}
             rooms={rooms}
             busy={busy}
+            selectedServerId={selectedServerId}
             onEnterRoom={enterRoom}
             onOp={(op, extra) => {
               if (op === 'badge_in') {

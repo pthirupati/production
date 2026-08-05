@@ -1,0 +1,60 @@
+title: 'VyOS: PXE Helper DHCP + Commit/Rollback Underlay'
+slug: ai-infra-vyos-pxe-helper-dhcp
+technology: AI Infrastructure Engineering
+category: Operate
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: Bare Metal / DCOps reports PXE enlist failing — nodes never get DHCP offers on
+  the PXE helper VLAN. Networking owns the VyOS underlay that serves DHCP for MAAS PXE.
+
+
+  ENVIRONMENT: AI Infrastructure Engineering lab terminal with VyOS CLI (configure / commit / compare /
+  rollback / show system commit). MAAS Bare Metal console for enlist verification.
+
+
+  SYMPTOM / STARTING STATE: VyOS DHCP for the PXE helper network is misconfigured or uncommitted.
+  MAAS Enlist (PXE) stalls. A bad commit may need rollback.
+
+
+  OBJECTIVE: Enter VyOS configure mode; set/fix DHCP for the PXE helper subnet; commit; verify with
+  compare/show; if broken, rollback; confirm MAAS can Enlist a node; mark FIXED-OK.
+
+
+  VERIFY: vyos show / commit history healthy; MAAS sees a New/Ready enlist path.'
+objectives:
+- Fix VyOS DHCP for PXE helper VLAN
+- Commit (or rollback) cleanly with compare/history
+- Confirm MAAS PXE enlist progresses
+initial_state: VyOS DHCP offer path broken for PXE VLAN.
+hints:
+- order: 1
+  cost: 0
+  content: From the Lab Terminal, enter VyOS configure. Use compare before commit.
+- order: 2
+  cost: 15
+  content: Set service dhcp-server shared-network for the PXE helper subnet matching MAAS docs.
+- order: 3
+  cost: 35
+  content: commit; if enlist still fails, show system commit and rollback 1, then re-apply.
+- order: 4
+  cost: 55
+  content: In Bare Metal, Enlist (PXE) and confirm a New machine appears, then FIXED-OK.
+consoles:
+- terminal
+- baremetal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - terminal
+  - baremetal

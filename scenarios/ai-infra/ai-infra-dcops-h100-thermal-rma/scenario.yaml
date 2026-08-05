@@ -1,0 +1,60 @@
+title: 'DCOps: H100 Thermal FRU RMA Closed Loop'
+slug: ai-infra-dcops-h100-thermal-rma
+technology: AI Infrastructure Engineering
+category: Troubleshoot
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: datacenter
+time_limit: 1800
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Critical
+description: 'CONTEXT: DCOps ticket — H100 node thermal trip. Vendor RMA parts must land at the dock,
+  get received, staged, installed in the repair bay, then burn-in before the ops ticket closes.
+
+
+  ENVIRONMENT: AI Infrastructure Engineering Datacenter twin (3D hall + campus rooms) + Lab Terminal.
+  Use NOC tickets, Loading Dock, Warehouse/Spares, Repair bay, Burn-in.
+
+
+  SYMPTOM / STARTING STATE: Thermal alert on an H100 chassis. Ops ticket open. No dock ASN yet.
+
+
+  OBJECTIVE: Select the failed server; advance ticket with ship_rma; Arrive/Receive FRU at dock (kit
+  stages for asset); Install kit in Repair bay; run Burn-in; close ticket; mark FIXED-OK.
+
+
+  VERIFY: Ticket closed; kit installed; burn-in pass; thermal clear.'
+objectives:
+- Open/advance RMA so dock ASN is queued
+- Receive FRU and stage kit for the asset
+- Install kit in repair bay and burn-in
+- Close the ops ticket
+initial_state: Thermal trip; ticket open; no RMA parts on dock.
+hints:
+- order: 1
+  cost: 0
+  content: On the 3D floor, select the hot H100. Open NOC tickets and ship_rma for the FRU.
+- order: 2
+  cost: 15
+  content: Enter Loading Dock — Arrive truck then Receive FRU. Kit should stage for the asset.
+- order: 3
+  cost: 35
+  content: Repair bay → Install kit. Then Burn-in room soak/load-bank.
+- order: 4
+  cost: 55
+  content: Resolve/close the ops ticket when burn-in is green, then FIXED-OK.
+consoles:
+- datacenter
+- terminal
+hosted_as: datacenter
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: datacenter
+  appears_in:
+  - datacenter
+  - terminal

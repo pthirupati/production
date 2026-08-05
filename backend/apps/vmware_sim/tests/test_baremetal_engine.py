@@ -268,3 +268,39 @@ class BaremetalLifecycleTests(TestCase):
         res = bm.apply_action(sid, "packer_publish_maas", {"sku": "h100"})
         self.assertTrue(res["ok"], res)
         self.assertEqual(bm.get_state(sid)["state"].get("broken") or {}, {})
+
+    def test_maas_deploy_uses_custom_boot_resource(self):
+        sid = self._session("maas-custom-deploy")
+        base = 5_000_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+        with mock.patch.object(bm, "_now", return_value=base + bm.COMMISSION_SECONDS + 1):
+            self.assertEqual(self._machine(sid, 2)["status"], "Ready")
+            t_deploy = base + bm.COMMISSION_SECONDS + 1
+        pub = bm.apply_action(sid, "maas_publish_boot_resource", {"sku": "h100"})
+        self.assertTrue(pub["ok"], pub)
+        with mock.patch.object(bm, "_now", return_value=t_deploy):
+            res = bm.apply_action(sid, "maas_deploy", {"machine_id": 2, "boot_resource": "custom/h100-jammy"})
+            self.assertTrue(res["ok"], res)
+            self.assertEqual(res.get("boot_resource"), "custom/h100-jammy")
+            deploying = self._machine(sid, 2)
+            self.assertEqual(deploying["status"], "Deploying")
+            self.assertEqual(deploying["boot_resource"], "custom/h100-jammy")
+            self.assertIn("h100", (deploying.get("pending_os") or "").lower())
+        with mock.patch.object(bm, "_now", return_value=t_deploy + bm.DEPLOY_SECONDS + 1):
+            done = self._machine(sid, 2)
+            self.assertEqual(done["status"], "Deployed")
+            self.assertIn("custom/h100-jammy", done.get("os") or "")
+
+    def test_maas_deploy_rejects_unknown_boot_resource(self):
+        sid = self._session("maas-bad-image")
+        base = 6_000_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+        with mock.patch.object(bm, "_now", return_value=base + bm.COMMISSION_SECONDS + 1):
+            self.assertEqual(self._machine(sid, 2)["status"], "Ready")
+            t_deploy = base + bm.COMMISSION_SECONDS + 1
+        with mock.patch.object(bm, "_now", return_value=t_deploy):
+            res = bm.apply_action(sid, "maas_deploy", {"machine_id": 2, "boot_resource": "custom/missing-jammy"})
+            self.assertFalse(res["ok"])
+            self.assertIn("not found", (res.get("error") or "").lower())
