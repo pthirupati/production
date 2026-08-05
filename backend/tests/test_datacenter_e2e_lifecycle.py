@@ -7,11 +7,19 @@ live_tick → journal replay without requiring a browser.
 import uuid
 
 from django.core.cache import cache
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from apps.vmware_sim import datacenter_engine as dc
 
+LOCMEM_CACHE = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "dc-e2e-lifecycle",
+    }
+}
 
+
+@override_settings(CACHES=LOCMEM_CACHE)
 class DatacenterE2ELifecycleTests(SimpleTestCase):
     def setUp(self):
         cache.clear()
@@ -79,3 +87,37 @@ class DatacenterE2ELifecycleTests(SimpleTestCase):
         self.assertTrue(final.get("evidence_pack") or final.get("doc_library"))
         mon = final.get("monitoring") or {}
         self.assertTrue(mon.get("series") is not None or mon.get("exporters"))
+
+    def test_burnin_soak_pass_closes_rma_ticket(self):
+        """Steam FRU loop: soak pass auto-closes awaiting_parts RMA for that asset."""
+        import json
+        from django.core.cache import cache as dj_cache
+
+        state = dc.get_state(self.sid)["state"]
+        machines = (state.get("burnin") or {}).get("machines") or []
+        mid = (machines[0] or {}).get("id") if machines else None
+        self.assertTrue(mid)
+
+        key = f"datacenter_session:{self.sid}"
+        raw = dj_cache.get(key)
+        entry = json.loads(raw) if isinstance(raw, str) else raw
+        self.assertIsNotNone(entry)
+        entry["state"].setdefault("tickets", []).append({
+            "id": "TKT-RMA-E2E",
+            "asset_id": mid,
+            "type": "rma",
+            "status": "awaiting_parts",
+            "summary": "GPU FRU RMA",
+            "history": [],
+        })
+        dj_cache.set(key, json.dumps(entry, default=str), timeout=None)
+
+        self._ok("burnin_ops", {"op": "attach_load_bank", "machine_id": mid})
+        # Three soaks → 100% pass
+        self._ok("burnin_ops", {"op": "soak", "machine_id": mid})
+        self._ok("burnin_ops", {"op": "soak", "machine_id": mid})
+        res = self._ok("burnin_ops", {"op": "soak", "machine_id": mid})
+        self.assertIn("TKT-RMA-E2E", res.get("tickets_closed") or [])
+        tickets = dc.get_state(self.sid)["state"].get("tickets") or []
+        t = next(x for x in tickets if x.get("id") == "TKT-RMA-E2E")
+        self.assertEqual(t.get("status"), "closed")

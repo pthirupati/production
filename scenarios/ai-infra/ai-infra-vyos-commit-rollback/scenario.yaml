@@ -1,0 +1,53 @@
+title: 'VyOS: Commit Rollback After Bad Underlay Change'
+slug: ai-infra-vyos-commit-rollback
+technology: AI Infrastructure Engineering
+category: Troubleshoot
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: Networking / Bare Metal — an engineer committed a bad VyOS underlay
+  change and broke BGP/PXE reachability. AI Infra Engineering must use compare / commit /
+  rollback safely (same workflow as production VyOS).
+
+
+  ENVIRONMENT: Lab Terminal VyOS CLI. Bare Metal for verifying MAAS reachability after restore.
+
+
+  SYMPTOM: After a bad commit, neighbors Idle and PXE helper unreachable.
+
+
+  OBJECTIVE: Inspect show system commit; rollback the bad revision; re-apply a safe change;
+  commit; verify; FIXED-OK.'
+objectives:
+- Inspect VyOS commit history
+- Rollback the bad revision
+- Re-apply a safe underlay change and commit
+initial_state: Bad VyOS commit active; underlay broken.
+hints:
+- order: 1
+  cost: 0
+  content: Run show system commit and show ip bgp summary to identify the bad revision before editing.
+- order: 2
+  cost: 20
+  content: Enter configure, then rollback 1 (or the bad step count) to restore the last known-good config.
+- order: 3
+  cost: 45
+  content: Re-apply the intended safe set … lines, compare, commit, verify BGP/PXE, then FIXED-OK.
+consoles:
+- terminal
+- baremetal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - terminal
+  - baremetal

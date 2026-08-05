@@ -93,9 +93,24 @@ function CameraIntro({ enabled, cinematic = false }) {
 }
 
 /** Corridor walls: reception → staging → data hall → MDF (low-poly Steam layout). */
-function CorridorShell() {
+function CorridorShell({ dockBusy = false }) {
   const wall = '#1e293b'
   const trim = '#334155'
+  const door = useRef()
+  const forklift = useRef()
+  useFrame(({ clock }) => {
+    if (door.current) {
+      // Mantrap door swings open when walking toward the hall (subtle idle motion).
+      const t = (Math.sin(clock.elapsedTime * 0.35) + 1) * 0.5
+      door.current.rotation.y = -0.15 - t * 0.95
+    }
+    if (forklift.current) {
+      const bob = dockBusy ? Math.sin(clock.elapsedTime * 2.2) * 0.04 : 0
+      const slide = dockBusy ? Math.sin(clock.elapsedTime * 0.6) * 0.35 : 0
+      forklift.current.position.x = -6.4 + slide
+      forklift.current.position.y = 0.35 + bob
+    }
+  })
   return (
     <group>
       {/* Reception / badge desk zone */}
@@ -111,6 +126,21 @@ function CorridorShell() {
         <div className="dc-3d-label">Reception · badge</div>
       </Html>
 
+      {/* Mantrap / badge door into the hall */}
+      <group ref={door} position={[-3.9, 1.05, 4.35]}>
+        <mesh castShadow position={[0.55, 0, 0]}>
+          <boxGeometry args={[1.1, 2.05, 0.06]} />
+          <meshStandardMaterial color="#1e3a5f" metalness={0.45} roughness={0.4} />
+        </mesh>
+        <mesh position={[0.95, 0.1, 0.04]}>
+          <boxGeometry args={[0.08, 0.12, 0.04]} />
+          <meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={0.6} />
+        </mesh>
+      </group>
+      <Html position={[-3.6, 2.2, 4.35]} center distanceFactor={11} style={{ pointerEvents: 'none' }}>
+        <div className="dc-3d-label">Mantrap · badge-in</div>
+      </Html>
+
       {/* Corridor side walls */}
       <mesh position={[-3.8, 1.15, 2.4]} receiveShadow>
         <boxGeometry args={[0.12, 2.3, 5.5]} />
@@ -121,13 +151,42 @@ function CorridorShell() {
         <meshStandardMaterial color={trim} roughness={0.88} />
       </mesh>
 
-      {/* Staging / dock stub */}
+      {/* Staging / dock stub + forklift / pallet */}
       <mesh position={[-6.0, 0.08, 1.5]} receiveShadow>
         <boxGeometry args={[2.4, 0.06, 2.0]} />
         <meshStandardMaterial color="#3f3f46" metalness={0.2} roughness={0.7} />
       </mesh>
+      <group ref={forklift} position={[-6.4, 0.35, 1.2]}>
+        <mesh castShadow>
+          <boxGeometry args={[0.9, 0.45, 0.55]} />
+          <meshStandardMaterial color="#f59e0b" metalness={0.3} roughness={0.55} />
+        </mesh>
+        <mesh position={[0.55, 0.35, 0]} castShadow>
+          <boxGeometry args={[0.08, 0.9, 0.08]} />
+          <meshStandardMaterial color="#78716c" metalness={0.6} />
+        </mesh>
+        <mesh position={[0.55, -0.05, 0.2]} castShadow>
+          <boxGeometry args={[0.55, 0.06, 0.08]} />
+          <meshStandardMaterial color="#a8a29e" metalness={0.5} />
+        </mesh>
+        <mesh position={[0.55, -0.05, -0.2]} castShadow>
+          <boxGeometry args={[0.55, 0.06, 0.08]} />
+          <meshStandardMaterial color="#a8a29e" metalness={0.5} />
+        </mesh>
+        {/* Pallet + FRU crate */}
+        <mesh position={[-0.85, -0.12, 0]} castShadow>
+          <boxGeometry args={[0.55, 0.12, 0.45]} />
+          <meshStandardMaterial color="#92400e" roughness={0.9} />
+        </mesh>
+        <mesh position={[-0.85, 0.12, 0]} castShadow>
+          <boxGeometry args={[0.4, 0.28, 0.32]} />
+          <meshStandardMaterial color="#334155" roughness={0.7} />
+        </mesh>
+      </group>
       <Html position={[-6.0, 1.4, 1.5]} center distanceFactor={12} style={{ pointerEvents: 'none' }}>
-        <div className="dc-3d-label">Staging / dock</div>
+        <div className={`dc-3d-label ${dockBusy ? 'dc-3d-label-hot' : ''}`}>
+          Staging / dock{dockBusy ? ' · FRU inbound' : ''}
+        </div>
       </Html>
 
       {/* MDF cage glass */}
@@ -931,6 +990,13 @@ function SceneContent({
     return Math.min(1, score)
   }, [tickets])
 
+  const dockBusy = useMemo(() => {
+    return (tickets || []).some((t) => {
+      const st = (t.status || '').toLowerCase()
+      return st === 'awaiting_parts' || t.type === 'rma' || t._pending_dock_asn || t.rma?.status === 'parts_shipped'
+    })
+  }, [tickets])
+
   const switchCount = (network?.switches || []).length
   const mdfPos = useMemo(() => new THREE.Vector3(5.5, 1.05, -1.2), [])
 
@@ -1023,7 +1089,7 @@ function SceneContent({
       <PulsingLight />
       <Environment preset="warehouse" />
       <Floor />
-      <CorridorShell />
+      <CorridorShell dockBusy={dockBusy} />
       <CeilingLights />
       <CableTray />
       <HotAisleGlow z={-1.6} />

@@ -767,6 +767,15 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                     "Wrote /tmp/nvidia-bug-report.log.gz\n"
                     "fieldiag: PASS (no FRU faults)"
                 )
+            if "psbcheck" in low or "psb-check" in low or "psb_check" in low:
+                return (
+                    "PSBCheck 2.1 — Platform Security Boot bundle\n"
+                    "Secure Boot: enabled\n"
+                    "Measured boot PCR[0..7]: OK\n"
+                    "GPU VBIOS / IFR signature: VALID\n"
+                    "SXM tray FRU EEPROM: OK\n"
+                    "Result: PASS — bundle written /tmp/psbcheck-report.json"
+                )
             if "mig" in low:
                 if "-lgip" in low:
                     return ("+-----------------------------------------------------------------------------+\n"

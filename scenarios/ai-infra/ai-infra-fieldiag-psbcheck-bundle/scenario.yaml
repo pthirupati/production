@@ -1,0 +1,53 @@
+title: 'DCOps: fieldiag + PSBCheck Bundle Before RMA Close'
+slug: ai-infra-fieldiag-psbcheck-bundle
+technology: AI Infrastructure Engineering
+category: Troubleshoot
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: DCOps / Bare Metal ticket — before closing an NVIDIA GPU FRU RMA,
+  run fieldiag (nvidia-bug-report) and PSBCheck platform security boot bundle on the
+  repaired node. AI Infra Engineering owns these BM/DCOps diagnostic commands.
+
+
+  ENVIRONMENT: Lab Terminal on the repaired GPU node + Bare Metal / Datacenter twin for
+  ticket context.
+
+
+  SYMPTOM: FRU replaced; ticket awaiting diagnostics evidence before close.
+
+
+  OBJECTIVE: Collect fieldiag / nvidia-bug-report; run psbcheck; confirm PASS; leave FIXED-OK.'
+objectives:
+- Collect fieldiag / nvidia-bug-report diagnostics
+- Run PSBCheck and confirm PASS
+- Close the DCOps evidence gate with FIXED-OK
+initial_state: GPU node repaired; diagnostic evidence not yet collected.
+hints:
+- order: 1
+  cost: 0
+  content: On Lab Terminal run nvidia-bug-report.sh or fieldiag and confirm /tmp/nvidia-bug-report.log.gz.
+- order: 2
+  cost: 20
+  content: Run psbcheck (or psb-check) and confirm Secure Boot / FRU EEPROM Result PASS in the report.
+- order: 3
+  cost: 45
+  content: Attach evidence mentally to the DCOps ticket workflow, then leave FIXED-OK to close the lab.
+consoles:
+- terminal
+- baremetal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - terminal
+  - baremetal
