@@ -626,7 +626,7 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 431. [ ] Datacenter: FRU RMA full loop UI (locate → dock → repair → burn-in)
 432. [ ] AI Infra: grow scenario count with VyOS/Packer/libguestfs heroes beyond academy packer markers
 433. [ ] Verify AWS labs on prod after #148 AuthBoot harden (hard refresh + reset path)
-434. [ ] AWX companion LabChromeControls visible on every ai-infra primary GUI lab (regression)
+434. [~] AWX companion LabChromeControls visible on every ai-infra primary GUI lab (regression) — *isAwxLab no longer steals ai-infra*
 
 
 ---

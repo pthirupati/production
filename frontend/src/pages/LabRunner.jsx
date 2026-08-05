@@ -1482,20 +1482,24 @@ export default function LabRunner() {
     ))
   )
   // AWX/Tower detection — match the sim type, slug, title, or tags so EVERY
-  // AWX-themed lab opens the AWX simulator, not just the ones slugged "awx".
-  // Title/tags are checked (not the long description) to avoid false positives
-  // from generic cross-tech copy that merely mentions AWX in passing.
+  // AWX-themed lab opens the AWX simulator as primary — but NOT for ai-infra
+  // (those keep terminal/MAAS/Packer primary and open AWX as a companion overlay).
+  const techSlugLcEarly = (scenario?.technology?.slug || '').toLowerCase()
   const _awxHay = scenarioTagHaystack(scenario)
-  const isAwxLab = !isCrossTech && (
+  const isAwxLab = !isCrossTech && techSlugLcEarly !== 'ai-infra' && (
     consolesKind === 'awx'
     || (!consolesKind && (
       scenario?.simulation_type === 'ansible-awx'
-      || /\bawx\b/.test(_awxHay)
-      || /\btower\b/.test(_awxHay)
-      || _awxHay.includes('automation controller')
+      || techSlugLcEarly === 'ansible-awx'
+      || (scenario?.slug || '').startsWith('awx-')
+      || (scenario?.slug || '').startsWith('academy-awx-')
+      || ((techSlugLcEarly === 'ansible' || techSlugLcEarly === '') && (
+        /\bawx\b/.test(_awxHay)
+        || /\btower\b/.test(_awxHay)
+        || _awxHay.includes('automation controller')
+      ))
     ))
-  )
-  const isTerraformSimLab = !isCrossTech && (
+  )  const isTerraformSimLab = !isCrossTech && (
     consolesKind === 'terraform' || (!consolesKind && isTerraformLab(scenario))
   )
   // AWS console heroes (aws-/ec2-/…) use the AWS Console as primary UI.
@@ -3027,7 +3031,7 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open PeopleSoft
             </button>
           )}
-          {(isAwxLab || showAwxLink) && (
+          {showAwxLink && (
             <button
               type="button"
               onClick={() => setShowAwxSim(true)}
@@ -3502,9 +3506,9 @@ export default function LabRunner() {
         </div>
       )}
 
-      {(showAwxLink || (isAwxLab && !isSimPrimaryLab)) && showAwxSim && (
+      {showAwxSim && (showAwxLink || isAwxLab) && (
         <div className="fixed inset-0 z-[60]">
-          <LazySimPanel Sim={LazyAwxSimulator} label="AWX" sessionId={sessionId} scenario={scenario} onExit={() => setShowAwxSim(false)} {...simChromeProps} />
+          <LazySimPanel Sim={LazyAwxSimulator} label="AWX" sessionId={sessionId} scenario={scenario} onExit={() => setShowAwxSim(false)} embedded {...simChromeProps} />
         </div>
       )}
 
