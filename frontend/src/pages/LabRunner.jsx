@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import api from '../api/client'
 import { labApi } from '../api/labs'
@@ -24,6 +24,7 @@ import LabTerminal, { scheduleReadySend } from '../components/LabTerminal'
 import { LabBackendTerminalStatusBar } from '../components/linux/LinuxTerminalChrome'
 import PrimaryLabSim from '../components/lab/PrimaryLabSim'
 import LazySimPanel from '../components/lab/LazySimPanel'
+import { LabChromeControls } from '../components/lab/LabChromeBar'
 import SimErrorBoundary from '../components/SimErrorBoundary'
 import {
   resolvePrimarySimFromConsoles,
@@ -50,6 +51,7 @@ import {
   LazyAzureConsole,
   LazyGcpConsole,
   LazyCodingIDE,
+  LazyPackerWorkspaceIde,
   LazyPromptPlayground,
 } from '../components/lab/labSimLoader'
 import { isTerraformLab } from '../utils/iacFlavor'
@@ -415,6 +417,7 @@ export default function LabRunner() {
   const [simTerminalOpen, setSimTerminalOpen] = useState(false)
   const [showBaremetalSim, setShowBaremetalSim] = useState(false)
   const [showDatacenterSim, setShowDatacenterSim] = useState(false)
+  const [showPackerSim, setShowPackerSim] = useState(false)
   // Bumped by the sim error-boundary "Reset saved state" action to force a
   // clean remount of the primary simulator subtree after re-seeding its store.
   const [simResetNonce, setSimResetNonce] = useState(0)
@@ -508,13 +511,17 @@ export default function LabRunner() {
     setGuidedDone({})
   }, [sessionId])
 
-  // Terraform IDE "Open Bare Metal" (and similar) → companion overlay in this lab.
+  // Terraform IDE "Open Bare Metal" / cloud consoles → companion overlay in this lab.
   useEffect(() => {
     const onOpen = (ev) => {
       const kind = ev?.detail?.kind
       if (kind === 'baremetal') setShowBaremetalSim(true)
       else if (kind === 'aws') setShowAwsSim(true)
+      else if (kind === 'azure') setShowAzureSim(true)
+      else if (kind === 'gcp') setShowGcpSim(true)
       else if (kind === 'datacenter') setShowDatacenterSim(true)
+      else if (kind === 'awx') setShowAwxSim(true)
+      else if (kind === 'packer') setShowPackerSim(true)
     }
     window.addEventListener('fixitlab:open-companion', onOpen)
     return () => window.removeEventListener('fixitlab:open-companion', onOpen)
@@ -1508,6 +1515,15 @@ export default function LabRunner() {
     ))
   )
   const techSlugLc = (scenario?.technology?.slug || '').toLowerCase()
+  // Packer image-factory labs keep the terminal primary (CVE/MAAS grading) and
+  // open a companion HCL workspace IDE — not coding_mode / CodingIDE.
+  // Allow cross_technology academy packs (academy-ai-infra-*-integration-packer*).
+  const _packerHay = `${scenario?.slug || ''} ${scenario?.title || ''} ${scenario?.topic || ''}`.toLowerCase()
+  const isPackerLab = !isTerraformSimLab && (
+    consolesInclude(scenario?.consoles, 'packer')
+    || (techSlugLc === 'ai-infra' && /packer|image[-_]?factory/.test(_packerHay))
+    || /packer|image[-_]?factory/.test(_packerHay)
+  )
   const isBaremetalGuiLab = !isCrossTech && (
     consolesKind === 'baremetal'
     || (!consolesKind && (
@@ -1651,7 +1667,7 @@ export default function LabRunner() {
     showMonitoringSim || showNmapSim || showWiresharkSim
     || showDataDashboardSim || showAgentSim || showWindowsSim || showPeopleSoftSim
     || showAwxSim || showBaremetalSim || showTerraformSim || showAwsSim || showCicdSim
-    || showDatacenterSim
+    || showDatacenterSim || showPackerSim
   )
   const primarySimKind = isAwsLab ? 'aws'
     : isK8sLab ? 'k8s'
@@ -1750,7 +1766,10 @@ export default function LabRunner() {
   const canAwsConsole = userHasTechAccess(techSubs, 'aws')
   const canAzureConsole = userHasTechAccess(techSubs, 'azure')
   const canGcpConsole = userHasTechAccess(techSubs, 'gcp')
-  const canAwxConsole = userHasTechAccess(techSubs, 'ansible') || userHasTechAccess(techSubs, 'ansible-awx')
+  const canAwxConsole = userHasTechAccess(techSubs, 'ansible')
+    || userHasTechAccess(techSubs, 'ansible-awx')
+    || userHasTechAccess(techSubs, 'ai-infra')
+    || techSlugLc === 'ai-infra'
   const showHostedAwsLink = !isAwsLab && canAwsConsole && (
     isAwsAcademyLab
     || hostPlatform === 'aws'
@@ -2647,6 +2666,22 @@ export default function LabRunner() {
                   {hostedAsLabel}
                 </span>
               )}
+              {/* Always-visible lab chrome — AWX/Bare Metal/DC primary labs hide the
+                  terminal action bar, so Hints/Check/+30m/Stop must live here. */}
+              <div className="flex items-center gap-1 lab-chrome-actions">
+                <LabChromeControls
+                  onHints={simChromeProps.onHints}
+                  onCheck={simChromeProps.onCheck}
+                  onExtend={simChromeProps.onExtend}
+                  onStop={simChromeProps.onStop}
+                  hintsLabel={simChromeProps.hintsLabel}
+                  checkDisabled={simChromeProps.checkDisabled}
+                  extendDisabled={simChromeProps.extendDisabled}
+                  showTimer={false}
+                  buttonClass="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-surface-600 text-surface-200 hover:border-accent-cyan hover:text-accent-cyan text-[10px] font-medium"
+                  primaryClass="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-emerald-500/40 text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 text-[10px] font-semibold"
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => setSimTerminalOpen((v) => !v)}
@@ -2736,16 +2771,6 @@ export default function LabRunner() {
                   style={{ borderColor: 'rgba(238,0,0,.45)', color: '#ff6b6b', background: 'rgba(238,0,0,.12)' }}
                 >
                   <ExternalLink size={12} /> Open AWX
-                </button>
-              )}
-              {(isTerraformSimLab || isDevOpsPipelineLab) && (
-                <button
-                  type="button"
-                  onClick={() => setShowAwsSim(true)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
-                  style={{ borderColor: 'rgba(255,153,0,.5)', color: '#ff9900', background: 'rgba(255,153,0,.12)' }}
-                >
-                  <ExternalLink size={12} /> AWS Console
                 </button>
               )}
               {isMonitoringLab && (
@@ -3013,17 +3038,7 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open AWX
             </button>
           )}
-          {isTerraformSimLab && (
-            <button
-              type="button"
-              onClick={() => setShowAwsSim(true)}
-              title="Open AWS Console — verify EC2/S3/IAM resources created by Terraform apply"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
-              style={{ borderColor: 'rgba(255,153,0,.5)', color: '#ff9900', background: 'rgba(255,153,0,.12)' }}
-            >
-              <ExternalLink size={12} /> AWS Console
-            </button>
-          )}
+          {/* AWS for terraform / academy uses showHostedAwsLink ("Open AWS") — do not duplicate. */}
           {isTerraformSimLab && (
             <button
               type="button"
@@ -3069,15 +3084,15 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open Terraform
             </button>
           )}
-          {isAwsLab && !isSimPrimaryLab && (
+          {isPackerLab && (
             <button
               type="button"
-              onClick={() => setShowAwsSim(true)}
-              title="Open the AWS Management Console — EC2, S3, IAM, VPC, RDS, Lambda and more"
+              onClick={() => setShowPackerSim(true)}
+              title="Open Packer workspace — edit .pkr.hcl, validate, and build (CVE gate → MAAS)"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
-              style={{ borderColor: 'rgba(255,153,0,.5)', color: '#ff9900', background: 'rgba(255,153,0,.12)' }}
+              style={{ borderColor: 'rgba(2,168,239,.45)', color: '#02A8EF', background: 'rgba(2,168,239,.12)' }}
             >
-              <ExternalLink size={12} /> AWS Console
+              <ExternalLink size={12} /> Open Packer
             </button>
           )}
           {isDevOpsPipelineLab && !isSimPrimaryLab && (
@@ -3526,6 +3541,22 @@ export default function LabRunner() {
           onExit={() => setShowTerraformSim(false)}
           {...simChromeProps}
         />
+      )}
+
+      {isPackerLab && showPackerSim && (
+        <Suspense fallback={<div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center text-sm text-sky-200">Loading Packer workspace…</div>}>
+          <LazyPackerWorkspaceIde
+            sessionId={sessionId}
+            scenario={scenario}
+            terminalSession={terminalSession}
+            terminalHost={terminalHost}
+            blockedCommands={blockedCmds}
+            isMobile={isMobile}
+            onExit={() => setShowPackerSim(false)}
+            {...simChromeProps}
+            showLabControls
+          />
+        </Suspense>
       )}
 
       {isTerraformSimLab && showAwsSim && (

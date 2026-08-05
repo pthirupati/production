@@ -453,7 +453,7 @@ Learner-facing UI never says simulation/demo/mock.
 
 ### T8 — Jira / collaboration
 289. [x] Coach reply when `@…team` parse fails (TODO 137) — *near-miss mention coach*
-290. [ ] E2E: mention → bot → disk appears in session `lsblk`
+290. [x] E2E: mention → bot → disk appears in session `lsblk`
 291. [ ] Teams channel bot parity
 
 ### T9 — Unified state bus remaining
@@ -482,7 +482,7 @@ Learner-facing UI never says simulation/demo/mock.
 310. [x] Ansible YAML backfill: `consoles: [terminal, awx]` or `awx_link: true` on all ansible heroes (not only academy `simulation_type: ansible`)
 311. [x] AWS companion link on every AWS-tech scenario (not only terraform/hosted heuristics)
 312. [ ] TypeScript coding tech tree (missing entirely) + academy coding_mode pack
-313. [ ] Packer CodingIDE / workspace for image-factory scenarios (ai-infra)
+313. [x] Packer CodingIDE / workspace for image-factory scenarios (ai-infra)
 314. [x] Terraform destroy → delete mirrored cloud/VMware resources
 315. [ ] MAAS UI region/rack/images panes pixel surface
 316. [ ] VyOS firewall/NAT/VPN/VRRP CLI + pixel appliance UI
@@ -492,7 +492,7 @@ Learner-facing UI never says simulation/demo/mock.
 320. [ ] Windows Simulator contrast pass (no white-on-white)
 321. [ ] PeopleSoft app-server persona verification E2E (not AWS DMI)
 322. [ ] Interview P2.1 voice loop + P2.R6 two-way framing UI
-323. [ ] E2E: `@storage team` → disk in `lsblk` (disk E2E)
+323. [x] E2E: `@storage team` → disk in `lsblk` (disk E2E)
 324. [ ] Learning journey / career track row for AI Infra on `/technologies/ai-infra`
 325. [ ] ai-infra scenario count growth: VyOS + Packer + MAAS + DCOps RMA heroes beyond current 150
 326. [ ] Cross-tech companion session_id share assert in CI
@@ -501,17 +501,111 @@ Learner-facing UI never says simulation/demo/mock.
 
 ---
 
+## U. Mega wave — Steam DC + AI Infra depth + AWS/IDE realism (2026-08-05 audit)
+
+Source: learner report (Steam Data Center Simulator parity, AI Infra as first-class tech, AWS Lab environment error, AWX chrome missing, Terraform popup consoles, Packer IDE, company-grade projects). Deep code audit before shipping — do not re-open fixed items blindly.
+
+### U0 — Critical learner blockers (ship first)
+329. [~] AWS "Lab environment error": distinguish ChunkLoadError vs Zustand — hide Reset for chunk fails; hard-reload copy — *wave1 UX*
+330. [ ] AWS: gate LabRunner on persist rehydrate so overlay reset is not undone by async merge
+331. [ ] AWS: `mergePersistedAws` keep string chrome arrays (`favorites` / `recentServices` / `homeWidgets`)
+332. [ ] AWS: null-safe ConsoleHome / S3Pages / InstanceList post-nav reads
+333. [ ] AWS: verify CDN/edge never caches `index.html` over nginx no-cache
+334. [ ] AWS: production verify academy-aws + aws-ec2 heroes load after deploy without boundary
+335. [~] Primary GUI labs (AWX/Bare Metal/DC/Terraform): always-visible Hints/Check/+30m/Stop on companion strip — *wave1*
+336. [~] AI Infra subscription unlocks Open AWX companion (not only ansible/ansible-awx) — *wave1*
+337. [~] Terraform Open Cloud → full overlay popup (not cramped bottom panel) via companion event — *wave1*
+338. [~] Deduplicate Terraform "Open AWS" vs "AWS Console" chips — *wave1*
+339. [~] Packer IDE: allow `cross_technology` academy packer labs (`isPackerLab` gate) — *wave1*
+340. [ ] Packer labs YAML: `consoles: [terminal, packer]` + drop or keep cross_tech intentionally
+341. [ ] AWX primary labs: CI assert LabChromeBar + companion strip both receive four handlers
+342. [ ] Close / merge storage lsblk E2E + Packer IDE PRs into main + 4D deploy
+
+### U1 — Steam-class Datacenter immersion (target: Data Center Simulator Game feel)
+343. [ ] Default entry: optional "Enter facility" cinematic (camera truck through security → reception → hall)
+344. [ ] First-person / badge-walk mode (even low-poly) for campus rooms — not orbit-only
+345. [ ] 3D corridor meshes linking reception → staging → data-hall → MDF (progressive; ErrorBoundary)
+346. [ ] Keep 2D floor default; "Enter hall (3D)" CTA with chrome intact + dedicated R3F ErrorBoundary
+347. [ ] Ambient CRAC/PDU/fan audio bed + thermal alarm stinger tied to DC tickets
+348. [ ] LED blink / fan spin / thermal aisle haze volume FX (extend Q 180–185)
+349. [ ] Cable bend + port LED realism on ToR / MDF trunks
+350. [ ] Full FRU RMA loop: locate → order → dock receive → repair bay swap → burn-in → close ticket
+351. [ ] Parts warehouse ↔ dock ↔ repair bay inventory sync with Jira FRU tickets
+352. [ ] Per-rack GPU tray cross-link to `ai-infra` scenario IDs (TODO 271)
+353. [ ] Soundscape mute / volume control in DC chrome
+354. [ ] Progressive LOD / mobile 2D-only path so Steam FX never brick phones
+355. [ ] DC twin performance budget: 60fps desktop target on mid GPU; degrade gracefully
+356. [ ] Pixel checklist: Steam store reference for rack install / cable / walk pacing (docs + QA rubric)
+
+### U2 — AI Infrastructure Engineering as first-class technology
+357. [x] Tech slug `ai-infra` live on prod with 150 scenarios (catalog verify)
+358. [ ] Career track / learning journey row on `/technologies/ai-infra` (324)
+359. [ ] Grow beyond 150: dedicated VyOS heroes (BGP, DHCP helper, firewall, commit/rollback UI)
+360. [ ] Grow: Packer image-factory heroes with IDE + MAAS publish assert
+361. [ ] Grow: MAAS commission/deploy/release paced PXE + region/rack/images pixel panes
+362. [ ] Grow: LXD GPU passthrough + projects/migration labs
+363. [ ] Grow: AWX JT packs for driver/DCGM/repave with inventory from MAAS
+364. [ ] Grow: DCOps RMA / thermal / SXM tray / fieldiag / DCGM heroes from Bare Metal team tickets
+365. [ ] Ingest Bare Metal + ImageDev + DCOps wiki/Jira/GitHub readmes → scenario matrix spreadsheet
+366. [ ] NVIDIA H100 / H200 / B300 + AMD MI300 command matrices in graded labs (not only GPU tech)
+367. [ ] libguestfs / virt-customize image inspect labs under ai-infra
+368. [ ] Packer-built artifact selectable as MAAS boot-resource in same session (end-to-end)
+369. [ ] Open MAAS / Open AWX / Open Datacenter / Open Packer always visible on ai-infra labs when entitled
+370. [ ] Ai-infra must NOT dump all work into `gpu` tech — keep GPU app-platform separate
+371. [ ] Integrated stack graded project: MAAS + VyOS + LXD + AWX + DC + GPU CLI as one flow
+372. [ ] Pixel MAAS UI: region/rack/images/scripts panes
+373. [ ] Pixel VyOS UI: interfaces + firewall + BGP summary (beyond CLI)
+374. [ ] AWX job stdout stream + inventory sync from MAAS for ai-infra JT labs
+375. [ ] Seed more company-style projects (multi-ticket, multi-team, deps) for ai-infra
+
+### U3 — Company-grade projects (all technologies)
+376. [ ] Project template: epic + multi-team Jira + wiki + Git + AWX + validation gates
+377. [ ] Every project lists real team handoffs (@storage / @network / @security / @backup / ImageDev / DCOps)
+378. [ ] Projects require cross-console proof (terminal + GUI + ticket comments)
+379. [ ] Refresh weak projects: acceptance criteria must name exact commands/consoles
+380. [ ] Add dependency graph UI on project board (blocked-by tickets)
+381. [ ] Project rubrics: timebox + severity + change window like real change management
+
+### U4 — Scenario quality / command coverage (all techs)
+382. [ ] Crawl every scenario YAML: consoles[], simulation_type, check.sh, graders — no fail-open
+383. [ ] Every linked button in lab chrome opens a working surface for that session_id
+384. [ ] Cross-tech scenarios: shared session_id assert in CI (326)
+385. [ ] Dead-link crawl CI for console routes (327)
+386. [ ] Per-tech 20-pack depth (273–283) with tracker dashboard (328)
+387. [ ] Improve weak solutions/hints that skip required tools
+388. [ ] Align academy markers FIXED-OK with real remediation paths
+
+### U5 — IDE excellence (Terraform / Packer / Coding)
+389. [~] Terraform: cloud consoles open as overlays not bottom tabs — *wave1*
+390. [ ] Terraform IDE: full folder tree, multi-root modules, `.terraform.lock.hcl`, fmt on save
+391. [ ] Terraform IDE: integrated terminal that creates/edits files under `/root/terraform`
+392. [ ] Terraform IDE: color themes, breadcrumbs, problems panel, command palette
+393. [ ] Packer IDE: sync edited `.pkr.hcl` into sim shell filesystem before build
+394. [ ] Packer IDE: variables UI + build log panel + artifact → MAAS publish button
+395. [ ] Coding IDE: file/folder structure, run/debug, multi-file tests (318)
+396. [ ] Unified IDE shell shared by TF/Packer/Coding (VsCodeWorkbench extensions)
+
+### U6 — AWS console depth & stability
+397. [ ] Expand service coverage only after mount stability green
+398. [ ] Persist schema version bump + migration for aws-sim blobs
+399. [ ] Soft-gate AppRouter/LabRunner until AWS rehydrate finishes
+400. [ ] E2E Playwright: open aws-ec2 lab, navigate EC2/S3, no boundary
+
+### U7 — Continue twin connectivity / leftover spine
+401. [ ] Terraform destroy/MAAS fan-out already partially shipped — extend other `maas_*` types
+402. [ ] VyOS commit/rollback + BGP UI depth (226/261)
+403. [ ] Subscription-manager realism remaining edge cases
+404. [ ] Interview P2 voice + framing (322)
+405. [ ] Unified asset registry finish (§S1) across AWS/DC/MAAS/AWX
+
+---
+
 ## Execution order (updated)
 
-1. **Ship** lab-surfaces PR (121–129) — hosting, links, ping stream, DC 3D fallback
-2. Consoles schema + academy coding_mode reseed (130–133)
-3. Terraform↔cloud bridge + AWS/DC load hardening (134–136) — **merged #131–#132**
-4. Jira mentions + contrast (137–138)
-5. **Merged PR #127–#132** AI Infra + AWX/Packer + GPU matrix + TF cloud + load harden
-6. **This wave:** TF→VMware + VyOS commit/rollback + AI Infra catalog visibility + **prod deploy seed**
-7. ~~Coding IDE reseed (java/shell/html/nodejs) + env-resolver CI hard-fail (243–250)~~ **merged #135**
-8. **Now:** subscription-manager + AWX ai-infra link + mention coach + follow streams (304–307)
-9. AWS/DC ErrorBoundary pin (308–309) + ansible consoles backfill (310)
-10. AI Infra depth: MAAS UI, Packer IDE, DCOps RMA, Steam DC stubs (315–317, 296–302)
-11. Interview realism P2 leftovers (322, 284–288)
-12. Per-tech 20-packs + unified bus finish (273–283, 292–295)
+1. **Wave1 (this PR):** AWS chunk-error UX, primary-lab chrome, AWX ai-infra entitlement, TF overlay popup + AWS chip dedupe, Packer cross-tech gate, merge storage+Packer
+2. AWS rehydrate/persist harden (330–334, 397–400)
+3. Steam DC immersion U1 (343–356) — start with 3D corridor + audio + FRU loop
+4. AI Infra growth U2 (359–375) — VyOS/Packer/MAAS/AWX/DCOps from BM tickets
+5. Company projects U3 + scenario crawl U4
+6. IDE excellence U5
+7. Twin leftovers U7 / Interview / registry

@@ -78,9 +78,10 @@ describe('SimErrorBoundary chunk-load recovery', () => {
       </SimErrorBoundary>,
     )
     // The error screen shows and NO further reload fires (guard prevents a loop).
-    await waitFor(() => expect(screen.queryByText(/Something went wrong/i)).not.toBeNull(), { timeout: 3000 })
-    // Clicking "Try again" also stays guarded.
-    fireEvent.click(screen.getByText(/Try again/i))
+    await waitFor(() => expect(screen.getByText(/Reload for update/i)).toBeTruthy(), { timeout: 3000 })
+    expect(screen.getByText(/outdated lab console/i)).toBeTruthy()
+    // Clicking the chunk-recovery button stays guarded (no second hard reload).
+    fireEvent.click(screen.getByText(/Reload for update/i))
     expect(reloadSpy).not.toHaveBeenCalled()
   })
 
