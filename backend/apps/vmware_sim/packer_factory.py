@@ -588,16 +588,40 @@ def handle_action(state: dict, action: str, payload: dict | None = None) -> dict
 
 
 def clear_needs_custom_image_deploy(state: dict) -> bool:
-    """Clear optional grading flag when a Deployed machine uses custom/* boot resource."""
+    """Clear optional grading flags when custom boot resources are published/deployed."""
     broken = state.get("broken")
-    if not isinstance(broken, dict) or not broken.get("needs_custom_image_deploy"):
+    if not isinstance(broken, dict):
         return False
-    machines = (state.get("maas") or {}).get("machines") or []
-    for m in machines:
-        br = (m.get("boot_resource") or "")
-        if m.get("status") == "Deployed" and str(br).startswith("custom/"):
-            broken.pop("needs_custom_image_deploy", None)
-            if not broken:
-                state["broken"] = {}
-            return True
-    return False
+    changed = False
+    resources = (state.get("maas") or {}).get("boot_resources") or []
+    names = {str(r.get("name") or "") for r in resources}
+
+    missing = broken.get("missing_boot_resources")
+    if isinstance(missing, list) and missing:
+        still = [n for n in missing if n not in names]
+        if len(still) != len(missing):
+            broken["missing_boot_resources"] = still
+            changed = True
+        if not still:
+            broken.pop("missing_boot_resources", None)
+            broken.pop("packer_image_unpublished", None)
+            changed = True
+
+    need = broken.get("missing_boot_resource")
+    if need and need in names:
+        broken.pop("missing_boot_resource", None)
+        broken.pop("packer_image_unpublished", None)
+        changed = True
+
+    if broken.get("needs_custom_image_deploy"):
+        machines = (state.get("maas") or {}).get("machines") or []
+        for m in machines:
+            br = (m.get("boot_resource") or "")
+            if m.get("status") == "Deployed" and str(br).startswith("custom/"):
+                broken.pop("needs_custom_image_deploy", None)
+                changed = True
+                break
+
+    if changed and not broken:
+        state["broken"] = {}
+    return changed

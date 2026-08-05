@@ -1,0 +1,62 @@
+title: 'AWX: MAAS Dynamic Inventory → GPU Fleet Deploy'
+slug: ai-infra-awx-maas-fleet-deploy
+technology: AI Infrastructure Engineering
+category: Automation
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: ansible-awx
+time_limit: 1800
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: Bare Metal / AWX integration ticket — Automation Controller''s MAAS
+  dynamic inventory source is stale, so the fleet deploy job template only sees a handful of
+  Ready nodes instead of the full rack. AI Infra Engineering owns this AWX↔MAAS inventory sync
+  and job template path for fleet bring-up.
+
+
+  ENVIRONMENT: AWX console + Bare Metal (MAAS) + Lab Terminal. Companion chrome (Hints/Check/+30m/Stop)
+  stays usable while AWX is open.
+
+
+  SYMPTOM / STARTING STATE: MAAS inventory source in AWX has not synced recently; the fleet
+  deploy job template inventory is missing several Ready nodes that MAAS already shows.
+
+
+  OBJECTIVE: Sync the MAAS inventory source in AWX; confirm the missing Ready nodes now appear
+  in the inventory; launch the fleet deploy job template against the full inventory; confirm
+  MAAS shows the nodes progressing to Deployed; leave FIXED-OK.'
+objectives:
+- Sync the MAAS inventory source in AWX
+- Confirm all Ready nodes appear in the fleet inventory
+- Launch the deploy job and confirm MAAS shows Deployed nodes
+initial_state: AWX MAAS inventory source stale; several Ready nodes missing from inventory.
+hints:
+- order: 1
+  cost: 0
+  content: Open AWX from the lab strip and check Inventories → the MAAS source''s last sync time and status.
+- order: 2
+  cost: 20
+  content: Trigger a manual Sync on the MAAS inventory source, then confirm the host count matches Ready nodes in MAAS.
+- order: 3
+  cost: 40
+  content: Launch the fleet deploy job template against the refreshed inventory, selecting all newly visible hosts.
+- order: 4
+  cost: 60
+  content: Switch to Bare Metal and confirm the nodes move to Deploying/Deployed, then leave FIXED-OK.
+consoles:
+- awx
+- baremetal
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - awx
+  - baremetal
+  - terminal

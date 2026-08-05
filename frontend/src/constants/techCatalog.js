@@ -24,7 +24,7 @@ export const TECH_CATALOG = [
   { name: 'DevOps', slug: 'devops', color: '#b266e0', tag: 'Hands-on labs', description: 'Practice CI/CD, infrastructure-as-code, and end-to-end delivery pipelines.' },
   { name: 'Prompt Engineering', slug: 'prompt-engineering', color: '#9a7bff', tag: 'Free AI course', price: 0, description: 'Master prompting and AI workflows — free course plus a practical terminal.' },
   { name: 'Bare Metal & IPMI', slug: 'baremetal', color: '#feb155', tag: 'Hands-on labs', description: 'Drive servers over IPMI/BMC — power, sensors, boot order, and remote console.' },
-  { name: 'AI Infrastructure Engineering', slug: 'ai-infra', color: '#76b900', tag: 'Hands-on labs', description: 'Commission GPU nodes with MAAS, DCGM, AWX, and DC twin — H100/H200 ops like production bare metal.' },
+  { name: 'AI Infrastructure Engineering', slug: 'ai-infra', color: '#76b900', tag: 'Hands-on labs', description: 'Separate career track: MAAS, VyOS, LXD, AWX, Packer/ImageDev, cloud-init, GPU sanity (H100/H200/B300/AMD), and Datacenter twin — DCOps / Bare Metal / PSINFRA fleet ops.' },
   { name: 'GPU & NVIDIA', slug: 'gpu', color: '#b266e0', tag: 'Hands-on labs', description: 'Troubleshoot GPU drivers, CUDA, and accelerated compute environments.' },
   { name: 'Grafana', slug: 'grafana', color: '#f7913b', tag: 'Hands-on labs', description: 'Operate Grafana — dashboards, panels, variables, alerting, and contact points.' },
   { name: 'Prometheus', slug: 'prometheus', color: '#e6522c', tag: 'Hands-on labs', description: 'Query PromQL, debug exporters, recording/alerting rules, and Alertmanager routing.' },

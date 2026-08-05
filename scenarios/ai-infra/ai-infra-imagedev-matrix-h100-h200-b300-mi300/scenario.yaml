@@ -1,0 +1,63 @@
+title: 'ImageDev: Packer Matrix Build — H100/H200/B300/MI300 → MAAS'
+slug: ai-infra-imagedev-matrix-h100-h200-b300-mi300
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 2100
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Critical
+description: 'CONTEXT: ImageDev (PSINFRA board) needs one Packer template matrix that produces
+  a boot resource for every GPU SKU on the fleet roadmap — H100, H200, B300, and AMD MI300 —
+  then publishes each artifact into MAAS so Bare Metal can Deploy the right image per rack.
+  AI Infra Engineering owns this multi-SKU image factory path, not the application GPU course.
+
+
+  ENVIRONMENT: Packer workspace IDE + Bare Metal (MAAS) Images pane + Lab Terminal. No external
+  cloud calls — treat the Packer→MAAS matrix as the production factory pipeline.
+
+
+  SYMPTOM / STARTING STATE: Only a subset of the matrix builds cleanly; MAAS boot-resources is
+  missing one or more of custom/h100-jammy, custom/h200-jammy, custom/b300-jammy, and
+  custom/mi300-jammy. Fleet bring-up is blocked for whichever SKU is missing.
+
+
+  OBJECTIVE: Open Packer; validate and build each SKU in the matrix (CVE gate must pass per
+  variant); Publish every successful artifact to MAAS; confirm Images lists all four
+  custom/<sku>-jammy resources; leave FIXED-OK once the matrix is complete.'
+objectives:
+- Validate and build the Packer matrix for all four GPU SKUs
+- Publish each SKU artifact to MAAS as custom/<sku>-jammy
+- Confirm MAAS Images lists all four boot resources
+initial_state: Packer matrix template present; one or more SKU boot resources missing from MAAS.
+hints:
+- order: 1
+  cost: 0
+  content: Open Packer and review the matrix template — each GPU SKU variable (h100/h200/b300/mi300) needs its own build.
+- order: 2
+  cost: 20
+  content: Run validate then build for each SKU in turn; a failing CVE gate on one variant should not block the others.
+- order: 3
+  cost: 40
+  content: After each successful build, Publish to MAAS so Images lists custom/<sku>-jammy for that specific SKU.
+- order: 4
+  cost: 60
+  content: In Bare Metal → Images, confirm all four custom/<sku>-jammy resources are present, then leave FIXED-OK.
+consoles:
+- packer
+- baremetal
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - packer
+  - baremetal
+  - terminal

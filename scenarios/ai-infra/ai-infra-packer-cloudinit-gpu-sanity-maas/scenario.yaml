@@ -1,0 +1,64 @@
+title: 'Packer → cloud-init → GPU Sanity → MAAS Deploy'
+slug: ai-infra-packer-cloudinit-gpu-sanity-maas
+technology: AI Infrastructure Engineering
+category: Production
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 2100
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Critical
+description: 'CONTEXT: ImageDev / Bare Metal end-to-end path — build a GPU image in Packer,
+  let cloud-init finish first boot on the deployed node, then run the ImageDev gpu-sanity
+  suite before the node is handed to the training team. AI Infra Engineering owns this full
+  Packer→cloud-init→gpu-sanity→MAAS chain.
+
+
+  ENVIRONMENT: Packer workspace IDE + Bare Metal (MAAS) + Lab Terminal + Datacenter twin for
+  rack context. Treat the full chain as the production image-to-deploy pipeline.
+
+
+  SYMPTOM / STARTING STATE: No custom image published; the target node is still on stock
+  ubuntu/jammy; cloud-init and gpu-sanity have not run on any deployed node yet.
+
+
+  OBJECTIVE: Build and Publish the Packer GPU image to MAAS; Deploy a Ready node with the
+  custom image; confirm cloud-init status is done; run gpu-sanity and confirm PASS; leave
+  FIXED-OK once the node is healthy end to end.'
+objectives:
+- Build and publish the Packer GPU image to MAAS
+- Deploy a Ready node with the custom image and confirm cloud-init done
+- Run gpu-sanity and confirm PASS
+initial_state: Stock jammy only; no custom image; cloud-init/gpu-sanity not yet run.
+hints:
+- order: 1
+  cost: 0
+  content: Open Packer, validate the GPU template, then build it — watch for the CVE gate to report clean.
+- order: 2
+  cost: 20
+  content: Publish the successful build to MAAS so Images lists the custom boot resource, then Deploy a Ready node with it.
+- order: 3
+  cost: 40
+  content: On Lab Terminal, run cloud-init status and wait for status done before checking anything else.
+- order: 4
+  cost: 60
+  content: Run the gpu-sanity suite and confirm PASS across every check, then leave FIXED-OK for the ticket.
+consoles:
+- packer
+- baremetal
+- terminal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - packer
+  - baremetal
+  - terminal
+  - datacenter

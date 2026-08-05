@@ -595,3 +595,187 @@
   border-color: #f97316; color: #fdba74;
   box-shadow: 0 0 12px rgba(249, 115, 22, 0.35);
 }
+
+/* ── Immersive game-view chrome: HUD, coach mark, minimap, tablet, pause menu ── */
+
+.dc-3d-hud-objective {
+  margin-bottom: 0.3rem; padding-bottom: 0.3rem; border-bottom: 1px solid rgba(148,163,184,0.2);
+  color: #e2e8f0;
+}
+
+@keyframes dc-hud-fade {
+  0% { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.dc-3d-hud { animation: dc-hud-fade 0.4s ease-out; }
+
+/* Coach mark — brief top-center toast that teaches the controls, then fades for good. */
+@keyframes dc-coachmark-life {
+  0% { opacity: 0; transform: translate(-50%, -6px); }
+  10% { opacity: 1; transform: translate(-50%, 0); }
+  82% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -6px); }
+}
+.dc-3d-coachmark {
+  position: absolute; z-index: 5; left: 50%; top: 1rem;
+  transform: translate(-50%, 0);
+  padding: 0.5rem 0.9rem; border-radius: 999px;
+  background: rgba(10, 13, 20, 0.72); border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #f1f5f9; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.01em;
+  backdrop-filter: blur(8px); pointer-events: none; white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  animation: dc-coachmark-life 5.2s ease forwards;
+}
+.dc-3d-coachmark kbd {
+  display: inline-block; padding: 0.05rem 0.35rem; margin: 0 0.1rem; border-radius: 4px;
+  background: #1e293b; border: 1px solid #3a4258; color: #fdba74;
+  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.68rem; font-weight: 700;
+}
+
+/* Aisle fog — subtle CSS vignette pulse over the canvas edges for cinematic depth. */
+@keyframes dc-aisle-fog-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.85; }
+}
+.dc-3d-aisle-fog {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 115%, rgba(249,115,22,0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(3,5,10,0.55) 100%);
+  animation: dc-aisle-fog-pulse 6s ease-in-out infinite;
+}
+
+/* Minimap — top-down radar tip with player dot + the four room-portal beacons. */
+.dc-3d-minimap {
+  position: absolute; z-index: 3; right: 0.85rem; top: 0.85rem;
+  width: 92px; height: 72px;
+  background: rgba(8, 12, 20, 0.6); border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 10px; backdrop-filter: blur(6px); pointer-events: none;
+}
+.dc-3d-minimap-ring {
+  position: absolute; inset: 6px; border: 1px dashed rgba(148, 163, 184, 0.35); border-radius: 6px;
+}
+.dc-3d-minimap-dot {
+  position: absolute; width: 5px; height: 5px; border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.dc-3d-minimap-player {
+  position: absolute; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%;
+  background: #fdba74; box-shadow: 0 0 8px rgba(253, 186, 116, 0.9); left: 50%; top: 50%;
+}
+
+/* Portal glow — pulsing beacon label on in-world room portals. */
+@keyframes dc-portal-glow {
+  0%, 100% { box-shadow: 0 0 8px 0 var(--portal-color, #38bdf8); }
+  50% { box-shadow: 0 0 16px 3px var(--portal-color, #38bdf8); }
+}
+.dc-3d-portal-label {
+  border-color: var(--portal-color, #38bdf8);
+  animation: dc-portal-glow 2.6s ease-in-out infinite;
+}
+
+/* Pinned accessibility controls — always visible, not hover-gated like the toolbar. */
+.dc-3d-pinned-controls {
+  position: absolute; z-index: 4; left: 0.85rem; top: 0.85rem;
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.dc-3d-exit-btn {
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.01em; color: #cbd3e3;
+  padding: 0.3rem 0.6rem; border-radius: 999px;
+  background: rgba(8, 12, 20, 0.55); border: 1px solid rgba(148, 163, 184, 0.3);
+  backdrop-filter: blur(6px); opacity: 0.7; transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+.dc-3d-exit-btn:hover { opacity: 1; border-color: #f97316; color: #fdba74; }
+
+/* Esc pause menu */
+.dc-3d-menu-backdrop {
+  position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center;
+  background: rgba(3, 5, 10, 0.6); backdrop-filter: blur(3px);
+}
+.dc-3d-menu {
+  width: min(300px, 84vw); display: flex; flex-direction: column; gap: 0.5rem;
+  padding: 1.1rem; border-radius: 12px;
+  background: linear-gradient(165deg, #171b26 0%, #0f1219 100%);
+  border: 1px solid #2a3144; box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+  animation: dc-hud-fade 0.2s ease-out;
+}
+.dc-3d-menu-title {
+  font-size: 0.85rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #f8fafc; margin-bottom: 0.2rem; text-align: center;
+}
+.dc-3d-menu-btn {
+  font-size: 0.78rem; font-weight: 600; color: #cbd3e3; padding: 0.55rem 0.7rem;
+  border-radius: 8px; border: 1px solid #2a3144; background: #12151f; text-align: center;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.dc-3d-menu-btn:hover { border-color: #f97316; color: #fdba74; }
+.dc-3d-menu-btn:active { transform: scale(0.97); }
+.dc-3d-menu-btn-primary { background: #f97316; border-color: #f97316; color: #0b0e14; }
+.dc-3d-menu-btn-primary:hover { background: #ea6a0d; color: #0b0e14; }
+.dc-3d-menu-hint {
+  margin-top: 0.3rem; font-size: 0.65rem; color: #8891a5; text-align: center;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* ── Handheld field tablet — sliding in-world device overlay (replaces admin drawer feel) ── */
+.dc-tablet-backdrop {
+  background: rgba(3, 5, 10, 0.35); backdrop-filter: blur(2px);
+  align-items: flex-end; justify-content: center;
+}
+@keyframes dc-tablet-slide-up {
+  0% { opacity: 0; transform: translateY(46px) rotateX(8deg) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0) rotateX(0deg) scale(1); }
+}
+.dc-tablet {
+  width: min(420px, 94vw); height: min(640px, 88vh); margin: 0 1.1rem 1.1rem 0;
+  border-radius: 22px; border: 1px solid #2f3648;
+  background: linear-gradient(180deg, #14171f 0%, #0c0e14 100%);
+  box-shadow: 0 30px 70px rgba(0,0,0,0.55), 0 0 0 1px rgba(56, 189, 248, 0.08),
+    inset 0 1px 0 rgba(255,255,255,0.04);
+  padding: 0.15rem 0.15rem 0.6rem;
+  transform-origin: bottom right;
+  animation: dc-tablet-slide-up 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex; flex-direction: column;
+}
+.dc-tablet-bezel {
+  display: flex; align-items: center; gap: 0.4rem; padding: 0.5rem 0.9rem 0.35rem;
+  flex-shrink: 0;
+}
+.dc-tablet-cam { width: 5px; height: 5px; border-radius: 50%; background: #334155; }
+.dc-tablet-bezel-label {
+  font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; color: #64748b;
+  font-family: 'JetBrains Mono', ui-monospace, monospace; text-transform: uppercase;
+}
+.dc-tablet-signal { margin-left: auto; display: flex; align-items: flex-end; gap: 1.5px; height: 8px; }
+.dc-tablet-signal i {
+  display: block; width: 3px; background: #34d399; border-radius: 1px;
+  animation: dc-blink 2.2s ease-in-out infinite;
+}
+.dc-tablet-signal i:nth-child(1) { height: 4px; }
+.dc-tablet-signal i:nth-child(2) { height: 6px; animation-delay: 0.2s; }
+.dc-tablet-signal i:nth-child(3) { height: 8px; animation-delay: 0.4s; }
+.dc-tablet .dc-drawer-head,
+.dc-tablet .dc-drawer-tabs,
+.dc-tablet .dc-drawer-section {
+  padding-left: 0.95rem; padding-right: 0.95rem;
+}
+.dc-tablet { overflow-y: auto; }
+.dc-tablet .dc-drawer-tabs { border-bottom-color: #232a3c; }
+.dc-tablet .dc-drawer-tab-active { background: rgba(249,115,22,0.12); }
+.dc-tablet .dc-btn-outline, .dc-tablet .dc-btn-danger, .dc-tablet .dc-btn-primary {
+  border-radius: 999px; transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.dc-tablet .dc-btn-outline:active, .dc-tablet .dc-btn-danger:active, .dc-tablet .dc-btn-primary:active {
+  transform: scale(0.95);
+}
+.dc-tablet .dc-btn-outline:hover { box-shadow: 0 0 0 1px rgba(249,115,22,0.25); }
+@media (max-width: 640px) {
+  .dc-tablet { width: 100vw; height: 100dvh; margin: 0; border-radius: 0; }
+  .dc-3d-minimap { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-3d-coachmark, .dc-3d-aisle-fog, .dc-3d-portal-label, .dc-tablet, .dc-3d-hud, .dc-3d-menu {
+    animation: none !important;
+  }
+}

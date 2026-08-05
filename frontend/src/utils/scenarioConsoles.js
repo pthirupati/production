@@ -4,7 +4,7 @@
  */
 
 /** Keys that never select a primary GUI overlay. */
-const NON_PRIMARY = new Set(['terminal', 'bmc', 'vmware'])
+const NON_PRIMARY = new Set(['terminal', 'bmc', 'vmware', 'packer', 'vyos', 'lxd'])
 
 /**
  * Map YAML console key → LabRunner primarySimKind.

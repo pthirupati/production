@@ -1,0 +1,61 @@
+title: 'DCOps: MAAS PXE VLAN Boot Failure'
+slug: ai-infra-dcops-pxe-vlan-boot-fail
+technology: AI Infrastructure Engineering
+category: Troubleshoot
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: DCOps / Bare Metal ticket (PSINFRA board) — new nodes on the provisioning
+  fabric are failing PXE discovery because the wrong VLAN tag reaches the NIC. Enlist never
+  starts, so the fleet bring-up queue is stalled behind this node.
+
+
+  ENVIRONMENT: Bare Metal (MAAS) console + Lab Terminal + Datacenter twin for rack/PXE fabric
+  context. Treat gpu-node-02 as the production canary for this incident.
+
+
+  SYMPTOM / STARTING STATE: PXE discovery fails — the provisioning fabric is tagging the wrong
+  VLAN, so gpu-node-02 never reaches the MAAS enlist path.
+
+
+  OBJECTIVE: Open Bare Metal from the lab toolbar; fix the PXE VLAN configuration in the
+  IPMI/MAAS view; verify the machine can enter commissioning; leave FIXED-OK once enlist
+  succeeds.'
+objectives:
+- Open Bare Metal console from the lab toolbar
+- Fix PXE VLAN configuration in the IPMI/MAAS view
+- Verify the machine can enter commissioning
+initial_state: PXE discovery fails — wrong VLAN tag on the provisioning fabric.
+hints:
+- order: 1
+  cost: 0
+  content: Open Bare Metal and check whether gpu-node-02 ever appears in the Enlist (PXE) queue at all.
+- order: 2
+  cost: 15
+  content: Compare the PXE helper VLAN tag against the provisioning fabric config — a mismatch drops the DHCP offer.
+- order: 3
+  cost: 35
+  content: Correct the VLAN tag so the PXE helper subnet reaches the node's NIC, then retry Enlist.
+- order: 4
+  cost: 55
+  content: Confirm the machine now enters commissioning cleanly, then leave FIXED-OK for the DCOps ticket.
+consoles:
+- baremetal
+- terminal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-02
+  role: primary
+  hostname: gpu-node-02
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal
+  - datacenter

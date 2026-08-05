@@ -843,6 +843,22 @@ def _apply_preset(state: dict, slug: str) -> None:
     elif "commission" in slug and "stuck" in slug:
         state["goal"] = {"title": "Commission stuck", "objective": "Reset stuck commissioning state and redeploy the node."}
         state["broken"] = {"commission_stuck": 2}
+    elif "matrix" in slug and ("imagedev" in slug or "packer" in slug):
+        state["goal"] = {
+            "title": "ImageDev GPU matrix",
+            "objective": "Build and publish H100/H200/B300/MI300 boot resources into MAAS.",
+        }
+        state["broken"] = {
+            "packer_image_unpublished": True,
+            "needs_custom_image_deploy": True,
+            "missing_boot_resources": [
+                "custom/h100-jammy",
+                "custom/h200-jammy",
+                "custom/b300-jammy",
+                "custom/mi300-jammy",
+            ],
+        }
+        packer_factory.ensure_factory(state)
     elif "packer" in slug or "image-factory" in slug or "image_factory" in slug or "imagedev" in slug:
         state["goal"] = {
             "title": "Packer Image Factory",
@@ -852,6 +868,30 @@ def _apply_preset(state: dict, slug: str) -> None:
             "packer_image_unpublished": True,
             "needs_custom_image_deploy": True,
             "missing_boot_resource": "custom/h100-jammy",
+        }
+        packer_factory.ensure_factory(state)
+    elif "bringup" in slug or "gpu-host" in slug:
+        state["goal"] = {
+            "title": "GPU host bring-up",
+            "objective": "Commission the GPU node, deploy the ImageDev image, and verify nvidia-smi.",
+        }
+        state["broken"] = {
+            "machine_needs_commission": 2,
+            "bmc_unreachable": True,
+            "needs_custom_image_deploy": True,
+            "missing_boot_resource": "custom/h100-jammy",
+        }
+        packer_factory.ensure_factory(state)
+    elif "psinfra" in slug or "gm1" in slug or "escalation" in slug:
+        state["goal"] = {
+            "title": "PSINFRA → ImageDev → DCOps handoff",
+            "objective": "Clear thermal, publish the image, and restore the node via MAAS + AWX.",
+        }
+        state["broken"] = {
+            "thermal_alert": True,
+            "machine_needs_commission": 2,
+            "packer_image_unpublished": True,
+            "needs_custom_image_deploy": True,
         }
         packer_factory.ensure_factory(state)
 

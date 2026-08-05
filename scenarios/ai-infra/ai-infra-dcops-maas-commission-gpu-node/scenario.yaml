@@ -1,0 +1,62 @@
+title: 'DCOps: Commission Failed MAAS GPU Node'
+slug: ai-infra-dcops-maas-commission-gpu-node
+technology: AI Infrastructure Engineering
+category: Troubleshoot
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: DCOps / Bare Metal ticket (PSINFRA board) — gpu-node-02 dropped out of
+  the MAAS commissioning queue with BMC unreachable. Fleet bring-up for the training rack is
+  blocked until the node reaches Deployed. AI Infra Engineering owns this MAAS enlist/commission
+  path for GPU SKUs.
+
+
+  ENVIRONMENT: Bare Metal (MAAS) console + Lab Terminal + Datacenter twin for rack/BMC context.
+  Treat gpu-node-02 as the production canary for this incident.
+
+
+  SYMPTOM / STARTING STATE: MAAS shows gpu-node-02 stuck in Failed commissioning with BMC
+  unreachable; the DCOps runbook step to re-power via IPMI has not been run yet.
+
+
+  OBJECTIVE: Open Bare Metal from the lab toolbar; restore BMC/IPMI reachability so gpu-node-02
+  can recommission; commission the node in MAAS; Deploy it and confirm status is Deployed; leave
+  FIXED-OK once the fleet inventory shows the node healthy.'
+objectives:
+- Restore BMC/IPMI reachability for gpu-node-02
+- Commission gpu-node-02 in MAAS
+- Deploy the node and confirm status is Deployed
+initial_state: MAAS shows gpu-node-02 Failed commissioning with BMC unreachable.
+hints:
+- order: 1
+  cost: 0
+  content: Open Bare Metal from the lab toolbar and check gpu-node-02 Power state — BMC unreachable blocks commissioning.
+- order: 2
+  cost: 15
+  content: Restore BMC/IPMI reachability first (power cycle via the out-of-band console), then retry Commission.
+- order: 3
+  cost: 30
+  content: Once commissioning finishes and the node is Ready, click Deploy and watch the state transition.
+- order: 4
+  cost: 50
+  content: Confirm the machine status reads Deployed in Bare Metal before leaving FIXED-OK for the DCOps ticket.
+consoles:
+- baremetal
+- terminal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-02
+  role: primary
+  hostname: gpu-node-02
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal
+  - datacenter

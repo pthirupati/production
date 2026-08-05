@@ -1528,11 +1528,13 @@ export default function LabRunner() {
   // Packer image-factory labs keep the terminal primary (CVE/MAAS grading) and
   // open a companion HCL workspace IDE — not coding_mode / CodingIDE.
   // Allow cross_technology academy packs (academy-ai-infra-*-integration-packer*).
-  const _packerHay = `${scenario?.slug || ''} ${scenario?.title || ''} ${scenario?.topic || ''}`.toLowerCase()
+  const _packerHay = `${scenario?.slug || ''} ${scenario?.title || ''} ${scenario?.topic || ''} ${(scenario?.description || '').slice(0, 400)}`.toLowerCase()
+  // AI Infra Image Factory is first-class: Packer IDE for packer/imagedev/cloud-init
+  // /gpu-image labs, plus any scenario that lists the packer console.
   const isPackerLab = !isTerraformSimLab && (
     consolesInclude(scenario?.consoles, 'packer')
-    || (techSlugLc === 'ai-infra' && /packer|image[-_]?factory|imagedev|libguestfs|cloud-init|e2e-image/.test(_packerHay))
-    || /packer|image[-_]?factory/.test(_packerHay)
+    || (techSlugLc === 'ai-infra' && /packer|image[-_]?factory|imagedev|libguestfs|cloud-init|e2e-image|gpu-image|boot-resource|custom\/h\d{2,3}/.test(_packerHay))
+    || /packer|image[-_]?factory|imagedev/.test(_packerHay)
   )
   // VyOS labs grade via the router CLI in Lab Terminal — do NOT make MAAS the
   // primary GUI (simulation_type is often baremetal for PXE underlay). MAAS/LXD/
@@ -1542,7 +1544,7 @@ export default function LabRunner() {
     || /(?:^|[-_/])vyos(?:[-_/]|$)/i.test(scenario?.slug || '')
     || /\bvyos\b/i.test(`${scenario?.title || ''} ${scenario?.topic || ''}`)
   )
-  const isBaremetalGuiLab = !isCrossTech && !isVyosLab && (
+  const isBaremetalGuiLab = !isCrossTech && !isVyosLab && !isPackerLab && (
     consolesKind === 'baremetal'
     || (!consolesKind && (
       scenario?.simulation_type === 'baremetal'
@@ -1552,6 +1554,13 @@ export default function LabRunner() {
       || /maas|lxd|lxc|kvm|virsh|ipmi|pxe/.test((scenario?.slug || '').toLowerCase())
     ))
   )
+
+  // ImageDev / Packer labs: auto-open the Packer workspace so the IDE is visible immediately.
+  useEffect(() => {
+    if (!sessionId || !isPackerLab) return undefined
+    setShowPackerSim(true)
+    return undefined
+  }, [sessionId, isPackerLab])
   // Enterprise storage / DC / SOC simulators — each is a dedicated technology
   // (see scenarios/<tech>/technology.yaml) with a matching backend engine under
   // apps/vmware_sim/. Gate on simulation_type OR technology slug OR slug prefix,
@@ -1823,14 +1832,20 @@ export default function LabRunner() {
     || consolesInclude(scenario?.consoles, 'maas')
     || consolesInclude(scenario?.consoles, 'lxd')
   )
-  const showLxdLink = !isBaremetalGuiLab && (
-    techSlugLc === 'ai-infra'
-    || techSlugLc === 'lxd'
-    || techSlugLc === 'baremetal'
+  // Prefer dedicated LXD console whenever the lab is LXD-shaped — even if MAAS
+  // is also primary (AI Infra GPU passthrough / batch jobs).
+  const showLxdLink = (
+    consolesInclude(scenario?.consoles, 'lxd')
     || /lxd|lxc/.test((scenario?.slug || '').toLowerCase())
     || scenario?.lxd_link === true
-    || consolesInclude(scenario?.consoles, 'lxd')
-    || consolesInclude(scenario?.consoles, 'baremetal')
+    || (
+      !isBaremetalGuiLab && (
+        techSlugLc === 'ai-infra'
+        || techSlugLc === 'lxd'
+        || techSlugLc === 'baremetal'
+        || consolesInclude(scenario?.consoles, 'baremetal')
+      )
+    )
   )
   const showHostedAzureLink = !isAzureLab && canAzureConsole && (
     hostPlatform === 'azure' || techSlugLc === 'azure'

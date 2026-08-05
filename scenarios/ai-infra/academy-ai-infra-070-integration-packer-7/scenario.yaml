@@ -5,7 +5,7 @@ category: Cross-Technology
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
-simulation_type: gpu
+simulation_type: baremetal
 time_limit: 1200
 max_score: 100
 is_free: false
@@ -114,12 +114,16 @@ hints:
     is actually healthy.'
 cross_technology: true
 consoles:
+- packer
+- baremetal
 - terminal
 hosted_as: baremetal
 lab_servers:
 - id: gpu-node-01
   role: primary
   hostname: gpu-node-01
-  persona: linux
+  persona: baremetal
   appears_in:
+  - packer
+  - baremetal
   - terminal

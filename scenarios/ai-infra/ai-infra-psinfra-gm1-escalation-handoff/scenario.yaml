@@ -1,0 +1,69 @@
+title: 'GM1 Escalation: PSINFRA → ImageDev → DCOps Handoff'
+slug: ai-infra-psinfra-gm1-escalation-handoff
+technology: AI Infrastructure Engineering
+category: Cross-Technology
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 2400
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Critical
+description: 'CONTEXT: PSINFRA opened a Sev2 for the GM1 facility — a GPU node RMA is stuck
+  across three teams: DCOps needs to badge in and swap the FRU at the rack, ImageDev owns the
+  Packer image that must be republished to MAAS before redeploy, and Bare Metal/AWX has to
+  re-run the fleet job once the node is back. Nothing moves until each team closes its part of
+  the handoff. AI Infra Engineering owns this cross-team PSINFRA escalation path.
+
+
+  ENVIRONMENT: Datacenter twin (GM1 facility) + Bare Metal (MAAS) + AWX + Packer + Lab Terminal.
+  Lab chrome (Hints/Check/+30m/Stop) stays usable across every companion console.
+
+
+  SYMPTOM / STARTING STATE: RMA ticket open in Datacenter twin awaiting FRU swap; MAAS shows the
+  node stuck pre-Deploy; the ImageDev boot resource is out of date; the AWX fleet job has not
+  been re-run since the outage started.
+
+
+  OBJECTIVE: In the Datacenter twin, badge in and complete the FRU swap to close the DCOps leg;
+  in Packer, republish the current image to MAAS to close the ImageDev leg; in Bare Metal,
+  Deploy the node with the fresh image; in AWX, launch the fleet job against the recovered node;
+  leave FIXED-OK once every leg of the handoff is closed.'
+objectives:
+- Complete the FRU swap in the Datacenter twin to close the DCOps leg
+- Republish the Packer image to MAAS to close the ImageDev leg
+- Deploy the node and re-run the AWX fleet job to close the handoff
+initial_state: RMA open at GM1; MAAS node stuck pre-Deploy; Packer image stale; AWX job not re-run.
+hints:
+- order: 1
+  cost: 0
+  content: Start in the Datacenter twin — badge in, locate the GM1 rack, and complete the FRU swap on the RMA ticket.
+- order: 2
+  cost: 20
+  content: Switch to Packer, rebuild/republish the current image so MAAS Images shows the up-to-date boot resource.
+- order: 3
+  cost: 40
+  content: In Bare Metal, Deploy the recovered node with the freshly published image and wait for Deployed status.
+- order: 4
+  cost: 60
+  content: Open AWX and re-run the fleet job template against the node; once it succeeds, leave FIXED-OK.
+consoles:
+- datacenter
+- baremetal
+- awx
+- terminal
+- packer
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - datacenter
+  - baremetal
+  - awx
+  - terminal
+  - packer

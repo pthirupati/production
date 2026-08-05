@@ -118,6 +118,7 @@ export function InteractiveCable({
   label,
 }) {
   const packetRef = useRef()
+  const packetRef2 = useRef()
   const tipRef = useRef()
   const [dragging, setDragging] = useState(false)
   const [tipOffset, setTipOffset] = useState(() => new THREE.Vector3())
@@ -171,6 +172,14 @@ export function InteractiveCable({
       packetRef.current.material.emissiveIntensity = 0.8 + Math.sin(t * 12) * 0.4
     } else if (packetRef.current) {
       packetRef.current.visible = false
+    }
+    if (packetRef2.current && traffic && !loose && !dragging) {
+      const u2 = (t * 0.4 + 0.5) % 1
+      packetRef2.current.position.copy(curve.getPointAt(u2))
+      packetRef2.current.visible = true
+      packetRef2.current.material.emissiveIntensity = 0.5 + Math.sin(t * 12 + Math.PI) * 0.3
+    } else if (packetRef2.current) {
+      packetRef2.current.visible = false
     }
     if (recoil > 0) setRecoil((r) => Math.max(0, r - dt * 2.2))
     if (snapFlash > 0) setSnapFlash((s) => Math.max(0, s - dt * 3))
@@ -285,6 +294,10 @@ export function InteractiveCable({
       <mesh ref={packetRef}>
         <sphereGeometry args={[0.026, 8, 8]} />
         <meshStandardMaterial color="#fff" emissive="#38bdf8" emissiveIntensity={1.1} toneMapped={false} />
+      </mesh>
+      <mesh ref={packetRef2}>
+        <sphereGeometry args={[0.018, 8, 8]} />
+        <meshStandardMaterial color="#fff" emissive={color} emissiveIntensity={0.8} toneMapped={false} />
       </mesh>
       {(loose || dragging) && (
         <Html position={tipWorld} center distanceFactor={9} style={{ pointerEvents: 'none' }}>

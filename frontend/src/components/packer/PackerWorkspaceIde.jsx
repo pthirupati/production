@@ -288,6 +288,44 @@ export default function PackerWorkspaceIde({
     }
   }, [detectSku, sessionId, openMaasImages])
 
+  /** Publish then Deploy the first Ready machine with this custom boot resource. */
+  const publishAndDeploy = useCallback(async () => {
+    const currentSku = detectSku()
+    const bootResource = bootResourceForSku(currentSku)
+    try {
+      await baremetalApi.login(sessionId)
+      const pub = await baremetalApi.publishBootResource(sessionId, {
+        sku: currentSku,
+        name: bootResource,
+        source: `packer output-gpu-${currentSku}/`,
+      })
+      const name = pub?.boot_resource?.name || bootResource
+      setBootResourceName(name)
+      setArtifactReady(true)
+      setSuggestPublish(false)
+      const st = await baremetalApi.getState(sessionId)
+      const machines = st?.state?.maas?.machines || []
+      const ready = machines.find((m) => m.status === 'Ready') || machines.find((m) => m.status === 'Allocated')
+      if (!ready) {
+        setOutput((prev) => `${prev ? `${prev}\n` : ''}Published ${name}. No Ready machine — open MAAS and Commission a node, then Deploy with ${name}.`)
+        toast.success(`Published ${name} — Commission a node before Deploy`)
+        openMaasImages()
+        return
+      }
+      const dep = await baremetalApi.deploy(sessionId, ready.id, { boot_resource: name })
+      if (dep?.ok === false) {
+        toast.error(dep.error || 'Deploy failed')
+        openMaasImages()
+        return
+      }
+      setOutput((prev) => `${prev ? `${prev}\n` : ''}Published ${name} and started Deploy on ${ready.hostname || ready.id} with that image.`)
+      toast.success(`Deploying ${ready.hostname || 'node'} with ${name}`)
+      openMaasImages()
+    } catch (err) {
+      toast.error(err?.response?.data?.error || err?.message || 'Publish/Deploy failed')
+    }
+  }, [detectSku, sessionId, openMaasImages])
+
   const onFactoryUpdate = useCallback((st) => {
     if (st?.artifact_ready) {
       setArtifactReady(true)
@@ -370,6 +408,15 @@ export default function PackerWorkspaceIde({
           </button>
           <button type="button" onClick={openMaasImages} className="vsc-btn" title="Open MAAS Images">
             <ExternalLink size={11} /> Open MAAS Images
+          </button>
+          <button
+            type="button"
+            onClick={publishAndDeploy}
+            className="vsc-btn inline-flex items-center gap-1"
+            style={artifactReady ? { background: '#0e8420', borderColor: '#0e8420', color: '#fff' } : undefined}
+            title={`Publish ${bootResourceName} then Deploy a Ready node with that image`}
+          >
+            <Upload size={11} /> Publish + Deploy in MAAS
           </button>
           <button type="button" onClick={syncFilesToShell} className="vsc-btn" title="Write IDE files into the lab shell">
             Sync files

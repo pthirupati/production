@@ -1,4 +1,4 @@
-description: "AI Infrastructure Engineering — GPU bare metal ops (MAAS, DCGM, AWX, DC twin). Reuses Bare Metal, Datacenter, AWX, and GPU Lab Server surfaces."
+description: "AI Infrastructure Engineering — the bare-metal fleet-ops career track behind GPU & NVIDIA, run by DCOps / Bare Metal / PSINFRA / ImageDev. Covers MAAS enlist-commission-deploy, VyOS PXE/BGP underlay, LXD GPU passthrough, AWX/Ansible fleet automation, Packer/ImageDev image builds with libguestfs inspection and cloud-init first-boot, GPU sanity across H100/H200/B300/AMD SKUs, and the Datacenter twin for rack/BMC/RMA ops. Reuses Bare Metal, Datacenter, AWX, Packer, LXD, VyOS, and GPU Lab Server surfaces."
 icon: cpu
 name: AI Infrastructure Engineering
 order: 13
