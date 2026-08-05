@@ -124,7 +124,17 @@ export default function DatacenterSimulator({
   const [flashId, setFlashId] = useState(null)
   const [drawerTab, setDrawerTab] = useState('overview')
   const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [floorView, setFloorView] = useState('2d') // 2D first paint; 3D opt-in (avoids R3F chunk throws on open)
+  const [floorView, setFloorView] = useState(() => {
+    // Steam-class default: immersive 3D hall. Fall back to 2D on phones /
+    // reduced-motion so Twin3DSafe never bricks the lab chrome.
+    try {
+      if (typeof window !== 'undefined') {
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return '2d'
+        if (window.matchMedia('(max-width: 900px)').matches) return '2d'
+      }
+    } catch { /* ignore */ }
+    return '3d'
+  })
   const dragRef = useRef(null)
   const movedRef = useRef(false)
   const liveTickInFlight = useRef(false)
@@ -412,7 +422,7 @@ export default function DatacenterSimulator({
                 type="button"
                 className={`dc-btn-outline dc-btn-xs ${floorView === '2d' ? 'dc-view-active' : ''}`}
                 onClick={() => setFloorView('2d')}
-                title="Isometric 2D floor (default — safest)"
+                title="Isometric 2D floor plan"
               >
                 <Move size={11} /> 2D floor
               </button>
@@ -420,22 +430,22 @@ export default function DatacenterSimulator({
                 type="button"
                 className={`dc-btn-outline dc-btn-xs ${floorView === '3d' ? 'dc-view-active' : ''}`}
                 onClick={() => setFloorView('3d')}
-                title="Enter animated 3D hall — chrome stays available; falls back to 2D on GPU errors"
+                title="Steam-class animated 3D hall — Walk (WASD) · falls back to 2D on GPU errors"
               >
-                <Box size={11} /> Enter hall (3D)
+                <Box size={11} /> 3D hall
               </button>
             </span>
           )}
           <DcAmbientAudio
-            enabled
+            enabled={floorView === '3d'}
             alert={Boolean(
               (st?.tickets || []).some((t) => /thermal|overheat|hot.?aisle/i.test(`${t?.title || ''} ${t?.status || ''}`))
               || cooling.some((c) => Number(c?.temp_c) >= 27),
             )}
           />
           {currentRoom.type === 'data_hall' && floorView === '3d'
-            ? <><Box size={12} /> Orbit · click chassis · Esc via 2D floor</>
-            : <><Move size={12} /> Drag floor to pan · Enter hall for Steam-class twin</>}
+            ? <><Box size={12} /> 3D twin · Walk (WASD) · Replay enter · Motions on</>
+            : <><Move size={12} /> 2D floor · switch to 3D hall for Steam immersion</>}
         </div>
       </div>
 

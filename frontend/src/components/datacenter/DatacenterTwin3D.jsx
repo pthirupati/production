@@ -956,8 +956,14 @@ function SceneContent({
       <ThermalHaze stress={thermalStress} />
       {animBoost > 0 && (
         <AirflowParticles
-          count={Math.round(140 * animBoost * (1 + thermalStress))}
+          count={Math.round(220 * animBoost * (1 + thermalStress * 1.4))}
           stress={thermalStress}
+        />
+      )}
+      {animBoost > 0 && thermalStress > 0.2 && (
+        <AirflowParticles
+          count={Math.round(80 * animBoost)}
+          stress={1}
         />
       )}
       <CracUnits cooling={cooling} />
@@ -1056,12 +1062,12 @@ export default function DatacenterTwin3D({
   return (
     <motion.div
       className="dc-3d-root"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.45 }}
+      initial={{ opacity: 0, scale: 0.985 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.55, ease: 'easeOut' }}
     >
       <div className="dc-3d-toolbar">
-        <span className="dc-twin-title">3D Lab Twin · plant-linked</span>
+        <span className="dc-twin-title">3D Lab Twin · Steam immersion</span>
         <label className="dc-3d-toggle">
           <input
             type="checkbox"
@@ -1094,9 +1100,14 @@ export default function DatacenterTwin3D({
           Replay enter
         </button>
         <span className="dc-muted">
-          ~{fps || '—'} FPS · {walkMode ? 'click canvas to look · WASD move · Shift sprint' : 'drag NIC connectors · double-click chassis → BMC'}
+          ~{fps || '—'} FPS · {walkMode ? 'click canvas to look · WASD move · Shift sprint' : 'cinematic enter · Motions · enable Walk for first-person'}
         </span>
       </div>
+      {!walkMode && !intro && (
+        <div className="dc-3d-immersion-hint">
+          Tip: enable <strong>Walk (WASD)</strong> for Steam-style first-person hall exploration
+        </div>
+      )}
       <div className="dc-3d-canvas-wrap">
         <Suspense fallback={<LoadingFallback />}>
           <Canvas

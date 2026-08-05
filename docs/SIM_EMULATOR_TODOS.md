@@ -576,9 +576,9 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 
 ### U5 — IDE excellence (Terraform / Packer / Coding)
 389. [~] Terraform: cloud consoles open as overlays not bottom tabs — *wave1*
-390. [ ] Terraform IDE: full folder tree, multi-root modules, `.terraform.lock.hcl`, fmt on save
+390. [~] Terraform IDE: full folder tree, multi-root modules, `.terraform.lock.hcl`, fmt on save — *folder tree #152*
 391. [ ] Terraform IDE: integrated terminal that creates/edits files under `/root/terraform`
-392. [ ] Terraform IDE: color themes, breadcrumbs, problems panel, command palette
+392. [~] Terraform IDE: color themes, breadcrumbs, problems panel, command palette — *themes+breadcrumbs #152*
 393. [ ] Packer IDE: sync edited `.pkr.hcl` into sim shell filesystem before build
 394. [~] Packer IDE: variables UI + build log panel + artifact → MAAS publish button — *publish+sync in #149*
 395. [ ] Coding IDE: file/folder structure, run/debug, multi-file tests (318)
@@ -587,11 +587,13 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 ### U6 — AWS console depth & stability
 397. [ ] Expand service coverage only after mount stability green
 398. [ ] Persist schema version bump + migration for aws-sim blobs
-399. [~] Soft-gate AppRouter/LabRunner until AWS rehydrate finishes — *AuthBootValidator children gate*400. [ ] E2E Playwright: open aws-ec2 lab, navigate EC2/S3, no boundary
+399. [~] Soft-gate AppRouter/LabRunner until AWS rehydrate finishes — *AuthBootValidator children gate*
+400. [ ] E2E Playwright: open aws-ec2 lab, navigate EC2/S3, no boundary
 
 ### U7 — Continue twin connectivity / leftover spine
 401. [ ] Terraform destroy/MAAS fan-out already partially shipped — extend other `maas_*` types
-402. [~] VyOS commit/rollback + BGP UI depth (226/261) — *compare + history CLI #150*403. [ ] Subscription-manager realism remaining edge cases
+402. [~] VyOS commit/rollback + BGP UI depth (226/261) — *compare + history CLI #151*
+403. [ ] Subscription-manager realism remaining edge cases
 404. [ ] Interview P2 voice + framing (322)
 405. [ ] Unified asset registry finish (§S1) across AWS/DC/MAAS/AWX
 
@@ -612,12 +614,20 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 419. [ ] IDE: file explorer create/rename/delete + drag-drop into workspace
 420. [ ] IDE: split editor + terminal panel resize + command palette (Ctrl/Cmd+P)
 421. [ ] IDE: syntax themes (light/dark/high-contrast) persisted per user
-422. [ ] Terraform popup: remove leftover bottom-panel cloud tabs entirely after overlay path
-423. [ ] AWS: InstanceList / S3Pages null-safe maps (332 companion)
-424. [~] AWS: bump persist version 3→4 after chrome string-array merge ships — *this PR*425. [ ] Scenario crawl: every ai-infra scenario has working consoles[] entries
+422. [~] Terraform popup: remove leftover bottom-panel cloud tabs entirely after overlay path — *#152*
+423. [~] AWS: InstanceList / S3Pages null-safe maps (332 companion)
+424. [~] AWS: bump persist version 3→4 after chrome string-array merge ships — *#148*
+425. [ ] Scenario crawl: every ai-infra scenario has working consoles[] entries
 426. [ ] Projects: multi-team AI cluster bring-up (MAAS+VyOS+LXD+AWX+DC) company template
 427. [ ] Cross-tech: terraform→aws create/destroy already shipped — assert no dual AWS chips
 428. [ ] Production smoke: academy-aws-001 + ai-infra AWX primary after each 4D deploy
+429. [~] Datacenter: default entry is Steam 3D hall (not 2D) with mobile/reduced-motion 2D fallback — *this PR*
+430. [ ] Datacenter: rack tray slide-in install animation with rail click + LED cascade
+431. [ ] Datacenter: FRU RMA full loop UI (locate → dock → repair → burn-in)
+432. [ ] AI Infra: grow scenario count with VyOS/Packer/libguestfs heroes beyond academy packer markers
+433. [ ] Verify AWS labs on prod after #148 AuthBoot harden (hard refresh + reset path)
+434. [ ] AWX companion LabChromeControls visible on every ai-infra primary GUI lab (regression)
+
 
 ---
 

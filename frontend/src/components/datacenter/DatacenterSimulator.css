@@ -529,6 +529,18 @@
   padding: 0.45rem 0.85rem; background: #12151f; border-bottom: 1px solid #232838;
   font-size: 0.72rem; color: #97a2b8;
 }
+.dc-3d-immersion-hint {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.72rem;
+  color: #fdba74;
+  background: linear-gradient(90deg, rgba(249,115,22,0.18), transparent 70%);
+  border-bottom: 1px solid #3a2a1a;
+  animation: dc-hint-pulse 2.4s ease-in-out infinite;
+}
+@keyframes dc-hint-pulse {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
 .dc-3d-toggle {
   display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; color: #cbd3e3;
 }
