@@ -622,7 +622,7 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 427. [ ] Cross-tech: terraform→aws create/destroy already shipped — assert no dual AWS chips
 428. [ ] Production smoke: academy-aws-001 + ai-infra AWX primary after each 4D deploy
 429. [~] Datacenter: default entry is Steam 3D hall (not 2D) with mobile/reduced-motion 2D fallback — *this PR*
-430. [ ] Datacenter: rack tray slide-in install animation with rail click + LED cascade
+430. [~] Datacenter: rack tray slide-in install animation with rail click + LED cascade — *slide+stagger #154*
 431. [ ] Datacenter: FRU RMA full loop UI (locate → dock → repair → burn-in)
 432. [ ] AI Infra: grow scenario count with VyOS/Packer/libguestfs heroes beyond academy packer markers
 433. [ ] Verify AWS labs on prod after #148 AuthBoot harden (hard refresh + reset path)
