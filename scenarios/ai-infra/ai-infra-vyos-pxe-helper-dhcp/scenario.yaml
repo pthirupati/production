@@ -47,6 +47,7 @@ hints:
   cost: 55
   content: In Bare Metal, Enlist (PXE) and confirm a New machine appears, then FIXED-OK.
 consoles:
+- vyos
 - terminal
 - baremetal
 hosted_as: baremetal

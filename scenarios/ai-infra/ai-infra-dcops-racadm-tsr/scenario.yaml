@@ -1,0 +1,55 @@
+title: 'DCOps: Collect Dell iDRAC TSR via racadm'
+slug: ai-infra-dcops-racadm-tsr
+technology: AI Infrastructure Engineering
+category: Troubleshoot
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: BM / DCOps ticket — GPU node thermal/fan event. Vendor RMA requires a Tech Support
+  Report (TSR) from iDRAC before parts ship. Collect via racadm on the crash-cart / BMC path, then attach
+  evidence for the ticket.
+
+
+  ENVIRONMENT: Lab Terminal (racadm / ipmitool) + Bare Metal + Datacenter twin.
+
+
+  SYMPTOM: Thermal warning on GPU.Slot; no TSR attached to the RMA case.
+
+
+  OBJECTIVE: racadm getsysinfo; collect techsupreport / TSR; confirm bundle path; leave FIXED-OK on the
+  ops marker after upload evidence is recorded.'
+objectives:
+- Run racadm getsysinfo against the chassis BMC
+- Collect a Tech Support Report (TSR)
+- Confirm /tmp/TSR_*.zip (or equivalent) exists for the RMA case
+initial_state: Thermal SEL event; no TSR collected.
+hints:
+- order: 1
+  cost: 0
+  content: racadm getsysinfo — confirm Service Tag and Power Status ON.
+- order: 2
+  cost: 15
+  content: racadm techsupreport collect (or supportassist) — wait for JobQueue complete.
+- order: 3
+  cost: 35
+  content: Confirm TSR saved under /tmp and note the path for the DCOps ticket, then FIXED-OK.
+consoles:
+- terminal
+- baremetal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - terminal
+  - baremetal
+  - datacenter

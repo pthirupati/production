@@ -39,6 +39,7 @@ hints:
   cost: 45
   content: If commit breaks reachability, rollback 1 and re-apply; then FIXED-OK.
 consoles:
+- vyos
 - terminal
 - baremetal
 hosted_as: baremetal

@@ -663,6 +663,67 @@
   position: absolute; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%;
   background: #fdba74; box-shadow: 0 0 8px rgba(253, 186, 116, 0.9); left: 50%; top: 50%;
 }
+/* Minimap "you are here" room label — sits just above the radar ring. */
+.dc-3d-minimap-label {
+  position: absolute; left: 0; right: 0; top: -1.2rem; text-align: center;
+  font-size: 0.58rem; font-weight: 700; color: #cbd3e3; letter-spacing: 0.01em;
+  font-family: 'JetBrains Mono', ui-monospace, monospace; white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+}
+
+/* ── AR overlay mode chip (V cycles Off / Thermal / Power / Network) ── */
+.dc-3d-ar-chip {
+  position: absolute; z-index: 4; left: 50%; top: 0.85rem; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.3rem 0.65rem; border-radius: 999px;
+  background: rgba(8, 12, 20, 0.6); border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #e2e8f0; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
+  backdrop-filter: blur(6px); pointer-events: none;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.dc-3d-ar-chip span { color: #94a3b8; font-weight: 700; }
+.dc-3d-ar-chip-thermal { border-color: rgba(249, 115, 22, 0.55); color: #fdba74; }
+.dc-3d-ar-chip-power { border-color: rgba(52, 211, 153, 0.55); color: #6ee7b7; }
+.dc-3d-ar-chip-network { border-color: rgba(56, 189, 248, 0.55); color: #7dd3fc; }
+
+/* ── Field kit HUD — bottom immersive toolbelt: Badge · ESD · Cart · BMC ── */
+.dc-3d-fieldkit {
+  position: absolute; z-index: 4; left: 50%; bottom: 0.85rem; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 0.35rem;
+}
+.dc-3d-fieldkit-row { display: flex; align-items: center; gap: 0.4rem; }
+.dc-3d-kit-btn {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.01em; color: #cbd3e3;
+  padding: 0.35rem 0.65rem; border-radius: 999px;
+  background: rgba(8, 12, 20, 0.6); border: 1px solid rgba(148, 163, 184, 0.3);
+  backdrop-filter: blur(6px); pointer-events: auto;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.dc-3d-kit-btn:hover { border-color: #f97316; color: #fdba74; }
+.dc-3d-kit-btn-on { border-color: rgba(52, 211, 153, 0.55); color: #6ee7b7; }
+.dc-3d-kit-btn-off { border-color: rgba(251, 191, 36, 0.55); color: #fbbf24; }
+.dc-3d-kit-btn-done { border-color: rgba(52, 211, 153, 0.55); color: #6ee7b7; opacity: 0.85; }
+.dc-3d-kit-toast {
+  font-size: 0.65rem; font-weight: 700; color: #1c1305; background: #fbbf24;
+  padding: 0.3rem 0.6rem; border-radius: 999px; box-shadow: 0 6px 18px rgba(251, 191, 36, 0.35);
+  animation: dc-kit-toast-life 3.2s ease forwards;
+}
+@keyframes dc-kit-toast-life {
+  0% { opacity: 0; transform: translateY(6px); }
+  10% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
+/* ── NOC wall stub — small in-world monitor panels near the NOC portal ── */
+.dc-noc-wall-panel {
+  display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  color: var(--noc-color, #38bdf8);
+}
+.dc-noc-wall-label { font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; }
+.dc-noc-wall-value { font-size: 0.82rem; font-weight: 800; }
 
 /* Portal glow — pulsing beacon label on in-world room portals. */
 @keyframes dc-portal-glow {
@@ -772,10 +833,13 @@
 @media (max-width: 640px) {
   .dc-tablet { width: 100vw; height: 100dvh; margin: 0; border-radius: 0; }
   .dc-3d-minimap { display: none; }
+  .dc-3d-ar-chip { top: 0.5rem; font-size: 0.6rem; padding: 0.25rem 0.55rem; }
+  .dc-3d-fieldkit { bottom: 0.5rem; }
+  .dc-3d-kit-btn { padding: 0.3rem 0.5rem; font-size: 0.6rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dc-3d-coachmark, .dc-3d-aisle-fog, .dc-3d-portal-label, .dc-tablet, .dc-3d-hud, .dc-3d-menu {
+  .dc-3d-coachmark, .dc-3d-aisle-fog, .dc-3d-portal-label, .dc-tablet, .dc-3d-hud, .dc-3d-menu, .dc-3d-kit-toast {
     animation: none !important;
   }
 }

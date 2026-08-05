@@ -40,6 +40,7 @@ hints:
   cost: 45
   content: commit; if enlist still fails use rollback 1, re-apply, then FIXED-OK once MAAS sees New nodes.
 consoles:
+- vyos
 - terminal
 - baremetal
 hosted_as: baremetal

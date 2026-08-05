@@ -1323,6 +1323,18 @@ export default function LabRunner() {
     return undefined
   }, [sessionId, loading, provisioning, scenario])
 
+  // VyOS underlay labs: auto-open the VyOS console (same hook discipline as Packer).
+  useEffect(() => {
+    if (!sessionId || loading || provisioning || !scenario) return undefined
+    const tech = (scenario?.technology?.slug || '').toLowerCase()
+    const hay = `${scenario?.slug || ''} ${scenario?.title || ''} ${scenario?.topic || ''}`.toLowerCase()
+    const vyos = consolesInclude(scenario?.consoles, 'vyos')
+      || (tech === 'ai-infra' && /(?:^|[-_/])vyos(?:[-_/]|$)/.test(hay))
+      || /(?:^|[-_/])vyos(?:[-_/]|$)/.test(hay)
+    if (vyos) setShowVyosSim(true)
+    return undefined
+  }, [sessionId, loading, provisioning, scenario])
+
   if (loading || provisioning) {
     const cloudSteps = [
       { label: 'Launching cloud server', done: provisioningStep >= 1 },

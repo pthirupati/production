@@ -217,6 +217,18 @@ export default function DatacenterSimulator({
   ]), [])
   const searchResources = useMemo(() => indexDatacenterState(st), [st])
 
+  const nocWallMetrics = useMemo(() => {
+    const gpuSeries = monitoring?.series?.dcgm_gpu_utilization || []
+    const gpuVals = gpuSeries.map((s) => s.value).filter((v) => typeof v === 'number')
+    const openTickets = (st?.tickets || [])
+      .filter((t) => !['closed', 'resolved'].includes((t.status || '').toLowerCase()))
+    return {
+      gpuUtil: gpuVals.length ? gpuVals.reduce((a, b) => a + b, 0) / gpuVals.length : undefined,
+      pue: monitoring?.pue ?? facility?.pue,
+      ticketsOpen: (st?.tickets || []).length ? openTickets.length : undefined,
+    }
+  }, [monitoring, facility, st])
+
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
     onBackToTerminal: onExit || onToggleTerminal,
@@ -491,7 +503,14 @@ export default function DatacenterSimulator({
               expandedRack={expandedRack}
               onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}
               onSelectRack={(id) => setExpandedRack((cur) => (cur === id ? null : id))}
-              onOpenBmc={(id) => { setSelectedServerId(id); setDrawerTab('bmc') }}
+              onOpenBmc={(id) => {
+                // Field-kit HUD calls this with no id — keep whatever server is
+                // already selected and just switch the drawer to the BMC tab.
+                setSelectedServerId((cur) => id ?? cur)
+                setDrawerTab('bmc')
+              }}
+              nocMetrics={nocWallMetrics}
+              currentRoomLabel={currentRoom.name || 'Data Hall A'}
               onUnplugCable={({ serverId, cableId } = {}) => {
                 const srv = (serverId && servers.find((s) => s.id === serverId))
                   || (selectedServerId && servers.find((s) => s.id === selectedServerId))

@@ -1,0 +1,54 @@
+title: 'ImageDev: nvidia_gpu_tools PSB / PPCIe Pre-Publish Gate'
+slug: ai-infra-gpu-nvidia-gpu-tools-psb
+technology: AI Infrastructure Engineering
+category: Security
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: ImageDev publish gate — before a custom H100/H200 image is published to MAAS as a
+  boot resource, run nvidia_gpu_tools.py Platform Security Boot (PSB) and PPCIe / CC-mode probes. Failures
+  block publish.
+
+
+  ENVIRONMENT: Lab Terminal + Packer IDE + Bare Metal (MAAS publish path).
+
+
+  SYMPTOM: Publish blocked until PSB/PPCIe PASS evidence exists.
+
+
+  OBJECTIVE: Run nvidia_gpu_tools.py --psb and --ppcie (or --cc-mode); confirm PASS; FIXED-OK.'
+objectives:
+- Run nvidia_gpu_tools.py PSB check
+- Run PPCIe / CC-mode probe
+- Confirm PASS results before MAAS publish
+initial_state: ImageDev gate waiting on PSB/PPCIe evidence.
+hints:
+- order: 1
+  cost: 0
+  content: nvidia_gpu_tools.py --psb — expect PASS and a report under /tmp.
+- order: 2
+  cost: 20
+  content: nvidia_gpu_tools.py --ppcie (or --cc-mode) — confirm mode query PASS.
+- order: 3
+  cost: 40
+  content: Attach evidence then FIXED-OK so publish can proceed.
+consoles:
+- terminal
+- packer
+- baremetal
+hosted_as: baremetal
+lab_servers:
+- id: imagedev-builder-01
+  role: primary
+  hostname: imagedev-builder-01
+  persona: baremetal
+  appears_in:
+  - terminal
+  - packer
+  - baremetal

@@ -579,3 +579,58 @@ class K8sOnVMwareBridgeTests(SimpleTestCase):
         fresh = K8sCluster(slug, session_id=sid)
         self.assertNotIn("worker-2", fresh.get_nodes())
         self.assertFalse(fresh.is_healthy())
+
+
+# ---------------------------------------------------------------------------
+# AI Infra — Kubernetes GPU Operator / device plugin
+# ---------------------------------------------------------------------------
+
+class K8sGpuOperatorTests(SimpleTestCase):
+    def test_gpu_operator_starts_without_allocatable(self):
+        sim = UnifiedSimulationEngine(
+            scenario_slug="ai-infra-k8s-gpu-operator",
+            simulation_type="baremetal",
+        )
+        self.assertIsNotNone(sim.cluster)
+        out = sim.shell.run(
+            "kubectl get nodes -o custom-columns=NAME:.metadata.name,GPU:.status.allocatable.nvidia\\.com/gpu"
+        )
+        self.assertIn("<none>", out)
+        self.assertFalse(sim.cluster.is_healthy())
+        desc = sim.shell.run("kubectl describe node gpu-worker-1")
+        self.assertIn("nvidia.com/gpu", desc)
+        self.assertRegex(desc, r"Allocatable:[\s\S]*nvidia\.com/gpu:\s+0")
+
+    def test_apply_device_plugin_restores_allocatable(self):
+        sim = UnifiedSimulationEngine(
+            scenario_slug="ai-infra-k8s-device-plugin",
+            simulation_type="baremetal",
+        )
+        manifest = (
+            "apiVersion: apps/v1\n"
+            "kind: DaemonSet\n"
+            "metadata:\n"
+            "  name: nvidia-device-plugin-daemonset\n"
+            "  namespace: gpu-operator\n"
+            "spec:\n"
+            "  template:\n"
+            "    spec:\n"
+            "      containers:\n"
+            "      - name: nvidia-device-plugin-ctr\n"
+            "        image: nvcr.io/nvidia/k8s-device-plugin:v0.14.1\n"
+        )
+        sim.shell.state.write_file("/tmp/dp.yaml", manifest)
+        out = sim.shell.run("kubectl apply -f /tmp/dp.yaml")
+        self.assertIn("configured", out.lower() + out)  # created or configured
+        cols = sim.shell.run(
+            "kubectl get nodes -o custom-columns=NAME:.metadata.name,GPU:.status.allocatable.nvidia\\.com/gpu"
+        )
+        self.assertRegex(cols, r"gpu-worker-1\s+8")
+        self.assertTrue(sim.cluster.is_healthy())
+
+    def test_enable_gpu_device_plugin_helper(self):
+        c = K8sCluster("ai-infra-k8s-gpu-operator")
+        self.assertFalse(c.is_healthy())
+        c.enable_gpu_device_plugin()
+        self.assertTrue(c.is_healthy())
+        self.assertEqual(c.find_node("gpu-worker-1").gpu_allocatable, 8)

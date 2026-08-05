@@ -309,6 +309,28 @@ _GPU_SKUS: dict[str, dict] = {
         "cuda": "12.4",
         "vendor": "nvidia",
     },
+    "a4000": {
+        "name": "NVIDIA RTX A4000",
+        "count": 1,
+        "mem_mib": 16376,
+        "arch": "Ampere",
+        "pci": "GA104",
+        "pwr_cap": 140,
+        "driver": "550.90.07",
+        "cuda": "12.4",
+        "vendor": "nvidia",
+    },
+    "a6000": {
+        "name": "NVIDIA RTX 6000 Ada Generation",
+        "count": 1,
+        "mem_mib": 49140,
+        "arch": "Ada",
+        "pci": "AD102",
+        "pwr_cap": 300,
+        "driver": "550.90.07",
+        "cuda": "12.4",
+        "vendor": "nvidia",
+    },
     "mi300x": {
         "name": "AMD Instinct MI300X",
         "count": 8,
@@ -330,6 +352,10 @@ def _resolve_gpu_sku(scenario_slug: str) -> dict:
         return dict(_GPU_SKUS["b300"])
     if "h200" in low:
         return dict(_GPU_SKUS["h200"])
+    if "a6000" in low or "6000-ada" in low or "rtx6000" in low:
+        return dict(_GPU_SKUS["a6000"])
+    if "a4000" in low or "rtx-a4000" in low:
+        return dict(_GPU_SKUS["a4000"])
     if "l40s" in low or "l40" in low:
         return dict(_GPU_SKUS["l40s"])
     if "a100" in low:
@@ -670,7 +696,9 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         gpu_tools = ("nvidia-smi", "dcgmi", "dcgm-exporter", "dcgm", "gpustat", "rocm-smi",
                      "amd-smi", "nvcc", "all_reduce_perf", "all_gather_perf",
                      "reduce_scatter_perf", "broadcast_perf", "nccl-tests",
-                     "vllm", "gpu-sanity", "cuda-samples", "bandwidthTest", "deviceQuery")
+                     "vllm", "gpu-sanity", "cuda-samples", "bandwidthTest", "deviceQuery",
+                     "racadm", "idracadm", "nvidia_gpu_tools.py", "nvidia_gpu_tools",
+                     "rocminfo", "radeontop", "fieldiag", "psbcheck", "dcgmprofrunner")
         kernel_tools = ("modprobe", "rmmod", "lspci", "lsmod", "modinfo")
         if any(low.startswith(c) for c in gpu_tools):
             pass
@@ -681,6 +709,138 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         else:
             return None
         healthy = engine.shell.state.gpu_healthy
+        # Dell iDRAC / racadm — BM + DCOps TSR collection against the chassis BMC.
+        if low.startswith("racadm") or low.startswith("idracadm"):
+            if "getsysinfo" in low or "getsysinfo" in "".join(parts).lower():
+                return (
+                    "RAC Information:\n"
+                    f"RAC Date/Time           = {time.strftime('%m/%d/%Y %H:%M:%S')}\n"
+                    "Firmware Version        = 7.00.00.00\n"
+                    "Firmware Build          = 24\n"
+                    "Last Firmware Update    = 03/12/2025 09:14:22\n"
+                    "Hardware Version        = 0.01\n"
+                    "MAC Address 1           = AA:BB:CC:DD:EE:01\n"
+                    "\n"
+                    "System Information:\n"
+                    f"System Model            = PowerEdge XE9680 ({_SMI_GPU_NAME} × {_SMI_GPU_COUNT})\n"
+                    "System BIOS Version     = 2.5.4\n"
+                    "Service Tag             = SKYLAB01\n"
+                    "Express Service Code    = 1234567890\n"
+                    "Host Name               = gpu-node-01\n"
+                    "OS Name                 = Ubuntu 22.04.4 LTS\n"
+                    "Power Status            = ON\n"
+                    "Fresh Air Compliant     = Yes"
+                )
+            if "getsel" in low or "getraclog" in low or "getlclog" in low:
+                return (
+                    "Record: 1\n"
+                    f"Date/Time: {time.strftime('%m/%d/%Y %H:%M:%S')}\n"
+                    "Source: Fan.Slot.1\n"
+                    "Severity: Information\n"
+                    "Description: The fan was inserted.\n"
+                    "\n"
+                    "Record: 2\n"
+                    f"Date/Time: {time.strftime('%m/%d/%Y %H:%M:%S')}\n"
+                    "Source: GPU.Slot.4\n"
+                    "Severity: Warning\n"
+                    f"Description: {_SMI_GPU_NAME} temperature threshold asserted."
+                )
+            if "techsupreport" in low or "tsr" in low or "supportassist" in low:
+                return (
+                    "RACADM collecting Tech Support Report…\n"
+                    "JobQueue: JID_123456789012\n"
+                    "Percent Complete: 100%\n"
+                    "TSR saved to /tmp/TSR_SKYLAB01.zip\n"
+                    "Message: Successfully generated Tech Support Report"
+                )
+            if "serveraction" in low:
+                action = "powercycle"
+                for tok in ("powercycle", "powerdown", "powerup", "hardreset", "graceshutdown"):
+                    if tok in low:
+                        action = tok
+                        break
+                return f"Server power operation initiated: {action}"
+            if "get" in low and ("nic" in low or "mac" in low):
+                return (
+                    "NIC.Integrated.1-1-1\n"
+                    "  MACAddress = AA:BB:CC:DD:EE:10\n"
+                    "NIC.Integrated.1-2-1\n"
+                    "  MACAddress = AA:BB:CC:DD:EE:11\n"
+                    "NIC.Slot.1-1-1\n"
+                    "  MACAddress = AA:BB:CC:DD:EE:20"
+                )
+            if "-h" in parts or "--help" in low or len(parts) == 1:
+                return (
+                    "racadm — Dell Remote Access Controller admin CLI\n"
+                    "Usage: racadm [subcommand]\n"
+                    "  getsysinfo                 System / RAC summary\n"
+                    "  getsel / getraclog         System Event / RAC logs\n"
+                    "  techsupreport collect      Collect TSR bundle\n"
+                    "  serveraction <action>      Power operations\n"
+                    "  get NIC.Integrated.1-1-1   NIC / MAC inventory"
+                )
+            return f"racadm: OK ({' '.join(parts[1:]) or 'executed'})"
+        # NVIDIA internal GPU tools — PSB / PPCIe / confidential-compute probes.
+        if low.startswith("nvidia_gpu_tools") or "nvidia_gpu_tools.py" in low:
+            if "psb" in low or "--psb" in low:
+                return (
+                    "nvidia_gpu_tools.py — Platform Security Boot (PSB) check\n"
+                    f"GPU: {_SMI_GPU_NAME} × {_SMI_GPU_COUNT}\n"
+                    "Secure Boot / measured boot: ENABLED\n"
+                    "GPU IFR / VBIOS signature: VALID\n"
+                    "Result: PASS — /tmp/psb_report.json"
+                )
+            if "ppcie" in low or "ppcIe" in low or "--ppcie" in low or "cc-mode" in low or "conf-compute" in low:
+                return (
+                    "nvidia_gpu_tools.py — PPCIe / Confidential Compute mode\n"
+                    f"GPU: {_SMI_GPU_NAME} × {_SMI_GPU_COUNT}\n"
+                    "CC mode: off (devtools)\n"
+                    "PPCIe attestation: N/A (CC off)\n"
+                    "Result: PASS — mode query complete"
+                )
+            if "ecc" in low or "inforom" in low:
+                return (
+                    "nvidia_gpu_tools.py — ECC / InfoROM\n"
+                    + "\n".join(
+                        f"GPU{i}: ECC enabled; InfoROM OK; retired pages=0"
+                        for i in range(_SMI_GPU_COUNT)
+                    )
+                    + "\nResult: PASS"
+                )
+            return (
+                "nvidia_gpu_tools.py — NVIDIA datacenter GPU diagnostics\n"
+                "Usage:\n"
+                "  nvidia_gpu_tools.py --psb\n"
+                "  nvidia_gpu_tools.py --ppcie\n"
+                "  nvidia_gpu_tools.py --cc-mode\n"
+                "  nvidia_gpu_tools.py --ecc --inforom"
+            )
+        if low.startswith("rocminfo"):
+            return (
+                "ROCk module is loaded\n"
+                "=====================    \n"
+                "HSA Agents               \n"
+                "=====================    \n"
+                "  Name:                    gfx942\n"
+                "  Marketing Name:          AMD Instinct MI300X\n"
+                "  Vendor Name:             AMD\n"
+                "  Device Type:             GPU\n"
+                f"  Compute Units:           {110 * max(1, _SMI_GPU_COUNT // 8)}\n"
+                "  Max Waves Per CU:        32"
+            )
+        if low.startswith("radeontop"):
+            return (
+                "radeontop for AMD GPUs — bus 03, gpu 42.18%, ee 0.00%, vgt 12.40%, "
+                "ta 8.20%, sx 3.10%, sh 1.00%, spi 4.50%, sc 2.20%, pa 0.80%, "
+                "db 6.10%, cb 5.40%, vram 18.2% 12480MB, gtt 2.1% 512MB"
+            )
+        if low.startswith("dcgmprofrunner"):
+            return (
+                "dcgmprofrunner: starting DCGM profiling run…\n"
+                f"Targets: {_SMI_GPU_COUNT} × {_SMI_GPU_NAME}\n"
+                "Fields: DCGM_FI_PROF_GR_ENGINE_ACTIVE, DCGM_FI_PROF_PIPE_TENSOR_ACTIVE\n"
+                "Result: PASS — /tmp/dcgmprofrunner.json"
+            )
         # ImageDev GPU sanity harness (pre-publish / post-deploy).
         if low.startswith("gpu-sanity") or low.startswith("cuda-samples") or low.startswith("devicequery") or low.startswith("bandwidthtest"):
             if not healthy and sku.get("vendor") != "amd":
@@ -1672,6 +1832,11 @@ def _handle_kubectl(c, parts: list[str], line: str, shell: RHELShell) -> str:
         if kind == "pods":
             return c.get_pods(ns, all_ns, wide)
         if kind == "nodes":
+            # custom-columns / jsonpath probing nvidia.com/gpu allocatable
+            if "custom-columns" in out_fmt or "nvidia.com/gpu" in line.lower() or (
+                "allocatable" in line.lower() and "gpu" in line.lower()
+            ):
+                return c.get_nodes_gpu_columns()
             return c.get_nodes(wide)
         if kind == "svc":
             return c.get_services(ns, all_ns)

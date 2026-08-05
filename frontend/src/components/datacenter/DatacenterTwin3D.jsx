@@ -2,7 +2,9 @@
  * Phase 7+ — Animated Lab Environment 3D digital twin (R3F + Rapier).
  * Camera intro, rack doors, LED/power pulse, fans, cable packets, airflow.
  */
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Suspense, cloneElement, isValidElement, useEffect, useMemo, useRef, useState,
+} from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import {
   OrbitControls, Html, Environment, ContactShadows, RoundedBox, Float, Bvh,
@@ -16,6 +18,23 @@ const RACK_W = 0.6
 const RACK_D = 1.05
 const RACK_H = 2.0
 const U_H = RACK_H / 42
+
+/** AR HUD overlay cycle — Off / Thermal / Power / Network (key `V`). */
+const AR_MODES = ['off', 'thermal', 'power', 'network']
+const AR_MODE_LABELS = { off: 'Off', thermal: 'Thermal', power: 'Power', network: 'Network' }
+
+/** Lerp between two `#rrggbb` colors without allocating a THREE.Color per call. */
+function lerpHex(a, b, t) {
+  const clamped = Math.max(0, Math.min(1, t))
+  const ah = parseInt(a.slice(1), 16)
+  const bh = parseInt(b.slice(1), 16)
+  const ar = (ah >> 16) & 255; const ag = (ah >> 8) & 255; const ab = ah & 255
+  const br = (bh >> 16) & 255; const bg = (bh >> 8) & 255; const bb = bh & 255
+  const rr = Math.round(ar + (br - ar) * clamped)
+  const rg = Math.round(ag + (bg - ag) * clamped)
+  const rb = Math.round(ab + (bb - ab) * clamped)
+  return `rgb(${rr}, ${rg}, ${rb})`
+}
 
 function vendorColor(vendor) {
   const v = (vendor || '').toLowerCase()
@@ -567,7 +586,8 @@ function FanSpinner({ position, powered, rpmScale = 1, fault = false }) {
   )
 }
 
-function PduStrips({ racks = [], pdus = [], onSelectPdu }) {
+function PduStrips({ racks = [], pdus = [], onSelectPdu, arMode = 'off' }) {
+  const powerBoost = arMode === 'power'
   return (
     <group>
       {racks.map((rack, i) => {
@@ -585,7 +605,7 @@ function PduStrips({ racks = [], pdus = [], onSelectPdu }) {
               <meshStandardMaterial
                 color={tripped ? '#7f1d1d' : '#1e293b'}
                 emissive={tripped ? '#ef4444' : '#22c55e'}
-                emissiveIntensity={tripped ? 0.55 : 0.12}
+                emissiveIntensity={tripped ? 0.55 : (powerBoost ? 0.4 : 0.12)}
                 metalness={0.65}
               />
             </mesh>
@@ -599,7 +619,7 @@ function PduStrips({ racks = [], pdus = [], onSelectPdu }) {
                   <meshStandardMaterial
                     color={lit ? '#0f172a' : '#334155'}
                     emissive={tripped ? '#ef4444' : lit ? '#22c55e' : '#000'}
-                    emissiveIntensity={tripped ? 0.7 : lit ? 0.45 : 0}
+                    emissiveIntensity={tripped ? 0.7 : lit ? (powerBoost ? 0.85 : 0.45) : (powerBoost ? 0.12 : 0)}
                   />
                 </mesh>
               )
@@ -812,6 +832,7 @@ function rackPosition(index) {
 
 function RackInner({
   rack, servers, selectedId, expanded, onSelectRack, onSelectServer, onOpenBmc, tip, animBoost,
+  arMode = 'off', arThermalLevel = 0,
 }) {
   const anyFail = servers.some((s) => Object.values(s.components || {}).some((c) => c !== 'healthy'))
   const group = useRef()
@@ -822,6 +843,17 @@ function RackInner({
     group.current.rotation.z = Math.sin(clock.elapsedTime * 1.8) * 0.035
   })
 
+  // AR Thermal overlay: tint healthy racks warmer as CRAC/ticket stress rises —
+  // failed racks already read red, so leave that signal untouched.
+  const thermalOn = arMode === 'thermal' && !anyFail && arThermalLevel > 0.04
+  const rackColor = anyFail ? '#3f1d1d' : (thermalOn ? lerpHex('#0f141f', '#7c2d12', arThermalLevel) : '#0f141f')
+  const rackEmissive = anyFail
+    ? '#7f1d1d'
+    : (thermalOn ? lerpHex('#0ea5e9', '#f97316', Math.min(1, arThermalLevel + 0.3)) : '#0ea5e9')
+  const rackEmissiveIntensity = anyFail
+    ? 0.28
+    : (open ? 0.08 : 0.02) + (thermalOn ? arThermalLevel * 0.35 : 0)
+
   return (
     <group
       ref={group}
@@ -829,11 +861,11 @@ function RackInner({
     >
       <RoundedBox args={[RACK_W, RACK_H, RACK_D]} radius={0.02} castShadow receiveShadow>
         <meshStandardMaterial
-          color={anyFail ? '#3f1d1d' : '#0f141f'}
+          color={rackColor}
           metalness={0.55}
           roughness={0.35}
-          emissive={anyFail ? '#7f1d1d' : '#0ea5e9'}
-          emissiveIntensity={anyFail ? 0.28 : open ? 0.08 : 0.02}
+          emissive={rackEmissive}
+          emissiveIntensity={rackEmissiveIntensity}
         />
       </RoundedBox>
       <mesh position={[-RACK_W / 2 + 0.02, 0, 0]}>
@@ -861,6 +893,7 @@ function RackInner({
 
 function RackMesh({
   rack, servers, index, selectedId, expandedRack, onSelectRack, onSelectServer, onOpenBmc, physicsEnabled, animBoost,
+  arMode = 'off', arThermalLevel = 0,
 }) {
   const tip = rack.physics?.tip_risk === 'high'
   const { x, z } = rackPosition(index)
@@ -886,6 +919,8 @@ function RackMesh({
       onOpenBmc={onOpenBmc}
       tip={tip}
       animBoost={animBoost}
+      arMode={arMode}
+      arThermalLevel={arThermalLevel}
     />
   )
 
@@ -1099,10 +1134,91 @@ function RoomPortal({ position, label, roomId, onEnterRoom, color = '#38bdf8' })
   )
 }
 
+/** Glowing badge desk near the mantrap — the in-world alternative to the toolbar
+ *  Badge-in button. Walk up and press E (or click) to badge in. */
+function BadgeDesk({ badgedIn, onBadgeIn }) {
+  const matRef = useRef()
+  useFrame(({ clock }) => {
+    if (!matRef.current) return
+    matRef.current.emissiveIntensity = 0.45 + Math.sin(clock.elapsedTime * 2.4) * 0.2
+  })
+  if (badgedIn) return null
+  return (
+    <group position={[-4.55, 0, 4.75]}>
+      <mesh castShadow receiveShadow position={[0, 0.5, 0]}>
+        <boxGeometry args={[0.55, 1.0, 0.4]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.4} roughness={0.55} />
+      </mesh>
+      <mesh
+        position={[0, 1.05, 0.16]}
+        onClick={(e) => { e.stopPropagation(); onBadgeIn?.() }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }}
+        onPointerOut={() => { document.body.style.cursor = 'default' }}
+      >
+        <boxGeometry args={[0.16, 0.22, 0.06]} />
+        <meshStandardMaterial ref={matRef} color="#0f172a" emissive="#fbbf24" emissiveIntensity={0.45} metalness={0.3} roughness={0.4} />
+      </mesh>
+      <Html position={[0, 1.42, 0.16]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
+        <div className="dc-3d-label dc-3d-label-hot">Badge reader · tap E</div>
+      </Html>
+    </group>
+  )
+}
+
+/** NOC wall stub — three small in-world monitor panels near the NOC portal,
+ *  fed from live monitoring/ticket counts when available, else static numbers.
+ *  Purely decorative — never forces a room switch. */
+function NocWall({ metrics = {} }) {
+  const panelRefs = useRef([])
+  const panels = useMemo(() => ([
+    { key: 'gpu', label: 'GPU util', value: `${Math.round(metrics.gpuUtil ?? 58)}%`, color: '#38bdf8' },
+    { key: 'pue', label: 'PUE', value: Number(metrics.pue ?? 1.34).toFixed(2), color: '#34d399' },
+    {
+      key: 'tix',
+      label: 'Tickets open',
+      value: `${metrics.ticketsOpen ?? 3}`,
+      color: (metrics.ticketsOpen ?? 3) > 5 ? '#f87171' : '#fbbf24',
+    },
+  ]), [metrics.gpuUtil, metrics.pue, metrics.ticketsOpen])
+
+  useFrame(({ clock }) => {
+    panelRefs.current.forEach((m, i) => {
+      if (m?.material) m.material.emissiveIntensity = 0.35 + Math.sin(clock.elapsedTime * 1.6 + i) * 0.08
+    })
+  })
+
+  return (
+    <group position={[2.15, 1.55, 2.85]}>
+      <mesh position={[0, 0, -0.03]} castShadow>
+        <boxGeometry args={[1.5, 0.8, 0.04]} />
+        <meshStandardMaterial color="#0b1220" metalness={0.5} roughness={0.4} />
+      </mesh>
+      {panels.map((p, i) => (
+        <group key={p.key} position={[-0.48 + i * 0.48, 0, 0.01]}>
+          <mesh ref={(el) => { if (el) panelRefs.current[i] = el }}>
+            <planeGeometry args={[0.4, 0.62]} />
+            <meshStandardMaterial color="#020617" emissive={p.color} emissiveIntensity={0.35} />
+          </mesh>
+          <Html center distanceFactor={8} position={[0, 0, 0.01]} style={{ pointerEvents: 'none' }}>
+            <div className="dc-noc-wall-panel" style={{ '--noc-color': p.color }}>
+              <span className="dc-noc-wall-label">{p.label}</span>
+              <span className="dc-noc-wall-value">{p.value}</span>
+            </div>
+          </Html>
+        </group>
+      ))}
+      <Html position={[0, 0.55, 0.01]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
+        <div className="dc-3d-label">NOC wall</div>
+      </Html>
+    </group>
+  )
+}
+
 function SceneContent({
   racks, serversByRack, network, cooling, pdus, selectedId, expandedRack,
   onSelectServer, onSelectRack, onOpenBmc, onUnplugCable, onPlugCable, physicsEnabled, onFps, animBoost, intro,
   walkMode = false, tickets = [], doorOpen = false, onEnterRoom, walkPaused = false, posRef,
+  arMode = 'off', badgedIn = false, onBadgeIn, nocMetrics = {},
 }) {
   const thermalStress = useMemo(() => {
     const units = cooling || []
@@ -1125,6 +1241,13 @@ function SceneContent({
     })
     return Math.min(1, score)
   }, [tickets])
+
+  // Shared with the AR Thermal overlay so racks tint warmer under the same
+  // CRAC/ticket stress signal that drives the hot-aisle haze.
+  const arThermalLevel = useMemo(
+    () => Math.min(1, thermalStress + ticketHeat * 0.6),
+    [thermalStress, ticketHeat],
+  )
 
   const dockBusy = useMemo(() => {
     return (tickets || []).some((t) => {
@@ -1231,6 +1354,8 @@ function SceneContent({
       <RoomPortal position={[-5.2, 1.05, 3.2]} label="Reception" roomId="reception" onEnterRoom={onEnterRoom} color="#94a3b8" />
       <RoomPortal position={[5.8, 1.05, 0.4]} label="MDF" roomId="mdf" onEnterRoom={onEnterRoom} color="#38bdf8" />
       <RoomPortal position={[3.2, 1.05, 3.4]} label="NOC" roomId="noc" onEnterRoom={onEnterRoom} color="#a78bfa" />
+      <NocWall metrics={nocMetrics} />
+      <BadgeDesk badgedIn={badgedIn} onBadgeIn={onBadgeIn} />
       {(tickets || [])
         .filter((t) => t?.asset_id && !['closed', 'resolved'].includes((t.status || '').toLowerCase()))
         .slice(0, 8)
@@ -1261,7 +1386,7 @@ function SceneContent({
         />
       )}
       <CracUnits cooling={cooling} />
-      <PduStrips racks={racks} pdus={pdus} />
+      <PduStrips racks={racks} pdus={pdus} arMode={arMode} />
 
       <TorSwitch position={[5.5, 0.95, -1.2]} label="MDF / Spine" ports={48} />
       <TorSwitch position={[5.5, 1.25, -1.2]} label="Leaf / ToR agg" ports={36} />
@@ -1280,6 +1405,8 @@ function SceneContent({
             onOpenBmc={onOpenBmc}
             physicsEnabled={physicsEnabled}
             animBoost={animBoost}
+            arMode={arMode}
+            arThermalLevel={arThermalLevel}
           />
         ))}
       </Bvh>
@@ -1297,6 +1424,7 @@ function SceneContent({
           label={c.label}
           onUnplug={c.interactive ? (payload) => onUnplugCable?.(payload) : undefined}
           onPlug={c.interactive ? (payload) => onPlugCable?.(payload) : undefined}
+          arNetwork={arMode === 'network'}
         />
       ))}
 
@@ -1323,7 +1451,7 @@ function CoachMark({ show }) {
   if (!show) return null
   return (
     <div className="dc-3d-coachmark" key="coach">
-      Walk the cold aisle · <kbd>E</kbd> interact · <kbd>Esc</kbd> menu
+      Walk the cold aisle · <kbd>E</kbd> interact · <kbd>V</kbd> AR overlay · <kbd>Esc</kbd> menu
     </div>
   )
 }
@@ -1335,8 +1463,9 @@ const RADAR_PORTALS = [
   { id: 'noc', x: 3.2, z: 3.4, color: '#a78bfa', hotkey: '4' },
 ]
 
-/** Lightweight top-down radar tip — player dot + the four room-portal beacons. */
-function Minimap({ posRef }) {
+/** Lightweight top-down radar tip — player dot + the four room-portal beacons,
+ *  plus a "you are here" room label above the ring. */
+function Minimap({ posRef, currentRoomLabel = 'Data Hall A' }) {
   const dotRef = useRef()
   useEffect(() => {
     let raf
@@ -1354,6 +1483,7 @@ function Minimap({ posRef }) {
   }, [posRef])
   return (
     <div className="dc-3d-minimap" aria-hidden>
+      <div className="dc-3d-minimap-label">{currentRoomLabel}</div>
       <div className="dc-3d-minimap-ring" />
       {RADAR_PORTALS.map((p) => (
         <span
@@ -1369,6 +1499,55 @@ function Minimap({ posRef }) {
         />
       ))}
       <span ref={dotRef} className="dc-3d-minimap-player" />
+    </div>
+  )
+}
+
+/** Current AR overlay mode chip — cycled with `V` (Off / Thermal / Power / Network). */
+function ArModeChip({ mode }) {
+  return (
+    <div className={`dc-3d-ar-chip dc-3d-ar-chip-${mode}`}>
+      <span>AR</span> {AR_MODE_LABELS[mode] || 'Off'}
+    </div>
+  )
+}
+
+/** Bottom "field kit" HUD — Badge · ESD · Cart · BMC quick actions. */
+function FieldKitHud({
+  badgedIn, onBadgeIn, esdOn, onToggleEsd, cartOpen, onToggleCart, onOpenBmc, esdToast,
+}) {
+  return (
+    <div className="dc-3d-fieldkit">
+      <div className="dc-3d-fieldkit-row">
+        <button
+          type="button"
+          className={`dc-3d-kit-btn ${badgedIn ? 'dc-3d-kit-btn-done' : ''}`}
+          onClick={() => onBadgeIn?.()}
+          title="Badge in at the mantrap"
+        >
+          Badge{badgedIn ? ' ✓' : ''}
+        </button>
+        <button
+          type="button"
+          className={`dc-3d-kit-btn ${esdOn ? 'dc-3d-kit-btn-on' : 'dc-3d-kit-btn-off'}`}
+          onClick={onToggleEsd}
+          title="ESD wrist strap"
+        >
+          ESD {esdOn ? 'On' : 'Off'}
+        </button>
+        <button
+          type="button"
+          className={`dc-3d-kit-btn ${cartOpen ? 'dc-3d-kit-btn-on' : ''}`}
+          onClick={onToggleCart}
+          title="Parts cart"
+        >
+          Cart
+        </button>
+        <button type="button" className="dc-3d-kit-btn" onClick={() => onOpenBmc?.()} title="Open BMC console">
+          BMC
+        </button>
+      </div>
+      {esdToast && <div className="dc-3d-kit-toast">Wrist strap recommended</div>}
     </div>
   )
 }
@@ -1390,7 +1569,7 @@ function ImmersiveMenu({ open, onResume, onExitImmersive, onExitTo2D, badgedIn }
           Switch to 2D floor
         </button>
         <div className="dc-3d-menu-hint">
-          {badgedIn ? 'Badged in' : 'Not badged in'} · 1 Dock · 2 Reception · 3 MDF · 4 NOC
+          {badgedIn ? 'Badged in' : 'Not badged in'} · 1 Dock · 2 Reception · 3 MDF · 4 NOC · V AR
         </div>
       </div>
     </div>
@@ -1434,6 +1613,8 @@ export default function DatacenterTwin3D({
   onOpenBmc,
   onUnplugCable,
   onPlugCable,
+  nocMetrics = {},
+  currentRoomLabel = 'Data Hall A',
 }) {
   const [physicsEnabled, setPhysicsEnabled] = useState(true)
   const [animBoost, setAnimBoost] = useState(1)
@@ -1444,14 +1625,35 @@ export default function DatacenterTwin3D({
   const [immersive, setImmersive] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [showCoach, setShowCoach] = useState(false)
+  // AR HUD overlay cycle (Off / Thermal / Power / Network) — key `V`.
+  const [arModeIdx, setArModeIdx] = useState(0)
+  // Field kit HUD state — ESD wrist-strap toggle + cosmetic parts-cart marker.
+  const [esdOn, setEsdOn] = useState(true)
+  const [cartOpen, setCartOpen] = useState(false)
+  const [esdToast, setEsdToast] = useState(false)
   const autoWalkStarted = useRef(false)
   const coachShown = useRef(false)
   const posRef = useRef({ x: 5.2, z: 4.5, yaw: 0 })
+  const prevSelectedRef = useRef(null)
+
+  const arMode = AR_MODES[arModeIdx] || 'off'
 
   const badgedIn = useMemo(() => {
     const ev = access?.events || []
     return ev.some((e) => (e.type || '') === 'allow' || /ALLOW|badge/i.test(e.message || ''))
   }, [access])
+
+  // Brief, non-blocking amber toast when a server tablet is opened without ESD protection.
+  useEffect(() => {
+    if (selectedServerId && selectedServerId !== prevSelectedRef.current && !esdOn) {
+      setEsdToast(true)
+      prevSelectedRef.current = selectedServerId
+      const id = setTimeout(() => setEsdToast(false), 3200)
+      return () => clearTimeout(id)
+    }
+    prevSelectedRef.current = selectedServerId
+    return undefined
+  }, [selectedServerId, esdOn])
 
   useEffect(() => {
     if (!intro || walkMode) return undefined
@@ -1496,7 +1698,7 @@ export default function DatacenterTwin3D({
     onExitTo2D?.()
   }
 
-  // In-world room hotkeys (1-4) + Esc pause menu — no tab bar needed while immersive.
+  // In-world room hotkeys (1-4) + AR overlay cycle (V) + Esc pause menu — no tab bar needed while immersive.
   useEffect(() => {
     if (!immersive || intro) return undefined
     const handler = (e) => {
@@ -1505,6 +1707,10 @@ export default function DatacenterTwin3D({
         return
       }
       if (menuOpen) return
+      if (e.code === 'KeyV') {
+        setArModeIdx((i) => (i + 1) % AR_MODES.length)
+        return
+      }
       const room = ROOM_HOTKEYS[e.code]
       if (room) onEnterRoom?.(room)
     }
@@ -1588,14 +1794,27 @@ export default function DatacenterTwin3D({
           <div className="dc-3d-hud">
             {objective && <div className="dc-3d-hud-objective"><strong>Objective</strong> · {objective}</div>}
             <div>WASD move · mouse look · Shift sprint · E interact</div>
-            <div>1 Dock · 2 Reception · 3 MDF · 4 NOC · Esc menu</div>
+            <div>1 Dock · 2 Reception · 3 MDF · 4 NOC · V AR overlay · Esc menu</div>
           </div>
         )}
-        {inGame && <Minimap posRef={posRef} />}
+        {inGame && <Minimap posRef={posRef} currentRoomLabel={currentRoomLabel} />}
         {inGame && <CoachMark show={showCoach} />}
+        {immersive && !intro && <ArModeChip mode={arMode} />}
+        {immersive && !intro && (
+          <FieldKitHud
+            badgedIn={badgedIn}
+            onBadgeIn={() => onBadgeIn?.()}
+            esdOn={esdOn}
+            onToggleEsd={() => setEsdOn((v) => !v)}
+            cartOpen={cartOpen}
+            onToggleCart={() => setCartOpen((v) => !v)}
+            onOpenBmc={() => onOpenBmc?.()}
+            esdToast={esdToast}
+          />
+        )}
         {immersive && (
           <div className="dc-3d-pinned-controls">
-            {audioControl}
+            {isValidElement(audioControl) ? cloneElement(audioControl, { posRef }) : audioControl}
             <button
               type="button"
               className="dc-3d-exit-btn"
@@ -1644,6 +1863,10 @@ export default function DatacenterTwin3D({
                 tickets={tickets}
                 doorOpen={badgedIn}
                 onEnterRoom={onEnterRoom}
+                arMode={arMode}
+                badgedIn={badgedIn}
+                onBadgeIn={onBadgeIn}
+                nocMetrics={nocMetrics}
               />
             </Physics>
           </Canvas>

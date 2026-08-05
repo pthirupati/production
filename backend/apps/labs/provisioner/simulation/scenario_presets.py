@@ -3998,6 +3998,23 @@ _PRESETS: dict[str, callable] = {
     "gpu-power-cap-too-low-throttle": lambda s: _plant_broken_config_sentinel("gpu-power-cap-too-low-throttle", s),
     "gpu-amd-mi300-rocm-driver-mismatch": lambda s: _plant_broken_config_sentinel("gpu-amd-mi300-rocm-driver-mismatch", s),
     "gpu-nvlink-lane-down-h100": lambda s: _plant_broken_config_sentinel("gpu-nvlink-lane-down-h100", s),
+    # AI Infra K8s-on-GPU: OS GPUs stay healthy; K8sCluster seeds the broken device plugin.
+    # Explicit preset wins over the generic "gpu" → fallen-off branch.
+    "ai-infra-k8s-gpu-operator": lambda s: setattr(s, "gpu_healthy", True),
+    "ai-infra-k8s-device-plugin": lambda s: setattr(s, "gpu_healthy", True),
+    "ai-infra-maas-commission-a4000": lambda s: (
+        setattr(s, "gpu_healthy", True),
+        _plant_broken_config_sentinel("ai-infra-maas-commission-a4000", s),
+    )[-1],
+    "ai-infra-maas-commission-a6000": lambda s: (
+        setattr(s, "gpu_healthy", True),
+        _plant_broken_config_sentinel("ai-infra-maas-commission-a6000", s),
+    )[-1],
+    "ai-infra-dcops-racadm-tsr": lambda s: _plant_broken_config_sentinel("ai-infra-dcops-racadm-tsr", s),
+    "ai-infra-gpu-nvidia-gpu-tools-psb": lambda s: (
+        setattr(s, "gpu_healthy", True),
+        _plant_broken_config_sentinel("ai-infra-gpu-nvidia-gpu-tools-psb", s),
+    )[-1],
 }
 
 

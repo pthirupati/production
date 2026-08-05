@@ -8,25 +8,25 @@ import { Html } from '@react-three/drei'
 import { RigidBody, BallCollider } from '@react-three/rapier'
 import * as THREE from 'three'
 
-export function StatusLed({ position, failed, powered, warning = false, size = 0.018 }) {
+export function StatusLed({ position, failed, powered, warning = false, size = 0.018, boost = 1 }) {
   const mat = useRef()
   useFrame(({ clock }) => {
     if (!mat.current) return
     const t = clock.elapsedTime
     if (failed) {
-      mat.current.emissiveIntensity = 0.35 + (Math.sin(t * 10) > 0 ? 0.65 : 0)
+      mat.current.emissiveIntensity = (0.35 + (Math.sin(t * 10) > 0 ? 0.65 : 0)) * boost
       mat.current.color.set('#ef4444')
       mat.current.emissive.set('#ef4444')
     } else if (warning) {
-      mat.current.emissiveIntensity = 0.3 + (Math.sin(t * 6) > 0 ? 0.55 : 0.1)
+      mat.current.emissiveIntensity = (0.3 + (Math.sin(t * 6) > 0 ? 0.55 : 0.1)) * boost
       mat.current.color.set('#f59e0b')
       mat.current.emissive.set('#f59e0b')
     } else if (powered) {
-      mat.current.emissiveIntensity = 0.55 + Math.sin(t * 2.2) * 0.12
+      mat.current.emissiveIntensity = (0.55 + Math.sin(t * 2.2) * 0.12) * boost
       mat.current.color.set('#34d399')
       mat.current.emissive.set('#34d399')
     } else {
-      mat.current.emissiveIntensity = 0.02
+      mat.current.emissiveIntensity = 0.02 * boost
       mat.current.color.set('#475569')
       mat.current.emissive.set('#000000')
     }
@@ -61,7 +61,12 @@ function CableConnector({ color = '#e2e8f0', kind = 'RJ45' }) {
   )
 }
 
-function PortJack({ position, linked, activity, label }) {
+function PortJack({ position, linked, activity, label, arNetwork = false }) {
+  const glowRef = useRef()
+  useFrame(({ clock }) => {
+    if (!glowRef.current) return
+    glowRef.current.material.opacity = arNetwork ? 0.35 + Math.sin(clock.elapsedTime * 2.6) * 0.15 : 0
+  })
   return (
     <group position={position}>
       <mesh>
@@ -72,9 +77,15 @@ function PortJack({ position, linked, activity, label }) {
         <boxGeometry args={[0.028, 0.016, 0.01]} />
         <meshStandardMaterial color="#1e293b" />
       </mesh>
-      <StatusLed position={[0.018, 0.014, 0.016]} failed={false} powered={linked} warning={!linked} size={0.006} />
+      <StatusLed position={[0.018, 0.014, 0.016]} failed={false} powered={linked} warning={!linked} size={0.006} boost={arNetwork ? 1.7 : 1} />
       {activity && linked && (
-        <StatusLed position={[-0.018, 0.014, 0.016]} failed={false} powered size={0.005} />
+        <StatusLed position={[-0.018, 0.014, 0.016]} failed={false} powered size={0.005} boost={arNetwork ? 1.7 : 1} />
+      )}
+      {arNetwork && (
+        <mesh ref={glowRef} position={[0, 0, 0.02]}>
+          <ringGeometry args={[0.026, 0.036, 16]} />
+          <meshBasicMaterial color="#38bdf8" transparent opacity={0.3} depthWrite={false} side={THREE.DoubleSide} />
+        </mesh>
       )}
       {label && (
         <Html position={[0, 0.045, 0]} center distanceFactor={14} style={{ pointerEvents: 'none' }}>
@@ -116,6 +127,7 @@ export function InteractiveCable({
   onUnplug,
   onPlug,
   label,
+  arNetwork = false,
 }) {
   const packetRef = useRef()
   const packetRef2 = useRef()
@@ -234,6 +246,7 @@ export function InteractiveCable({
         linked={!loose && !dragging}
         activity={traffic && !loose}
         label={label || cableId}
+        arNetwork={arNetwork}
       />
       <mesh geometry={tube}>
         <meshStandardMaterial
@@ -286,7 +299,7 @@ export function InteractiveCable({
           <meshStandardMaterial
             color="#fff"
             emissive={loose ? '#f59e0b' : '#38bdf8'}
-            emissiveIntensity={0.9 + snapFlash}
+            emissiveIntensity={0.9 + snapFlash + (arNetwork ? 0.45 : 0)}
             toneMapped={false}
           />
         </mesh>
