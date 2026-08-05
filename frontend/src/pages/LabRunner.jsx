@@ -1760,10 +1760,22 @@ export default function LabRunner() {
   const explicitDatacenterScenario = scenario?.datacenter_link === true
     || consolesInclude(scenario?.consoles, 'datacenter')
     || consolesInclude(scenario?.consoles, 'bmc')
-  const showDatacenterLink = !isDatacenterLab && canOpenCompanionConsole(techSubs, explicitDatacenterScenario, 'datacenter')
+    || techSlugLc === 'ai-infra'
+  // ai-infra unlocks DC companion (same entitlement pattern as AWX) — BM/DCOps
+  // workflows live inside AI Infra Engineering, not only the Datacenter tech sub.
+  const canDatacenterCompanion = techSlugLc === 'ai-infra'
+    || userHasTechAccess(techSubs, 'ai-infra')
+    || userHasTechAccess(techSubs, 'datacenter')
+  const showDatacenterLink = !isDatacenterLab && explicitDatacenterScenario && (
+    techSlugLc === 'ai-infra'
+      ? canDatacenterCompanion
+      : canOpenCompanionConsole(techSubs, true, 'datacenter')
+  )
   // Locked chips: scenario needs the companion console but learner lacks the sub.
   const showVmwareSubscribeHint = explicitVmwareScenario && !isVmwareLab && techSubs && !canVmwareConsole
-  const showDatacenterSubscribeHint = explicitDatacenterScenario && !isDatacenterLab && techSubs && !canDatacenterConsole
+  const showDatacenterSubscribeHint = explicitDatacenterScenario && !isDatacenterLab && techSubs
+    && !canDatacenterCompanion && !showDatacenterLink
+    && techSlugLc !== 'ai-infra'
   // Academy AWS packs grade via Lab Server FIXED-OK (terminal primary), but
   // entitled learners should still open the AWS Console as a companion so
   // EC2/S3/IAM practice matches the lab copy. Also surface when the Lab Server
@@ -1831,15 +1843,21 @@ export default function LabRunner() {
   // Ansible terminal labs run playbooks from the shell, so the terminal stays
   // primary (we do NOT make them AWX-primary). Surface Open AWX for Ansible tech
   // labs (and explicit AWX/controller slugs) when the learner has ansible access.
-  const showAwxLink = !isCrossTech && !isAwxLab && canAwxConsole
+  // ai-infra (+ consoles awx) always get Open AWX even on cross_technology packs;
+  // other ansible labs still hide the chip on cross-tech to avoid chrome noise.
+  const showAwxLink = !isAwxLab && canAwxConsole
     && (
-      scenario?.awx_link === true
-      || scenario?.simulation_type === 'ansible'
-      || scenario?.simulation_type === 'ansible-awx'
-      || techSlugLc === 'ansible'
-      || techSlugLc === 'ai-infra'
+      techSlugLc === 'ai-infra'
       || consolesInclude(scenario?.consoles, 'awx')
-      || /(?:^|-)(awx|tower)(?:-|$)/i.test(scenarioSlug)
+      || (
+        !isCrossTech && (
+          scenario?.awx_link === true
+          || scenario?.simulation_type === 'ansible'
+          || scenario?.simulation_type === 'ansible-awx'
+          || techSlugLc === 'ansible'
+          || /(?:^|-)(awx|tower)(?:-|$)/i.test(scenarioSlug)
+        )
+      )
     )
   const vmwareWorkflowHint = showVmwareCompanionLink
     ? 'Use vCenter for hypervisor steps, then return here and rescan/reboot.'
@@ -2778,6 +2796,39 @@ export default function LabRunner() {
                   <ExternalLink size={12} /> Open AWX
                 </button>
               )}
+              {showHostedBaremetalLink && (
+                <button
+                  type="button"
+                  onClick={() => setShowBaremetalSim(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
+                  style={{ borderColor: 'rgba(13,148,136,.45)', color: '#2dd4bf', background: 'rgba(13,148,136,.14)' }}
+                  title="Open MAAS / LXD / KVM bare metal console"
+                >
+                  <ExternalLink size={12} /> Open Bare Metal
+                </button>
+              )}
+              {isPackerLab && (
+                <button
+                  type="button"
+                  onClick={() => setShowPackerSim(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
+                  style={{ borderColor: 'rgba(2,168,239,.45)', color: '#02A8EF', background: 'rgba(2,168,239,.12)' }}
+                  title="Open Packer workspace — edit .pkr.hcl, validate, build, publish to MAAS"
+                >
+                  <ExternalLink size={12} /> Open Packer
+                </button>
+              )}
+              {isTerraformSimLab && (
+                <button
+                  type="button"
+                  onClick={() => setShowTerraformSim(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
+                  style={{ borderColor: 'rgba(124,58,237,.45)', color: '#a78bfa', background: 'rgba(124,58,237,.14)' }}
+                  title="Open Terraform workspace IDE"
+                >
+                  <ExternalLink size={12} /> Open Terraform
+                </button>
+              )}
               {isMonitoringLab && (
                 <button
                   type="button"
@@ -3508,44 +3559,59 @@ export default function LabRunner() {
       )}
 
       {showAwxSim && (showAwxLink || isAwxLab) && (
-        <div className="fixed inset-0 z-[60]">
-          <LazySimPanel Sim={LazyAwxSimulator} label="AWX" sessionId={sessionId} scenario={scenario} onExit={() => setShowAwxSim(false)} embedded {...simChromeProps} />
+        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+          <LazySimPanel
+            Sim={LazyAwxSimulator}
+            label="AWX"
+            sessionId={sessionId}
+            scenario={scenario}
+            onExit={() => setShowAwxSim(false)}
+            {...simChromeProps}
+          />
         </div>
       )}
 
       {isBaremetalGuiLab && !isSimPrimaryLab && showBaremetalSim && (
-        <LazySimPanel Sim={LazyBaremetalSimulator} label="bare metal" sessionId={sessionId} scenario={scenario} onExit={() => setShowBaremetalSim(false)} {...simChromeProps} />
+        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+          <LazySimPanel Sim={LazyBaremetalSimulator} label="bare metal" sessionId={sessionId} scenario={scenario} onExit={() => setShowBaremetalSim(false)} {...simChromeProps} />
+        </div>
       )}
       {showHostedBaremetalLink && showBaremetalSim && (
-        <LazySimPanel Sim={LazyBaremetalSimulator} label="bare metal" sessionId={sessionId} scenario={scenario} onExit={() => setShowBaremetalSim(false)} {...simChromeProps} />
+        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+          <LazySimPanel Sim={LazyBaremetalSimulator} label="bare metal" sessionId={sessionId} scenario={scenario} onExit={() => setShowBaremetalSim(false)} {...simChromeProps} />
+        </div>
       )}
       {showDatacenterLink && showDatacenterSim && (
-        <LazySimPanel
-          Sim={LazyDatacenterSimulator}
-          label="datacenter"
-          sessionId={sessionId}
-          scenario={scenario}
-          onExit={() => setShowDatacenterSim(false)}
-          {...simChromeProps}
-        />
+        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+          <LazySimPanel
+            Sim={LazyDatacenterSimulator}
+            label="datacenter"
+            sessionId={sessionId}
+            scenario={scenario}
+            onExit={() => setShowDatacenterSim(false)}
+            {...simChromeProps}
+          />
+        </div>
       )}
 
       {isTerraformSimLab && !isSimPrimaryLab && showTerraformSim && (
-        <LazySimPanel
-          Sim={LazyTerraformSimulator}
-          name="terraform"
-          label="Terraform"
-          autoResetStorageOnError
-          onResetStorage={() => { hardResetAwsSim(); resetTerraformAwsLabState() }}
-          sessionId={sessionId}
-          scenario={scenario}
-          terminalSession={terminalSession}
-          terminalHost={terminalHost}
-          blockedCommands={blockedCmds}
-          isMobile={isMobile}
-          onExit={() => setShowTerraformSim(false)}
-          {...simChromeProps}
-        />
+        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+          <LazySimPanel
+            Sim={LazyTerraformSimulator}
+            name="terraform"
+            label="Terraform"
+            autoResetStorageOnError
+            onResetStorage={() => { hardResetAwsSim(); resetTerraformAwsLabState() }}
+            sessionId={sessionId}
+            scenario={scenario}
+            terminalSession={terminalSession}
+            terminalHost={terminalHost}
+            blockedCommands={blockedCmds}
+            isMobile={isMobile}
+            onExit={() => setShowTerraformSim(false)}
+            {...simChromeProps}
+          />
+        </div>
       )}
 
       {isPackerLab && showPackerSim && (
@@ -3564,91 +3630,65 @@ export default function LabRunner() {
         </Suspense>
       )}
 
-      {isTerraformSimLab && showAwsSim && (
-        <LazySimPanel
-          Sim={LazyAwsLabOverlay}
-          name="aws"
-          label="AWS Console"
-          autoResetStorageOnError
-          resetStorageKey={awsSimStorageKey(useAuthStore.getState().user?.id)}
-          onResetStorage={() => hardResetAwsSim()}
-          sessionId={sessionId}
-          scenario={scenario}
-          onToggleTerminal={() => setShowAwsSim(false)}
-          vmwareHref={showSimVmwareLink ? vmwareServerHref : null}
-          {...simChromeProps}
-        />
+      {/* Single AWS companion mount — terraform labs already set showHostedAwsLink. */}
+      {(showHostedAwsLink || isTerraformSimLab) && showAwsSim && (
+        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+          <LazySimPanel
+            Sim={LazyAwsLabOverlay}
+            name="aws"
+            label="AWS Console"
+            autoResetStorageOnError
+            resetStorageKey={awsSimStorageKey(useAuthStore.getState().user?.id)}
+            onResetStorage={() => hardResetAwsSim()}
+            sessionId={sessionId}
+            scenario={scenario}
+            embedded={false}
+            onExit={() => setShowAwsSim(false)}
+            onToggleTerminal={() => setShowAwsSim(false)}
+            vmwareHref={showSimVmwareLink ? vmwareServerHref : null}
+            {...simChromeProps}
+          />
+        </div>
       )}
 
-      {isTerraformSimLab && showAzureSim && (
-        <LazySimPanel
-          Sim={LazyAzureConsole}
-          label="Azure Portal"
-          sessionId={sessionId}
-          scenario={scenario}
-          onExit={() => setShowAzureSim(false)}
-          {...simChromeProps}
-        />
+      {(isTerraformSimLab || showHostedAzureLink) && showAzureSim && (
+        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+          <LazySimPanel
+            Sim={LazyAzureConsole}
+            label="Azure Portal"
+            sessionId={sessionId}
+            scenario={scenario}
+            onExit={() => setShowAzureSim(false)}
+            {...simChromeProps}
+          />
+        </div>
       )}
 
-      {isTerraformSimLab && showGcpSim && (
-        <LazySimPanel
-          Sim={LazyGcpConsole}
-          label="GCP Console"
-          sessionId={sessionId}
-          scenario={scenario}
-          onExit={() => setShowGcpSim(false)}
-          {...simChromeProps}
-        />
-      )}
-
-      {showHostedAwsLink && showAwsSim && (
-        <LazySimPanel
-          Sim={LazyAwsLabOverlay}
-          name="aws"
-          label="AWS Console"
-          autoResetStorageOnError
-          resetStorageKey={awsSimStorageKey(useAuthStore.getState().user?.id)}
-          onResetStorage={() => hardResetAwsSim()}
-          sessionId={sessionId}
-          scenario={scenario}
-          onToggleTerminal={() => setShowAwsSim(false)}
-          {...simChromeProps}
-        />
-      )}
-
-      {showHostedAzureLink && showAzureSim && (
-        <LazySimPanel
-          Sim={LazyAzureConsole}
-          label="Azure Portal"
-          sessionId={sessionId}
-          scenario={scenario}
-          onExit={() => setShowAzureSim(false)}
-          {...simChromeProps}
-        />
-      )}
-
-      {showHostedGcpLink && showGcpSim && (
-        <LazySimPanel
-          Sim={LazyGcpConsole}
-          label="GCP Console"
-          sessionId={sessionId}
-          scenario={scenario}
-          onExit={() => setShowGcpSim(false)}
-          {...simChromeProps}
-        />
+      {(isTerraformSimLab || showHostedGcpLink) && showGcpSim && (
+        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+          <LazySimPanel
+            Sim={LazyGcpConsole}
+            label="GCP Console"
+            sessionId={sessionId}
+            scenario={scenario}
+            onExit={() => setShowGcpSim(false)}
+            {...simChromeProps}
+          />
+        </div>
       )}
 
       {isDevOpsPipelineLab && !isSimPrimaryLab && showCicdSim && (
-        <LazySimPanel
-          Sim={LazyCicdPipelineSim}
-          label="CI/CD pipeline"
-          sessionId={sessionId}
-          scenario={scenario}
-          onExit={() => setShowCicdSim(false)}
-          vmwareHref={showSimVmwareLink ? vmwareServerHref : null}
-          {...simChromeProps}
-        />
+        <div className="fixed inset-0 z-[60] bg-surface-950 flex flex-col min-h-0">
+          <LazySimPanel
+            Sim={LazyCicdPipelineSim}
+            label="CI/CD pipeline"
+            sessionId={sessionId}
+            scenario={scenario}
+            onExit={() => setShowCicdSim(false)}
+            vmwareHref={showSimVmwareLink ? vmwareServerHref : null}
+            {...simChromeProps}
+          />
+        </div>
       )}
 
       {showShortcuts && (

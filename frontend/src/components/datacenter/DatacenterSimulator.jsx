@@ -636,6 +636,7 @@ export default function DatacenterSimulator({
             access={accessControl}
             rooms={rooms}
             busy={busy}
+            selectedServerId={selectedServerId}
             onEnterRoom={enterRoom}
             onOp={(op, extra) => {
               if (op === 'badge_in') {
@@ -864,6 +865,7 @@ export default function DatacenterSimulator({
             access={accessControl}
             rooms={rooms}
             busy={busy}
+            selectedServerId={selectedServerId}
             onEnterRoom={enterRoom}
             onOp={(op, extra) => {
               if (op === 'badge_in') {

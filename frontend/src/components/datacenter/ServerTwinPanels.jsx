@@ -610,7 +610,7 @@ export function FailureInjectBar({ presets, busy, onInject, onClear, broken, ass
 }
 
 /** Campus / plant room overview cards with light live ops */
-export function CampusRoomView({ room, campus, access = null, rooms = [], busy = false, onOp, onEnterRoom }) {
+export function CampusRoomView({ room, campus, access = null, rooms = [], busy = false, onOp, onEnterRoom, selectedServerId = null }) {
   if (!room) return null
   const c = campus || {}
   const act = (op, extra = {}) => onOp?.(op, extra)
@@ -771,7 +771,7 @@ export function CampusRoomView({ room, campus, access = null, rooms = [], busy =
               body={`${b.label} · ${b.sku} · qty ${b.qty} (min ${b.min_qty}) · bin ${b.location}`}
               actions={onOp && (
                 <>
-                  <button type="button" className="dc-btn-sm" disabled={busy || intOr(b.qty, 0) <= 0} onClick={() => act('issue_spare', { bin_id: b.id })}>Issue</button>
+                  <button type="button" className="dc-btn-sm" disabled={busy || intOr(b.qty, 0) <= 0 || !selectedServerId} title={!selectedServerId ? 'Select a server on the floor first' : undefined} onClick={() => act('issue_spare', { bin_id: b.id, asset_id: selectedServerId })}>Issue</button>
                   <button type="button" className="dc-btn-sm" disabled={busy} onClick={() => act('restock_spare', { bin_id: b.id })}>Restock</button>
                   <button type="button" className="dc-btn-sm" disabled={busy || intOr(b.qty, 0) <= 0} onClick={() => act('quarantine_spare', { bin_id: b.id })}>Quarantine</button>
                 </>
