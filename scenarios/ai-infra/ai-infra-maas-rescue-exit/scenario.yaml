@@ -1,0 +1,57 @@
+title: 'MAAS: Exit Rescue Mode and Restore Deployed Status'
+slug: ai-infra-maas-rescue-exit
+technology: AI Infrastructure Engineering
+category: Fix
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: Bare Metal / AI Infra — gpu-node-01 was put into Rescue mode for a disk check and
+  the engineer who ran the diagnostic forgot to exit; the node has been stuck in Rescue mode since and
+  cannot serve workloads while in that state.
+
+
+  ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin.
+
+
+  SYMPTOM: Node status is Rescue mode; the previously Deployed OS is not receiving traffic; nothing else
+  in MAAS is broken — the node just needs to leave Rescue and come back to its prior Deployed state.
+
+
+  OBJECTIVE: From Bare Metal, exit Rescue mode on gpu-node-01; confirm on Lab Terminal that the node has
+  rebooted back into the deployed OS rather than the rescue shell; confirm MAAS status is Deployed again;
+  FIXED-OK.'
+objectives:
+- Exit Rescue mode on the stuck node
+- Confirm the node reboots into the deployed OS
+- Confirm MAAS status returns to Deployed
+initial_state: GPU node gpu-node-01 is stuck in Rescue mode after a prior diagnostic session.
+hints:
+- order: 1
+  cost: 0
+  content: Open Bare Metal → Machines → gpu-node-01. Status shows Rescue mode; use the take action menu to Exit rescue mode.
+- order: 2
+  cost: 15
+  content: Watch the machine reboot out of the ephemeral rescue environment and back into its previously deployed OS image.
+- order: 3
+  cost: 35
+  content: On Lab Terminal confirm the deployed OS is reachable again, then confirm MAAS status is Deployed and mark FIXED-OK.
+consoles:
+- baremetal
+- terminal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal
+  - datacenter

@@ -1,0 +1,55 @@
+title: 'ImageDev: cloud-init GPU First-Boot Userdata'
+slug: ai-infra-imagedev-cloud-init-gpu
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: ImageDev — Packer GPU images must finish first boot via cloud-init
+  (DataSourceMAAS): netplan, users, nvidia-persistenced, and a post-boot gpu-sanity hook.
+  AI Infra Engineering owns this image-factory path (not the application GPU course).
+
+
+  ENVIRONMENT: Lab Terminal + Packer + Bare Metal. Inspect cloud-init status after deploy.
+
+
+  SYMPTOM: Deployed node never reaches sshd; cloud-init stuck or missing runcmd for GPU.
+
+
+  OBJECTIVE: Verify cloud-init status / datasource MAAS; ensure GPU userdata runcmd runs;
+  confirm nvidia-smi after final; FIXED-OK.'
+objectives:
+- Confirm cloud-init DataSourceMAAS and status done
+- Validate GPU first-boot runcmd (persistenced / sanity)
+- Verify nvidia-smi after cloud-init final
+initial_state: Custom GPU image deployed; cloud-init userdata incomplete or failing.
+hints:
+- order: 1
+  cost: 0
+  content: On Lab Terminal run cloud-init status and cloud-id — expect DataSourceMAAS and status done.
+- order: 2
+  cost: 20
+  content: Inspect cloud-init output for runcmd enabling nvidia-persistenced and gpu-sanity hooks.
+- order: 3
+  cost: 45
+  content: After cloud-init final, run nvidia-smi -L and leave FIXED-OK when GPUs enumerate.
+consoles:
+- terminal
+- packer
+- baremetal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - terminal
+  - packer
+  - baremetal

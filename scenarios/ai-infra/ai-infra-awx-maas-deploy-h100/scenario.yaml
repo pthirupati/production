@@ -1,0 +1,56 @@
+title: 'AWX + MAAS: Deploy H100 Fleet Job Template'
+slug: ai-infra-awx-maas-deploy-h100
+technology: AI Infrastructure Engineering
+category: Automation
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: ansible-awx
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: Bare Metal / AWX integration — Automation Controller must trigger MAAS deploy
+  of Ready H100 nodes with the ImageDev custom boot resource. AI Infra Engineering owns AWX↔MAAS
+  job templates for fleet bring-up (not the GPU app course).
+
+
+  ENVIRONMENT: AWX console + Bare Metal (MAAS) + Lab Terminal. Companion chrome (Hints/Check/+30m/Stop)
+  must stay usable while AWX is open.
+
+
+  SYMPTOM: Job template exists but canary stays New/Ready without Deploy; custom/h100-jammy unused.
+
+
+  OBJECTIVE: Launch the MAAS deploy job from AWX; confirm MAAS shows Deploying/Deployed with the
+  custom image; verify on Lab Terminal; FIXED-OK.'
+objectives:
+- Run AWX job that deploys via MAAS
+- Confirm H100 node reaches Deployed
+- Prefer custom/h100-jammy boot resource when published
+initial_state: AWX template ready; MAAS node Ready; deploy not triggered.
+hints:
+- order: 1
+  cost: 0
+  content: Open AWX from the lab strip (chrome stays visible). Select the MAAS / H100 deploy job template.
+- order: 2
+  cost: 20
+  content: Launch against canary inventory; then open Bare Metal and watch the machine move to Deploying.
+- order: 3
+  cost: 45
+  content: Confirm Deployed OS references the GPU image (custom/h100-jammy if published), then FIXED-OK.
+consoles:
+- awx
+- baremetal
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - awx
+  - baremetal
+  - terminal

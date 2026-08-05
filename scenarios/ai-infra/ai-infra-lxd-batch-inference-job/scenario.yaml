@@ -1,0 +1,60 @@
+title: 'LXD: Start Stopped Batch Inference Container'
+slug: ai-infra-lxd-batch-inference-job
+technology: AI Infrastructure Engineering
+category: Troubleshoot
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 900
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: Bare Metal ticket — the batch-job LXD container on gpu-node-01 is
+  Stopped with no IPv4 assigned, so the scheduled batch inference run never started. AI Infra
+  Engineering owns LXD on MAAS-deployed GPU hosts.
+
+
+  ENVIRONMENT: LXD console + Bare Metal + Lab Terminal on gpu-node-01. Treat the container as
+  the production batch worker for this incident.
+
+
+  SYMPTOM / STARTING STATE: LXD container batch-job is Stopped with no IPv4 assigned; the batch
+  inference schedule is blocked behind it.
+
+
+  OBJECTIVE: Open the LXD console (or Bare Metal LXD tab); inspect the batch-job container;
+  start it and confirm it gets an IPv4 address; leave FIXED-OK once it is RUNNING.'
+objectives:
+- Open the LXD console and locate the batch-job container
+- Start the batch-job container
+- Confirm the container is RUNNING with an IPv4 address
+initial_state: LXD container batch-job is Stopped with no IPv4 assigned.
+hints:
+- order: 1
+  cost: 0
+  content: Open LXD (or the Bare Metal LXD tab) and run lxc list to see batch-job's current state.
+- order: 2
+  cost: 10
+  content: Check lxc info batch-job for the last stop reason before restarting — note any exit code.
+- order: 3
+  cost: 25
+  content: Start it with lxc start batch-job, then re-run lxc list to confirm STOPPED became RUNNING.
+- order: 4
+  cost: 40
+  content: Wait for DHCP to assign an IPv4 in lxc list, then leave FIXED-OK once the address appears.
+consoles:
+- lxd
+- baremetal
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - lxd
+  - baremetal
+  - terminal

@@ -196,6 +196,8 @@ def register_modules(engine: "UnifiedSimulationEngine", shell: RHELShell | None 
         modules |= {"baremetal", "gpu"}
         if "awx" in slug or "ansible" in slug:
             modules.add("ansible")
+        if any(k in slug for k in ("k8s", "kube", "operator", "device-plugin")):
+            modules |= {"kubernetes", "docker"}
     elif any(k in slug for k in ("maas", "lxd", "packer", "vyos", "pxe", "bmc")):
         modules.add("baremetal")
     if "gpu" in modules:
@@ -667,7 +669,8 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         # other scenarios keep using the normal Linux handlers.
         gpu_tools = ("nvidia-smi", "dcgmi", "dcgm-exporter", "dcgm", "gpustat", "rocm-smi",
                      "amd-smi", "nvcc", "all_reduce_perf", "all_gather_perf",
-                     "reduce_scatter_perf", "broadcast_perf", "nccl-tests")
+                     "reduce_scatter_perf", "broadcast_perf", "nccl-tests",
+                     "vllm", "gpu-sanity", "cuda-samples", "bandwidthTest", "deviceQuery")
         kernel_tools = ("modprobe", "rmmod", "lspci", "lsmod", "modinfo")
         if any(low.startswith(c) for c in gpu_tools):
             pass
@@ -678,6 +681,52 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         else:
             return None
         healthy = engine.shell.state.gpu_healthy
+        # ImageDev GPU sanity harness (pre-publish / post-deploy).
+        if low.startswith("gpu-sanity") or low.startswith("cuda-samples") or low.startswith("devicequery") or low.startswith("bandwidthtest"):
+            if not healthy and sku.get("vendor") != "amd":
+                return "gpu-sanity: FAIL — driver/NVML unreachable"
+            return (
+                "=== ImageDev GPU Sanity Suite ===\n"
+                f"SKU: {_SMI_GPU_NAME} × {_SMI_GPU_COUNT}\n"
+                "deviceQuery ........................ PASS\n"
+                "bandwidthTest (H2D/D2H/D2D) ........ PASS\n"
+                "nvidia-smi -L ....................... PASS\n"
+                "dcgmi diag -r 1 ..................... PASS\n"
+                "Persistence mode .................... PASS\n"
+                "Result: ALL PASS — /tmp/gpu-sanity-report.json"
+            )
+        # vLLM inference server (AI Infra — not application GPU course).
+        if low.startswith("vllm"):
+            if "serve" in low or "openai" in low or "--model" in low:
+                model = "meta-llama/Llama-3.1-70B-Instruct"
+                for i, p in enumerate(parts):
+                    if p in ("--model", "-m") and i + 1 < len(parts):
+                        model = parts[i + 1]
+                        break
+                return (
+                    f"INFO  vllm.entrypoints.openai.api_server: Starting vLLM on {_SMI_GPU_NAME} × {_SMI_GPU_COUNT}\n"
+                    f"INFO  model={model}\n"
+                    "INFO  tensor_parallel_size=8\n"
+                    "INFO  CUDA graphs captured\n"
+                    "INFO  Avg prompt throughput: 1842.3 tokens/s\n"
+                    "INFO  Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)\n"
+                    "vllm: READY — OpenAI-compatible /v1/completions"
+                )
+            if "bench" in low or "benchmark" in low:
+                return (
+                    "vllm bench throughput\n"
+                    f"  GPUs: {_SMI_GPU_COUNT} × {_SMI_GPU_NAME}\n"
+                    "  Request throughput: 42.8 req/s\n"
+                    "  Output token throughput: 6120.4 tok/s\n"
+                    "  Mean TTFT: 48.2 ms\n"
+                    "Result: PASS"
+                )
+            return (
+                "vLLM — high-throughput LLM serving\n"
+                "Usage: vllm serve <model> --tensor-parallel-size N\n"
+                "       vllm bench throughput --model <model>\n"
+                "OpenAI API on :8000 when serve is running."
+            )
         if low.startswith("nvidia-smi"):
             if sku.get("vendor") == "amd":
                 return (
@@ -2014,6 +2063,122 @@ def _seed_devops_git_repo(state) -> None:
     )
 
 
+def _vyos_session_id(engine: "UnifiedSimulationEngine") -> str:
+    sid = getattr(engine, "lab_session_id", None) or getattr(engine, "session_id", None)
+    if sid:
+        return str(sid)
+    st = getattr(getattr(engine, "shell", None), "state", None)
+    if st is not None:
+        sid = getattr(st, "session_id", None) or ""
+        if sid:
+            return str(sid)
+    return ""
+
+
+def _ensure_vyos_networking(engine: "UnifiedSimulationEngine") -> NetworkingState:
+    """Return NetworkingState, preferring cache-backed session state when available."""
+    if engine.networking is not None:
+        return engine.networking
+    sid = _vyos_session_id(engine)
+    slug = engine.scenario_slug or ""
+    if sid:
+        try:
+            from apps.vmware_sim.vyos_views import load_networking
+            engine.networking = load_networking(sid, slug)
+            return engine.networking
+        except Exception:
+            pass
+    engine.networking = NetworkingState(slug)
+    return engine.networking
+
+
+def _persist_vyos_networking(engine: "UnifiedSimulationEngine", net: NetworkingState) -> None:
+    sid = _vyos_session_id(engine)
+    if not sid:
+        return
+    try:
+        from apps.vmware_sim.vyos_views import save_networking
+        save_networking(sid, net)
+    except Exception:
+        pass
+
+
+def _vyos_dispatch(net: NetworkingState, line: str, engine: "UnifiedSimulationEngine") -> str:
+    """Dispatch a VyOS CLI line; prefer shared apply_cli_line when available."""
+    shell_state = getattr(getattr(engine, "shell", None), "state", None)
+    try:
+        from apps.vmware_sim.vyos_views import apply_cli_line
+        return apply_cli_line(net, line, shell_state)
+    except Exception:
+        pass
+    # Fallback without vmware_sim import (tests / isolated)
+    low = line.strip().lower()
+    if low == "configure" or low.startswith("configure "):
+        return net.vyos_enter_configure()
+    if low == "exit" and net.vyos_configure_mode:
+        return net.vyos_exit_configure()
+    if low in ("discard",) or low.startswith("discard "):
+        return net.vyos_discard()
+    if low == "compare" or low.startswith("compare"):
+        return net.vyos_compare()
+    if low.startswith("show system commit"):
+        return net.vyos_show_history()
+    if low.startswith("commit-confirm"):
+        parts = line.strip().split()
+        minutes = 10
+        if len(parts) > 1 and parts[1].isdigit():
+            minutes = int(parts[1])
+        return net.vyos_commit_confirm(minutes)
+    if low == "confirm" or low.startswith("confirm "):
+        return net.vyos_confirm()
+    if low == "commit" or low.startswith("commit "):
+        return net.vyos_commit()
+    if low.startswith("rollback"):
+        parts_r = line.strip().split()
+        steps = 1
+        if len(parts_r) > 1 and parts_r[1].lstrip("-").isdigit():
+            steps = abs(int(parts_r[1]))
+        return net.vyos_rollback(steps)
+    if low == "save" or low.startswith("save "):
+        return net.vyos_save(shell_state)
+    if low == "load" or low.startswith("load "):
+        return net.vyos_load(shell_state)
+    if low.startswith("set "):
+        return net.vyos_set(line.strip()[4:].strip())
+    if low.startswith("delete "):
+        return net.vyos_delete(line.strip()[7:].strip())
+    if low.startswith("edit "):
+        return net.vyos_edit(line.strip()[5:].strip())
+    if low == "edit":
+        return net.vyos_edit("")
+    if low == "up":
+        return net.vyos_up()
+    if low == "top":
+        return net.vyos_top()
+    if low in ("show",) or "show pending" in low:
+        return net.vyos_show_pending()
+    if "show conf" in low or "configuration" in low:
+        cand = "candidate" in low or net.vyos_configure_mode
+        return net.vyos_show_config(candidate=cand)
+    if "show ip bgp" in low or "show protocols bgp" in low or "bgp summary" in low:
+        return net.show_ip_bgp_summary()
+    if "show ip route" in low:
+        return net.show_ip_route()
+    if "show interfaces" in low:
+        return net.show_interfaces()
+    if "show vrrp" in low or "show high-availability" in low:
+        return net.show_vrrp()
+    if "show nat" in low:
+        return net.show_nat()
+    if "show firewall" in low:
+        return net.show_firewall()
+    if "show dhcp" in low:
+        return net.show_dhcp_leases()
+    if "show version" in low:
+        return net.show_version()
+    return f"Invalid command: {line}"
+
+
 def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
     # IPMI power labs start with the chassis OFF so the learner has to bring it
     # up (`ipmitool power on`); otherwise the canonical power check auto-passes.
@@ -2034,9 +2199,32 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
         ]
     if not hasattr(engine, "_lxd_instances"):
         engine._lxd_instances = {
-            "gpu-worker-1": {"state": "RUNNING", "type": "container", "ipv4": "10.150.1.10"},
-            "k8s-node-2": {"state": "STOPPED", "type": "virtual-machine", "ipv4": ""},
-            "burn-in-h100": {"state": "RUNNING", "type": "container", "ipv4": "10.150.1.20"},
+            "gpu-worker-1": {
+                "state": "RUNNING", "type": "container", "ipv4": "10.150.1.10",
+                "ipv6": "", "snapshots": 0, "profiles": ["default", "gpu-passthrough"],
+                "devices": {"gpu": {"type": "gpu"}}, "config": {}, "project": "default",
+                "location": "node1", "nvidia_smi_ok": True, "image": "ubuntu:22.04",
+            },
+            "k8s-node-2": {
+                "state": "STOPPED", "type": "virtual-machine", "ipv4": "",
+                "ipv6": "", "snapshots": 0, "profiles": ["default"],
+                "devices": {}, "config": {}, "project": "default",
+                "location": "none", "nvidia_smi_ok": False, "image": "ubuntu:22.04",
+            },
+            "burn-in-h100": {
+                "state": "RUNNING", "type": "container", "ipv4": "10.150.1.20",
+                "ipv6": "", "snapshots": 0, "profiles": ["default"],
+                "devices": {}, "config": {}, "project": "default",
+                "location": "none", "nvidia_smi_ok": False, "image": "ubuntu:22.04",
+            },
+        }
+    if not hasattr(engine, "_lxd_profiles"):
+        engine._lxd_profiles = {
+            "default": {"config": {}, "devices": {}},
+            "gpu-passthrough": {
+                "config": {"nvidia.runtime": "true"},
+                "devices": {"gpu0": {"type": "gpu", "gputype": "physical", "pci": "0000:19:00.0"}},
+            },
         }
     if not hasattr(engine, "_maas_boot_resources") or engine._maas_boot_resources is None:
         engine._maas_boot_resources = ["ubuntu/jammy", "ubuntu/noble"]
@@ -2047,6 +2235,129 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
             or getattr(shell.state, "session_id", None)
             or ""
         )
+
+    def _sync_maas_from_gui() -> None:
+        """Prefer the MAAS console session inventory when this lab has one.
+
+        Merge — do not replace — so CLI-seeded nodes (e.g. gpu-node-04) remain
+        commissionable even when the GUI session only seeded a subset.
+        """
+        sid = _session_id()
+        if not sid:
+            return
+        try:
+            from apps.vmware_sim import baremetal_engine as bm
+            data = bm.get_state(sid, engine.scenario_slug or "")
+            machines = (data.get("state") or {}).get("maas", {}).get("machines") or []
+            if machines:
+                prior = list(getattr(engine, "_maas_machines", None) or [])
+                merged = [
+                    {
+                        "name": m.get("hostname") or m.get("name") or f"node-{m.get('id')}",
+                        "status": m.get("status") or "New",
+                        "power": m.get("power") or "off",
+                        "arch": m.get("arch") or "amd64/generic",
+                        "zone": m.get("zone") or "default",
+                        "pool": m.get("pool") or "default",
+                        "ip": m.get("ip") or "-",
+                        "id": m.get("id"),
+                    }
+                    for m in machines
+                ]
+                gui_names = {m["name"] for m in merged}
+                for m in prior:
+                    if m.get("name") and m["name"] not in gui_names:
+                        merged.append(m)
+                engine._maas_machines = merged
+            br = (data.get("state") or {}).get("maas", {}).get("boot_resources") or []
+            if br:
+                engine._maas_boot_resources = [
+                    (r.get("name") if isinstance(r, dict) else str(r)) for r in br
+                ]
+        except Exception:
+            pass
+
+    def _apply_maas_gui_action(action: str, payload: dict) -> dict | None:
+        sid = _session_id()
+        if not sid:
+            return None
+        try:
+            from apps.vmware_sim import baremetal_engine as bm
+            # Ensure a signed-in console session exists for CLI parity.
+            st = bm.get_state(sid, engine.scenario_slug or "")
+            if not (st.get("state") or {}).get("session", {}).get("logged_in"):
+                bm.apply_action(sid, "login", {"user": "admin"})
+            return bm.apply_action(sid, action, payload)
+        except Exception:
+            return None
+
+    def _sync_lxd_from_gui() -> None:
+        """Prefer the LXD console session inventory when this lab has one."""
+        sid = _session_id()
+        if not sid:
+            return
+        try:
+            from apps.vmware_sim import baremetal_engine as bm
+            data = bm.get_state(sid, engine.scenario_slug or "")
+            lxd = (data.get("state") or {}).get("lxd") or {}
+            containers = lxd.get("containers") or []
+            if containers:
+                engine._lxd_instances = {}
+                for c in containers:
+                    name = c.get("name") or "unnamed"
+                    status = (c.get("status") or "Stopped").upper()
+                    if status == "RUNNING":
+                        cli_state = "RUNNING"
+                    else:
+                        cli_state = "STOPPED"
+                    snaps = c.get("snapshots") or []
+                    engine._lxd_instances[name] = {
+                        "state": cli_state,
+                        "type": c.get("type") or "container",
+                        "ipv4": c.get("ipv4") or "",
+                        "ipv6": c.get("ipv6") or "",
+                        "snapshots": len(snaps) if isinstance(snaps, list) else int(snaps or 0),
+                        "profiles": list(c.get("profiles") or ["default"]),
+                        "devices": dict(c.get("devices") or {}),
+                        "config": dict(c.get("config") or {}),
+                        "project": c.get("project") or "default",
+                        "location": c.get("location") or "none",
+                        "nvidia_smi_ok": bool(c.get("nvidia_smi_ok")),
+                        "image": c.get("image") or "ubuntu:22.04",
+                        "snapshot_list": list(snaps) if isinstance(snaps, list) else [],
+                    }
+            profiles = lxd.get("profiles") or []
+            if profiles:
+                engine._lxd_profiles = {}
+                for p in profiles:
+                    if isinstance(p, str):
+                        engine._lxd_profiles[p] = {"config": {}, "devices": {}}
+                    elif isinstance(p, dict) and p.get("name"):
+                        engine._lxd_profiles[p["name"]] = {
+                            "config": dict(p.get("config") or {}),
+                            "devices": dict(p.get("devices") or {}),
+                            "description": p.get("description") or "",
+                        }
+            engine._lxd_storage = lxd.get("storage_pools")
+            engine._lxd_networks = lxd.get("networks")
+            engine._lxd_projects = lxd.get("projects")
+            engine._lxd_cluster = lxd.get("cluster")
+            engine._lxd_images = lxd.get("images")
+        except Exception:
+            pass
+
+    def _apply_lxd_gui_action(action: str, payload: dict) -> dict | None:
+        sid = _session_id()
+        if not sid:
+            return None
+        try:
+            from apps.vmware_sim import baremetal_engine as bm
+            st = bm.get_state(sid, engine.scenario_slug or "")
+            if not (st.get("state") or {}).get("session", {}).get("logged_in"):
+                bm.apply_action(sid, "login", {"user": "admin"})
+            return bm.apply_action(sid, action, payload)
+        except Exception:
+            return None
 
     def _mirror_maas(machine: dict) -> None:
         """S1: commission/deploy → unified asset registry."""
@@ -2065,72 +2376,75 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
         slug = (engine.scenario_slug or "").lower()
         vyos_lab = any(k in slug for k in ("vyos", "ai-infra", "pxe", "maas", "underlay", "bgp"))
         vyos_cmds = (
-            low in ("configure", "commit", "rollback", "exit", "compare")
+            low in ("configure", "commit", "rollback", "exit", "compare", "save", "load",
+                    "discard", "confirm", "edit", "up", "top", "show")
             or low.startswith("configure ")
             or low.startswith("commit ")
+            or low.startswith("commit-confirm")
             or low.startswith("rollback")
             or low.startswith("set ")
             or low.startswith("delete ")
             or low.startswith("compare")
+            or low.startswith("save ")
+            or low.startswith("load ")
+            or low.startswith("discard ")
+            or low.startswith("confirm ")
+            or low.startswith("edit ")
             or low.startswith("show system commit")
             or low.startswith("show conf")
             or low.startswith("show configuration")
             or low.startswith("show ip bgp")
+            or low.startswith("show ip route")
             or low.startswith("show protocols")
             or low.startswith("show interfaces")
             or low.startswith("show dhcp")
+            or low.startswith("show vrrp")
+            or low.startswith("show nat")
+            or low.startswith("show firewall")
+            or low.startswith("show version")
+            or low.startswith("show pending")
+            or low.startswith("show high-availability")
         )
         if vyos_lab and vyos_cmds:
-            if engine.networking is None:
-                engine.networking = NetworkingState(engine.scenario_slug)
-            net = engine.networking
-            if low == "configure" or low.startswith("configure "):
-                return net.vyos_enter_configure()
-            if low == "exit" and net.vyos_configure_mode:
-                return net.vyos_exit_configure()
-            if low == "compare" or low.startswith("compare"):
-                return net.vyos_compare()
-            if low.startswith("show system commit"):
-                return net.vyos_show_history()
-            if low == "commit" or low.startswith("commit "):
-                return net.vyos_commit()
-            if low.startswith("rollback"):
-                parts_r = line.strip().split()
-                steps = 1
-                if len(parts_r) > 1 and parts_r[1].lstrip("-").isdigit():
-                    steps = abs(int(parts_r[1]))
-                return net.vyos_rollback(steps)
-            if low.startswith("set "):
-                return net.vyos_set(line.strip()[4:].strip())
-            if low.startswith("delete "):
-                return net.vyos_delete(line.strip()[7:].strip())
-            if "show conf" in low or "configuration" in low:
-                cand = "candidate" in low or net.vyos_configure_mode
-                return net.vyos_show_config(candidate=cand)
-            if "show ip bgp" in low or "show protocols bgp" in low or "bgp summary" in low:
-                return net.bgp_summary()
-            if "show interfaces" in low:
-                return (
-                    "Codes: S - State, L - Link, u - Up, D - Down, A - Admin Down\n"
-                    "Interface        IP Address                        S/L  Description\n"
-                    "eth0             10.64.1.1/24                      u/u  management\n"
-                    "eth1             10.64.12.1/24                     u/u  pxe-provision\n"
-                    "eth1.100         10.64.100.1/24                    u/u  gpu-fabric\n"
-                    "lo               127.0.0.1/8                       u/u"
-                )
-            if "show dhcp" in low:
-                return (
-                    "IP address    Hardware address    Lease expiration     Pool      Client Name\n"
-                    "10.64.12.11   a4:bb:6d:aa:01:01   2026/08/01 12:00:00  pxe-pool  gpu-node-01\n"
-                    "10.64.12.12   a4:bb:6d:aa:01:02   2026/08/01 12:00:00  pxe-pool  gpu-node-02"
-                )
+            net = _ensure_vyos_networking(engine)
+            out = _vyos_dispatch(net, line, engine)
+            _persist_vyos_networking(engine, net)
+            return out
 
         bare_tools = (
             "ipmitool", "dmidecode", "esxcli", "maas", "lxc", "lxd", "virsh",
-            "packer", "vyos", "vyatta",
+            "packer", "vyos", "vyatta", "cloud-init", "cloud-id", "cloud-init-per",
         )
         if not any(low.startswith(t) for t in bare_tools):
             return None
+        if low.startswith("cloud-init") or low.startswith("cloud-id"):
+            if "status" in low:
+                return (
+                    "status: done\n"
+                    "extended_status: done\n"
+                    "boot_status_code: enabled-by-generator\n"
+                    "detail: DataSourceMAAS\n"
+                    "errors: []"
+                )
+            if "query" in low or low.startswith("cloud-id"):
+                return "maas"
+            if "schema" in low:
+                return "Valid schema"
+            if "clean" in low:
+                return "cleaned cloud-init artifacts under /var/lib/cloud"
+            # Default: show ImageDev-style userdata summary for GPU images.
+            return (
+                "cloud-init 24.1.3\n"
+                "datasource: DataSourceMAAS\n"
+                "modules: [migrator, seed_random, bootcmd, write_files, users_groups,\n"
+                "          disk_setup, mounts, set_hostname, update_hostname,\n"
+                "          update_etc_hosts, ca_certs, rsyslog, users_groups,\n"
+                "          ssh, growpart, resizefs, disk_setup, mounts, set_passwords,\n"
+                "          package_update_upgrade_install, landscape, timezone,\n"
+                "          disable_ec2_metadata, runcmd, byobu]\n"
+                "runcmd: nvidia-smi -L; systemctl enable nvidia-persistenced; gpu-sanity\n"
+                "final_message: ImageDev GPU image cloud-init finished in 42.1 seconds"
+            )
         if low.startswith("ipmitool"):
             if "power status" in low:
                 return f"Chassis Power is {engine._power_state}"
@@ -2184,9 +2498,11 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
         if "esxcli" in low:
             return "Host CPU: Intel Xeon Gold 6248R\nMemory: 256 GB"
         if low.startswith("maas"):
+            _sync_maas_from_gui()
             machines = engine._maas_machines
             # `maas admin machines read` / `maas login` / commission / deploy
             if "login" in low:
+                _apply_maas_gui_action("login", {"user": "admin"})
                 return "Logged into MAAS at http://10.64.1.2:5240/MAAS/ (user: admin)"
             if "machines" in low and ("read" in low or "list" in low):
                 rows = [
@@ -2202,20 +2518,23 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
             if "commission" in low:
                 target = None
                 for tok in parts:
-                    if tok.startswith("gpu-node") or tok.startswith("node-"):
+                    if tok.startswith("gpu-node") or tok.startswith("node-") or tok.startswith("storage-"):
                         target = tok
                         break
                 for m in machines:
                     if target and m["name"] != target:
                         continue
-                    if m["status"] in ("New", "Failed commissioning", "Ready"):
-                        m["status"] = "Commissioning"
-                        m["power"] = "on"
+                    if m["status"] in ("New", "Failed commissioning", "Failed", "Ready", "Broken"):
+                        mid = m.get("id")
+                        gui = _apply_maas_gui_action("maas_commission", {"machine_id": mid}) if mid else None
+                        if gui and gui.get("ok"):
+                            _sync_maas_from_gui()
+                        else:
+                            m["status"] = "Ready"
+                            m["power"] = "on"
+                            _mirror_maas(m)
                         name = m["name"]
-                        # Simulate quick transition for lab UX
-                        m["status"] = "Ready"
                         from .shell import StreamedCommandResult
-                        _mirror_maas(m)
                         return StreamedCommandResult(
                             lines=[
                                 f"Commissioning started for {name}…",
@@ -2233,11 +2552,20 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                 return "No matching machine available to commission."
             if "deploy" in low:
                 for m in machines:
-                    if m["status"] == "Ready":
-                        m["status"] = "Deployed"
-                        m["ip"] = m["ip"] if m["ip"] != "-" else "10.64.12.40"
+                    if m["status"] in ("Ready", "Allocated"):
+                        mid = m.get("id")
+                        gui = _apply_maas_gui_action("maas_deploy", {"machine_id": mid}) if mid else None
+                        if gui and gui.get("ok"):
+                            _sync_maas_from_gui()
+                            # For CLI UX, advance to Deployed for immediate feedback
+                            # while GUI continues wall-clock Deploying when polled.
+                            m["status"] = "Deployed"
+                            m["ip"] = m["ip"] if m["ip"] not in ("-", "", None) else "10.64.12.40"
+                        else:
+                            m["status"] = "Deployed"
+                            m["ip"] = m["ip"] if m["ip"] != "-" else "10.64.12.40"
+                            _mirror_maas(m)
                         from .shell import StreamedCommandResult
-                        _mirror_maas(m)
                         return StreamedCommandResult(
                             lines=[
                                 f"Deploying Ubuntu 22.04 LTS to {m['name']} "
@@ -2255,8 +2583,13 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
             if "release" in low:
                 for m in machines:
                     if m["status"] == "Deployed":
-                        m["status"] = "Ready"
-                        _mirror_maas(m)
+                        mid = m.get("id")
+                        gui = _apply_maas_gui_action("maas_release", {"machine_id": mid}) if mid else None
+                        if not (gui and gui.get("ok")):
+                            m["status"] = "Ready"
+                            _mirror_maas(m)
+                        else:
+                            _sync_maas_from_gui()
                         return f"Released {m['name']} → Ready"
                 return "No Deployed machine to release."
             if "power" in low:
@@ -2264,14 +2597,19 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                 for m in machines:
                     if action == "status":
                         return "\n".join(f"{x['name']}: power {x['power']}" for x in machines)
+                    mid = m.get("id")
+                    if mid:
+                        _apply_maas_gui_action("maas_power", {"machine_id": mid, "power": action})
                     m["power"] = action
+                _sync_maas_from_gui()
                 return f"Power {action} requested for matching machines."
             if "boot-resources" in low or ("boot" in low and "resource" in low):
+                _sync_maas_from_gui()
                 resources = list(getattr(engine, "_maas_boot_resources", None) or ["ubuntu/jammy", "ubuntu/noble"])
                 rows = ["id  name              architecture  type"]
                 for i, name in enumerate(resources, start=1):
-                    kind = "Uploaded" if name.startswith("custom/") else "Synced"
-                    rows.append(f"{i:<3} {name:<17} amd64/generic  {kind}")
+                    kind = "Uploaded" if str(name).startswith("custom/") else "Synced"
+                    rows.append(f"{i:<3} {str(name):<17} amd64/generic  {kind}")
                 return "\n".join(rows)
             return (
                 "usage: maas <profile> machines read|commission|deploy|release\n"
@@ -2279,56 +2617,469 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                 "       maas login <profile> <url> <api-key>"
             )
         if low.startswith("lxc") or low.startswith("lxd"):
+            _sync_lxd_from_gui()
             inst = engine._lxd_instances
-            if "list" in low:
+            profiles = getattr(engine, "_lxd_profiles", None) or {}
+            parts_raw = line.strip().split()
+            # Drop leading lxc/lxd
+            args = parts_raw[1:] if len(parts_raw) > 1 else []
+            sub = (args[0].lower() if args else "")
+
+            def _inst_name_from_args(offset: int = 1) -> str:
+                if len(args) > offset:
+                    return args[offset]
+                for tok in args[1:]:
+                    if tok in inst:
+                        return tok
+                return ""
+
+            def _type_short(t: str) -> str:
+                t = (t or "container").lower()
+                if t in ("virtual-machine", "vm", "virtual_machine"):
+                    return "VIRTUAL-MACHINE"
+                return "CONTAINER"
+
+            # list — NAME STATE IPV4 IPV6 TYPE SNAPSHOTS
+            if sub == "list" or (sub == "" and "list" in low):
                 rows = [
-                    "+---------------+---------+----------------------+------+-----------+-----------+",
-                    "| NAME          | STATE   | IPV4                 | TYPE | PROCESSES | LOCATION  |",
-                    "+---------------+---------+----------------------+------+-----------+-----------+",
+                    "+---------------+---------+----------------------+----------------------+-----------------+-----------+",
+                    "| NAME          | STATE   | IPV4                 | IPV6                 | TYPE            | SNAPSHOTS |",
+                    "+---------------+---------+----------------------+----------------------+-----------------+-----------+",
                 ]
                 for name, meta in inst.items():
+                    snap_n = meta.get("snapshots")
+                    if isinstance(snap_n, list):
+                        snap_n = len(snap_n)
+                    snap_n = int(snap_n or 0)
                     rows.append(
-                        f"| {name:<13} | {meta['state']:<7} | {meta.get('ipv4') or '-':<20} "
-                        f"| {meta['type']:<4} | 42        | none      |"
+                        f"| {name:<13} | {meta.get('state', 'STOPPED'):<7} "
+                        f"| {(meta.get('ipv4') or '-'):<20} "
+                        f"| {(meta.get('ipv6') or '-'):<20} "
+                        f"| {_type_short(meta.get('type')):<15} "
+                        f"| {snap_n:<9} |"
                     )
-                rows.append("+---------------+---------+----------------------+------+-----------+-----------+")
+                rows.append("+---------------+---------+----------------------+----------------------+-----------------+-----------+")
                 return "\n".join(rows)
-            if "start" in low:
-                for name, meta in inst.items():
-                    if name in low or (len(parts) > 2 and parts[-1] == name):
-                        meta["state"] = "RUNNING"
-                        if not meta.get("ipv4"):
-                            meta["ipv4"] = "10.150.1.99"
-                        return f"Instance {name} started"
-                # start last stopped
-                for name, meta in inst.items():
-                    if meta["state"] != "RUNNING":
+
+            if sub in ("start", "stop", "restart", "delete", "rm", "info"):
+                name = _inst_name_from_args(1)
+                if sub == "start":
+                    target = name
+                    if not target or target not in inst:
+                        target = next((n for n, m in inst.items() if m.get("state") != "RUNNING"), "")
+                    if not target:
+                        return "All instances already running"
+                    gui = _apply_lxd_gui_action("lxd_start", {"name": target})
+                    if gui and gui.get("ok"):
+                        _sync_lxd_from_gui()
+                    else:
+                        meta = inst.setdefault(target, {"state": "STOPPED", "type": "container", "ipv4": ""})
                         meta["state"] = "RUNNING"
                         meta["ipv4"] = meta.get("ipv4") or "10.150.1.99"
-                        return f"Instance {name} started"
-                return "All instances already running"
-            if "stop" in low:
-                for name, meta in inst.items():
-                    if name in low:
-                        meta["state"] = "STOPPED"
-                        return f"Instance {name} stopped"
-                return "Specify instance name"
-            if "profile" in low:
-                return (
-                    "name: gpu-passthrough\n"
-                    "config:\n"
-                    "  nvidia.runtime: \"true\"\n"
-                    "devices:\n"
-                    "  gpu0:\n"
-                    "    type: gpu\n"
-                    "    gputype: physical\n"
-                    "    pci: \"0000:19:00.0\""
-                )
-            if "launch" in low or "init" in low:
-                name = parts[-1] if len(parts) > 2 else "lab-container"
-                inst[name] = {"state": "RUNNING", "type": "container", "ipv4": "10.150.1.50"}
-                return f"Creating {name}\nStarting {name}\n{name} is ready"
-            return "LXD: OK — try `lxc list`, `lxc start <name>`, `lxc profile show gpu-passthrough`"
+                    return f"Instance {target} started"
+                if sub == "stop":
+                    if not name or name not in inst:
+                        return "Error: specify instance name"
+                    gui = _apply_lxd_gui_action("lxd_stop", {"name": name})
+                    if gui and gui.get("ok"):
+                        _sync_lxd_from_gui()
+                    else:
+                        inst[name]["state"] = "STOPPED"
+                        inst[name]["ipv4"] = ""
+                    return f"Instance {name} stopped"
+                if sub == "restart":
+                    if not name or name not in inst:
+                        return "Error: specify instance name"
+                    gui = _apply_lxd_gui_action("lxd_restart", {"name": name})
+                    if gui and gui.get("ok"):
+                        _sync_lxd_from_gui()
+                    else:
+                        inst[name]["state"] = "RUNNING"
+                        inst[name]["ipv4"] = inst[name].get("ipv4") or "10.150.1.99"
+                    return f"Instance {name} restarted"
+                if sub in ("delete", "rm"):
+                    if not name:
+                        return "Error: specify instance name"
+                    gui = _apply_lxd_gui_action("lxd_delete", {"name": name})
+                    if gui and gui.get("ok"):
+                        _sync_lxd_from_gui()
+                    else:
+                        inst.pop(name, None)
+                    return f"Instance {name} deleted"
+                if sub == "info":
+                    if not name or name not in inst:
+                        return "Error: Instance not found"
+                    meta = inst[name]
+                    cfg = meta.get("config") or {}
+                    cfg_lines = "\n".join(f"  {k}: {v}" for k, v in cfg.items()) or "  {}"
+                    dev = meta.get("devices") or {}
+                    dev_lines = "\n".join(f"  {k}: {v}" for k, v in dev.items()) or "  {}"
+                    return (
+                        f"Name: {name}\n"
+                        f"Status: {meta.get('state')}\n"
+                        f"Type: {meta.get('type')}\n"
+                        f"Architecture: x86_64\n"
+                        f"PID: 12345\n"
+                        f"Created: 2026/01/15 10:00 UTC\n"
+                        f"Profiles: {', '.join(meta.get('profiles') or ['default'])}\n"
+                        f"Project: {meta.get('project') or 'default'}\n"
+                        f"Location: {meta.get('location') or 'none'}\n"
+                        f"Ips:\n"
+                        f"  eth0:\tinet\t{meta.get('ipv4') or '(none)'}\n"
+                        f"Config:\n{cfg_lines}\n"
+                        f"Devices:\n{dev_lines}"
+                    )
+
+            if sub in ("launch", "init"):
+                # lxc launch ubuntu:22.04 name [--vm]
+                image = "ubuntu:22.04"
+                name = "lab-instance"
+                is_vm = "--vm" in args or any(a == "vm" for a in args)
+                nonflags = [a for a in args[1:] if not a.startswith("-")]
+                if len(nonflags) >= 1:
+                    image = nonflags[0]
+                if len(nonflags) >= 2:
+                    name = nonflags[1]
+                elif len(nonflags) == 1 and ":" not in nonflags[0]:
+                    name = nonflags[0]
+                itype = "virtual-machine" if is_vm else "container"
+                action = "lxd_launch" if sub == "launch" else "lxd_create"
+                gui = _apply_lxd_gui_action(action, {
+                    "name": name, "image": image, "type": itype,
+                    "start": sub == "launch",
+                })
+                if gui and gui.get("ok"):
+                    _sync_lxd_from_gui()
+                else:
+                    inst[name] = {
+                        "state": "RUNNING" if sub == "launch" else "STOPPED",
+                        "type": itype,
+                        "ipv4": "10.150.1.50" if sub == "launch" else "",
+                        "ipv6": "", "snapshots": 0, "profiles": ["default"],
+                        "devices": {}, "config": {}, "project": "default",
+                        "location": "none", "nvidia_smi_ok": False, "image": image,
+                    }
+                if sub == "launch":
+                    return f"Creating {name}\nStarting {name}\n{name} is ready"
+                return f"Creating {name}\n{name} created (stopped)"
+
+            if sub == "config":
+                # config set|get|show|device
+                cfg_op = (args[1].lower() if len(args) > 1 else "")
+                if cfg_op == "device" and len(args) > 2 and args[2].lower() == "add":
+                    # lxc config device add <instance> <device> <type> [key=val...]
+                    iname = args[3] if len(args) > 3 else ""
+                    dname = args[4] if len(args) > 4 else "dev0"
+                    dtype = args[5] if len(args) > 5 else "disk"
+                    kv = {}
+                    for tok in args[6:]:
+                        if "=" in tok:
+                            k, v = tok.split("=", 1)
+                            kv[k] = v
+                    payload = {"name": iname, "device": dname, "type": dtype, **kv}
+                    gui = _apply_lxd_gui_action("lxd_config_device_add", payload)
+                    if gui and gui.get("ok"):
+                        _sync_lxd_from_gui()
+                    elif iname in inst:
+                        devices = inst[iname].setdefault("devices", {})
+                        devices[dname] = {"type": dtype, **kv}
+                        if dtype == "gpu":
+                            inst[iname]["nvidia_smi_ok"] = True
+                            devices["gpu"] = devices[dname]
+                    return f"Device {dname} added to {iname}"
+                if cfg_op == "set" and len(args) >= 4:
+                    iname, key, value = args[2], args[3], args[4] if len(args) > 4 else ""
+                    gui = _apply_lxd_gui_action("lxd_config_set", {"name": iname, "key": key, "value": value})
+                    if gui and gui.get("ok"):
+                        _sync_lxd_from_gui()
+                    elif iname in inst:
+                        inst[iname].setdefault("config", {})[key] = value
+                    return f"Config {key} set on {iname}"
+                if cfg_op == "get" and len(args) >= 4:
+                    iname, key = args[2], args[3]
+                    meta = inst.get(iname) or {}
+                    return str((meta.get("config") or {}).get(key, ""))
+                if cfg_op == "show" and len(args) >= 3:
+                    iname = args[2]
+                    meta = inst.get(iname) or {}
+                    cfg = meta.get("config") or {}
+                    lines = ["architecture: x86_64", "config:"]
+                    for k, v in cfg.items():
+                        lines.append(f"  {k}: \"{v}\"")
+                    if not cfg:
+                        lines.append("  {}")
+                    lines.append(f"devices:")
+                    for dk, dv in (meta.get("devices") or {}).items():
+                        lines.append(f"  {dk}:")
+                        if isinstance(dv, dict):
+                            for kk, vv in dv.items():
+                                lines.append(f"    {kk}: {vv}")
+                        else:
+                            lines.append(f"    {dv}")
+                    lines.append(f"ephemeral: false")
+                    lines.append(f"profiles: {meta.get('profiles') or ['default']}")
+                    lines.append(f"stateful: false")
+                    lines.append(f"description: \"\"")
+                    return "\n".join(lines)
+                return "usage: lxc config set|get|show <instance> [key] [value]\n       lxc config device add <instance> <device> <type> [key=value...]"
+
+            if sub == "profile":
+                pop = (args[1].lower() if len(args) > 1 else "list")
+                if pop == "list" or (pop == "" and "list" in low):
+                    rows = ["+------------------+---------+", "| NAME             | USED BY |", "+------------------+---------+"]
+                    for pname in profiles:
+                        rows.append(f"| {pname:<16} | 0       |")
+                    rows.append("+------------------+---------+")
+                    return "\n".join(rows)
+                if pop == "create" and len(args) > 2:
+                    pname = args[2]
+                    gui = _apply_lxd_gui_action("lxd_profile_create", {"name": pname})
+                    if gui and gui.get("ok"):
+                        _sync_lxd_from_gui()
+                    else:
+                        profiles[pname] = {"config": {}, "devices": {}}
+                        engine._lxd_profiles = profiles
+                    return f"Profile {pname} created"
+                if pop == "show" and len(args) > 2:
+                    pname = args[2]
+                    p = profiles.get(pname)
+                    if not p and pname == "gpu-passthrough":
+                        return (
+                            "name: gpu-passthrough\n"
+                            "config:\n"
+                            "  nvidia.runtime: \"true\"\n"
+                            "devices:\n"
+                            "  gpu0:\n"
+                            "    type: gpu\n"
+                            "    gputype: physical\n"
+                            "    pci: \"0000:19:00.0\""
+                        )
+                    if not p:
+                        return f"Error: Profile {pname} not found"
+                    lines = [f"name: {pname}", "config:"]
+                    for k, v in (p.get("config") or {}).items():
+                        lines.append(f"  {k}: \"{v}\"")
+                    if not p.get("config"):
+                        lines.append("  {}")
+                    lines.append("devices:")
+                    for dk, dv in (p.get("devices") or {}).items():
+                        lines.append(f"  {dk}:")
+                        if isinstance(dv, dict):
+                            for kk, vv in dv.items():
+                                lines.append(f"    {kk}: {vv}")
+                    if not p.get("devices"):
+                        lines.append("  {}")
+                    return "\n".join(lines)
+                if pop in ("assign", "add", "set") and len(args) > 3:
+                    # lxc profile assign <instance> <profiles>
+                    iname = args[2]
+                    plist = args[3].split(",") if len(args) > 3 else ["default"]
+                    gui = _apply_lxd_gui_action("lxd_profile_assign", {"name": iname, "profiles": plist})
+                    if gui and gui.get("ok"):
+                        _sync_lxd_from_gui()
+                    elif iname in inst:
+                        inst[iname]["profiles"] = plist
+                    return f"Profiles {','.join(plist)} applied to {iname}"
+                if "show" in low and "gpu" in low:
+                    return (
+                        "name: gpu-passthrough\n"
+                        "config:\n"
+                        "  nvidia.runtime: \"true\"\n"
+                        "devices:\n"
+                        "  gpu0:\n"
+                        "    type: gpu\n"
+                        "    gputype: physical\n"
+                        "    pci: \"0000:19:00.0\""
+                    )
+                return "usage: lxc profile list|create|show|assign"
+
+            if sub == "image" or (sub == "images"):
+                images = getattr(engine, "_lxd_images", None) or [
+                    {"alias": "ubuntu:22.04", "fingerprint": "a1b2c3d4e5f6", "public": True, "description": "ubuntu 22.04 LTS amd64", "type": "container"},
+                    {"alias": "ubuntu:24.04", "fingerprint": "f6e5d4c3b2a1", "public": True, "description": "ubuntu 24.04 LTS amd64", "type": "container"},
+                ]
+                rows = [
+                    "+-------+--------------+--------+-------------------------------------------+--------------+",
+                    "| ALIAS | FINGERPRINT  | PUBLIC | DESCRIPTION                               | TYPE         |",
+                    "+-------+--------------+--------+-------------------------------------------+--------------+",
+                ]
+                for img in images:
+                    alias = (img.get("alias") if isinstance(img, dict) else str(img)) or "-"
+                    fp = (img.get("fingerprint") if isinstance(img, dict) else "-") or "-"
+                    pub = "yes" if (isinstance(img, dict) and img.get("public")) else "no"
+                    desc = (img.get("description") if isinstance(img, dict) else "") or ""
+                    itype = (img.get("type") if isinstance(img, dict) else "container") or "container"
+                    rows.append(f"| {alias:<5} | {fp[:12]:<12} | {pub:<6} | {desc[:41]:<41} | {itype:<12} |")
+                rows.append("+-------+--------------+--------+-------------------------------------------+--------------+")
+                return "\n".join(rows)
+
+            if sub == "snapshot":
+                # lxc snapshot <instance> [snapname]  OR  lxc snapshot restore <instance> <snap>
+                if len(args) > 1 and args[1].lower() == "restore":
+                    iname = args[2] if len(args) > 2 else ""
+                    snap = args[3] if len(args) > 3 else ""
+                    gui = _apply_lxd_gui_action("lxd_restore", {"name": iname, "snapshot": snap})
+                    if gui and gui.get("ok"):
+                        _sync_lxd_from_gui()
+                    elif iname in inst:
+                        inst[iname]["state"] = "STOPPED"
+                        inst[iname]["ipv4"] = ""
+                    return f"Instance {iname} restored from snapshot {snap}"
+                iname = args[1] if len(args) > 1 else ""
+                snap = args[2] if len(args) > 2 else f"snap{len(inst.get(iname, {}).get('snapshot_list') or [])}"
+                gui = _apply_lxd_gui_action("lxd_snapshot", {"name": iname, "snapshot": snap})
+                if gui and gui.get("ok"):
+                    _sync_lxd_from_gui()
+                elif iname in inst:
+                    inst[iname]["snapshots"] = int(inst[iname].get("snapshots") or 0) + 1
+                    inst[iname].setdefault("snapshot_list", []).append({"name": snap})
+                return f"Snapshot {snap} created for {iname}"
+
+            if sub == "restore":
+                iname = args[1] if len(args) > 1 else ""
+                snap = args[2] if len(args) > 2 else ""
+                gui = _apply_lxd_gui_action("lxd_restore", {"name": iname, "snapshot": snap})
+                if gui and gui.get("ok"):
+                    _sync_lxd_from_gui()
+                elif iname in inst:
+                    inst[iname]["state"] = "STOPPED"
+                    inst[iname]["ipv4"] = ""
+                return f"Instance {iname} restored from snapshot {snap}"
+
+            if sub == "publish":
+                iname = args[1] if len(args) > 1 else ""
+                alias = "image"
+                for i, a in enumerate(args):
+                    if a == "--alias" and i + 1 < len(args):
+                        alias = args[i + 1]
+                gui = _apply_lxd_gui_action("lxd_publish", {"name": iname, "alias": alias})
+                if gui and gui.get("ok"):
+                    _sync_lxd_from_gui()
+                return f"Instance {iname} published as {alias}"
+
+            if sub == "storage" or ("storage" in low and "list" in low):
+                pools = getattr(engine, "_lxd_storage", None) or [
+                    {"name": "default", "driver": "dir", "source": "/var/snap/lxd/common/lxd/storage-pools/default"},
+                    {"name": "gpu-pool", "driver": "zfs", "source": "tank/lxd"},
+                ]
+                _apply_lxd_gui_action("lxd_storage_list", {})
+                rows = [
+                    "+----------+--------+-----------------------------------------------+",
+                    "| NAME     | DRIVER | SOURCE                                        |",
+                    "+----------+--------+-----------------------------------------------+",
+                ]
+                for p in pools:
+                    rows.append(
+                        f"| {(p.get('name') or ''):<8} | {(p.get('driver') or ''):<6} "
+                        f"| {(p.get('source') or '')[:45]:<45} |"
+                    )
+                rows.append("+----------+--------+-----------------------------------------------+")
+                return "\n".join(rows)
+
+            if sub == "network" or ("network" in low and "list" in low):
+                nets = getattr(engine, "_lxd_networks", None) or [
+                    {"name": "lxdbr0", "type": "bridge", "managed": True, "ipv4": "10.10.2.1/24", "ipv6": "fd42::1/64"},
+                ]
+                _apply_lxd_gui_action("lxd_network_list", {})
+                rows = [
+                    "+-----------+----------+---------+----------------+-----------------+",
+                    "| NAME      | TYPE     | MANAGED | IPV4            | IPV6            |",
+                    "+-----------+----------+---------+----------------+-----------------+",
+                ]
+                for n in nets:
+                    rows.append(
+                        f"| {(n.get('name') or ''):<9} | {(n.get('type') or ''):<8} "
+                        f"| {'YES' if n.get('managed') else 'NO':<7} "
+                        f"| {(n.get('ipv4') or '-'):<14} | {(n.get('ipv6') or '-'):<15} |"
+                    )
+                rows.append("+-----------+----------+---------+----------------+-----------------+")
+                return "\n".join(rows)
+
+            if sub == "project" or ("project" in low and "list" in low):
+                projects = getattr(engine, "_lxd_projects", None) or [
+                    {"name": "default"}, {"name": "inference"},
+                ]
+                if len(args) > 1 and args[1].lower() == "create" and len(args) > 2:
+                    pname = args[2]
+                    gui = _apply_lxd_gui_action("lxd_project_create", {"name": pname})
+                    if gui and gui.get("ok"):
+                        _sync_lxd_from_gui()
+                    return f"Project {pname} created"
+                rows = ["+-------------------+", "| NAME              |", "+-------------------+"]
+                for p in projects:
+                    rows.append(f"| {(p.get('name') if isinstance(p, dict) else p):<17} |")
+                rows.append("+-------------------+")
+                return "\n".join(rows)
+
+            if sub == "cluster" or ("cluster" in low) or ("list" in low and "member" in low):
+                members = getattr(engine, "_lxd_cluster", None) or [
+                    {"name": "node1", "url": "https://10.64.12.11:8443", "roles": ["database"], "architecture": "x86_64", "failure_domain": "default"},
+                    {"name": "node2", "url": "https://10.64.12.12:8443", "roles": ["database"], "architecture": "x86_64", "failure_domain": "default"},
+                    {"name": "node3", "url": "https://10.64.12.13:8443", "roles": ["database-standby"], "architecture": "x86_64", "failure_domain": "default"},
+                ]
+                _apply_lxd_gui_action("lxd_cluster_list", {})
+                rows = [
+                    "+-------+--------------------------+------------------+--------------+-------------------+",
+                    "| NAME  | URL                      | ROLES            | ARCHITECTURE | FAILURE DOMAIN    |",
+                    "+-------+--------------------------+------------------+--------------+-------------------+",
+                ]
+                for m in members:
+                    roles = m.get("roles") or []
+                    role_s = ",".join(roles) if isinstance(roles, list) else str(roles)
+                    rows.append(
+                        f"| {(m.get('name') or ''):<5} | {(m.get('url') or ''):<24} "
+                        f"| {role_s:<16} | {(m.get('architecture') or ''):<12} "
+                        f"| {(m.get('failure_domain') or 'default'):<17} |"
+                    )
+                rows.append("+-------+--------------------------+------------------+--------------+-------------------+")
+                return "\n".join(rows)
+
+            if sub in ("exec", "shell"):
+                # lxc exec <name> -- <cmd>   /  lxc shell <name>
+                iname = args[1] if len(args) > 1 else next(iter(inst), "infer-svc")
+                cmd = "bash"
+                if "--" in args:
+                    idx = args.index("--")
+                    cmd = " ".join(args[idx + 1:]) or "bash"
+                elif sub == "exec" and len(args) > 2:
+                    cmd = " ".join(a for a in args[2:] if a != "--") or "bash"
+                gui = _apply_lxd_gui_action("lxd_exec_echo", {"name": iname, "command": cmd})
+                if gui and gui.get("ok") and gui.get("output"):
+                    out = gui["output"]
+                    prompt = gui.get("prompt") or f"root@{iname}:~#"
+                    if cmd.strip() in ("bash", "sh", "/bin/bash") or sub == "shell":
+                        return (
+                            f"{out}\n"
+                            f"# LXD session marker: root@{iname}\n"
+                            f"{prompt} "
+                        )
+                    return out
+                if cmd.strip() in ("bash", "sh", "/bin/bash") or sub == "shell":
+                    return (
+                        f"root@{iname}:~#\n"
+                        f"# LXD session marker: root@{iname}\n"
+                        f"root@{iname}:~# "
+                    )
+                if "nvidia-smi" in cmd.lower():
+                    meta = inst.get(iname) or {}
+                    if meta.get("nvidia_smi_ok"):
+                        return (
+                            "NVIDIA-SMI 535.104.05   Driver Version: 535.104.05   CUDA Version: 12.2\n"
+                            "GPU 0: NVIDIA H100 80GB HBM3 (UUID: GPU-lab-h100-01)"
+                        )
+                    return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
+                if cmd.lower().startswith("echo "):
+                    return cmd[5:]
+                return f"{cmd}\nroot@{iname}:~#"
+
+            return (
+                "usage: lxc list|launch|init|start|stop|restart|delete|info\n"
+                "       lxc config set|get|show|device add\n"
+                "       lxc profile list|create|show|assign\n"
+                "       lxc image list|snapshot|restore|publish\n"
+                "       lxc storage list|network list|project list|cluster list\n"
+                "       lxc exec <instance> -- <cmd> | lxc shell <instance>"
+            )
         if low.startswith("virsh"):
             if "list" in low:
                 return " Id   Name         State\n------------------------\n 1    vm-k8s-node  running"
@@ -2437,34 +3188,27 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                 "><fs> "
             )
         if low.startswith("vyos") or low.startswith("vyatta"):
-            if engine.networking is None:
-                engine.networking = NetworkingState(engine.scenario_slug)
-            net = engine.networking
+            net = _ensure_vyos_networking(engine)
             rest = line.strip().split(None, 1)
-            sub = rest[1].strip().lower() if len(rest) > 1 else ""
-            if "show interfaces" in sub or sub == "interfaces":
+            sub = rest[1].strip() if len(rest) > 1 else ""
+            sub_low = sub.lower()
+            if not sub:
+                _persist_vyos_networking(engine, net)
                 return (
-                    "Codes: S - State, L - Link, u - Up, D - Down, A - Admin Down\n"
-                    "Interface        IP Address                        S/L  Description\n"
-                    "eth0             10.64.1.1/24                      u/u  management\n"
-                    "eth1             10.64.12.1/24                     u/u  pxe-provision\n"
-                    "eth1.100         10.64.100.1/24                    u/u  gpu-fabric\n"
-                    "lo               127.0.0.1/8                       u/u"
+                    "VyOS OK — try: configure / set … / commit / rollback / "
+                    "show interfaces / show dhcp server leases / show configuration / show ip bgp summary"
                 )
-            if "show dhcp" in sub or "dhcp" in sub:
+            # Delegate "vyos show …" / "vyos configure" to the same dispatcher.
+            out = _vyos_dispatch(net, sub, engine)
+            _persist_vyos_networking(engine, net)
+            if out.startswith("Invalid command"):
+                if "bgp" in sub_low:
+                    return net.bgp_summary()
                 return (
-                    "IP address    Hardware address    Lease expiration     Pool      Client Name\n"
-                    "10.64.12.11   a4:bb:6d:aa:01:01   2026/08/01 12:00:00  pxe-pool  gpu-node-01\n"
-                    "10.64.12.12   a4:bb:6d:aa:01:02   2026/08/01 12:00:00  pxe-pool  gpu-node-02"
+                    "VyOS OK — try: configure / set … / commit / rollback / "
+                    "show interfaces / show dhcp server leases / show configuration / show ip bgp summary"
                 )
-            if "show conf" in sub or "configuration" in sub:
-                return net.vyos_show_config(candidate=False)
-            if "bgp" in sub:
-                return net.bgp_summary()
-            return (
-                "VyOS OK — try: configure / set … / commit / rollback / "
-                "show interfaces / show dhcp server leases / show configuration / show ip bgp summary"
-            )
+            return out
         return f"{line}: OK"
     shell.register_handler(handler)
 

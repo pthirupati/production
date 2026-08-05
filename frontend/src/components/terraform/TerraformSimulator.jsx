@@ -38,8 +38,9 @@ export default function TerraformSimulator(props) {
 
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
-    onBackToTerminal: embedded ? undefined : onExit,
+    onBackToTerminal: onExit || onToggleTerminal,
     hintsLabel, checkDisabled, extendDisabled,
+    backLabel: simTerminalOpen ? 'Hide terminal' : (onExit ? 'Close' : 'Terminal'),
     vmwareHref,
   }
 

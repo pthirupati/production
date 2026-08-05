@@ -40,6 +40,95 @@ const hclLanguage = StreamLanguage.define({
   },
 })
 
+/** Lightweight HTML highlighter (no extra @codemirror/lang-html dep). */
+const htmlLanguage = StreamLanguage.define({
+  startState: () => ({ inTag: false }),
+  token(stream, state) {
+    if (stream.match('<!--')) {
+      while (!stream.eol()) {
+        if (stream.match('-->')) break
+        stream.next()
+      }
+      return 'comment'
+    }
+    if (stream.match(/<\/?[a-zA-Z][\w:-]*/)) {
+      state.inTag = true
+      return 'tagName'
+    }
+    if (state.inTag) {
+      if (stream.match('>')) { state.inTag = false; return 'tagName' }
+      if (stream.match(/"[^"]*"|'[^']*'/)) return 'string'
+      if (stream.match(/[a-zA-Z_:][\w:.-]*/)) return 'attributeName'
+      stream.next()
+      return null
+    }
+    stream.next()
+    return null
+  },
+})
+
+const cssLanguage = StreamLanguage.define({
+  startState: () => ({}),
+  token(stream) {
+    if (stream.eatSpace()) return null
+    if (stream.match('/*')) {
+      while (!stream.eol()) {
+        if (stream.match('*/')) break
+        stream.next()
+      }
+      return 'comment'
+    }
+    if (stream.match(/#[0-9a-fA-F]{3,8}\b/)) return 'atom'
+    if (stream.match(/"[^"]*"|'[^']*'/)) return 'string'
+    if (stream.match(/-?[0-9]+(\.[0-9]+)?(px|em|rem|%|vh|vw|s|ms)?/)) return 'number'
+    if (stream.match(/[{};:]/)) return 'punctuation'
+    if (stream.match(/[.#]?[a-zA-Z_-][\w-]*/)) return 'variable'
+    stream.next()
+    return null
+  },
+})
+
+const javaLanguage = StreamLanguage.define({
+  startState: () => ({}),
+  token(stream) {
+    if (stream.eatSpace()) return null
+    if (stream.match('//')) { stream.skipToEnd(); return 'comment' }
+    if (stream.match('/*')) {
+      while (!stream.eol()) {
+        if (stream.match('*/')) break
+        stream.next()
+      }
+      return 'comment'
+    }
+    if (stream.match(/"(?:[^\\"]|\\.)*"/)) return 'string'
+    if (stream.match(/\b(public|private|protected|class|interface|extends|implements|static|void|return|if|else|for|while|new|import|package|try|catch|finally|throw|throws|this|super|null|true|false)\b/)) {
+      return 'keyword'
+    }
+    if (stream.match(/\b(int|long|double|float|boolean|char|byte|short|String)\b/)) return 'typeName'
+    if (stream.match(/\b\d+(\.\d+)?\b/)) return 'number'
+    if (stream.match(/[a-zA-Z_][\w]*/)) return 'variable'
+    stream.next()
+    return null
+  },
+})
+
+const shellLanguage = StreamLanguage.define({
+  startState: () => ({}),
+  token(stream) {
+    if (stream.eatSpace()) return null
+    if (stream.match('#')) { stream.skipToEnd(); return 'comment' }
+    if (stream.match(/'(?:[^']*)'/)) return 'string'
+    if (stream.match(/"(?:[^\\"]|\\.)*"/)) return 'string'
+    if (stream.match(/\$\{?[a-zA-Z_][\w]*\}?/)) return 'variableName'
+    if (stream.match(/\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|return|exit|export|source|local|set|echo|cd|ls|cat|grep|awk|sed)\b/)) {
+      return 'keyword'
+    }
+    if (stream.match(/[a-zA-Z_./-][\w./-]*/)) return 'variable'
+    stream.next()
+    return null
+  },
+})
+
 function languageExtension(language) {
   const lang = (language || '').toLowerCase()
   if (lang === 'python' || lang === 'py') return python()
@@ -51,8 +140,13 @@ function languageExtension(language) {
   if (lang === 'yaml' || lang === 'yml') return yaml()
   if (lang === 'hcl' || lang === 'terraform' || lang === 'tf') return hclLanguage
   if (lang === 'markdown' || lang === 'md') return markdown()
+  if (lang === 'html' || lang === 'htm') return htmlLanguage
+  if (lang === 'css') return cssLanguage
+  if (lang === 'java') return javaLanguage
+  if (['shell', 'bash', 'sh', 'zsh'].includes(lang)) return shellLanguage
   return []
 }
+
 
 const PYTHON_KW = completeFromList([
   'def', 'class', 'import', 'from', 'return', 'if', 'elif', 'else', 'for', 'while',
@@ -123,79 +217,101 @@ const lightTheme = EditorView.theme({
 }, { dark: false })
 
 const CodeEditor = forwardRef(function CodeEditor(
-  { value = '', onChange, language = 'python', readOnly = false, onRun, fontSize = 13, vimMode = false, formatOnSave = false },
+  {
+    value = '', onChange, language = 'python', readOnly = false, onRun, onSave,
+    fontSize = 13, vimMode = false, formatOnSave = false,
+  },
   ref,
 ) {
   const hostRef = useRef(null)
   const viewRef = useRef(null)
   const onChangeRef = useRef(onChange)
   const onRunRef = useRef(onRun)
+  const onSaveRef = useRef(onSave)
+  const formatOnSaveRef = useRef(formatOnSave)
   const langCompartment = useRef(new Compartment())
   const autocompleteCompartment = useRef(new Compartment())
   const themeCompartment = useRef(new Compartment())
   const readOnlyCompartment = useRef(new Compartment())
   const fontCompartment = useRef(new Compartment())
   const vimCompartment = useRef(new Compartment())
+  const keymapCompartment = useRef(new Compartment())
   const lintCompartment = useRef(new Compartment())
 
   const theme = useThemeStore((s) => s.theme)
   const isDark = theme !== 'light'
 
+  const formatDoc = (view) => {
+    if (!view) return
+    const lines = view.state.doc.toString().split('\n')
+    const formatted = lines.map((l) => {
+      const t = l.trimStart()
+      if (!t) return ''
+      const depth = Math.floor((l.length - t.length) / 4)
+      return '    '.repeat(depth) + t
+    }).join('\n')
+    const cur = view.state.doc.toString()
+    if (formatted !== cur) {
+      view.dispatch({ changes: { from: 0, to: cur.length, insert: formatted } })
+    }
+  }
+
   useImperativeHandle(ref, () => ({
     openSearch: () => { const v = viewRef.current; if (v) { openSearchPanel(v); v.focus() } },
     focus: () => viewRef.current?.focus(),
-    formatDocument: () => {
-      const view = viewRef.current
-      if (!view) return
-      const lines = view.state.doc.toString().split('\n')
-      const formatted = lines.map((l) => {
-        const t = l.trimStart()
-        if (!t) return ''
-        const depth = Math.floor((l.length - t.length) / 4)
-        return '    '.repeat(depth) + t
-      }).join('\n')
-      const cur = view.state.doc.toString()
-      if (formatted !== cur) {
-        view.dispatch({ changes: { from: 0, to: cur.length, insert: formatted } })
-      }
-    },
+    formatDocument: () => formatDoc(viewRef.current),
   }), [])
 
   const fontTheme = (px) => EditorView.theme({
     '&': { height: '100%', fontSize: `${px}px` },
-    '.cm-scroller': { fontFamily: '"JetBrains Mono", monospace' },
+    '.cm-scroller': { fontFamily: '"JetBrains Mono", "Fira Code", Menlo, monospace' },
+    '.cm-vim-panel, .cm-panels.cm-panels-bottom': {
+      backgroundColor: isDark ? '#252526' : '#f3f3f3',
+      color: isDark ? '#cccccc' : '#333',
+      fontFamily: '"JetBrains Mono", monospace',
+      fontSize: '12px',
+    },
   })
 
-  useEffect(() => { onChangeRef.current = onChange }, [onChange])
-  useEffect(() => { onRunRef.current = onRun }, [onRun])
-
-  useEffect(() => {
-    if (!hostRef.current) return
-
-    const runKeymap = keymap.of([
+  const editorKeymaps = (useVim) => {
+    const base = useVim
+      ? [indentWithTab, ...searchKeymap, ...historyKeymap]
+      : [indentWithTab, ...searchKeymap, ...defaultKeymap, ...historyKeymap]
+    return keymap.of([
       { key: 'Mod-Enter', run: () => { onRunRef.current?.(); return true } },
       {
-        key: 'Mod-Shift-f',
+        key: 'Mod-s',
         run: (view) => {
-          const lines = view.state.doc.toString().split('\n')
-          const formatted = lines.map((l) => {
-            const t = l.trimStart()
-            if (!t) return ''
-            const depth = Math.floor((l.length - t.length) / 4)
-            return '    '.repeat(depth) + t
-          }).join('\n')
-          const cur = view.state.doc.toString()
-          if (formatted !== cur) view.dispatch({ changes: { from: 0, to: cur.length, insert: formatted } })
+          if (formatOnSaveRef.current) formatDoc(view)
+          onSaveRef.current?.(view.state.doc.toString())
           return true
         },
       },
+      {
+        key: 'Mod-Shift-f',
+        run: (view) => { formatDoc(view); return true },
+      },
+      ...base,
     ])
+  }
+
+  useEffect(() => { onChangeRef.current = onChange }, [onChange])
+  useEffect(() => { onRunRef.current = onRun }, [onRun])
+  useEffect(() => { onSaveRef.current = onSave }, [onSave])
+  useEffect(() => { formatOnSaveRef.current = formatOnSave }, [formatOnSave])
+
+  useEffect(() => {
+    if (!hostRef.current) return
 
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         onChangeRef.current?.(update.state.doc.toString())
       }
     })
+
+    if (vimMode) {
+      try { Vim.map('jj', '<Esc>', 'insert') } catch { /* already mapped */ }
+    }
 
     const state = EditorState.create({
       doc: value,
@@ -210,12 +326,12 @@ const CodeEditor = forwardRef(function CodeEditor(
         bracketMatching(),
         indentUnit.of('    '),
         EditorState.tabSize.of(4),
-        runKeymap,
-        keymap.of([indentWithTab, ...searchKeymap, ...defaultKeymap, ...historyKeymap]),
+        // Vim must be early so it owns input before other keymaps.
+        vimCompartment.current.of(vimMode ? vim({ status: true }) : []),
+        keymapCompartment.current.of(editorKeymaps(vimMode)),
         langCompartment.current.of(languageExtension(language)),
         autocompleteCompartment.current.of(autocompleteFor(language)),
         lintCompartment.current.of([lintGutter(), basicLinter(language)]),
-        vimCompartment.current.of(vimMode ? vim() : []),
         themeCompartment.current.of(isDark ? oneDark : lightTheme),
         readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly)),
         fontCompartment.current.of(fontTheme(fontSize)),
@@ -227,8 +343,9 @@ const CodeEditor = forwardRef(function CodeEditor(
     const view = new EditorView({ state, parent: hostRef.current })
     viewRef.current = view
     return () => { view.destroy(); viewRef.current = null }
+    // Remount when vim toggles so status panel + keymap stay consistent.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [vimMode])
 
   useEffect(() => {
     const view = viewRef.current
@@ -260,37 +377,7 @@ const CodeEditor = forwardRef(function CodeEditor(
   useEffect(() => {
     viewRef.current?.dispatch({ effects: fontCompartment.current.reconfigure(fontTheme(fontSize)) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fontSize])
-
-  useEffect(() => {
-    viewRef.current?.dispatch({ effects: vimCompartment.current.reconfigure(vimMode ? vim() : []) })
-    if (vimMode) Vim.map('jj', '<Esc>', 'insert')
-  }, [vimMode])
-
-  useEffect(() => {
-    if (!formatOnSave) return undefined
-    const formatDoc = () => {
-      const view = viewRef.current
-      if (!view) return
-      const lines = view.state.doc.toString().split('\n')
-      const formatted = lines.map((l) => {
-        const t = l.trimStart()
-        if (!t) return ''
-        const depth = Math.floor((l.length - t.length) / 4)
-        return '    '.repeat(depth) + t
-      }).join('\n')
-      const cur = view.state.doc.toString()
-      if (formatted !== cur) view.dispatch({ changes: { from: 0, to: cur.length, insert: formatted } })
-    }
-    const onKey = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault()
-        formatDoc()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [formatOnSave])
+  }, [fontSize, isDark])
 
   return <div ref={hostRef} className="h-full w-full overflow-hidden text-left" />
 })

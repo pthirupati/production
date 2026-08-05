@@ -5,8 +5,11 @@ import LabTerminal, { scheduleReadySend } from '../LabTerminal'
 import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab, VscActivityButton } from '../ide/VsCodeWorkbench'
 import { LabChromeControls } from '../lab/LabChromeBar'
 import { baremetalApi } from '../../api/baremetal'
+import { packerApi } from '../../api/packer'
+import PackerCiPipelinePanel from './PackerCiPipelinePanel'
 import {
   FileCode, FolderOpen, Play, Plus, Trash2, RefreshCw, Terminal, Files, ExternalLink, Upload,
+  GitBranch, Workflow,
 } from 'lucide-react'
 import '../../styles/vscode-workbench.css'
 
@@ -47,6 +50,21 @@ build {
     script = "scripts/install-gpu-\${var.sku}.sh"
   }
 
+  provisioner "file" {
+    content = <<-EOF
+      #cloud-config
+      datasource:
+        MAAS: {}
+      package_update: true
+      runcmd:
+        - systemctl enable --now nvidia-persistenced
+        - gpu-sanity || true
+        - cloud-init status --wait
+      final_message: "ImageDev GPU image cloud-init finished in $UPTIME seconds"
+    EOF
+    destination = "/tmp/gpu-cloud-init.cfg"
+  }
+
   post-processor "shell-local" {
     inline = [
       "trivy image --exit-code 1 --severity HIGH,CRITICAL output-gpu-\${var.sku}/",
@@ -66,6 +84,11 @@ const DEFAULT_FILES = {
 
 function storageKey(sessionId) {
   return `fixitlab:packer-ide:${sessionId || 'local'}`
+}
+
+function bootResourceForSku(sku) {
+  if (sku === 'rhel-gpu' || sku === 'rhel') return 'custom/rhel-gpu'
+  return `custom/${sku}-jammy`
 }
 
 /** VS Code–style Packer workspace — edit .pkr.hcl, validate/fmt/build via lab terminal. */
@@ -102,6 +125,11 @@ export default function PackerWorkspaceIde({
   const [dirty, setDirty] = useState(false)
   const [showTerminal, setShowTerminal] = useState(true)
   const [terminalReady, setTerminalReady] = useState({})
+  const [buildSucceeded, setBuildSucceeded] = useState(false)
+  const [artifactReady, setArtifactReady] = useState(false)
+  const [suggestPublish, setSuggestPublish] = useState(false)
+  const [bootResourceName, setBootResourceName] = useState('custom/h100-jammy')
+  const [showCiPanel, setShowCiPanel] = useState(true)
   const filesRef = useRef(files)
   const terminalRef = useRef(null)
   const pendingSendRef = useRef(null)
@@ -116,6 +144,44 @@ export default function PackerWorkspaceIde({
     } catch { /* ignore */ }
   }, [files, activeFile, sessionId])
 
+  const detectSku = useCallback(() => {
+    const blob = `${activeFile}\n${Object.keys(files).join('\n')}\n${files[activeFile] || ''}\n${scenario?.slug || ''}`.toLowerCase()
+    if (blob.includes('rhel')) return 'rhel-gpu'
+    for (const key of ['b300', 'h200', 'h100', 'a100', 'mi300']) {
+      if (blob.includes(key)) return key
+    }
+    return 'h100'
+  }, [files, activeFile, scenario?.slug])
+
+  const sku = detectSku()
+  const mainFile = Object.keys(files).find((f) => f.endsWith('.pkr.hcl') && !f.startsWith('variables')) || 'gpu-h100.pkr.hcl'
+
+  useEffect(() => {
+    setBootResourceName(bootResourceForSku(sku))
+  }, [sku])
+
+  // Ensure baremetal session is signed in so factory actions work.
+  useEffect(() => {
+    if (!sessionId) return undefined
+    let cancelled = false
+    ;(async () => {
+      try {
+        await baremetalApi.getState(sessionId, scenario?.slug || '')
+        await baremetalApi.login(sessionId)
+        if (!cancelled) {
+          const st = await packerApi.getFactoryState(sessionId)
+          if (st?.build_succeeded) setBuildSucceeded(true)
+          if (st?.artifact_ready) {
+            setArtifactReady(true)
+            setSuggestPublish(true)
+          }
+          if (st?.suggested_boot_resource) setBootResourceName(st.suggested_boot_resource)
+        }
+      } catch { /* companion may not be ready */ }
+    })()
+    return () => { cancelled = true }
+  }, [sessionId, scenario?.slug])
+
   const handleTerminalReady = useCallback((hostKey) => {
     setTerminalReady((prev) => (prev[hostKey] ? prev : { ...prev, [hostKey]: true }))
     const pending = pendingSendRef.current
@@ -129,14 +195,32 @@ export default function PackerWorkspaceIde({
     }
   }, [])
 
+  const noteBuildSuccess = useCallback(async () => {
+    setBuildSucceeded(true)
+    setOutput((prev) => `${prev ? `${prev}\n` : ''}Packer build succeeded — Image Factory pipeline is available.`)
+    toast.success('Build artifact ready — run Image Factory pipeline', { duration: 2500 })
+    setBottomTab('ci')
+    setShowCiPanel(true)
+    if (sessionId) {
+      try {
+        await packerApi.markBuild(sessionId, { sku: detectSku(), success: true })
+      } catch { /* ignore */ }
+    }
+  }, [sessionId, detectSku])
+
   const sendToTerminal = useCallback((cmd) => {
     const line = cmd.trim()
     if (!line) return
     setBottomTab('terminal')
     setShowTerminal(true)
     setOutput((prev) => `${prev ? `${prev}\n` : ''}$ ${line}`)
+    const isBuild = /\bpacker\s+build\b/.test(line)
     if (terminalRef.current?.sendCommand(line)) {
       toast.success(`Terminal: ${line.split(/\s+/)[0]}`, { duration: 1200 })
+      if (isBuild) {
+        // Lab shell streams build success; enable pipeline after typical stream window.
+        window.setTimeout(() => { noteBuildSuccess() }, 3200)
+      }
       return
     }
     pendingSendRef.current = { line, cmd: line.split(/\s+/)[0] }
@@ -147,6 +231,7 @@ export default function PackerWorkspaceIde({
         pendingSendRef.current = null
         sendCancelRef.current = null
         toast.success(`Terminal: ${line.split(/\s+/)[0]}`, { duration: 1500 })
+        if (isBuild) window.setTimeout(() => { noteBuildSuccess() }, 3200)
       },
       onError: () => {
         pendingSendRef.current = null
@@ -157,25 +242,14 @@ export default function PackerWorkspaceIde({
       intervalMs: 150,
       initialDelayMs: 150,
     })
-  }, [])
+  }, [noteBuildSuccess])
 
   const canTerminal = terminalSession?.status === 'RUNNING'
   const fileList = Object.keys(files)
-  const mainFile = fileList.find((f) => f.endsWith('.pkr.hcl') && !f.startsWith('variables')) || 'gpu-h100.pkr.hcl'
-
-  const detectSku = useCallback(() => {
-    const blob = `${mainFile}\n${files[mainFile] || ''}\n${scenario?.slug || ''}`.toLowerCase()
-    if (blob.includes('rhel')) return 'rhel-gpu'
-    for (const key of ['b300', 'h200', 'h100', 'a100', 'mi300']) {
-      if (blob.includes(key)) return key
-    }
-    return 'h100'
-  }, [files, mainFile, scenario?.slug])
 
   const syncFilesToShell = useCallback(() => {
     const entries = Object.entries(filesRef.current || {})
     if (!entries.length) return
-    // Write IDE buffers into the lab shell so packer build sees learner edits.
     const script = entries.map(([name, content]) => {
       const body = String(content ?? '').replace(/\r\n/g, '\n')
       return `cat > ${name} <<'FIXITLAB_EOF'\n${body}\nFIXITLAB_EOF`
@@ -184,27 +258,101 @@ export default function PackerWorkspaceIde({
     setOutput((prev) => `${prev ? `${prev}\n` : ''}Synced ${entries.length} file(s) to lab workspace.`)
   }, [sendToTerminal])
 
+  const openMaasImages = useCallback(() => {
+    try {
+      window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind: 'baremetal' } }))
+      toast.success('Opening MAAS Images', { duration: 1500 })
+    } catch {
+      toast.error('Could not open MAAS companion')
+    }
+  }, [])
+
   const publishToMaas = useCallback(async () => {
-    const sku = detectSku()
-    const bootResource = sku === 'rhel-gpu' ? 'custom/rhel-gpu' : `custom/${sku}-jammy`
+    const currentSku = detectSku()
+    const bootResource = bootResourceForSku(currentSku)
     try {
       const res = await baremetalApi.publishBootResource(sessionId, {
-        sku,
-        boot_resource: bootResource,
-        source: `packer output-gpu-${sku}/`,
+        sku: currentSku,
+        name: bootResource,
+        source: `packer output-gpu-${currentSku}/`,
       })
       const name = res?.boot_resource?.name || bootResource
+      setBootResourceName(name)
+      setArtifactReady(true)
+      setSuggestPublish(false)
       setOutput((prev) => `${prev ? `${prev}\n` : ''}Published ${name} → MAAS Images (boot-resources). Open MAAS → Images to deploy.`)
       toast.success(`Published ${name} to MAAS`)
-      try {
-        window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind: 'baremetal' } }))
-      } catch { /* ignore */ }
+      openMaasImages()
     } catch (err) {
       toast.error(err?.response?.data?.error || err?.message || 'MAAS publish failed')
     }
-  }, [detectSku, sessionId])
+  }, [detectSku, sessionId, openMaasImages])
+
+  /** Publish then Deploy the first Ready machine with this custom boot resource. */
+  const publishAndDeploy = useCallback(async () => {
+    const currentSku = detectSku()
+    const bootResource = bootResourceForSku(currentSku)
+    try {
+      await baremetalApi.login(sessionId)
+      const pub = await baremetalApi.publishBootResource(sessionId, {
+        sku: currentSku,
+        name: bootResource,
+        source: `packer output-gpu-${currentSku}/`,
+      })
+      const name = pub?.boot_resource?.name || bootResource
+      setBootResourceName(name)
+      setArtifactReady(true)
+      setSuggestPublish(false)
+      const st = await baremetalApi.getState(sessionId)
+      const machines = st?.state?.maas?.machines || []
+      const ready = machines.find((m) => m.status === 'Ready') || machines.find((m) => m.status === 'Allocated')
+      if (!ready) {
+        setOutput((prev) => `${prev ? `${prev}\n` : ''}Published ${name}. No Ready machine — open MAAS and Commission a node, then Deploy with ${name}.`)
+        toast.success(`Published ${name} — Commission a node before Deploy`)
+        openMaasImages()
+        return
+      }
+      const dep = await baremetalApi.deploy(sessionId, ready.id, { boot_resource: name })
+      if (dep?.ok === false) {
+        toast.error(dep.error || 'Deploy failed')
+        openMaasImages()
+        return
+      }
+      setOutput((prev) => `${prev ? `${prev}\n` : ''}Published ${name} and started Deploy on ${ready.hostname || ready.id} with that image.`)
+      toast.success(`Deploying ${ready.hostname || 'node'} with ${name}`)
+      openMaasImages()
+    } catch (err) {
+      toast.error(err?.response?.data?.error || err?.message || 'Publish/Deploy failed')
+    }
+  }, [detectSku, sessionId, openMaasImages])
+
+  const onFactoryUpdate = useCallback((st) => {
+    if (st?.artifact_ready) {
+      setArtifactReady(true)
+      setSuggestPublish(true)
+    }
+    if (st?.suggested_boot_resource) setBootResourceName(st.suggested_boot_resource)
+    if (st?.build_succeeded) setBuildSucceeded(true)
+  }, [])
 
   const bottomContent = () => {
+    if (bottomTab === 'ci') {
+      return (
+        <PackerCiPipelinePanel
+          sessionId={sessionId}
+          sku={sku}
+          files={files}
+          buildSucceeded={buildSucceeded}
+          onFactoryUpdate={onFactoryUpdate}
+          onPublishSuggest={(name) => {
+            if (name) setBootResourceName(name)
+            setSuggestPublish(true)
+            setArtifactReady(true)
+            toast.success(`Artifact ready — publish ${name || bootResourceName}`, { duration: 2200 })
+          }}
+        />
+      )
+    }
     if (bottomTab === 'terminal' && showTerminal && canTerminal) {
       return (
         <LabTerminal
@@ -242,18 +390,35 @@ export default function PackerWorkspaceIde({
           </button>
           <button
             type="button"
-            onClick={() => { syncFilesToShell(); publishToMaas() }}
-            className="vsc-btn"
-            title="Register Packer artifact as MAAS boot-resource"
+            disabled={!buildSucceeded}
+            onClick={() => { setBottomTab('ci'); setShowCiPanel(true) }}
+            className="vsc-btn disabled:opacity-40"
+            title={buildSucceeded ? 'Open Image Factory CI pipeline' : 'Complete packer build first'}
           >
-            <Upload size={11} /> Publish to MAAS
+            <Workflow size={11} /> Run Image Factory pipeline
           </button>
           <button
             type="button"
-            onClick={syncFilesToShell}
-            className="vsc-btn"
-            title="Write IDE files into the lab shell"
+            onClick={() => { syncFilesToShell(); publishToMaas() }}
+            className={`vsc-btn inline-flex items-center gap-1 ${suggestPublish || artifactReady ? 'vsc-btn-primary' : ''}`}
+            style={suggestPublish || artifactReady ? { background: '#02A8EF', borderColor: '#02A8EF' } : undefined}
+            title={`Register Packer artifact as ${bootResourceName}`}
           >
+            <Upload size={11} /> {suggestPublish ? 'Publish to MAAS (suggested)' : 'Publish to MAAS'}
+          </button>
+          <button type="button" onClick={openMaasImages} className="vsc-btn" title="Open MAAS Images">
+            <ExternalLink size={11} /> Open MAAS Images
+          </button>
+          <button
+            type="button"
+            onClick={publishAndDeploy}
+            className="vsc-btn inline-flex items-center gap-1"
+            style={artifactReady ? { background: '#0e8420', borderColor: '#0e8420', color: '#fff' } : undefined}
+            title={`Publish ${bootResourceName} then Deploy a Ready node with that image`}
+          >
+            <Upload size={11} /> Publish + Deploy in MAAS
+          </button>
+          <button type="button" onClick={syncFilesToShell} className="vsc-btn" title="Write IDE files into the lab shell">
             Sync files
           </button>
           <button
@@ -262,6 +427,9 @@ export default function PackerWorkspaceIde({
               setFiles({ ...DEFAULT_FILES })
               setActiveFile('gpu-h100.pkr.hcl')
               setDirty(false)
+              setBuildSucceeded(false)
+              setArtifactReady(false)
+              setSuggestPublish(false)
               setOutput('Reset template to GPU H100 defaults.')
             }}
             className="vsc-btn"
@@ -273,6 +441,11 @@ export default function PackerWorkspaceIde({
               <Terminal size={11} /> Shell{terminalReady[terminalHost] ? '' : ' ▸'}
             </button>
           )}
+        </div>
+        <div className="text-[10px] text-[var(--vsc-muted)] shrink-0 flex flex-wrap gap-x-3 gap-y-0.5">
+          <span>MAAS boot resource: <span className="text-[#02A8EF] font-mono">{bootResourceName}</span></span>
+          {buildSucceeded && <span className="text-emerald-400">Build OK — pipeline enabled</span>}
+          {artifactReady && <span className="text-emerald-400">Artifact ready to publish</span>}
         </div>
         <pre className="text-xs whitespace-pre-wrap break-words flex-1 overflow-auto font-mono leading-relaxed text-[var(--vsc-text)]">
           {output || 'Edit the Packer template, then validate and build. Successful builds pass the CVE gate and publish to MAAS boot-resources.'}
@@ -286,6 +459,7 @@ export default function PackerWorkspaceIde({
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--vsc-border,#333)] shrink-0">
         <span className="text-xs font-semibold text-[#02A8EF]">Packer Image Factory</span>
         <span className="text-[10px] text-[var(--vsc-muted)] truncate">{scenario?.title || scenario?.slug || 'GPU image build'}</span>
+        <span className="text-[10px] font-mono text-[#02A8EF]/opacity-80 hidden sm:inline">{bootResourceName}</span>
         <div className="ml-auto flex items-center gap-1.5">
           {showLabControls && (onHints || onCheck || onExtend || onStop) && (
             <LabChromeControls
@@ -313,7 +487,14 @@ export default function PackerWorkspaceIde({
         subtitle={scenario?.title || 'Image factory IDE'}
         activityBar={(
           <div className="vsc-activity-bar hidden sm:flex">
-            <VscActivityButton active title="Explorer"><Files size={22} /></VscActivityButton>
+            <VscActivityButton active={!showCiPanel || bottomTab !== 'ci'} title="Explorer"><Files size={22} /></VscActivityButton>
+            <VscActivityButton
+              active={bottomTab === 'ci'}
+              onClick={() => { setBottomTab('ci'); setShowCiPanel(true) }}
+              title="Image Factory CI"
+            >
+              <GitBranch size={22} />
+            </VscActivityButton>
             {canTerminal && (
               <VscActivityButton
                 active={bottomTab === 'terminal'}
@@ -393,6 +574,18 @@ export default function PackerWorkspaceIde({
                 <Terminal size={11} /> {cmd}
               </button>
             ))}
+            <button
+              type="button"
+              disabled={!buildSucceeded}
+              onClick={() => { setBottomTab('ci'); setShowCiPanel(true) }}
+              className="vsc-btn disabled:opacity-40"
+              title="Image Factory CI"
+            >
+              <Workflow size={11} /> Pipeline
+            </button>
+            <button type="button" onClick={openMaasImages} className="vsc-btn" title="Open MAAS Images">
+              <ExternalLink size={11} /> MAAS Images
+            </button>
           </>
         )}
         editor={(
@@ -407,17 +600,34 @@ export default function PackerWorkspaceIde({
             }}
           />
         )}
-        bottomTabs={(
-          <>
-            <VscPanelTab active={bottomTab === 'output'} onClick={() => setBottomTab('output')}>Output</VscPanelTab>
-            {canTerminal && (
-              <VscPanelTab active={bottomTab === 'terminal'} onClick={() => { setBottomTab('terminal'); setShowTerminal(true) }}>
-                Terminal
+        bottomPanel={{
+          height: bottomTab === 'ci' ? 300 : 240,
+          tabs: (
+            <>
+              <VscPanelTab active={bottomTab === 'output'} onClick={() => setBottomTab('output')}>Output</VscPanelTab>
+              <VscPanelTab active={bottomTab === 'ci'} onClick={() => { setBottomTab('ci'); setShowCiPanel(true) }}>
+                <GitBranch size={11} /> CI Pipeline
               </VscPanelTab>
-            )}
-          </>
-        )}
-        bottom={bottomContent()}
+              {canTerminal && (
+                <VscPanelTab active={bottomTab === 'terminal'} onClick={() => { setBottomTab('terminal'); setShowTerminal(true) }}>
+                  Terminal
+                </VscPanelTab>
+              )}
+            </>
+          ),
+          content: bottomContent(),
+        }}
+        statusBar={{
+          left: activeFile,
+          center: `Packer · ${sku.toUpperCase()} · ${bootResourceName}`,
+          right: (
+            <>
+              {dirty ? <span>Modified</span> : <span>Saved</span>}
+              {buildSucceeded && <span className="text-emerald-400">Build OK</span>}
+              {artifactReady && <span className="text-[#02A8EF]">Artifact ready</span>}
+            </>
+          ),
+        }}
       />
     </div>
   )

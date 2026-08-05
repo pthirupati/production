@@ -1,5 +1,6 @@
 from django.urls import path
 
+from .vyos_views import VyosSimActionView, VyosSimReleaseView, VyosSimStateView
 from .views import (
     ActiveFaultsView,
     AzureSimActionView,
@@ -141,6 +142,11 @@ urlpatterns = [
     path("baremetal/sessions/<uuid:session_id>/", BaremetalSimStateView.as_view(), name="baremetal-sim-state"),
     path("baremetal/sessions/<uuid:session_id>/action/", BaremetalSimActionView.as_view(), name="baremetal-sim-action"),
     path("baremetal/sessions/<uuid:session_id>/release/", BaremetalSimReleaseView.as_view(), name="baremetal-sim-release"),
+
+    # VyOS router ops dashboard (CLI remains primary in Lab Terminal)
+    path("vyos/sessions/<uuid:session_id>/", VyosSimStateView.as_view(), name="vyos-sim-state"),
+    path("vyos/sessions/<uuid:session_id>/action/", VyosSimActionView.as_view(), name="vyos-sim-action"),
+    path("vyos/sessions/<uuid:session_id>/release/", VyosSimReleaseView.as_view(), name="vyos-sim-release"),
 
     # AWS console simulation
     path("aws/sessions/<uuid:session_id>/", AwsSimStateView.as_view(), name="aws-sim-state"),

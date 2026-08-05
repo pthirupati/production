@@ -1,0 +1,54 @@
+title: 'LXD Cluster: GPU Project Profiles and Pool'
+slug: ai-infra-lxd-cluster-gpu
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: AI Infra Engineering owns LXD on MAAS GPU fleets — cluster members, projects,
+  storage pools, and gpu-passthrough profiles for inference containers.
+
+
+  ENVIRONMENT: Lab Terminal (lxc/lxd) + Bare Metal. Datacenter twin for rack context.
+
+
+  SYMPTOM: Single-node LXD only; gpu-passthrough profile incomplete; no cluster storage pool.
+
+
+  OBJECTIVE: Inspect cluster/members; ensure gpu-passthrough profile; launch container with GPU
+  profile; FIXED-OK.'
+objectives:
+- Inspect LXD cluster / members
+- Ensure gpu-passthrough profile with physical GPU
+- Launch a container using the GPU profile
+initial_state: LXD up; cluster/profile incomplete for GPU workloads.
+hints:
+- order: 1
+  cost: 0
+  content: Run lxc list and lxc profile show gpu-passthrough to inspect current GPU device mapping.
+- order: 2
+  cost: 20
+  content: Confirm nvidia.runtime true and devices.gpu0 type=gpu gputype=physical on the profile.
+- order: 3
+  cost: 45
+  content: lxc launch with -p gpu-passthrough; confirm RUNNING; leave FIXED-OK.
+consoles:
+- terminal
+- baremetal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - terminal
+  - baremetal
+  - datacenter

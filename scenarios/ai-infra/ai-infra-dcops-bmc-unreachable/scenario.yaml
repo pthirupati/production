@@ -1,0 +1,60 @@
+title: 'DCOps: MAAS IPMI BMC Unreachable'
+slug: ai-infra-dcops-bmc-unreachable
+technology: AI Infrastructure Engineering
+category: Troubleshoot
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: DCOps / Bare Metal ticket (PSINFRA board) — MAAS cannot reach the BMC
+  for gpu-node-02 over IPMI, so power control and commissioning both fail. On-call DCOps must
+  restore the out-of-band path before the fleet bring-up can resume.
+
+
+  ENVIRONMENT: Bare Metal (MAAS) console + Lab Terminal + Datacenter twin for rack/BMC context.
+  Treat gpu-node-02 as the production canary for this incident.
+
+
+  SYMPTOM / STARTING STATE: BMC unreachable on gpu-node-02; MAAS commissioning failed because
+  power/IPMI control never responded.
+
+
+  OBJECTIVE: Open Bare Metal; restore BMC/IPMI reachability for gpu-node-02; commission the
+  previously failed GPU node; leave FIXED-OK once MAAS shows the node past commissioning.'
+objectives:
+- Open Bare Metal console
+- Restore BMC/IPMI reachability for gpu-node-02
+- Commission the previously failed GPU node
+initial_state: BMC unreachable on gpu-node-02; commissioning failed.
+hints:
+- order: 1
+  cost: 0
+  content: Open Bare Metal and check gpu-node-02 Power status — BMC unreachable shows as a power query failure.
+- order: 2
+  cost: 15
+  content: Fix the BMC/IPMI address or credentials for gpu-node-02 so out-of-band power control responds again.
+- order: 3
+  cost: 35
+  content: Retry Commission once IPMI answers; watch for the node to progress past the failed state to Ready.
+- order: 4
+  cost: 55
+  content: Confirm gpu-node-02 clears commissioning cleanly, then leave FIXED-OK for the DCOps ticket.
+consoles:
+- baremetal
+- terminal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-02
+  role: primary
+  hostname: gpu-node-02
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal
+  - datacenter

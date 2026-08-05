@@ -849,7 +849,7 @@ class SimulationProvisioner:
             cached = entry.get("state", {}).get("ssh_client_shell")
             shell = cached if isinstance(cached, RHELShell) else self._setup_ssh_client_shell(engine, entry)
             holder = SimulationStreamHolder(
-                shell.run,
+                shell.create_stream_handler(),
                 prompt=shell.prompt,
                 dynamic_prompt=lambda: shell.prompt,
                 banner=(
@@ -888,7 +888,7 @@ class SimulationProvisioner:
                 shell.state.editor = None
 
             holder = SimulationStreamHolder(
-                shell.run,
+                shell.create_stream_handler(),
                 prompt=shell.prompt,
                 dynamic_prompt=lambda: shell.prompt,
                 get_editor_state=get_ed,

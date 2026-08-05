@@ -123,6 +123,9 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
             row = existing
         else:
             scripts.append(row)
+        broken = state.get("broken")
+        if isinstance(broken, dict):
+            broken.pop("scripts_unattached", None)
         return {"ok": True, "message": f"Commissioning script {name} attached", "script": row}
 
     if action in ("maas_publish_boot_resource", "maas_import_boot_resource", "packer_publish_maas"):
@@ -156,6 +159,11 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         if isinstance(broken, dict):
             broken.pop("missing_boot_resource", None)
             broken.pop("packer_image_unpublished", None)
+            missing = broken.get("missing_boot_resources")
+            if isinstance(missing, list) and name in missing:
+                broken["missing_boot_resources"] = [n for n in missing if n != name]
+                if not broken["missing_boot_resources"]:
+                    broken.pop("missing_boot_resources", None)
             if not broken:
                 state["broken"] = {}
         return {

@@ -93,16 +93,17 @@ function CameraIntro({ enabled, cinematic = false }) {
 }
 
 /** Corridor walls: reception → staging → data hall → MDF (low-poly Steam layout). */
-function CorridorShell({ dockBusy = false }) {
+function CorridorShell({ dockBusy = false, doorOpen = false }) {
   const wall = '#1e293b'
   const trim = '#334155'
   const door = useRef()
   const forklift = useRef()
   useFrame(({ clock }) => {
     if (door.current) {
-      // Mantrap door swings open when walking toward the hall (subtle idle motion).
-      const t = (Math.sin(clock.elapsedTime * 0.35) + 1) * 0.5
-      door.current.rotation.y = -0.15 - t * 0.95
+      // Closed until badge-in; then swings open (Steam mantrap).
+      const target = doorOpen ? -1.15 : -0.05
+      const cur = door.current.rotation.y
+      door.current.rotation.y = cur + (target - cur) * Math.min(1, 0.08 + Math.sin(clock.elapsedTime) * 0.01)
     }
     if (forklift.current) {
       const bob = dockBusy ? Math.sin(clock.elapsedTime * 2.2) * 0.04 : 0
@@ -242,24 +243,27 @@ function ThermalHaze({ stress = 0, ticketHeat = 0 }) {
   )
 }
 
-/** First-person hall walk (WASD + mouse look). Orbit disabled while active. */
-function WalkController({ enabled }) {
+/** First-person hall walk (WASD + mouse look) with cinematic head-bob. Orbit disabled while active. */
+function WalkController({ enabled, paused = false, posRef }) {
   const { camera, gl } = useThree()
   const keys = useRef({})
   const yaw = useRef(0)
   const pitch = useRef(-0.12)
   const pos = useRef(new THREE.Vector3(5.2, 1.55, 4.5))
+  const bobPhase = useRef(0)
+  const bobAmount = useRef(0)
 
   useEffect(() => {
     if (!enabled) return undefined
     const down = (e) => { keys.current[e.code] = true }
     const up = (e) => { keys.current[e.code] = false }
     const move = (e) => {
+      if (paused) return
       if (document.pointerLockElement !== gl.domElement) return
       yaw.current -= e.movementX * 0.0022
       pitch.current = Math.max(-1.2, Math.min(1.2, pitch.current - e.movementY * 0.0022))
     }
-    const click = () => { gl.domElement.requestPointerLock?.() }
+    const click = () => { if (!paused) gl.domElement.requestPointerLock?.() }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     window.addEventListener('mousemove', move)
@@ -272,26 +276,65 @@ function WalkController({ enabled }) {
       gl.domElement.removeEventListener('click', click)
       try { document.exitPointerLock?.() } catch { /* */ }
     }
-  }, [enabled, camera, gl])
+  }, [enabled, camera, gl, paused])
 
   useFrame((_, dt) => {
     if (!enabled) return
-    const speed = (keys.current.ShiftLeft ? 4.2 : 2.4) * dt
+    if (paused) { keys.current = {}; return }
+    const sprinting = !!keys.current.ShiftLeft
+    const speed = (sprinting ? 4.2 : 2.4) * dt
     const forward = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current))
     const right = new THREE.Vector3(Math.cos(yaw.current), 0, -Math.sin(yaw.current))
-    if (keys.current.KeyW || keys.current.ArrowUp) pos.current.addScaledVector(forward, speed)
-    if (keys.current.KeyS || keys.current.ArrowDown) pos.current.addScaledVector(forward, -speed)
-    if (keys.current.KeyA || keys.current.ArrowLeft) pos.current.addScaledVector(right, -speed)
-    if (keys.current.KeyD || keys.current.ArrowRight) pos.current.addScaledVector(right, speed)
+    let moving = false
+    if (keys.current.KeyW || keys.current.ArrowUp) { pos.current.addScaledVector(forward, speed); moving = true }
+    if (keys.current.KeyS || keys.current.ArrowDown) { pos.current.addScaledVector(forward, -speed); moving = true }
+    if (keys.current.KeyA || keys.current.ArrowLeft) { pos.current.addScaledVector(right, -speed); moving = true }
+    if (keys.current.KeyD || keys.current.ArrowRight) { pos.current.addScaledVector(right, speed); moving = true }
     // Soft bounds inside hall + corridor
     pos.current.x = Math.max(-8.5, Math.min(7.5, pos.current.x))
     pos.current.z = Math.max(-5.5, Math.min(6.5, pos.current.z))
+
+    // Steam-style boot-fall head-bob while walking — settles instantly when idle.
+    const bobFreq = sprinting ? 11.5 : 7.5
+    const bobTarget = moving ? (sprinting ? 0.045 : 0.028) : 0
+    bobAmount.current += (bobTarget - bobAmount.current) * Math.min(1, dt * 8)
+    if (moving) bobPhase.current += dt * bobFreq
+    const bob = Math.sin(bobPhase.current) * bobAmount.current
+    const sway = Math.cos(bobPhase.current * 0.5) * bobAmount.current * 0.4
+
+    camera.position.set(pos.current.x + sway, pos.current.y + bob, pos.current.z)
     pos.current.y = 1.55
-    camera.position.copy(pos.current)
     camera.rotation.order = 'YXZ'
     camera.rotation.y = yaw.current
-    camera.rotation.x = pitch.current
+    camera.rotation.x = pitch.current + bob * 0.15
+
+    if (posRef) {
+      posRef.current.x = pos.current.x
+      posRef.current.z = pos.current.z
+      posRef.current.yaw = yaw.current
+    }
   })
+  return null
+}
+
+/** "E" key fires a synthetic click at the crosshair (screen center) so mouse-locked
+ *  players can interact with racks / portals / cables without unlocking the pointer. */
+function CrosshairInteract({ enabled }) {
+  const { gl } = useThree()
+  useEffect(() => {
+    if (!enabled) return undefined
+    const handler = (e) => {
+      if (e.code !== 'KeyE') return
+      if (document.pointerLockElement !== gl.domElement) return
+      const rect = gl.domElement.getBoundingClientRect()
+      const cx = rect.left + rect.width / 2
+      const cy = rect.top + rect.height / 2
+      const opts = { clientX: cx, clientY: cy, bubbles: true, cancelable: true }
+      gl.domElement.dispatchEvent(new MouseEvent('click', opts))
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [enabled, gl])
   return null
 }
 
@@ -963,10 +1006,103 @@ function CableTray() {
   )
 }
 
+/** Ticket objective marker — glowing beacon above the faulted rack/U (Steam quest marker). */
+function TicketWaypoint({ ticket, racks, serversByRack, onSelectServer }) {
+  const ref = useRef()
+  const pos = useMemo(() => {
+    const aid = ticket?.asset_id
+    if (!aid) return null
+    let rackIdx = -1
+    let uy = 1.2
+    racks.forEach((rack, i) => {
+      const list = serversByRack[rack.id] || []
+      const s = list.find((x) => x.id === aid)
+      if (s) {
+        rackIdx = i
+        uy = ((s.u_slot || 1) - 1) * U_H + U_H * 0.5 + 0.35
+      }
+    })
+    if (rackIdx < 0) return null
+    const { x, z } = rackPosition(rackIdx)
+    return [x, uy, z + RACK_D / 2 + 0.25]
+  }, [ticket, racks, serversByRack])
+
+  useFrame(({ clock }) => {
+    if (!ref.current || !pos) return
+    ref.current.position.y = pos[1] + Math.sin(clock.elapsedTime * 2.4) * 0.08
+    ref.current.rotation.y = clock.elapsedTime * 1.2
+  })
+  if (!pos) return null
+  const hot = /critical|high/i.test(ticket?.priority || '')
+  return (
+    <group
+      ref={ref}
+      position={pos}
+      onClick={(e) => {
+        e.stopPropagation()
+        if (ticket?.asset_id) onSelectServer?.(ticket.asset_id)
+      }}
+      onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }}
+      onPointerOut={() => { document.body.style.cursor = 'default' }}
+    >
+      <mesh castShadow>
+        <coneGeometry args={[0.12, 0.28, 4]} />
+        <meshStandardMaterial
+          color={hot ? '#ef4444' : '#f59e0b'}
+          emissive={hot ? '#dc2626' : '#d97706'}
+          emissiveIntensity={0.85}
+          metalness={0.2}
+          roughness={0.4}
+        />
+      </mesh>
+      <Html center distanceFactor={8} style={{ pointerEvents: 'none' }}>
+        <div className={`dc-3d-label ${hot ? 'dc-3d-label-hot' : ''}`}>
+          {(ticket.id || 'TKT').slice(0, 12)} · {(ticket.summary || ticket.title || 'fault').slice(0, 28)}
+        </div>
+      </Html>
+    </group>
+  )
+}
+
+/** Corridor door portal into another campus room (walk-up, not room-tab only). */
+function RoomPortal({ position, label, roomId, onEnterRoom, color = '#38bdf8' }) {
+  const matRef = useRef()
+  useFrame(({ clock }) => {
+    if (!matRef.current) return
+    matRef.current.emissiveIntensity = 0.25 + Math.sin(clock.elapsedTime * 2) * 0.12
+  })
+  return (
+    <group position={position}>
+      <mesh
+        castShadow
+        onClick={(e) => {
+          e.stopPropagation()
+          onEnterRoom?.({ id: roomId, name: label })
+        }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }}
+        onPointerOut={() => { document.body.style.cursor = 'default' }}
+      >
+        <boxGeometry args={[1.1, 2.1, 0.08]} />
+        <meshStandardMaterial
+          ref={matRef}
+          color="#0f172a"
+          emissive={color}
+          emissiveIntensity={0.3}
+          metalness={0.5}
+          roughness={0.35}
+        />
+      </mesh>
+      <Html position={[0, 1.25, 0.1]} center distanceFactor={10} style={{ pointerEvents: 'none' }}>
+        <div className="dc-3d-label dc-3d-portal-label" style={{ '--portal-color': color }}>{label}</div>
+      </Html>
+    </group>
+  )
+}
+
 function SceneContent({
   racks, serversByRack, network, cooling, pdus, selectedId, expandedRack,
   onSelectServer, onSelectRack, onOpenBmc, onUnplugCable, onPlugCable, physicsEnabled, onFps, animBoost, intro,
-  walkMode = false, tickets = [],
+  walkMode = false, tickets = [], doorOpen = false, onEnterRoom, walkPaused = false, posRef,
 }) {
   const thermalStress = useMemo(() => {
     const units = cooling || []
@@ -1080,7 +1216,8 @@ function SceneContent({
     <>
       <FpsMeter onFps={onFps} />
       {!walkMode && <CameraIntro enabled={intro} cinematic />}
-      <WalkController enabled={walkMode} />
+      <WalkController enabled={walkMode} paused={walkPaused} posRef={posRef} />
+      <CrosshairInteract enabled={walkMode && !walkPaused} />
       <color attach="background" args={['#0b0e14']} />
       <fog attach="fog" args={['#0b0e14', 12, 32]} />
       <ambientLight intensity={0.28} />
@@ -1089,7 +1226,23 @@ function SceneContent({
       <PulsingLight />
       <Environment preset="warehouse" />
       <Floor />
-      <CorridorShell dockBusy={dockBusy} />
+      <CorridorShell dockBusy={dockBusy} doorOpen={doorOpen} />
+      <RoomPortal position={[-6.2, 1.05, 0.2]} label="Staging / dock" roomId="loading-dock" onEnterRoom={onEnterRoom} color="#f59e0b" />
+      <RoomPortal position={[-5.2, 1.05, 3.2]} label="Reception" roomId="reception" onEnterRoom={onEnterRoom} color="#94a3b8" />
+      <RoomPortal position={[5.8, 1.05, 0.4]} label="MDF" roomId="mdf" onEnterRoom={onEnterRoom} color="#38bdf8" />
+      <RoomPortal position={[3.2, 1.05, 3.4]} label="NOC" roomId="noc" onEnterRoom={onEnterRoom} color="#a78bfa" />
+      {(tickets || [])
+        .filter((t) => t?.asset_id && !['closed', 'resolved'].includes((t.status || '').toLowerCase()))
+        .slice(0, 8)
+        .map((t) => (
+          <TicketWaypoint
+            key={t.id || t.asset_id}
+            ticket={t}
+            racks={racks}
+            serversByRack={serversByRack}
+            onSelectServer={onSelectServer}
+          />
+        ))}
       <CeilingLights />
       <CableTray />
       <HotAisleGlow z={-1.6} />
@@ -1165,6 +1318,85 @@ function SceneContent({
   )
 }
 
+/** Fading coach mark shown once when the player takes control (Steam-style onboarding toast). */
+function CoachMark({ show }) {
+  if (!show) return null
+  return (
+    <div className="dc-3d-coachmark" key="coach">
+      Walk the cold aisle · <kbd>E</kbd> interact · <kbd>Esc</kbd> menu
+    </div>
+  )
+}
+
+const RADAR_PORTALS = [
+  { id: 'loading-dock', x: -6.2, z: 0.2, color: '#f59e0b', hotkey: '1' },
+  { id: 'reception', x: -5.2, z: 3.2, color: '#94a3b8', hotkey: '2' },
+  { id: 'mdf', x: 5.8, z: 0.4, color: '#38bdf8', hotkey: '3' },
+  { id: 'noc', x: 3.2, z: 3.4, color: '#a78bfa', hotkey: '4' },
+]
+
+/** Lightweight top-down radar tip — player dot + the four room-portal beacons. */
+function Minimap({ posRef }) {
+  const dotRef = useRef()
+  useEffect(() => {
+    let raf
+    const tick = () => {
+      if (dotRef.current && posRef?.current) {
+        const px = 50 + Math.max(-1, Math.min(1, posRef.current.x / 9)) * 42
+        const pz = 50 + Math.max(-1, Math.min(1, posRef.current.z / 7)) * 42
+        dotRef.current.style.left = `${px}%`
+        dotRef.current.style.top = `${pz}%`
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [posRef])
+  return (
+    <div className="dc-3d-minimap" aria-hidden>
+      <div className="dc-3d-minimap-ring" />
+      {RADAR_PORTALS.map((p) => (
+        <span
+          key={p.id}
+          className="dc-3d-minimap-dot"
+          style={{
+            left: `${50 + Math.max(-1, Math.min(1, p.x / 9)) * 42}%`,
+            top: `${50 + Math.max(-1, Math.min(1, p.z / 7)) * 42}%`,
+            background: p.color,
+            boxShadow: `0 0 6px ${p.color}`,
+          }}
+          title={p.id}
+        />
+      ))}
+      <span ref={dotRef} className="dc-3d-minimap-player" />
+    </div>
+  )
+}
+
+/** Esc-triggered pause menu — accessible exit from pointer-locked immersive mode. */
+function ImmersiveMenu({ open, onResume, onExitImmersive, onExitTo2D, badgedIn }) {
+  if (!open) return null
+  return (
+    <div className="dc-3d-menu-backdrop" onClick={onResume}>
+      <div className="dc-3d-menu" onClick={(e) => e.stopPropagation()}>
+        <div className="dc-3d-menu-title">Paused</div>
+        <button type="button" className="dc-3d-menu-btn dc-3d-menu-btn-primary" onClick={onResume}>
+          Resume walking
+        </button>
+        <button type="button" className="dc-3d-menu-btn" onClick={onExitImmersive}>
+          Exit immersive mode
+        </button>
+        <button type="button" className="dc-3d-menu-btn" onClick={onExitTo2D}>
+          Switch to 2D floor
+        </button>
+        <div className="dc-3d-menu-hint">
+          {badgedIn ? 'Badged in' : 'Not badged in'} · 1 Dock · 2 Reception · 3 MDF · 4 NOC
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function LoadingFallback() {
   return (
     <div className="dc-3d-loading">
@@ -1174,6 +1406,13 @@ function LoadingFallback() {
   )
 }
 
+const ROOM_HOTKEYS = {
+  Digit1: { id: 'loading-dock', name: 'Staging / dock' },
+  Digit2: { id: 'reception', name: 'Reception' },
+  Digit3: { id: 'mdf', name: 'MDF' },
+  Digit4: { id: 'noc', name: 'NOC' },
+}
+
 export default function DatacenterTwin3D({
   racks = [],
   serversByRack = {},
@@ -1181,6 +1420,13 @@ export default function DatacenterTwin3D({
   cooling = [],
   pdus = [],
   tickets = [],
+  access = null,
+  objective = '',
+  audioControl = null,
+  onBadgeIn,
+  onEnterRoom,
+  onImmersiveChange,
+  onExitTo2D,
   selectedServerId,
   expandedRack,
   onSelectServer,
@@ -1194,6 +1440,18 @@ export default function DatacenterTwin3D({
   const [intro, setIntro] = useState(true)
   const [walkMode, setWalkMode] = useState(false)
   const [fps, setFps] = useState(0)
+  // Steam-class default: start immersive (game view) — heavy chrome stays collapsed.
+  const [immersive, setImmersive] = useState(true)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [showCoach, setShowCoach] = useState(false)
+  const autoWalkStarted = useRef(false)
+  const coachShown = useRef(false)
+  const posRef = useRef({ x: 5.2, z: 4.5, yaw: 0 })
+
+  const badgedIn = useMemo(() => {
+    const ev = access?.events || []
+    return ev.some((e) => (e.type || '') === 'allow' || /ALLOW|badge/i.test(e.message || ''))
+  }, [access])
 
   useEffect(() => {
     if (!intro || walkMode) return undefined
@@ -1201,15 +1459,76 @@ export default function DatacenterTwin3D({
     return () => clearTimeout(id)
   }, [intro, walkMode])
 
+  // After cinematic enter, offer Walk only once badge-in is done (Steam mantrap ritual).
+  useEffect(() => {
+    if (intro || walkMode || !immersive || !badgedIn || autoWalkStarted.current) return undefined
+    const id = setTimeout(() => {
+      autoWalkStarted.current = true
+      setWalkMode(true)
+    }, 600)
+    return () => clearTimeout(id)
+  }, [intro, walkMode, immersive, badgedIn])
+
+  const inGame = immersive && walkMode && badgedIn
+
+  useEffect(() => { onImmersiveChange?.(immersive) }, [immersive, onImmersiveChange])
+
+  // Brief fading coach mark the first time the player takes control.
+  useEffect(() => {
+    if (!inGame || coachShown.current) return undefined
+    coachShown.current = true
+    setShowCoach(true)
+    const id = setTimeout(() => setShowCoach(false), 5200)
+    return () => clearTimeout(id)
+  }, [inGame])
+
+  const exitImmersive = () => {
+    setMenuOpen(false)
+    setImmersive(false)
+    setWalkMode(false)
+    try { document.exitPointerLock?.() } catch { /* */ }
+  }
+
+  const exitTo2D = () => {
+    setMenuOpen(false)
+    setWalkMode(false)
+    try { document.exitPointerLock?.() } catch { /* */ }
+    onExitTo2D?.()
+  }
+
+  // In-world room hotkeys (1-4) + Esc pause menu — no tab bar needed while immersive.
+  useEffect(() => {
+    if (!immersive || intro) return undefined
+    const handler = (e) => {
+      if (e.code === 'Escape') {
+        setMenuOpen((m) => !m)
+        return
+      }
+      if (menuOpen) return
+      const room = ROOM_HOTKEYS[e.code]
+      if (room) onEnterRoom?.(room)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [immersive, intro, menuOpen, onEnterRoom])
+
   return (
     <motion.div
-      className="dc-3d-root"
+      className={`dc-3d-root${immersive ? ' dc-3d-immersive' : ''}`}
       initial={{ opacity: 0, scale: 0.985 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.55, ease: 'easeOut' }}
     >
       <div className="dc-3d-toolbar">
         <span className="dc-twin-title">3D Lab Twin · Steam immersion</span>
+        <label className="dc-3d-toggle">
+          <input
+            type="checkbox"
+            checked={immersive}
+            onChange={(e) => setImmersive(e.target.checked)}
+          />
+          Immersive
+        </label>
         <label className="dc-3d-toggle">
           <input
             type="checkbox"
@@ -1232,6 +1551,9 @@ export default function DatacenterTwin3D({
             checked={walkMode}
             onChange={(e) => {
               const on = e.target.checked
+              if (on && !badgedIn) {
+                onBadgeIn?.()
+              }
               setWalkMode(on)
               if (on) setIntro(false)
             }}
@@ -1241,21 +1563,61 @@ export default function DatacenterTwin3D({
         <button type="button" className="dc-btn-outline dc-btn-xs" onClick={() => { setWalkMode(false); setIntro(true) }}>
           Replay enter
         </button>
+        {!badgedIn && (
+          <button type="button" className="dc-btn-outline dc-btn-xs" onClick={() => onBadgeIn?.()}>
+            Badge-in
+          </button>
+        )}
         <span className="dc-muted">
-          ~{fps || '—'} FPS · {walkMode ? 'click canvas to look · WASD move · Shift sprint' : 'cinematic enter · Motions · enable Walk for first-person'}
+          ~{fps || '—'} FPS · {inGame
+            ? 'click to look · WASD · Shift sprint · Esc menu'
+            : walkMode
+              ? (badgedIn ? 'badged · WASD' : 'badge required')
+              : 'cinematic enter → auto Walk'}
         </span>
       </div>
-      {!walkMode && !intro && (
+      {!walkMode && !intro && !immersive && (
         <div className="dc-3d-immersion-hint">
-          Tip: enable <strong>Walk (WASD)</strong> for Steam-style first-person hall exploration
+          Tip: <strong>Badge-in</strong> at the mantrap, then Walk — ticket beacons mark DCOps faults on racks
         </div>
       )}
       <div className="dc-3d-canvas-wrap">
+        {inGame && <div className="dc-3d-aisle-fog" aria-hidden />}
+        {inGame && <div className="dc-3d-hud-crosshair" aria-hidden />}
+        {inGame && (
+          <div className="dc-3d-hud">
+            {objective && <div className="dc-3d-hud-objective"><strong>Objective</strong> · {objective}</div>}
+            <div>WASD move · mouse look · Shift sprint · E interact</div>
+            <div>1 Dock · 2 Reception · 3 MDF · 4 NOC · Esc menu</div>
+          </div>
+        )}
+        {inGame && <Minimap posRef={posRef} />}
+        {inGame && <CoachMark show={showCoach} />}
+        {immersive && (
+          <div className="dc-3d-pinned-controls">
+            {audioControl}
+            <button
+              type="button"
+              className="dc-3d-exit-btn"
+              onClick={exitImmersive}
+              title="Exit immersive mode — restore the full toolbar"
+            >
+              Exit immersive
+            </button>
+          </div>
+        )}
+        <ImmersiveMenu
+          open={menuOpen}
+          badgedIn={badgedIn}
+          onResume={() => setMenuOpen(false)}
+          onExitImmersive={exitImmersive}
+          onExitTo2D={exitTo2D}
+        />
         <Suspense fallback={<LoadingFallback />}>
           <Canvas
             shadows
             dpr={[1, Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio : 1.5)]}
-            camera={{ position: [12, 9, 14], fov: 42, near: 0.1, far: 80 }}
+            camera={{ position: [12, 9, 14], fov: inGame ? 68 : 42, near: 0.1, far: 80 }}
             gl={{ antialias: true, powerPreference: 'high-performance' }}
           >
             <Physics gravity={[0, -9.81, 0]} colliders={false} paused={!physicsEnabled}>
@@ -1276,8 +1638,12 @@ export default function DatacenterTwin3D({
                 onFps={setFps}
                 animBoost={animBoost}
                 intro={intro}
-                walkMode={walkMode}
+                walkMode={walkMode && badgedIn}
+                walkPaused={menuOpen}
+                posRef={posRef}
                 tickets={tickets}
+                doorOpen={badgedIn}
+                onEnterRoom={onEnterRoom}
               />
             </Physics>
           </Canvas>

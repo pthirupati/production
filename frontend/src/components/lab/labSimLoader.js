@@ -17,6 +17,7 @@ export const LazyMonitoringSimulator = lazyWithRetry(() => import('../monitoring
 export const LazyWindowsServerSimulator = lazyWithRetry(() => import('../windows/WindowsServerSimulator'))
 export const LazyPeopleSoftSimulator = lazyWithRetry(() => import('../peoplesoft/PeopleSoftSimulator'))
 export const LazyBaremetalSimulator = lazyWithRetry(() => import('../baremetal/BaremetalSimulator'))
+export const LazyLxdConsole = lazyWithRetry(() => import('../lxd/LxdConsole'))
 export const LazyDataDashboardSimulator = lazyWithRetry(() => import('../datascience/DataDashboardSimulator'))
 export const LazyAgentWorkflowSimulator = lazyWithRetry(() => import('../aiml/AgentWorkflowSimulator'))
 export const LazyNmapSimulator = lazyWithRetry(() => import('../nmap/NmapSimulator'))
@@ -35,6 +36,7 @@ export const LazyGcpConsole = lazyWithRetry(() => import('../gcp/GcpConsole'))
 export const LazyOpenStackConsole = lazyWithRetry(() => import('../openstack/OpenStackConsole'))
 export const LazyK8sConsole = lazyWithRetry(() => import('../k8s/K8sConsole'))
 export const LazyDockerConsole = lazyWithRetry(() => import('../docker/DockerConsole'))
+export const LazyVyosConsole = lazyWithRetry(() => import('../vyos/VyosConsole'))
 
 export const PRIMARY_SIM_COMPONENTS = {
   aws: LazyAwsLabOverlay,
@@ -44,6 +46,7 @@ export const PRIMARY_SIM_COMPONENTS = {
   windows: LazyWindowsServerSimulator,
   peoplesoft: LazyPeopleSoftSimulator,
   baremetal: LazyBaremetalSimulator,
+  lxd: LazyLxdConsole,
   datadashboard: LazyDataDashboardSimulator,
   agent: LazyAgentWorkflowSimulator,
   nmap: LazyNmapSimulator,

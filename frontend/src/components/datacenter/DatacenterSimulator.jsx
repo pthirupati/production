@@ -124,6 +124,9 @@ export default function DatacenterSimulator({
   const [flashId, setFlashId] = useState(null)
   const [drawerTab, setDrawerTab] = useState('overview')
   const [pan, setPan] = useState({ x: 0, y: 0 })
+  // Mirrors the 3D twin's own immersive flag so this shell can collapse its
+  // tab bar / status strip / goal banner into the twin's thin in-world HUD.
+  const [twinImmersive, setTwinImmersive] = useState(true)
   const [floorView, setFloorView] = useState(() => {
     // Steam-class default: immersive 3D hall. Fall back to 2D on phones /
     // reduced-motion so Twin3DSafe never bricks the lab chrome.
@@ -189,6 +192,10 @@ export default function DatacenterSimulator({
   const aiPlatform = st.ai_platform || {}
   const currentRoomId = st.current_room || 'data-hall-a'
   const currentRoom = rooms.find((r) => r.id === currentRoomId) || rooms[0] || { type: 'data_hall', racks: [] }
+  // Not a button dashboard: while the 3D twin is walking its own immersive game
+  // view, collapse the tab bar / status strip / goal banner into its in-world HUD.
+  const isDataHall3d = currentRoom.type === 'data_hall' && floorView === '3d'
+  const immersed3d = isDataHall3d && twinImmersive
 
   const serversByRack = useMemo(() => {
     const m = {}
@@ -212,9 +219,9 @@ export default function DatacenterSimulator({
 
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
-    onBackToTerminal: embedded ? (onToggleTerminal || undefined) : onExit,
+    onBackToTerminal: onExit || onToggleTerminal,
     hintsLabel, checkDisabled, extendDisabled,
-    backLabel: simTerminalOpen ? 'Hide terminal' : 'Terminal',
+    backLabel: simTerminalOpen ? 'Hide terminal' : (onExit ? 'Close' : 'Terminal'),
     vmwareHref,
   }
 
@@ -371,83 +378,80 @@ export default function DatacenterSimulator({
         )}
       </LabChromeBar>
 
-      {goal.objective && (
+      {goal.objective && !immersed3d && (
         <div className="sim-goal-banner">
           <AlertTriangle size={14} className="shrink-0" />
           <span><strong>{goal.title}:</strong> {goal.objective}</span>
         </div>
       )}
 
-      {/* Room switcher */}
-      <div className="dc-room-tabs">
-        {rooms.map((room) => {
-          const RoomIcon = ROOM_ICONS[room.type] || Building2
-          const active = room.id === currentRoomId
-          return (
-            <button key={room.id} type="button"
-              className={`dc-room-tab ${active ? 'dc-room-tab-active' : ''}`}
-              onClick={() => enterRoom(room)}>
-              <RoomIcon size={13} /> {room.name}
-            </button>
-          )
-        })}
-        <span className="dc-pue-pill">
-          <Gauge size={12} /> PUE {facility.pue ?? sustainability?.pue ?? '—'} · WUE {sustainability?.wue_l_per_kwh ?? '—'} · CO₂ {sustainability?.carbon_kg_hr ?? '—'} kg/h
-          <span className={`dc-ashrae-dot ${facility.ashrae_ok === false ? 'dc-ashrae-bad' : 'dc-ashrae-ok'}`} />
-        </span>
-      </div>
+      {/* Room switcher — collapses into the twin's in-world HUD + hotkeys while immersive */}
+      {!immersed3d && (
+        <div className="dc-room-tabs">
+          {rooms.map((room) => {
+            const RoomIcon = ROOM_ICONS[room.type] || Building2
+            const active = room.id === currentRoomId
+            return (
+              <button key={room.id} type="button"
+                className={`dc-room-tab ${active ? 'dc-room-tab-active' : ''}`}
+                onClick={() => enterRoom(room)}>
+                <RoomIcon size={13} /> {room.name}
+              </button>
+            )
+          })}
+          <span className="dc-pue-pill">
+            <Gauge size={12} /> PUE {facility.pue ?? sustainability?.pue ?? '—'} · WUE {sustainability?.wue_l_per_kwh ?? '—'} · CO₂ {sustainability?.carbon_kg_hr ?? '—'} kg/h
+            <span className={`dc-ashrae-dot ${facility.ashrae_ok === false ? 'dc-ashrae-bad' : 'dc-ashrae-ok'}`} />
+          </span>
+        </div>
+      )}
 
       {/* PDU / cooling status strip */}
-      <div className="dc-status-strip">
-        <div className="dc-status-group">
-          <Gauge size={13} className="opacity-70" />
-          {pdus.slice(0, 6).map((p) => (
-            <span key={p.id} className={`dc-status-chip ${p.status === 'online' ? 'dc-chip-ok' : 'dc-chip-bad'}`}>
-              {p.id} · {p.load_pct}%
-            </span>
-          ))}
-        </div>
-        <div className="dc-status-group">
-          <Snowflake size={13} className="opacity-70" />
-          {cooling.map((c) => (
-            <span key={c.id} className={`dc-status-chip ${c.status === 'running' ? 'dc-chip-ok' : 'dc-chip-bad'}`}>
-              {c.id} · {c.temp_c}°C
-            </span>
-          ))}
-        </div>
-        <div className="dc-status-hint">
-          {currentRoom.type === 'data_hall' && (
-            <span className="dc-view-toggle">
-              <button
-                type="button"
-                className={`dc-btn-outline dc-btn-xs ${floorView === '2d' ? 'dc-view-active' : ''}`}
-                onClick={() => setFloorView('2d')}
-                title="Isometric 2D floor plan"
-              >
-                <Move size={11} /> 2D floor
-              </button>
-              <button
-                type="button"
-                className={`dc-btn-outline dc-btn-xs ${floorView === '3d' ? 'dc-view-active' : ''}`}
-                onClick={() => setFloorView('3d')}
-                title="Steam-class animated 3D hall — Walk (WASD) · falls back to 2D on GPU errors"
-              >
-                <Box size={11} /> 3D hall
-              </button>
-            </span>
-          )}
-          <DcAmbientAudio
-            enabled={floorView === '3d'}
-            alert={Boolean(
-              (st?.tickets || []).some((t) => /thermal|overheat|hot.?aisle/i.test(`${t?.title || ''} ${t?.status || ''}`))
-              || cooling.some((c) => Number(c?.temp_c) >= 27),
+      {!immersed3d && (
+        <div className="dc-status-strip">
+          <div className="dc-status-group">
+            <Gauge size={13} className="opacity-70" />
+            {pdus.slice(0, 6).map((p) => (
+              <span key={p.id} className={`dc-status-chip ${p.status === 'online' ? 'dc-chip-ok' : 'dc-chip-bad'}`}>
+                {p.id} · {p.load_pct}%
+              </span>
+            ))}
+          </div>
+          <div className="dc-status-group">
+            <Snowflake size={13} className="opacity-70" />
+            {cooling.map((c) => (
+              <span key={c.id} className={`dc-status-chip ${c.status === 'running' ? 'dc-chip-ok' : 'dc-chip-bad'}`}>
+                {c.id} · {c.temp_c}°C
+              </span>
+            ))}
+          </div>
+          <div className="dc-status-hint">
+            {currentRoom.type === 'data_hall' && (
+              <span className="dc-view-toggle">
+                <button
+                  type="button"
+                  className={`dc-btn-outline dc-btn-xs ${floorView === '2d' ? 'dc-view-active' : ''}`}
+                  onClick={() => setFloorView('2d')}
+                  title="Isometric 2D floor plan"
+                >
+                  <Move size={11} /> 2D floor
+                </button>
+                <button
+                  type="button"
+                  className={`dc-btn-outline dc-btn-xs ${floorView === '3d' ? 'dc-view-active' : ''}`}
+                  onClick={() => setFloorView('3d')}
+                  title="Steam-class animated 3D hall — Walk (WASD) · falls back to 2D on GPU errors"
+                >
+                  <Box size={11} /> 3D hall
+                </button>
+              </span>
             )}
-          />
-          {currentRoom.type === 'data_hall' && floorView === '3d'
-            ? <><Box size={12} /> 3D twin · Walk (WASD) · Replay enter · Motions on</>
-            : <><Move size={12} /> 2D floor · switch to 3D hall for Steam immersion</>}
+            {currentRoom.type === 'data_hall' && floorView === '3d'
+              ? <><Box size={12} /> 3D twin · Walk (WASD) · Replay enter · Motions on</>
+              : <><Move size={12} /> 2D floor · switch to 3D hall for Steam immersion</>}
+          </div>
         </div>
-      </div>
+      )}
 
       {currentRoom.type === 'data_hall' && floorView === '3d' && (
         <Twin3DSafe onFallback={() => setFloorView('2d')}>
@@ -459,6 +463,30 @@ export default function DatacenterSimulator({
               cooling={cooling}
               pdus={pdus.length ? pdus : (powerChain.rack_pdus || [])}
               tickets={st?.tickets || []}
+              access={accessControl}
+              objective={goal.objective ? `${goal.title ? `${goal.title}: ` : ''}${goal.objective}` : ''}
+              onImmersiveChange={setTwinImmersive}
+              onExitTo2D={() => setFloorView('2d')}
+              audioControl={(
+                <DcAmbientAudio
+                  alert={Boolean(
+                    (st?.tickets || []).some((t) => /thermal|overheat|hot.?aisle/i.test(`${t?.title || ''} ${t?.status || ''}`))
+                    || cooling.some((c) => Number(c?.temp_c) >= 27),
+                  )}
+                />
+              )}
+              onBadgeIn={() => {
+                const badges = accessControl?.badges || []
+                const staff = badges.find((b) => !(b.role === 'visitor' || b.escort_required))
+                const id = staff?.id || badges[0]?.id || 'BADGE-1001'
+                doAction(
+                  () => datacenterApi.accessOps(sessionId, 'badge_in', { badge_id: id, zone: 'reception' }),
+                  `Badge-in ${id}`,
+                )
+              }}
+              onEnterRoom={(room) => {
+                if (room?.id) enterRoom(room)
+              }}
               selectedServerId={selectedServerId}
               expandedRack={expandedRack}
               onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}
@@ -879,8 +907,21 @@ export default function DatacenterSimulator({
       )}
 
       {selectedServer && (
-        <div className="dc-drawer-backdrop" onClick={() => setSelectedServerId(null)}>
-          <div className="dc-drawer dc-drawer-wide" onClick={(e) => e.stopPropagation()}>
+        <div
+          className={`dc-drawer-backdrop ${isDataHall3d ? 'dc-tablet-backdrop' : ''}`}
+          onClick={() => setSelectedServerId(null)}
+        >
+          <div
+            className={`dc-drawer dc-drawer-wide ${isDataHall3d ? 'dc-tablet' : ''}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {isDataHall3d && (
+              <div className="dc-tablet-bezel">
+                <span className="dc-tablet-cam" />
+                <span className="dc-tablet-bezel-label">FIELD TABLET · {selectedServer.rack}</span>
+                <span className="dc-tablet-signal"><i /><i /><i /></span>
+              </div>
+            )}
             <div className="dc-drawer-head">
               <div>
                 <div className="dc-drawer-title">

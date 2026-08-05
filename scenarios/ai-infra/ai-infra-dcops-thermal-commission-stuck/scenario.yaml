@@ -1,0 +1,62 @@
+title: 'DCOps: GPU Node Thermal Alert Blocks Commission'
+slug: ai-infra-dcops-thermal-commission-stuck
+technology: AI Infrastructure Engineering
+category: Troubleshoot
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Critical
+description: 'CONTEXT: DCOps / Bare Metal ticket (PSINFRA board) — a thermal alert on gpu-node-02
+  tripped mid-commissioning and MAAS commissioning has stalled with the machine wedged in a
+  transient state. Facilities flagged the rack sensor; DCOps must clear the alert before the
+  fleet bring-up can continue.
+
+
+  ENVIRONMENT: Bare Metal (MAAS) console + Lab Terminal + Datacenter twin for rack/thermal/BMC
+  context. Treat gpu-node-02 as the production canary for this incident.
+
+
+  SYMPTOM / STARTING STATE: Thermal alert active on gpu-node-02; MAAS commissioning stuck; the
+  node will not progress to Ready until the alert clears and commissioning is retried.
+
+
+  OBJECTIVE: Clear the thermal alert in Bare Metal / Datacenter twin; reset the stuck
+  commissioning state so gpu-node-02 re-enters the queue cleanly; Deploy the node successfully;
+  leave FIXED-OK once the rack shows healthy thermals and Deployed status.'
+objectives:
+- Clear the thermal alert on gpu-node-02
+- Reset the stuck MAAS commissioning state
+- Deploy the GPU node and confirm Deployed status
+initial_state: Thermal alert active; MAAS commission stuck on gpu-node-02.
+hints:
+- order: 1
+  cost: 0
+  content: Open the Datacenter twin or Bare Metal panel and locate the active thermal alert on gpu-node-02.
+- order: 2
+  cost: 20
+  content: Acknowledge/clear the thermal alert first — a live alert will keep blocking the commissioning retry.
+- order: 3
+  cost: 40
+  content: Abort the stuck commissioning attempt in Bare Metal, then re-run Commission once the alert is clear.
+- order: 4
+  cost: 60
+  content: After the node reaches Ready, Deploy it and confirm Deployed status before leaving FIXED-OK.
+consoles:
+- baremetal
+- terminal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-02
+  role: primary
+  hostname: gpu-node-02
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal
+  - datacenter

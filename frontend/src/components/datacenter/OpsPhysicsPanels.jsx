@@ -208,6 +208,22 @@ export function PxeMaasPanel({ pxeMaas, busy, selectedServerId, onOp }) {
           </span>
         ))}
       </div>
+      <div className="dc-drawer-label mt-2">PXE boot stages</div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap', gap: '0.35rem' }}>
+        {['DHCP', 'TFTP', 'Kernel', 'Curtin', 'cloud-init', 'sshd'].map((stage, i) => {
+          const active = (p.events || []).some((e) => (e.message || '').toLowerCase().includes(stage.toLowerCase().split('-')[0]))
+            || (selectedServerId && (p.machines || []).find((m) => m.id === selectedServerId)?.status === 'Deployed' && i < 6)
+          return (
+            <span
+              key={stage}
+              className={`dc-topology-chip ${active ? 'dc-text-ok' : ''}`}
+              style={active ? { borderColor: '#34d399', color: '#34d399' } : undefined}
+            >
+              {i + 1}. {stage}
+            </span>
+          )
+        })}
+      </div>
       <div className="dc-drawer-label mt-2">PXE menu</div>
       <div className="dc-muted">{(p.pxe_menu || []).join(' · ')}</div>
       <div className="dc-drawer-label mt-2">Machines</div>

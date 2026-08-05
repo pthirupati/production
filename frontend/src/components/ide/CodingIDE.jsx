@@ -3,28 +3,32 @@ import {
   Play, CheckCircle2, XCircle, FileCode, Loader2, Terminal as TerminalIcon,
   ListChecks, FileText, Lightbulb, Lock, EyeOff, AlertTriangle, Trophy,
   Sparkles, Search, Sun, Moon, ZoomIn, ZoomOut, Bug, ScrollText, Save, Eye,
+  Plus, Folder, RefreshCw, X, Files, Settings2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CodeEditor from './CodeEditor'
 import MentorPanel from './MentorPanel'
 import HtmlPreviewPane from './HtmlPreviewPane'
-import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab } from './VsCodeWorkbench'
+import IdeExplorer from './IdeExplorer'
+import VsCodeWorkbench, { VscEditorTab, VscPanelTab, VscActivityButton } from './VsCodeWorkbench'
 import '../../styles/vscode-workbench.css'
 import { runPython, runPythonTests } from '../../utils/ide/pyodideRunner'
 import { runJavaScript, runJavaScriptTests } from '../../utils/ide/jsRunner'
 import { hasHtmlPreview, editorLanguageForPath, listHtmlPaths } from '../../utils/ide/composeHtmlPreview'
+import {
+  parentDirs, fileBasename, stubContentForPath, newFileHint,
+} from '../../utils/ide/fileTree'
 import { labApi } from '../../api/labs'
 import { useThemeStore } from '../../store/themeStore'
 
 const LANG_LABEL = {
-  python: 'Python', javascript: 'JavaScript', js: 'JavaScript', node: 'Node.js',
-  bash: 'Bash', typescript: 'TypeScript', json: 'JSON', yaml: 'YAML', markdown: 'Markdown',
-  html: 'HTML', css: 'CSS',
+  python: 'Python', javascript: 'JavaScript', js: 'JavaScript', node: 'Node.js', nodejs: 'Node.js',
+  bash: 'Bash', shell: 'Shell', sh: 'Shell', typescript: 'TypeScript', ts: 'TypeScript',
+  json: 'JSON', yaml: 'YAML', markdown: 'Markdown', html: 'HTML', css: 'CSS', java: 'Java',
 }
 
 function fileName(path) {
-  const parts = (path || '').split('/')
-  return parts[parts.length - 1] || path
+  return fileBasename(path)
 }
 
 function tsLine(text) {
@@ -143,6 +147,12 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   const [files, setFiles] = useState({})        // { path: content }
   const [readonlyPaths, setReadonlyPaths] = useState(new Set())
   const [activePath, setActivePath] = useState('')
+  const [openTabs, setOpenTabs] = useState([])  // ordered open editor tabs
+  const [dirtyPaths, setDirtyPaths] = useState(() => new Set())
+  const [expandedDirs, setExpandedDirs] = useState(() => new Set())
+  const [showExplorer, setShowExplorer] = useState(true)
+  const seedFilesRef = useRef({})               // last server template (for Refresh)
+  const seedReadonlyRef = useRef(new Set())
 
   // Bottom panel: terminal | output | logs | tests | debug
   const [bottomTab, setBottomTab] = useState('output')
@@ -193,7 +203,10 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     if (!showHtmlPreview || !htmlPaths.length) return
     if (activePath && /\.html?$/i.test(activePath)) return
     const preferred = htmlPaths.find((p) => /index\.html?$/i.test(p)) || htmlPaths[0]
-    if (preferred) setActivePath(preferred)
+    if (preferred) {
+      setActivePath(preferred)
+      setOpenTabs((tabs) => (tabs.includes(preferred) ? tabs : [...tabs, preferred]))
+    }
     setRightTab((tab) => (tab === 'instructions' ? 'preview' : tab))
   // eslint-disable-next-line react-hooks/exhaustive-deps -- only on first html detection / file set change
   }, [showHtmlPreview, htmlPaths.join('|')])
@@ -203,6 +216,53 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   }, [])
 
   // ── Load the coding spec (hidden tests stripped server-side) ──
+  const applySpecFiles = useCallback((s, { mergeDraft = true, announce = false } = {}) => {
+    const fileMap = {}
+    const ro = new Set()
+    ;(s.files || []).forEach((f) => {
+      if (!f?.path) return
+      fileMap[f.path] = f.content || ''
+      if (f.readonly) ro.add(f.path)
+    })
+    seedFilesRef.current = { ...fileMap }
+    seedReadonlyRef.current = new Set(ro)
+
+    if (mergeDraft) {
+      const draft = loadDraft(sessionId)
+      if (draft?.files) {
+        let restored = false
+        Object.entries(draft.files).forEach(([path, content]) => {
+          if (ro.has(path) || typeof content !== 'string') return
+          // Restore edits AND learner-created files not in the server seed.
+          if (!(path in fileMap) || content !== fileMap[path]) {
+            fileMap[path] = content
+            restored = true
+          }
+        })
+        if (restored) {
+          setSavedAt(draft.ts || Date.now())
+          if (announce) appendTerminal('restored your autosaved work from this browser')
+        }
+      }
+    }
+
+    const dirs = new Set()
+    Object.keys(fileMap).forEach((p) => parentDirs(p).forEach((d) => dirs.add(d)))
+    setExpandedDirs(dirs)
+    setFiles(fileMap)
+    setReadonlyPaths(ro)
+    setDirtyPaths(new Set())
+    hydratedRef.current = true
+    dirtyRef.current = false
+
+    const entry = s.entrypoint && fileMap[s.entrypoint] !== undefined
+      ? s.entrypoint
+      : Object.keys(fileMap)[0] || ''
+    setActivePath(entry)
+    setOpenTabs(entry ? [entry] : Object.keys(fileMap).slice(0, 8))
+    return Object.keys(fileMap).length
+  }, [sessionId, appendTerminal])
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -211,38 +271,10 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         if (cancelled) return
         const s = data.spec || {}
         setSpec(s)
-        const fileMap = {}
-        const ro = new Set()
-        ;(s.files || []).forEach((f) => {
-          fileMap[f.path] = f.content || ''
-          if (f.readonly) ro.add(f.path)
-        })
-        // Restore autosaved drafts: overlay saved content for editable files
-        // that still exist in the spec, so a reload doesn't lose work. Readonly
-        // (scaffold) files always come from the server.
-        const draft = loadDraft(sessionId)
-        if (draft?.files) {
-          let restored = false
-          Object.entries(draft.files).forEach(([path, content]) => {
-            if (path in fileMap && !ro.has(path) && typeof content === 'string' && content !== fileMap[path]) {
-              fileMap[path] = content
-              restored = true
-            }
-          })
-          if (restored) {
-            setSavedAt(draft.ts || Date.now())
-            appendTerminal('restored your autosaved work from this browser')
-          }
+        const n = applySpecFiles(s, { mergeDraft: true, announce: true })
+        if (n === 0) {
+          appendTerminal('warning: this lab has no starter files — use New File to begin')
         }
-        setFiles(fileMap)
-        setReadonlyPaths(ro)
-        // Mark hydrated on the next tick so the save-effect doesn't immediately
-        // re-persist the initial state (it only fires on genuine edits after).
-        hydratedRef.current = true
-        const entry = s.entrypoint && fileMap[s.entrypoint] !== undefined
-          ? s.entrypoint
-          : Object.keys(fileMap)[0] || ''
-        setActivePath(entry)
         if (data.validation_passed) setSolved(true)
       })
       .catch((err) => {
@@ -251,6 +283,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per session
   }, [sessionId])
 
   // ── Autosave editable files to localStorage (debounced) ──
@@ -262,7 +295,10 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     })
     if (Object.keys(editable).length === 0) return
     const id = setTimeout(() => {
-      if (saveDraft(sessionId, editable)) setSavedAt(Date.now())
+      if (saveDraft(sessionId, editable)) {
+        setSavedAt(Date.now())
+        setDirtyPaths(new Set())
+      }
     }, 600)
     return () => clearTimeout(id)
   }, [files, readonlyPaths, sessionId, loading])
@@ -287,6 +323,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       dirtyRef.current = true   // genuine edit — enable autosave
       return { ...prev, [activePath]: text }
     })
+    setDirtyPaths((prev) => (prev.has(activePath) ? prev : new Set(prev).add(activePath)))
   }, [activePath])
 
   const isJs = ['javascript', 'js', 'node', 'nodejs'].includes((language || '').toLowerCase())
@@ -470,6 +507,159 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
 
   const handleUnlockReference = useCallback(() => askMentor('all', { unlock: true }), [askMentor])
 
+  // ── Manual save (Ctrl/Cmd+S or toolbar) — forces an immediate draft flush ──
+  const handleSave = useCallback(() => {
+    const editable = {}
+    Object.keys(files).forEach((p) => {
+      if (!readonlyPaths.has(p)) editable[p] = files[p]
+    })
+    if (saveDraft(sessionId, editable)) {
+      setSavedAt(Date.now())
+      setDirtyPaths(new Set())
+      dirtyRef.current = false
+      appendTerminal('saved to browser storage')
+    }
+  }, [files, readonlyPaths, sessionId, appendTerminal])
+
+  // ── Explorer: folders, files, tabs ──
+  const toggleDir = useCallback((path) => {
+    setExpandedDirs((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }, [])
+
+  const openFile = useCallback((path) => {
+    setActivePath(path)
+    setOpenTabs((prev) => (prev.includes(path) ? prev : [...prev, path]))
+  }, [])
+
+  const closeTab = useCallback((path, e) => {
+    e?.stopPropagation?.()
+    setOpenTabs((prev) => {
+      const idx = prev.indexOf(path)
+      const next = prev.filter((p) => p !== path)
+      setActivePath((cur) => {
+        if (cur !== path) return cur
+        if (!next.length) return ''
+        return next[Math.max(0, idx - 1)] || next[0]
+      })
+      return next
+    })
+  }, [])
+
+  const createFile = useCallback(() => {
+    const existing = Object.keys(files)
+    const suggestion = newFileHint(language, existing)
+    const input = window.prompt('New file path', suggestion)
+    if (!input) return
+    const path = input.trim().replace(/^\/+/, '')
+    if (!path) return
+    if (files[path] !== undefined) { toast.error('A file already exists at that path'); return }
+    setFiles((prev) => ({ ...prev, [path]: stubContentForPath(path, language) }))
+    setExpandedDirs((prev) => {
+      const next = new Set(prev)
+      parentDirs(path).forEach((d) => next.add(d))
+      return next
+    })
+    setOpenTabs((prev) => (prev.includes(path) ? prev : [...prev, path]))
+    setActivePath(path)
+    dirtyRef.current = true
+    setDirtyPaths((prev) => new Set(prev).add(path))
+    appendTerminal(`created ${path}`)
+  }, [files, language, appendTerminal])
+
+  const createFolder = useCallback(() => {
+    const input = window.prompt('New folder path', 'new-folder')
+    if (!input) return
+    const dir = input.trim().replace(/^\/+|\/+$/g, '')
+    if (!dir) return
+    const keepPath = `${dir}/.keep`
+    if (files[keepPath] !== undefined) return
+    setFiles((prev) => ({ ...prev, [keepPath]: '' }))
+    setExpandedDirs((prev) => {
+      const next = new Set(prev)
+      next.add(dir)
+      parentDirs(keepPath).forEach((d) => next.add(d))
+      return next
+    })
+    dirtyRef.current = true
+    appendTerminal(`created folder ${dir}/`)
+  }, [files, appendTerminal])
+
+  const deleteFile = useCallback((path) => {
+    if (readonlyPaths.has(path)) return
+    if (!window.confirm(`Delete ${path}? This cannot be undone.`)) return
+    setFiles((prev) => {
+      const next = { ...prev }
+      delete next[path]
+      return next
+    })
+    setOpenTabs((prev) => {
+      const idx = prev.indexOf(path)
+      const next = prev.filter((p) => p !== path)
+      setActivePath((cur) => {
+        if (cur !== path) return cur
+        if (!next.length) return ''
+        return next[Math.max(0, idx - 1)] || next[0]
+      })
+      return next
+    })
+    setDirtyPaths((prev) => {
+      if (!prev.has(path)) return prev
+      const next = new Set(prev)
+      next.delete(path)
+      return next
+    })
+    dirtyRef.current = true
+    appendTerminal(`deleted ${path}`)
+  }, [readonlyPaths, appendTerminal])
+
+  const renameFile = useCallback((path) => {
+    if (readonlyPaths.has(path)) return
+    const input = window.prompt('Rename file', path)
+    if (!input) return
+    const next = input.trim().replace(/^\/+/, '')
+    if (!next || next === path) return
+    if (files[next] !== undefined) { toast.error('A file already exists at that path'); return }
+    setFiles((prev) => {
+      const copy = { ...prev }
+      copy[next] = copy[path]
+      delete copy[path]
+      return copy
+    })
+    setOpenTabs((prev) => prev.map((p) => (p === path ? next : p)))
+    setActivePath((prev) => (prev === path ? next : prev))
+    setDirtyPaths((prev) => {
+      if (!prev.has(path)) return prev
+      const copy = new Set(prev)
+      copy.delete(path)
+      copy.add(next)
+      return copy
+    })
+    dirtyRef.current = true
+    appendTerminal(`renamed ${path} → ${next}`)
+  }, [files, readonlyPaths, appendTerminal])
+
+  // ── Reload starter files from the server, discarding local drafts ──
+  const handleRefresh = useCallback(async () => {
+    if (solved || loading) return
+    if (dirtyRef.current && !window.confirm('Reload starter files? This discards local edits.')) return
+    try {
+      const data = await labApi.getCodingSpec(sessionId)
+      const s = data.spec || {}
+      setSpec(s)
+      applySpecFiles(s, { mergeDraft: false, announce: false })
+      clearDraft(sessionId)
+      appendTerminal('reloaded starter files from server')
+      toast.success('Starter files reloaded')
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Could not reload starter files')
+    }
+  }, [solved, loading, sessionId, applySpecFiles, appendTerminal])
+
   if (!authenticated) {
     const submitLogin = (e) => {
       e.preventDefault()
@@ -549,12 +739,13 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     )
   }
 
-  const paths = Object.keys(files)
   const visibleTests = spec?.visible_tests || []
   const hiddenCount = spec?.hidden_test_count || 0
   const objectives = scenario?.objectives || []
   const langLabel = LANG_LABEL[(language || '').toLowerCase()] || language
   const mentorDisabled = !lastCtx.current.output && !lastCtx.current.error && !lastCtx.current.tests.length && !mentor
+  const tabPaths = openTabs.filter((p) => files[p] !== undefined)
+  const protectedPaths = new Set(Object.keys(seedFilesRef.current).filter((p) => seedReadonlyRef.current.has(p)))
 
   const BOTTOM_TABS = [
     { key: 'terminal', label: 'Terminal', icon: TerminalIcon },
@@ -572,21 +763,37 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       subtitle={scenario?.title || 'Coding Lab'}
       toolbar={(
         <>
-          <button onClick={handleRun} disabled={running || checking || solved} className="vsc-btn" title="Run (Ctrl/Cmd+Enter)">
+          <button type="button" onClick={handleRun} disabled={running || checking || solved || !activePath} className="vsc-btn" title="Run (Ctrl/Cmd+Enter)">
             {running ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
             {pyLoading && running ? 'Loading…' : 'Run'}
           </button>
-          <button onClick={handleCheck} disabled={checking || running || solved} className="vsc-btn vsc-btn-primary" title="Grade on server">
+          <button type="button" onClick={handleCheck} disabled={checking || running || solved} className="vsc-btn vsc-btn-primary" title="Grade on server">
             {checking ? <Loader2 size={13} className="animate-spin" /> : solved ? <Trophy size={13} /> : <ListChecks size={13} />}
             {solved ? 'Solved' : 'Check Solution'}
           </button>
-          <button onClick={() => editorRef.current?.openSearch()} className="vsc-btn" title="Find"><Search size={13} /></button>
-          <button onClick={() => setVimMode((v) => !v)} className={`vsc-btn ${vimMode ? 'vsc-btn-primary' : ''}`}>Vim</button>
-          <button onClick={() => editorRef.current?.formatDocument?.()} className="vsc-btn">Format</button>
-          <button onClick={() => setFontSize((f) => Math.max(10, f - 1))} className="vsc-btn" title="Zoom out"><ZoomOut size={13} /></button>
-          <button onClick={() => setFontSize((f) => Math.min(22, f + 1))} className="vsc-btn" title="Zoom in"><ZoomIn size={13} /></button>
-          <button onClick={toggleTheme} className="vsc-btn" title="Toggle theme">{isDark ? <Sun size={13} /> : <Moon size={13} />}</button>
-          <button onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }} className="vsc-btn"><Sparkles size={13} /> Mentor</button>
+          <button type="button" onClick={handleSave} disabled={solved} className="vsc-btn" title="Save (Ctrl/Cmd+S)">
+            <Save size={13} /> Save
+          </button>
+          <button type="button" onClick={handleRefresh} disabled={solved || loading} className="vsc-btn" title="Reload lab starter files">
+            <RefreshCw size={13} /> Refresh
+          </button>
+          <button type="button" onClick={() => editorRef.current?.openSearch()} className="vsc-btn" title="Find (Ctrl/Cmd+F)"><Search size={13} /></button>
+          <button type="button" onClick={() => setVimMode((v) => !v)} className={`vsc-btn ${vimMode ? 'vsc-btn-primary' : ''}`} title="Toggle Vim keybindings">
+            Vim
+          </button>
+          <button type="button" onClick={() => editorRef.current?.formatDocument?.()} className="vsc-btn" title="Format document">Format</button>
+          <button
+            type="button"
+            onClick={() => setFormatOnSave((v) => !v)}
+            className={`vsc-btn ${formatOnSave ? 'vsc-btn-primary' : ''}`}
+            title="Format on Save"
+          >
+            <Settings2 size={13} /> FoS
+          </button>
+          <button type="button" onClick={() => setFontSize((f) => Math.max(10, f - 1))} className="vsc-btn" title="Zoom out"><ZoomOut size={13} /></button>
+          <button type="button" onClick={() => setFontSize((f) => Math.min(22, f + 1))} className="vsc-btn" title="Zoom in"><ZoomIn size={13} /></button>
+          <button type="button" onClick={toggleTheme} className="vsc-btn" title="Toggle theme">{isDark ? <Sun size={13} /> : <Moon size={13} />}</button>
+          <button type="button" onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }} className="vsc-btn"><Sparkles size={13} /> Mentor</button>
           {showHtmlPreview && (
             <button
               type="button"
@@ -597,29 +804,100 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
               <Eye size={13} /> Preview
             </button>
           )}
-          {savedAt && !solved && <span className="text-[10px] text-emerald-400 flex items-center gap-1"><Save size={11} /> Saved</span>}
+          {(savedAt && !solved) && (
+            <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+              <Save size={11} /> {dirtyPaths.size ? 'Edited' : 'Saved'}
+            </span>
+          )}
           <span className="text-[10px] text-[var(--vsc-muted)] hidden lg:inline flex items-center gap-1"><EyeOff size={10} /> {hiddenCount} hidden</span>
         </>
       )}
-      sidebarHeader="Explorer"
-      sidebar={paths.map((p) => (
-        <VscFileItem key={p} active={activePath === p} onClick={() => setActivePath(p)}>
-          <FileCode size={13} className="shrink-0 opacity-70" />
-          <span className="truncate">{fileName(p)}</span>
-          {readonlyPaths.has(p) && <Lock size={10} className="ml-auto opacity-50" />}
-        </VscFileItem>
-      ))}
-      editorTabs={paths.map((p) => (
-        <VscEditorTab key={p} active={activePath === p} onClick={() => setActivePath(p)}>
-          <FileCode size={12} /> {fileName(p)}{readonlyPaths.has(p) ? ' 🔒' : ''}
+      activityBar={(
+        <div className="vsc-activity-bar hidden sm:flex">
+          <VscActivityButton active={showExplorer} onClick={() => setShowExplorer((v) => !v)} title="Explorer">
+            <Files size={22} />
+          </VscActivityButton>
+          <VscActivityButton active={bottomTab === 'terminal'} onClick={() => setBottomTab('terminal')} title="Terminal">
+            <TerminalIcon size={22} />
+          </VscActivityButton>
+          <VscActivityButton active={bottomTab === 'tests'} onClick={() => setBottomTab('tests')} title="Test Results">
+            <ListChecks size={22} />
+          </VscActivityButton>
+        </div>
+      )}
+      showSidebar={showExplorer}
+      sidebarHeader={(
+        <div className="flex items-center justify-between gap-1 w-full">
+          <span>EXPLORER</span>
+          <div className="flex items-center gap-0.5">
+            <button type="button" onClick={createFolder} disabled={solved} className="p-0.5 text-[var(--vsc-accent)]" title="New folder"><Folder size={12} /></button>
+            <button type="button" onClick={createFile} disabled={solved} className="p-0.5 text-[var(--vsc-accent)]" title="New file"><Plus size={12} /></button>
+            <button type="button" onClick={handleRefresh} disabled={solved} className="p-0.5 text-[var(--vsc-muted)]" title="Refresh"><RefreshCw size={12} /></button>
+          </div>
+        </div>
+      )}
+      sidebar={(
+        <IdeExplorer
+          files={files}
+          activePath={activePath}
+          dirtyPaths={dirtyPaths}
+          readonlyPaths={readonlyPaths}
+          protectedPaths={protectedPaths}
+          expandedDirs={expandedDirs}
+          onToggleDir={toggleDir}
+          onOpenFile={openFile}
+          onDeleteFile={solved ? undefined : deleteFile}
+          onRenameFile={solved ? undefined : renameFile}
+          onCreateFile={solved ? undefined : createFile}
+          emptyHint="No files in this lab yet. Create a file or folder, or ask support if the lab should have starters."
+        />
+      )}
+      editorTabs={tabPaths.length ? tabPaths.map((p) => (
+        <VscEditorTab key={p} active={activePath === p} onClick={() => openFile(p)}>
+          <FileCode size={12} />
+          <span className="truncate max-w-[120px]">{fileName(p)}</span>
+          {dirtyPaths.has(p) && !readonlyPaths.has(p) && <span className="text-amber-400">●</span>}
+          {readonlyPaths.has(p) && <Lock size={10} className="opacity-50" />}
+          {!solved && (
+            <span
+              role="button"
+              tabIndex={0}
+              className="ml-1 opacity-50 hover:opacity-100"
+              title="Close"
+              onClick={(e) => closeTab(p, e)}
+              onKeyDown={(e) => { if (e.key === 'Enter') closeTab(p, e) }}
+            >
+              <X size={11} />
+            </span>
+          )}
         </VscEditorTab>
-      ))}
-      editor={activePath ? (
-        <CodeEditor ref={editorRef} key={activePath} value={files[activePath] ?? ''} onChange={handleEditorChange}
-          language={editorLanguage} readOnly={solved || readonlyPaths.has(activePath)} onRun={handleRun}
-          fontSize={fontSize} vimMode={vimMode} formatOnSave={formatOnSave} />
+      )) : (
+        <div className="px-3 py-1.5 text-[11px] text-[var(--vsc-muted)]">No open editors</div>
+      )}
+      editor={activePath && files[activePath] !== undefined ? (
+        <CodeEditor
+          ref={editorRef}
+          key={`${activePath}:${vimMode ? 'vim' : 'norm'}`}
+          value={files[activePath] ?? ''}
+          onChange={handleEditorChange}
+          onSave={handleSave}
+          language={editorLanguage}
+          readOnly={solved || readonlyPaths.has(activePath)}
+          onRun={handleRun}
+          fontSize={fontSize}
+          vimMode={vimMode}
+          formatOnSave={formatOnSave}
+        />
       ) : (
-        <div className="h-full flex items-center justify-center text-[var(--vsc-muted)] text-sm">No file open</div>
+        <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--vsc-muted)] text-sm p-6 text-center">
+          <FileCode size={36} className="opacity-40" />
+          <p>{Object.keys(files).length ? 'Select a file from the Explorer' : 'No file open'}</p>
+          {!solved && (
+            <button type="button" onClick={createFile} className="vsc-btn vsc-btn-primary">
+              <Plus size={13} /> New File
+            </button>
+          )}
+        </div>
       )}
       bottomPanel={{
         height: 224,
@@ -743,9 +1021,15 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         ),
       }}
       statusBar={{
-        left: activePath ? fileName(activePath) : 'No file',
-        center: `${langLabel} · UTF-8 · Spaces: 4${vimMode ? ' · VIM' : ''}`,
-        right: <><span>{fontSize}px</span><span>{solved ? 'Read-only' : 'Editing'}</span></>,
+        left: activePath || 'No file',
+        center: `${langLabel} · UTF-8 · Spaces: 4${vimMode ? ' · --VIM--' : ''}${formatOnSave ? ' · FoS' : ''}`,
+        right: (
+          <>
+            <span>{Object.keys(files).length} files</span>
+            <span>{fontSize}px</span>
+            <span>{solved ? 'Read-only' : dirtyPaths.size ? 'Unsaved' : 'Editing'}</span>
+          </>
+        ),
       }}
     />
   )

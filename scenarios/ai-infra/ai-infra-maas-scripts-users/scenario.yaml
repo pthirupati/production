@@ -1,0 +1,58 @@
+title: 'MAAS: Attach a Commissioning Script and Create an Operator User'
+slug: ai-infra-maas-scripts-users
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: Bare Metal / AI Infra — the team needs a custom hardware-inventory commissioning
+  script to run automatically on every commission, and a dedicated operator account with an SSH key so
+  on-call engineers stop sharing the admin login.
+
+
+  ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin.
+
+
+  SYMPTOM: No custom commissioning scripts are registered under Scripts, so hardware inventory beyond the
+  MAAS defaults is never collected; no operator user exists, so day-2 SSH access relies on the shared admin
+  account.
+
+
+  OBJECTIVE: Under Scripts, upload and attach the commissioning script so it runs in the commissioning
+  script set; under Users, create an operator account with an SSH key; commission a node and confirm the
+  custom script ran and the operator can log in on Lab Terminal; FIXED-OK.'
+objectives:
+- Attach the commissioning script to the script set
+- Create an operator user with an SSH key
+- Commission a node and verify both
+initial_state: No custom commissioning script is registered and no operator user exists in MAAS.
+hints:
+- order: 1
+  cost: 0
+  content: Open Bare Metal → Scripts. Add and attach the commissioning script so it is included in the default commissioning script set.
+- order: 2
+  cost: 20
+  content: Open Bare Metal → Users. Create an operator account and attach its SSH public key.
+- order: 3
+  cost: 45
+  content: Commission a node, confirm the custom script appears in commissioning results, then confirm operator SSH access on Lab Terminal and mark FIXED-OK.
+consoles:
+- baremetal
+- terminal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal
+  - datacenter

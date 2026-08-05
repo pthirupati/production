@@ -1,0 +1,54 @@
+title: 'LXD: GPU Passthrough Profile for Inference Containers'
+slug: ai-infra-lxd-gpu-passthrough-profile
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: PSINFRA / Bare Metal / LXD ticket — inference pods need an LXD profile with
+  NVIDIA GPU passthrough (nvidia.runtime + physical GPU device). AI Infra Engineering owns LXD
+  on MAAS-deployed GPU nodes; this is not the application GPU course.
+
+
+  ENVIRONMENT: Lab Terminal with LXD (`lxc` / `lxd`) + Bare Metal for host context.
+
+
+  SYMPTOM: Containers start without GPU; nvidia-smi inside guest fails. Profile gpu-passthrough missing
+  or incomplete.
+
+
+  OBJECTIVE: Inspect `lxc profile show gpu-passthrough`; create/fix profile; launch a container with
+  the profile; verify GPU path; FIXED-OK.'
+objectives:
+- Inspect or create LXD gpu-passthrough profile
+- Launch a container with GPU passthrough
+- Confirm profile exposes physical GPU device
+initial_state: LXD up; GPU passthrough profile missing or incomplete.
+hints:
+- order: 1
+  cost: 0
+  content: On Lab Terminal run lxc list and lxc profile show gpu-passthrough to see the current GPU device map.
+- order: 2
+  cost: 20
+  content: Ensure nvidia.runtime is true and devices.gpu0 type=gpu gputype=physical on the passthrough profile.
+- order: 3
+  cost: 45
+  content: lxc launch with -p gpu-passthrough, confirm RUNNING, then leave FIXED-OK for the lab grader.
+consoles:
+- terminal
+- baremetal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - terminal
+  - baremetal

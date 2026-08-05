@@ -1,0 +1,64 @@
+title: 'GPU Host Bring-Up Runbook: BMC → PXE → MAAS → Deploy → nvidia-smi/dcgmi'
+slug: ai-infra-gpu-host-bringup-runbook
+technology: AI Infrastructure Engineering
+category: Production
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 2400
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Critical
+description: 'CONTEXT: DCOps / Bare Metal runbook — bring a brand-new GPU chassis online end to
+  end: confirm the BMC answers, let PXE enlist the node into MAAS, commission and Deploy it with
+  the ImageDev boot resource, then prove the GPUs are healthy with nvidia-smi and dcgmi. This is
+  the exact sequence AI Infra Engineering follows for every new rack landing.
+
+
+  ENVIRONMENT: Bare Metal (MAAS) console + Lab Terminal + Datacenter twin for rack/BMC context +
+  Packer for the boot resource. Treat gpu-node-01 as a freshly racked host.
+
+
+  SYMPTOM / STARTING STATE: gpu-node-01 is freshly racked and powered but has never been
+  enlisted; MAAS shows nothing for it yet; no image has been Deployed; GPU health is unverified.
+
+
+  OBJECTIVE: Confirm BMC/IPMI reachability; Enlist the node via PXE so it appears New in MAAS;
+  Commission it to Ready; Deploy it with the ImageDev GPU boot resource; run nvidia-smi and
+  dcgmi diag on the deployed node and confirm both report healthy; leave FIXED-OK.'
+objectives:
+- Confirm BMC/IPMI reachability and enlist gpu-node-01 via PXE
+- Commission the node to Ready and Deploy the ImageDev GPU image
+- Confirm nvidia-smi and dcgmi diag report the GPUs healthy
+initial_state: gpu-node-01 racked and powered; not yet enlisted, commissioned, or Deployed.
+hints:
+- order: 1
+  cost: 0
+  content: Open Bare Metal and check Power/BMC status for gpu-node-01 before attempting anything else in the runbook.
+- order: 2
+  cost: 20
+  content: Trigger Enlist (PXE) so the node appears New in MAAS, then Commission it and wait for Ready.
+- order: 3
+  cost: 40
+  content: Deploy the node with the ImageDev GPU boot resource (build/publish via Packer first if it is missing).
+- order: 4
+  cost: 60
+  content: On Lab Terminal run nvidia-smi and dcgmi diag -r 1; both must report healthy before you leave FIXED-OK.
+consoles:
+- baremetal
+- terminal
+- datacenter
+- packer
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal
+  - datacenter
+  - packer

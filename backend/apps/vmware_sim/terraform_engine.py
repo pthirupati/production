@@ -641,6 +641,43 @@ def _mirror_apply_to_clouds(session_id: str, resources: list[dict]) -> dict[str,
                         "create_lxd",
                         {"name": name, "image": "ubuntu:22.04"},
                     )
+            elif rtype == "maas_tag":
+                from apps.vmware_sim import baremetal_engine as be
+
+                be.get_state(session_id, "terraform-apply")
+                be.apply_action(session_id, "login", {"user": "terraform"})
+                be.apply_action(
+                    session_id,
+                    "maas_tag_machine",
+                    {"tag": r.get("tag") or name},
+                )
+            elif rtype == "maas_instance":
+                from apps.vmware_sim import baremetal_engine as be
+
+                be.get_state(session_id, "terraform-apply")
+                be.apply_action(session_id, "login", {"user": "terraform"})
+                bm_state = ((be.get_state(session_id) or {}).get("state") or {})
+                machines = bm_state.get("maas", {}).get("machines") or []
+                machine = next((m for m in machines if (m.get("hostname") or "") == name), None)
+                if machine is None:
+                    enlisted = be.apply_action(session_id, "maas_enlist", {"hostname": name})
+                    mid = enlisted.get("machine_id")
+                    if mid is not None:
+                        be.apply_action(session_id, "maas_commission", {"machine_id": mid})
+                elif machine.get("status") == "Ready":
+                    be.apply_action(session_id, "maas_deploy", {"machine_id": machine.get("id")})
+                elif machine.get("status") in ("New", "Failed", "Failed commissioning"):
+                    be.apply_action(session_id, "maas_commission", {"machine_id": machine.get("id")})
+            elif rtype in ("maas_vlan", "maas_subnet"):
+                from apps.vmware_sim import baremetal_engine as be
+
+                be.get_state(session_id, "terraform-apply")
+                be.apply_action(session_id, "login", {"user": "terraform"})
+                be.apply_action(
+                    session_id,
+                    "maas_add_subnet",
+                    {"space": r.get("space") or "default", "subnet": r.get("cidr") or r.get("subnet")},
+                )
         except Exception:
             continue
     return {k: v for k, v in links.items() if v}

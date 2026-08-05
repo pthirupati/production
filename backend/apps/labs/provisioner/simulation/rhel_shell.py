@@ -532,6 +532,11 @@ class RHELShell:
             # Resetting here stops a previous failure from leaking into `&&`/`||`.
             self.state.last_exit_code = 0
             out = fn(parts)
+            from .shell import StreamedCommandResult
+            if isinstance(out, StreamedCommandResult):
+                if redirect and (redirect.get("stdout") or redirect.get("stderr")):
+                    return self._apply_redirect("\n".join(out.lines), redirect)
+                return out
             if self._looks_like_stderr(out) and self.state.last_exit_code == 0:
                 self.state.last_exit_code = 1
             return self._apply_redirect(out, redirect)
@@ -4636,6 +4641,27 @@ class RHELShell:
         host = target
         if "@" in target:
             user, host = target.split("@", 1)
+
+        # Platform isolation + power / Deployed gates from ServerIdentity.
+        sid = getattr(self.state, "session_id", None)
+        local_plat = ""
+        slug = (getattr(self, "_scenario_slug", None) or getattr(self, "scenario_slug", "") or "").lower()
+        if "aws" in slug:
+            local_plat = "aws"
+        elif "azure" in slug:
+            local_plat = "azure"
+        elif "gcp" in slug:
+            local_plat = "gcp"
+        elif any(k in slug for k in ("maas", "ai-infra", "baremetal", "vyos", "lxd")):
+            local_plat = "maas"
+        try:
+            from .reachability import ssh_peer_allowed
+            _row, ssh_err = ssh_peer_allowed(host=host, session_id=sid, local_platform=local_plat)
+            if ssh_err:
+                return ssh_err
+        except Exception:
+            pass
+
         host_key = getattr(self, "_host_ips", {}).get(host)
         if not host_key and host in getattr(self, "_host_names", {}):
             host_key = host
@@ -4646,13 +4672,12 @@ class RHELShell:
             if resolved_ip:
                 host_key = getattr(self, "_host_ips", {}).get(resolved_ip)
                 if not host_key and resolved_ip == host:
-                    # IP known in identity but not yet in shell maps.
                     host_key = None
             if not host_key:
-                sid = getattr(self.state, "session_id", None)
                 if sid:
                     try:
                         from .server_identity import list_servers, register_terminal_ssh_host
+                        from .reachability import _platform_of, _same_l3_family
                         for s in list_servers(sid):
                             if host in (
                                 s.get("hostname"),
@@ -4661,6 +4686,12 @@ class RHELShell:
                             ) or (resolved_ip and resolved_ip == s.get("primary_ip")):
                                 if s.get("power") == "off":
                                     return f"ssh: connect to host {host} port 22: Connection refused"
+                                inst = (s.get("install_state") or "").lower()
+                                plat = _platform_of(s)
+                                if plat in ("maas", "baremetal", "ai-infra") and inst != "deployed":
+                                    return f"ssh: connect to host {host} port 22: Connection refused"
+                                if local_plat and not _same_l3_family(local_plat, plat):
+                                    return f"ssh: connect to host {host} port 22: No route to host"
                                 hn = s.get("hostname") or host
                                 ip = s.get("primary_ip") or resolved_ip or ""
                                 if hn and ip:
@@ -4673,6 +4704,19 @@ class RHELShell:
                         pass
         if not host_key:
             return f"ssh: connect to host {host} port 22: Connection refused"
+        # Re-check power for peers already in host maps (AWS stop mid-lab).
+        if sid:
+            try:
+                from .server_identity import list_servers
+                for s in list_servers(sid):
+                    if host_key in (s.get("hostname"), s.get("fqdn")) or host in (
+                        s.get("hostname"), s.get("primary_ip"),
+                    ):
+                        if s.get("power") == "off":
+                            return f"ssh: connect to host {host} port 22: Connection refused"
+                        break
+            except Exception:
+                pass
         engine = getattr(self, "_engine", None)
         remote = engine.state.clone_for_host(host_key) if engine else self.state.clone_for_host(host_key)
         meta = getattr(self, "_host_names", {}).get(host) or getattr(self, "_host_names", {}).get(host_key) or {}
@@ -4698,6 +4742,8 @@ class RHELShell:
         # Parse flags the way iputils does, accepting both `-c 3` and glued `-c3`,
         # plus -W/-w/-i/-s/-t with values. The first non-flag token is the host.
         count = 4
+        interval = 1.0
+        ttl = 64
         host = None
         i = 1
         while i < len(p):
@@ -4710,8 +4756,14 @@ class RHELShell:
                         val = p[i + 1]
                         i += 1
                     if opt == "c" and val.isdigit():
-                        count = int(val)
-                # -n / -q / -4 / -6 etc take no value.
+                        count = max(1, min(20, int(val)))
+                    elif opt == "i":
+                        try:
+                            interval = max(0.2, min(5.0, float(val)))
+                        except ValueError:
+                            pass
+                    elif opt == "t" and val.isdigit():
+                        ttl = max(1, min(255, int(val)))
                 i += 1
                 continue
             if host is None:
@@ -4722,44 +4774,79 @@ class RHELShell:
             return ("Usage: ping [-aAbBdCDfhLnOqrRUvV64] [-c count] [-i interval] ...\n"
                     "            [-w deadline] [-W timeout] destination")
 
-        # Resolve the target: localhost, our own IP, a known lab peer, or a public
-        # host (in a lab the box has egress). Only garbage names fail to resolve.
-        target_ip = None
-        if host in ("localhost", "127.0.0.1", "::1"):
-            target_ip = "127.0.0.1"
-        elif host in getattr(self, "_host_ips", {}):
-            target_ip = getattr(self, "_host_ips")[host]
-        else:
-            own = []
-            for data in self.state.network_ifs.values():
-                for a in data.get("addrs", []):
-                    own.append(a.split("/")[0])
-            if host in own:
-                target_ip = host
-            elif re.match(r"^\d{1,3}(\.\d{1,3}){3}$", host):
-                target_ip = host  # any dotted-quad is reachable in the lab
-            elif "." in host and " " not in host:
-                # A hostname (google.com, gateway) resolves via DNS in the lab.
-                target_ip = self._resolve_hostname(host)
+        iface_addrs = []
+        for data in self.state.network_ifs.values():
+            for a in data.get("addrs", []):
+                iface_addrs.append(a)
 
-        if target_ip is None:
-            self.state.last_exit_code = 2
-            return f"ping: {host}: Name or service not known"
+        from .reachability import resolve_icmp_target, _platform_of
+        local_plat = ""
+        sid = getattr(self.state, "session_id", None)
+        try:
+            from .server_identity import list_servers
+            hn = getattr(self.state, "hostname", "") or ""
+            for s in list_servers(sid) or []:
+                if hn and hn in (s.get("hostname"), s.get("fqdn")):
+                    local_plat = _platform_of(s)
+                    break
+        except Exception:
+            pass
+        if not local_plat:
+            slug = (getattr(self, "_scenario_slug", None) or getattr(self, "scenario_slug", "") or "").lower()
+            if "aws" in slug:
+                local_plat = "aws"
+            elif "azure" in slug:
+                local_plat = "azure"
+            elif "gcp" in slug:
+                local_plat = "gcp"
+            elif any(k in slug for k in ("maas", "ai-infra", "baremetal", "vyos", "lxd")):
+                local_plat = "maas"
+
+        target_ip, err = resolve_icmp_target(
+            host=host,
+            host_ips=getattr(self, "_host_ips", {}) or {},
+            host_names=getattr(self, "_host_names", {}) or {},
+            iface_addrs=iface_addrs,
+            session_id=sid,
+            local_platform=local_plat,
+        )
+        if err:
+            self.state.last_exit_code = 1
+            # Format like real ping for unreachable / unknown host
+            if "Name or service not known" in err or err.startswith("Usage:"):
+                self.state.last_exit_code = 2
+                return err
+            if "Network is unreachable" in err:
+                return err
+            # Host unreachable — still print PING header then failure lines
+            tip = target_ip or host
+            lines = [f"PING {host} ({tip}) 56(84) bytes of data."]
+            for seq in range(1, count + 1):
+                lines.append(f"From {tip} icmp_seq={seq} Destination Host Unreachable")
+            lines.append(f"\n--- {host} ping statistics ---")
+            lines.append(
+                f"{count} packets transmitted, 0 received, 100% packet loss, "
+                f"time {int(count * interval * 1000)}ms"
+            )
+            from .shell import StreamedCommandResult
+            return StreamedCommandResult(lines=lines, delay_s=interval)
+
         lines = [f"PING {host} ({target_ip}) 56(84) bytes of data."]
         rtts = []
         for seq in range(1, count + 1):
-            rtt = round(0.2 + seq * 0.05, 3)
+            rtt = round(0.2 + seq * 0.05 + (hash(f"{target_ip}{seq}") % 7) * 0.03, 3)
             rtts.append(rtt)
-            lines.append(f"64 bytes from {target_ip}: icmp_seq={seq} ttl=64 time={rtt} ms")
+            lines.append(f"64 bytes from {target_ip}: icmp_seq={seq} ttl={ttl} time={rtt} ms")
         lines.append(f"\n--- {host} ping statistics ---")
         lines.append(
             f"{count} packets transmitted, {count} received, 0% packet loss, "
-            f"time {count * 1000 - 1}ms"
+            f"time {int(count * interval * 1000) - 1}ms"
         )
         lines.append(
             f"rtt min/avg/max/mdev = {min(rtts):.3f}/{sum(rtts) / len(rtts):.3f}/{max(rtts):.3f}/0.020 ms"
         )
-        return "\n".join(lines)
+        from .shell import StreamedCommandResult
+        return StreamedCommandResult(lines=lines, delay_s=interval)
 
     def _cmd_subscription_manager(self, p: list[str]) -> str:
         """Red Hat Subscription Manager — status/register/list/repos/attach/…"""

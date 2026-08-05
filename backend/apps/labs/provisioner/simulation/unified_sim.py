@@ -91,7 +91,17 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
         get_ed, save_ed, clear_ed = self._stream_callbacks()
 
         def handler(line: str) -> str:
-            return engine._handle_shell(line)
+            out = engine._handle_shell(line)
+            from apps.labs.provisioner.simulation.shell import StreamedCommandResult
+            if isinstance(out, StreamedCommandResult):
+                return out
+            # Pace classic network tools when handlers return a plain string.
+            name = ((line or "").strip().split() or [""])[0].rsplit("/", 1)[-1]
+            if name in ("ping", "ping6") and out:
+                return StreamedCommandResult(lines=str(out).split("\n"), delay_s=1.0)
+            if name in ("traceroute", "tracepath") and out:
+                return StreamedCommandResult(lines=str(out).split("\n"), delay_s=0.45)
+            return out
 
         holder = SimulationStreamHolder(
             handler,

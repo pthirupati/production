@@ -517,7 +517,16 @@ def upsert_from_maas_machine(
             for i in range(8)
         ]
         patch["raid"] = {"level": "RAID10", "controllers": 1, "virtual_disks": 2}
-    return upsert_server(session_id, patch, source=source)
+    row = upsert_server(session_id, patch, source=source)
+    # Terminal SSH peers: only Deployed + powered-on nodes (real guest OS).
+    if row and status == "Deployed" and ip and power == "on":
+        try:
+            register_terminal_ssh_host(
+                session_id, hostname=name, ip=ip, source="maas-deployed",
+            )
+        except Exception:
+            pass
+    return row
 
 
 def list_assets(session_id: str) -> list[dict[str, Any]]:

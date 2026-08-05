@@ -1,0 +1,58 @@
+title: 'MAAS: Fix NTP and Commissioning Distro Settings'
+slug: ai-infra-maas-settings-ntp
+technology: AI Infrastructure Engineering
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: Bare Metal / AI Infra — recent commissioning runs have been failing hardware clock/time-sync
+  checks and coming up on the wrong Ubuntu release; both point back to the global MAAS Settings page, not
+  the node itself.
+
+
+  ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin.
+
+
+  SYMPTOM: MAAS Settings shows an unreachable NTP server list and a commissioning default distro series
+  that does not match the images actually imported into boot-resources, so newly commissioned nodes drift
+  in clock and pick the wrong release.
+
+
+  OBJECTIVE: Open Settings; correct the NTP servers to a reachable pool; set the Commissioning distro series
+  to the imported release (jammy); Save; re-commission a node and confirm clock sync and the correct release
+  on Lab Terminal; FIXED-OK.'
+objectives:
+- Fix the NTP servers in Settings
+- Correct the commissioning default distro series
+- Re-commission a node and verify clock sync and release
+initial_state: MAAS Settings has an unreachable NTP pool and a commissioning distro series that does not match imported images.
+hints:
+- order: 1
+  cost: 0
+  content: Open Bare Metal → Settings. Check the Network services NTP servers field and the Commissioning default distro series.
+- order: 2
+  cost: 20
+  content: Replace the NTP servers with a reachable pool and set the distro series to match the imported boot-resource (jammy), then Save.
+- order: 3
+  cost: 45
+  content: Re-commission a node and, on Lab Terminal, confirm the clock is synchronized and the release matches, then FIXED-OK.
+consoles:
+- baremetal
+- terminal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal
+  - datacenter

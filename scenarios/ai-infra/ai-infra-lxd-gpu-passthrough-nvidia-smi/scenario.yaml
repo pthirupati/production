@@ -1,0 +1,62 @@
+title: 'LXD: GPU Passthrough Profile → nvidia-smi Inside Container'
+slug: ai-infra-lxd-gpu-passthrough-nvidia-smi
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: Bare Metal ticket — an inference team needs an LXD container on
+  gpu-node-01 with the physical GPU passed through, confirmed by nvidia-smi running inside the
+  container, not just on the host. AI Infra Engineering owns LXD GPU-passthrough profiles on
+  MAAS-deployed fleets.
+
+
+  ENVIRONMENT: LXD console + Bare Metal + Lab Terminal on gpu-node-01. Treat the container as
+  the production inference sandbox for this ticket.
+
+
+  SYMPTOM / STARTING STATE: gpu-passthrough profile is missing or incomplete; the container
+  launches but nvidia-smi inside it reports no devices found.
+
+
+  OBJECTIVE: Inspect/fix the gpu-passthrough LXD profile so it maps the physical GPU device;
+  launch (or restart) the container with that profile; run nvidia-smi inside the container and
+  confirm it lists the GPU; leave FIXED-OK once the device is visible in-container.'
+objectives:
+- Fix the gpu-passthrough LXD profile to map the physical GPU
+- Launch or restart the container using that profile
+- Confirm nvidia-smi inside the container lists the GPU
+initial_state: gpu-passthrough profile incomplete; nvidia-smi inside the container sees no GPU.
+hints:
+- order: 1
+  cost: 0
+  content: Run lxc profile show gpu-passthrough and compare its devices block against what the host GPU actually exposes.
+- order: 2
+  cost: 20
+  content: Set devices.gpu0 type=gpu gputype=physical (and nvidia.runtime true) on the profile if either is missing.
+- order: 3
+  cost: 35
+  content: Apply the profile with lxc profile add <container> gpu-passthrough, then restart the container.
+- order: 4
+  cost: 55
+  content: lxc exec <container> -- nvidia-smi should now list the GPU; leave FIXED-OK once it does.
+consoles:
+- lxd
+- baremetal
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - lxd
+  - baremetal
+  - terminal

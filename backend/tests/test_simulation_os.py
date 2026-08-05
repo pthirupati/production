@@ -1189,11 +1189,16 @@ class SystemInfoToolTests(SimpleTestCase):
 
     def test_ping_parses_count_flag(self):
         sh = RHELShell()
-        out = sh.run("ping -c1 8.8.8.8")
-        self.assertIn("1 packets transmitted, 1 received", out)
-        self.assertNotIn("Name or service not known", out)
-        out2 = sh.run("ping -c 2 10.0.0.1")
+        # Random public IPs are not in the lab underlay — Host Unreachable.
+        out_pub = str(sh.run("ping -c1 8.8.8.8"))
+        self.assertIn("Destination Host Unreachable", out_pub)
+        self.assertIn("0 received", out_pub)
+        # Gateway .1 on the eth0 /24 underlay is reachable (routing labs).
+        out2 = str(sh.run("ping -c 2 10.0.0.1"))
         self.assertIn("2 packets transmitted, 2 received", out2)
+        # Empty subnet host (no inventory peer) is unreachable.
+        out3 = str(sh.run("ping -c1 10.0.0.99"))
+        self.assertIn("Destination Host Unreachable", out3)
 
     def test_ping_bad_host(self):
         sh = RHELShell()

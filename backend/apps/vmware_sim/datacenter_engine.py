@@ -2420,9 +2420,23 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                     broken.clear()
                 console_lines = [
                     f"=== PXE → MAAS ({(platform.get('region') or {}).get('url')}) ===",
-                    f"DHCP offer · TFTP · loading {srv.get('hostname')}",
-                    "iPXE> chain pxelinux.0",
+                    "1/6 DHCP discover → offer → request → ack",
+                    "2/6 TFTP: bootx64.efi → grubx64.efi → vmlinuz + initrd",
+                    "3/6 Kernel + initramfs · iPXE chain pxelinux.0",
+                    "4/6 Curtin: partition + install rootfs",
+                    "5/6 cloud-init: DataSourceMAAS · netplan · users · runcmd",
+                    "6/6 Reboot → sshd listening · node Ready/Deployed path",
+                    f"Host {srv.get('hostname')} · PXE stages complete",
                 ]
+                srv["pxe_boot_stages"] = [
+                    {"id": "dhcp", "label": "DHCP", "done": True},
+                    {"id": "tftp", "label": "TFTP", "done": True},
+                    {"id": "kernel", "label": "Kernel", "done": True},
+                    {"id": "curtin", "label": "Curtin", "done": True},
+                    {"id": "cloud_init", "label": "cloud-init", "done": True},
+                    {"id": "sshd", "label": "sshd", "done": True},
+                ]
+                srv["pxe_anim"] = {"active": True, "stage": 5, "started_at": _now_iso()}
                 state["console"] = {"open": True, "asset_id": srv["id"], "lines": console_lines}
             else:
                 return {"ok": False, "error": "PXE failed — DHCP down. Run fix_dhcp."}

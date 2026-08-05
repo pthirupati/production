@@ -1,0 +1,58 @@
+title: 'MAAS: Enable DHCP on the PXE VLAN for Commissioning'
+slug: ai-infra-maas-dhcp-enable
+technology: AI Infrastructure Engineering
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: Bare Metal / AI Infra — a new GPU node was racked and cabled to the PXE-tagged VLAN,
+  but commissioning never starts: MAAS never sees a DHCP request from the node because DHCP is disabled
+  on that VLAN.
+
+
+  ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin (rack view shows the node''s link/power
+  LEDs).
+
+
+  SYMPTOM: The node stays New with no commissioning log entries; the PXE VLAN in MAAS Networking shows
+  DHCP disabled, so the node''s DHCP DISCOVER never gets an OFFER and PXE never reaches TFTP.
+
+
+  OBJECTIVE: In MAAS Networking/Subnets, enable DHCP on the PXE VLAN with the rack controller providing
+  it; Commission the New node and confirm the DHCP DISCOVER → OFFER → ACK sequence on Lab Terminal; confirm
+  status reaches Ready; FIXED-OK.'
+objectives:
+- Enable DHCP on the PXE-tagged VLAN
+- Commission the node and confirm the DHCP handshake
+- Confirm the node reaches Ready
+initial_state: DHCP is disabled on the PXE VLAN in MAAS; the new node is stuck in New.
+hints:
+- order: 1
+  cost: 0
+  content: Open Bare Metal → Subnets/VLANs. Find the PXE-tagged VLAN and check whether DHCP is enabled for it.
+- order: 2
+  cost: 20
+  content: Enable DHCP on that VLAN with the rack controller providing it, then return to Machines and Commission the New node.
+- order: 3
+  cost: 45
+  content: On Lab Terminal watch for DHCP DISCOVER, OFFER, and ACK, then confirm the node reaches Ready and mark FIXED-OK.
+consoles:
+- baremetal
+- terminal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal
+  - datacenter

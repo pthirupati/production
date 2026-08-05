@@ -84,6 +84,9 @@ export function editorLanguageForPath(path, fallback = 'javascript') {
   if (p.endsWith('.json')) return 'json'
   if (p.endsWith('.yml') || p.endsWith('.yaml')) return 'yaml'
   if (p.endsWith('.md') || p.endsWith('.markdown')) return 'markdown'
-  if (p.endsWith('.html') || p.endsWith('.htm') || p.endsWith('.css')) return 'markdown'
+  if (p.endsWith('.html') || p.endsWith('.htm')) return 'html'
+  if (p.endsWith('.css')) return 'css'
+  if (p.endsWith('.java')) return 'java'
+  if (p.endsWith('.sh') || p.endsWith('.bash') || p.endsWith('.zsh')) return 'shell'
   return fallback
 }

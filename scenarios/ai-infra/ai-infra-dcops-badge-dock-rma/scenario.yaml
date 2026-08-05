@@ -1,0 +1,55 @@
+title: 'DCOps: Badge-In Dock Receive FRU then Close RMA'
+slug: ai-infra-dcops-badge-dock-rma
+technology: AI Infrastructure Engineering
+category: Troubleshoot
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: datacenter
+time_limit: 1800
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Critical
+description: 'CONTEXT: DCOps / Bare Metal — Steam-class facility loop. Badge into the hall, receive
+  the FRU ASN at the loading dock, install the kit on the thermal ticket asset, run burn-in soak,
+  and close the RMA. AI Infra Engineering owns this DCOps path for GPU fleets.
+
+
+  ENVIRONMENT: Datacenter twin (3D Walk: reception → mantrap → staging/dock → data hall) + Bare Metal.
+
+
+  SYMPTOM: Ticket awaiting_parts; ASN on dock; soak not run; ticket still open.
+
+
+  OBJECTIVE: Badge-in; receive dock ASN; install FRU; attach load bank and soak to pass (auto-closes
+  ticket); FIXED-OK.'
+objectives:
+- Badge into the facility and reach the dock
+- Receive FRU ASN and install kit on the asset
+- Burn-in soak pass closes the RMA ticket
+initial_state: RMA awaiting_parts; FRU ASN staged at dock; burn-in not started.
+hints:
+- order: 1
+  cost: 0
+  content: Enter the Datacenter twin, badge-in at reception/mantrap, then Walk toward Staging / dock.
+- order: 2
+  cost: 20
+  content: Receive the dock ASN for the RMA, install the FRU kit on the ticket asset, then open Burn-in.
+- order: 3
+  cost: 45
+  content: Attach load bank and soak until pass — ticket should auto-close — then leave FIXED-OK.
+consoles:
+- datacenter
+- baremetal
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - datacenter
+  - baremetal
+  - terminal
