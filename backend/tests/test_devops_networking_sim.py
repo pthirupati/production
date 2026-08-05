@@ -83,3 +83,30 @@ class DevOpsNetworkingSimTests(TestCase):
         engine.shell.run("router bgp 65001\n neighbor 10.0.0.2 remote-as 65001")
         out2 = engine.shell.run('vtysh -c "show ip bgp summary"')
         self.assertIn("Established", out2)
+
+    def test_vyos_configure_commit_compare_rollback(self):
+        n = NetworkingState("ai-infra-vyos-bgp")
+        self.assertEqual(n.vyos_enter_configure(), "[edit]")
+        before = n.vyos_running
+        self.assertEqual(n.vyos_compare(), "No changes between working and active configurations")
+        n.vyos_set("protocols bgp 65099 neighbor 10.64.1.50 remote-as 65099")
+        diff = n.vyos_compare()
+        self.assertIn("+", diff)
+        self.assertIn("Commit complete", n.vyos_commit())
+        self.assertNotEqual(n.vyos_running, before)
+        self.assertIn("Rollback complete", n.vyos_rollback(1))
+        self.assertEqual(n.vyos_running, before)
+        hist = n.vyos_show_history()
+        self.assertTrue("Revision" in hist or "No commits" in hist)
+
+    def test_vyos_shell_commit_rollback_on_ai_infra(self):
+        engine = UnifiedSimulationEngine("academy-ai-infra-005-production-cross-tech", simulation_type="rhel")
+        out = engine.shell.run("configure")
+        self.assertIn("[edit]", out)
+        engine.shell.run("set interfaces ethernet eth1 description pxe-uplink")
+        cmp_out = engine.shell.run("compare")
+        self.assertTrue("+" in cmp_out or "No changes" in cmp_out or "Error" in cmp_out)
+        commit = engine.shell.run("commit")
+        self.assertTrue("Commit" in commit or "No configuration" in commit)
+        rb = engine.shell.run("rollback 1")
+        self.assertTrue("Rollback" in rb or "Error" in rb or "no previous" in rb.lower())

@@ -591,8 +591,7 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 
 ### U7 — Continue twin connectivity / leftover spine
 401. [ ] Terraform destroy/MAAS fan-out already partially shipped — extend other `maas_*` types
-402. [ ] VyOS commit/rollback + BGP UI depth (226/261)
-403. [ ] Subscription-manager realism remaining edge cases
+402. [~] VyOS commit/rollback + BGP UI depth (226/261) — *compare + history CLI #150*403. [ ] Subscription-manager realism remaining edge cases
 404. [ ] Interview P2 voice + framing (322)
 405. [ ] Unified asset registry finish (§S1) across AWS/DC/MAAS/AWX
 
