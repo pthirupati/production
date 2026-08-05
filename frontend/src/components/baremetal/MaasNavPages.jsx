@@ -778,15 +778,19 @@ export function LxdPage({ state, busy, sessionId, run }) {
   return (
     <div>
       <h1 className="maas-page-title">LXD</h1>
-      <p className="maas-page-sub">Containers on the lab LXD host</p>
+      <p className="maas-page-sub">
+        Instances on the shared LXD inventory — open the LXD console for full management
+      </p>
       <div className="maas-table-wrap">
         <table className="maas-table">
           <thead>
             <tr>
               <th className="no-sort">Name</th>
               <th className="no-sort">Status</th>
+              <th className="no-sort">Type</th>
               <th className="no-sort">Image</th>
               <th className="no-sort">IPv4</th>
+              <th className="no-sort">Snapshots</th>
               <th className="no-sort" />
             </tr>
           </thead>
@@ -795,8 +799,10 @@ export function LxdPage({ state, busy, sessionId, run }) {
               <tr key={c.name}>
                 <td>{c.name}</td>
                 <td><MaasStatusBadge status={c.status === 'Running' ? 'Deployed' : 'New'} /></td>
+                <td>{c.type || 'container'}</td>
                 <td className="mono">{c.image}</td>
                 <td className="mono">{c.ipv4 || '—'}</td>
+                <td>{(c.snapshots || []).length}</td>
                 <td>
                   {c.status === 'Running' ? (
                     <button
@@ -820,7 +826,7 @@ export function LxdPage({ state, busy, sessionId, run }) {
                 </td>
               </tr>
             ))}
-            {!containers.length && <tr><td colSpan={5}><div className="maas-empty">No LXD containers.</div></td></tr>}
+            {!containers.length && <tr><td colSpan={7}><div className="maas-empty">No LXD instances.</div></td></tr>}
           </tbody>
         </table>
       </div>

@@ -108,6 +108,50 @@ export const baremetalApi = {
   startLxd(sessionId, name) {
     return baremetalApi.action(sessionId, 'lxd_start', { name })
   },
+  lxdStop(sessionId, name) {
+    return baremetalApi.action(sessionId, 'lxd_stop', { name })
+  },
+  lxdRestart(sessionId, name) {
+    return baremetalApi.action(sessionId, 'lxd_restart', { name })
+  },
+  lxdLaunch(sessionId, name, opts = {}) {
+    return baremetalApi.action(sessionId, 'lxd_launch', { name, ...opts })
+  },
+  lxdCreate(sessionId, name, opts = {}) {
+    return baremetalApi.action(sessionId, 'lxd_create', { name, start: false, ...opts })
+  },
+  lxdDelete(sessionId, name) {
+    return baremetalApi.action(sessionId, 'lxd_delete', { name })
+  },
+  lxdSnapshot(sessionId, name, snapshot) {
+    return baremetalApi.action(sessionId, 'lxd_snapshot', { name, snapshot })
+  },
+  lxdRestore(sessionId, name, snapshot) {
+    return baremetalApi.action(sessionId, 'lxd_restore', { name, snapshot })
+  },
+  lxdProfileCreate(sessionId, name, opts = {}) {
+    return baremetalApi.action(sessionId, 'lxd_profile_create', { name, ...opts })
+  },
+  lxdProfileSet(sessionId, name, opts = {}) {
+    return baremetalApi.action(sessionId, 'lxd_profile_set', { name, ...opts })
+  },
+  lxdProfileAssign(sessionId, name, profiles) {
+    return baremetalApi.action(sessionId, 'lxd_profile_assign', { name, profiles })
+  },
+  lxdConfigSet(sessionId, name, key, value) {
+    return baremetalApi.action(sessionId, 'lxd_config_set', { name, key, value })
+  },
+  lxdDeviceAdd(sessionId, name, device, type, extra = {}) {
+    return baremetalApi.action(sessionId, 'lxd_config_device_add', {
+      name, device, type, ...extra,
+    })
+  },
+  lxdProjectCreate(sessionId, name, opts = {}) {
+    return baremetalApi.action(sessionId, 'lxd_project_create', { name, ...opts })
+  },
+  lxdExec(sessionId, name, command) {
+    return baremetalApi.action(sessionId, 'lxd_exec_echo', { name, command })
+  },
   startKvm(sessionId, name) {
     return baremetalApi.action(sessionId, 'kvm_start', { name })
   },
@@ -142,6 +186,19 @@ export const baremetalApi = {
       architecture,
       source: source || `packer output-gpu-${sku}/`,
     })
+  },
+  /** Packer Image Factory CI (see also api/packer.js). */
+  packerFactoryState(sessionId) {
+    return baremetalApi.action(sessionId, 'packer_factory_get_state', {})
+  },
+  packerFactoryStart(sessionId, payload = {}) {
+    return baremetalApi.action(sessionId, 'packer_factory_start_pipeline', payload)
+  },
+  packerFactoryAdvance(sessionId, payload = {}) {
+    return baremetalApi.action(sessionId, 'packer_factory_advance_job', payload)
+  },
+  packerFactoryJobLogs(sessionId, jobId) {
+    return baremetalApi.action(sessionId, 'packer_factory_get_job_logs', { job_id: jobId })
   },
   deleteMachine(sessionId, machineId, hostname) {
     return baremetalApi.action(sessionId, 'maas_delete', {

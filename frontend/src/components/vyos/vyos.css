@@ -1,0 +1,128 @@
+/* VyOS ops dashboard — dark terminal-adjacent router look */
+
+.vyos-root {
+  --vyos-bg: #0b0f0e;
+  --vyos-panel: #121a17;
+  --vyos-border: #1e2e28;
+  --vyos-text: #d7e6dc;
+  --vyos-muted: #7a9588;
+  --vyos-accent: #c8a84b;
+  --vyos-ok: #3ecf8e;
+  --vyos-warn: #e0a84a;
+  --vyos-err: #e06c6c;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(200, 168, 75, 0.08), transparent 55%),
+    linear-gradient(180deg, #0d1411 0%, var(--vyos-bg) 40%);
+  color: var(--vyos-text);
+  font-family: "IBM Plex Mono", "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+}
+
+.vyos-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid var(--vyos-border);
+  background: rgba(18, 26, 23, 0.92);
+  font-size: 12px;
+  color: var(--vyos-muted);
+}
+
+.vyos-banner strong {
+  color: var(--vyos-accent);
+  font-weight: 600;
+}
+
+.vyos-grid {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.75rem;
+  padding: 0.85rem 1rem 1.25rem;
+}
+
+.vyos-card {
+  background: var(--vyos-panel);
+  border: 1px solid var(--vyos-border);
+  border-radius: 2px;
+  padding: 0.7rem 0.8rem;
+  min-height: 140px;
+}
+
+.vyos-card h3 {
+  margin: 0 0 0.55rem;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--vyos-accent);
+  font-weight: 600;
+}
+
+.vyos-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.vyos-table th {
+  text-align: left;
+  color: var(--vyos-muted);
+  font-weight: 500;
+  padding: 0.2rem 0.35rem 0.35rem 0;
+  border-bottom: 1px solid var(--vyos-border);
+}
+
+.vyos-table td {
+  padding: 0.28rem 0.35rem 0.28rem 0;
+  border-bottom: 1px solid rgba(30, 46, 40, 0.55);
+  vertical-align: top;
+}
+
+.vyos-pill {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--vyos-border);
+  border-radius: 2px;
+  font-size: 10px;
+}
+
+.vyos-pill.ok { color: var(--vyos-ok); border-color: rgba(62, 207, 142, 0.35); }
+.vyos-pill.warn { color: var(--vyos-warn); border-color: rgba(224, 168, 74, 0.4); }
+.vyos-pill.err { color: var(--vyos-err); border-color: rgba(224, 108, 108, 0.4); }
+
+.vyos-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #b9cfc2;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.vyos-empty {
+  color: var(--vyos-muted);
+  font-size: 11px;
+}
+
+.vyos-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 11px;
+  color: var(--vyos-muted);
+}
+
+.vyos-meta span {
+  border: 1px solid var(--vyos-border);
+  padding: 0.15rem 0.45rem;
+  border-radius: 2px;
+}

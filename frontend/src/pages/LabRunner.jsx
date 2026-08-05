@@ -38,6 +38,7 @@ import {
   LazyWindowsServerSimulator,
   LazyPeopleSoftSimulator,
   LazyBaremetalSimulator,
+  LazyLxdConsole,
   LazyDataDashboardSimulator,
   LazyAgentWorkflowSimulator,
   LazyNmapSimulator,
@@ -53,6 +54,7 @@ import {
   LazyCodingIDE,
   LazyPackerWorkspaceIde,
   LazyPromptPlayground,
+  LazyVyosConsole,
 } from '../components/lab/labSimLoader'
 import { isTerraformLab } from '../utils/iacFlavor'
 import { resetTerraformAwsLabState } from '../utils/terraformAwsBridge'
@@ -416,8 +418,10 @@ export default function LabRunner() {
   const [showGcpSim, setShowGcpSim] = useState(false)
   const [simTerminalOpen, setSimTerminalOpen] = useState(false)
   const [showBaremetalSim, setShowBaremetalSim] = useState(false)
+  const [showLxdSim, setShowLxdSim] = useState(false)
   const [showDatacenterSim, setShowDatacenterSim] = useState(false)
   const [showPackerSim, setShowPackerSim] = useState(false)
+  const [showVyosSim, setShowVyosSim] = useState(false)
   // Bumped by the sim error-boundary "Reset saved state" action to force a
   // clean remount of the primary simulator subtree after re-seeding its store.
   const [simResetNonce, setSimResetNonce] = useState(0)
@@ -516,6 +520,7 @@ export default function LabRunner() {
     const onOpen = (ev) => {
       const kind = ev?.detail?.kind
       if (kind === 'baremetal') setShowBaremetalSim(true)
+      else if (kind === 'lxd') setShowLxdSim(true)
       else if (kind === 'aws') setShowAwsSim(true)
       else if (kind === 'azure') setShowAzureSim(true)
       else if (kind === 'gcp') setShowGcpSim(true)
@@ -1679,8 +1684,8 @@ export default function LabRunner() {
   const simOverlayOpen = !isSimPrimaryLab && (
     showMonitoringSim || showNmapSim || showWiresharkSim
     || showDataDashboardSim || showAgentSim || showWindowsSim || showPeopleSoftSim
-    || showAwxSim || showBaremetalSim || showTerraformSim || showAwsSim || showCicdSim
-    || showDatacenterSim || showPackerSim || showAzureSim || showGcpSim
+    || showAwxSim || showBaremetalSim || showLxdSim || showTerraformSim || showAwsSim || showCicdSim
+    || showDatacenterSim || showPackerSim || showAzureSim || showGcpSim || showVyosSim
   )
   const primarySimKind = isAwsLab ? 'aws'
     : isK8sLab ? 'k8s'
@@ -1817,6 +1822,15 @@ export default function LabRunner() {
     || consolesInclude(scenario?.consoles, 'baremetal')
     || consolesInclude(scenario?.consoles, 'maas')
     || consolesInclude(scenario?.consoles, 'lxd')
+  )
+  const showLxdLink = !isBaremetalGuiLab && (
+    techSlugLc === 'ai-infra'
+    || techSlugLc === 'lxd'
+    || techSlugLc === 'baremetal'
+    || /lxd|lxc/.test((scenario?.slug || '').toLowerCase())
+    || scenario?.lxd_link === true
+    || consolesInclude(scenario?.consoles, 'lxd')
+    || consolesInclude(scenario?.consoles, 'baremetal')
   )
   const showHostedAzureLink = !isAzureLab && canAzureConsole && (
     hostPlatform === 'azure' || techSlugLc === 'azure'
@@ -2819,6 +2833,17 @@ export default function LabRunner() {
                   <ExternalLink size={12} /> Open Bare Metal
                 </button>
               )}
+              {showLxdLink && (
+                <button
+                  type="button"
+                  onClick={() => setShowLxdSim(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
+                  style={{ borderColor: 'rgba(233,84,32,.45)', color: '#E95420', background: 'rgba(233,84,32,.12)' }}
+                  title="Open LXD console — instances, profiles, storage, cluster"
+                >
+                  <ExternalLink size={12} /> Open LXD
+                </button>
+              )}
               {isVyosLab && (
                 <button
                   type="button"
@@ -2826,12 +2851,13 @@ export default function LabRunner() {
                     setShowBaremetalSim(false)
                     setShowAwxSim(false)
                     setShowDatacenterSim(false)
+                    setShowVyosSim(true)
                     setSimTerminalOpen(true)
                     setSidebarOpen(false)
                   }}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
                   style={{ borderColor: 'rgba(234,179,8,.45)', color: '#facc15', background: 'rgba(234,179,8,.12)' }}
-                  title="VyOS router CLI — configure in Lab Terminal (configure / commit / show)"
+                  title="VyOS — Lab Terminal CLI + ops dashboard"
                 >
                   <Terminal size={12} /> Open VyOS
                 </button>
@@ -3213,6 +3239,17 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open Bare Metal
             </button>
           )}
+          {showLxdLink && (
+            <button
+              type="button"
+              onClick={() => setShowLxdSim(true)}
+              title="Open LXD console — instances, profiles, storage, cluster"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(233,84,32,.45)', color: '#E95420', background: 'rgba(233,84,32,.12)' }}
+            >
+              <ExternalLink size={12} /> Open LXD
+            </button>
+          )}
           {isVyosLab && (
             <button
               type="button"
@@ -3220,10 +3257,11 @@ export default function LabRunner() {
                 setShowBaremetalSim(false)
                 setShowAwxSim(false)
                 setShowDatacenterSim(false)
+                setShowVyosSim(true)
                 setSimTerminalOpen(true)
                 setSidebarOpen(false)
               }}
-              title="VyOS router CLI — configure in Lab Terminal (configure / commit / show)"
+              title="VyOS — Lab Terminal CLI + ops dashboard"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(234,179,8,.45)', color: '#facc15', background: 'rgba(234,179,8,.12)' }}
             >
@@ -3645,6 +3683,31 @@ export default function LabRunner() {
           <LazySimPanel Sim={LazyBaremetalSimulator} label="bare metal" sessionId={sessionId} scenario={scenario} embedded={false}
             onExit={() => setShowBaremetalSim(false)}
             onToggleTerminal={() => setShowBaremetalSim(false)} {...simChromeProps} />
+        </div>
+      )}
+      {showLxdLink && showLxdSim && (
+        <div className={companionOverlayClass}>
+          <LazySimPanel Sim={LazyLxdConsole} label="LXD" sessionId={sessionId} scenario={scenario} embedded={false}
+            onExit={() => setShowLxdSim(false)}
+            onToggleTerminal={() => setShowLxdSim(false)} {...simChromeProps} />
+        </div>
+      )}
+      {isVyosLab && showVyosSim && (
+        <div className={companionOverlayClass}>
+          <LazySimPanel
+            Sim={LazyVyosConsole}
+            label="VyOS"
+            sessionId={sessionId}
+            scenario={scenario}
+            embedded={false}
+            onExit={() => setShowVyosSim(false)}
+            onToggleTerminal={() => {
+              setShowVyosSim(false)
+              setSimTerminalOpen(true)
+            }}
+            simTerminalOpen={simTerminalOpen}
+            {...simChromeProps}
+          />
         </div>
       )}
       {showDatacenterLink && showDatacenterSim && (

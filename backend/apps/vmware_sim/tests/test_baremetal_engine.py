@@ -452,3 +452,182 @@ class BaremetalLifecycleTests(TestCase):
             "Failed commissioning", "Failed deployment",
         ):
             self.assertIn(status, bm.LIFECYCLE)
+
+    # ── Packer Image Factory pipeline ──────────────────────────────────────
+    def test_packer_factory_pipeline_publish_boot_resource(self):
+        sid = self._session("ai-infra-packer-gpu-image-factory")
+        st = bm.get_state(sid)["state"]
+        self.assertIn("needs_custom_image_deploy", st.get("broken") or {})
+
+        template = (
+            'provisioner "shell" { script = "scripts/install-gpu-h100.sh" }\n'
+            'runcmd: [systemctl enable --now nvidia-persistenced]\n'
+        )
+        start = bm.apply_action(sid, "packer_factory_start_pipeline", {
+            "sku": "h100",
+            "files": {"gpu-h100.pkr.hcl": template},
+            "template": template,
+        })
+        self.assertTrue(start["ok"], start)
+        self.assertEqual(start["run"]["sku"], "h100")
+
+        # Drive all jobs: init/validate/build/libguestfs complete in one advance each;
+        # vuln-scan needs fail then remediate; gpu-sanity + publish need two steps each.
+        max_steps = 40
+        for _ in range(max_steps):
+            run = bm.apply_action(sid, "packer_factory_get_state", {}).get("active_run") or {}
+            if run.get("status") == "success":
+                break
+            if run.get("status") == "failure":
+                failed = next((j for j in run["jobs"] if j["status"] == "failure"), None)
+                self.assertIsNotNone(failed)
+                if failed["id"] == "vuln-scan+remediate":
+                    # Advance again remediates CVE, or explicit re-run
+                    adv = bm.apply_action(sid, "packer_factory_advance_job", {})
+                    self.assertTrue(adv["ok"], adv)
+                    continue
+                rerun = bm.apply_action(sid, "packer_factory_rerun_job", {
+                    "job_id": failed["id"],
+                    "files": {"gpu-h100.pkr.hcl": template},
+                })
+                self.assertTrue(rerun["ok"], rerun)
+                continue
+            adv = bm.apply_action(sid, "packer_factory_advance_job", {})
+            self.assertTrue(adv["ok"], adv)
+        else:
+            self.fail("Pipeline did not complete within step budget")
+
+        final = bm.apply_action(sid, "packer_factory_get_state", {})
+        self.assertTrue(final.get("artifact_ready") or (final.get("active_run") or {}).get("artifact_ready"))
+        names = {r["name"] for r in bm.get_state(sid)["state"]["maas"]["boot_resources"]}
+        self.assertIn("custom/h100-jammy", names)
+        broken = bm.get_state(sid)["state"].get("broken") or {}
+        self.assertNotIn("packer_image_unpublished", broken)
+        self.assertNotIn("missing_boot_resource", broken)
+
+    def test_packer_factory_gpu_sanity_requires_nvidia_marker(self):
+        sid = self._session("packer-gpu-sanity")
+        start = bm.apply_action(sid, "packer_factory_start_pipeline", {
+            "sku": "h200",
+            "files": {"gpu-h200.pkr.hcl": 'source "qemu" "gpu" {}\n# no driver markers\n'},
+            "template": "plain packer without drivers",
+        })
+        self.assertTrue(start["ok"], start)
+        self.assertFalse(start["run"]["has_nvidia_marker"])
+
+        # Advance through jobs until gpu-sanity fails
+        for _ in range(30):
+            run = (bm.apply_action(sid, "packer_factory_get_state", {}).get("active_run") or {})
+            jobs = {j["id"]: j for j in run.get("jobs") or []}
+            if jobs.get("gpu-sanity", {}).get("status") == "failure":
+                break
+            if run.get("status") == "failure" and jobs.get("vuln-scan+remediate", {}).get("status") == "failure":
+                bm.apply_action(sid, "packer_factory_advance_job", {})  # remediate
+                continue
+            bm.apply_action(sid, "packer_factory_advance_job", {})
+        else:
+            self.fail("gpu-sanity did not fail")
+
+        gpu = next(j for j in bm.apply_action(sid, "packer_factory_get_state", {})["active_run"]["jobs"] if j["id"] == "gpu-sanity")
+        self.assertEqual(gpu["status"], "failure")
+        names = {r["name"] for r in bm.get_state(sid)["state"]["maas"]["boot_resources"]}
+        self.assertNotIn("custom/h200-jammy", names)
+
+    def test_needs_custom_image_deploy_cleared_on_deploy(self):
+        sid = self._session("ai-infra-packer-custom-deploy")
+        # Seed broken flag (preset already sets it for packer slugs)
+        broken = bm.get_state(sid)["state"].get("broken") or {}
+        self.assertTrue(broken.get("needs_custom_image_deploy"))
+
+        base = 7_000_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            # Clear publish-related flags via publish
+            pub = bm.apply_action(sid, "maas_publish_boot_resource", {"sku": "h100"})
+            self.assertTrue(pub["ok"], pub)
+            bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+        with mock.patch.object(bm, "_now", return_value=base + bm.COMMISSION_SECONDS + 1):
+            self.assertEqual(self._machine(sid, 2)["status"], "Ready")
+            t_deploy = base + bm.COMMISSION_SECONDS + 1
+        with mock.patch.object(bm, "_now", return_value=t_deploy):
+            # Re-set needs_custom_image_deploy after publish cleared other flags
+            from django.core.cache import cache as _cache
+            import json as _json
+            key = f"baremetal_session:{sid}"
+            raw = _cache.get(key)
+            data = _json.loads(raw) if isinstance(raw, str) else raw
+            data["state"].setdefault("broken", {})["needs_custom_image_deploy"] = True
+            _cache.set(key, _json.dumps(data), 7200)
+            res = bm.apply_action(sid, "maas_deploy", {"machine_id": 2, "boot_resource": "custom/h100-jammy"})
+            self.assertTrue(res["ok"], res)
+        with mock.patch.object(bm, "_now", return_value=t_deploy + bm.DEPLOY_SECONDS + 1):
+            done = self._machine(sid, 2)
+            self.assertEqual(done["status"], "Deployed")
+            self.assertTrue(str(done.get("boot_resource") or "").startswith("custom/"))
+            ok, msg = bm.validate_baremetal_lab(sid, "ai-infra-packer-custom-deploy")
+            self.assertTrue(ok, msg)
+            self.assertNotIn("needs_custom_image_deploy", bm.get_state(sid)["state"].get("broken") or {})
+
+    # ── LXD inventory / lifecycle ─────────────────────────────────────────
+    def test_lxd_launch_creates_running_instance(self):
+        sid = self._session("lxd-container-stopped")
+        res = bm.apply_action(sid, "lxd_launch", {
+            "name": "lab-infer",
+            "image": "ubuntu:22.04",
+            "type": "container",
+        })
+        self.assertTrue(res["ok"], res)
+        containers = bm.get_state(sid)["state"]["lxd"]["containers"]
+        row = next(c for c in containers if c["name"] == "lab-infer")
+        self.assertEqual(row["status"], "Running")
+        self.assertEqual(row["type"], "container")
+        self.assertTrue(row.get("ipv4"))
+        self.assertIn("default", row.get("profiles") or [])
+        self.assertIsInstance(row.get("snapshots"), list)
+        self.assertIsInstance(row.get("devices"), dict)
+        self.assertEqual(row.get("project"), "default")
+
+    def test_lxd_snapshot_and_restore(self):
+        sid = self._session("lxd-container-stopped")
+        bm.apply_action(sid, "lxd_start", {"name": "batch-job"})
+        res = bm.apply_action(sid, "lxd_snapshot", {"name": "batch-job", "snapshot": "pre-change"})
+        self.assertTrue(res["ok"], res)
+        c = next(x for x in bm.get_state(sid)["state"]["lxd"]["containers"] if x["name"] == "batch-job")
+        self.assertTrue(any(s.get("name") == "pre-change" for s in c["snapshots"]))
+        res = bm.apply_action(sid, "lxd_restore", {"name": "batch-job", "snapshot": "pre-change"})
+        self.assertTrue(res["ok"], res)
+        c = next(x for x in bm.get_state(sid)["state"]["lxd"]["containers"] if x["name"] == "batch-job")
+        self.assertEqual(c["status"], "Stopped")
+        self.assertEqual(c.get("ipv4") or "", "")
+
+    def test_lxd_gpu_device_sets_nvidia_smi_ok(self):
+        sid = self._session("lxd-container-stopped")
+        res = bm.apply_action(sid, "lxd_config_device_add", {
+            "name": "infer-svc",
+            "device": "gpu",
+            "type": "gpu",
+            "pci": "0000:19:00.0",
+        })
+        self.assertTrue(res["ok"], res)
+        c = next(x for x in bm.get_state(sid)["state"]["lxd"]["containers"] if x["name"] == "infer-svc")
+        self.assertTrue(c.get("nvidia_smi_ok"))
+        self.assertIn("gpu", c.get("devices") or {})
+        self.assertEqual(c["devices"]["gpu"]["type"], "gpu")
+        exec_res = bm.apply_action(sid, "lxd_exec_echo", {"name": "infer-svc", "command": "nvidia-smi"})
+        self.assertTrue(exec_res["ok"], exec_res)
+        self.assertIn("NVIDIA", exec_res.get("output") or "")
+
+    def test_lxd_seed_has_storage_networks_cluster(self):
+        sid = self._session("lxd-container-stopped")
+        lxd = bm.get_state(sid)["state"]["lxd"]
+        self.assertGreaterEqual(len(lxd.get("storage_pools") or []), 1)
+        self.assertGreaterEqual(len(lxd.get("networks") or []), 1)
+        self.assertGreaterEqual(len(lxd.get("cluster") or []), 1)
+        self.assertGreaterEqual(len(lxd.get("projects") or []), 1)
+        for c in lxd["containers"]:
+            self.assertIn("type", c)
+            self.assertIn("profiles", c)
+            self.assertIn("snapshots", c)
+            self.assertIn("devices", c)
+            self.assertIn("config", c)
+            self.assertIn("project", c)
+            self.assertIn("location", c)

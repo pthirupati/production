@@ -24,6 +24,7 @@ from typing import Any
 from django.core.cache import cache
 
 from .baremetal_v2_facades import apply_v2_action, ensure_v2
+from . import packer_factory
 
 SESSION_TTL = 7200
 
@@ -470,6 +471,202 @@ def _ensure_maas_infra(state: dict) -> None:
                 pool["machine_count"] = counts[name]
 
 
+def _lxd_instance(
+    name: str,
+    *,
+    status: str = "Stopped",
+    itype: str = "container",
+    ipv4: str = "",
+    ipv6: str = "",
+    image: str = "ubuntu:22.04",
+    profiles: list | None = None,
+    snapshots: list | None = None,
+    devices: dict | None = None,
+    config: dict | None = None,
+    project: str = "default",
+    location: str = "none",
+    nvidia_smi_ok: bool = False,
+) -> dict:
+    """Canonical LXD instance row shared by GUI and CLI inventory."""
+    return {
+        "name": name,
+        "status": status,
+        "type": itype,
+        "ipv4": ipv4,
+        "ipv6": ipv6,
+        "image": image,
+        "profiles": list(profiles if profiles is not None else ["default"]),
+        "snapshots": list(snapshots if snapshots is not None else []),
+        "devices": dict(devices if devices is not None else {
+            "root": {"path": "/", "pool": "default", "type": "disk"},
+            "eth0": {"name": "eth0", "network": "lxdbr0", "type": "nic"},
+        }),
+        "config": dict(config if config is not None else {}),
+        "project": project,
+        "location": location,
+        "nvidia_smi_ok": bool(nvidia_smi_ok),
+    }
+
+
+def _enrich_lxd_instance(inst: dict) -> dict:
+    """Upgrade a legacy {name,status,ipv4,image} row to the full instance shape."""
+    if not isinstance(inst, dict):
+        return inst
+    defaults = _lxd_instance(
+        inst.get("name") or "unnamed",
+        status=inst.get("status") or "Stopped",
+        itype=inst.get("type") or "container",
+        ipv4=inst.get("ipv4") or "",
+        ipv6=inst.get("ipv6") or "",
+        image=inst.get("image") or "ubuntu:22.04",
+        profiles=inst.get("profiles"),
+        snapshots=inst.get("snapshots"),
+        devices=inst.get("devices"),
+        config=inst.get("config"),
+        project=inst.get("project") or "default",
+        location=inst.get("location") or "none",
+        nvidia_smi_ok=bool(inst.get("nvidia_smi_ok")),
+    )
+    for key, value in defaults.items():
+        if key not in inst or inst.get(key) is None:
+            inst[key] = value
+    if not isinstance(inst.get("profiles"), list):
+        inst["profiles"] = ["default"]
+    if not isinstance(inst.get("snapshots"), list):
+        inst["snapshots"] = []
+    if not isinstance(inst.get("devices"), dict):
+        inst["devices"] = defaults["devices"]
+    if not isinstance(inst.get("config"), dict):
+        inst["config"] = {}
+    return inst
+
+
+def _lxd_infra_seed() -> dict:
+    return {
+        "profiles": [
+            {
+                "name": "default",
+                "description": "Default LXD profile",
+                "config": {},
+                "devices": {
+                    "root": {"path": "/", "pool": "default", "type": "disk"},
+                    "eth0": {"name": "eth0", "network": "lxdbr0", "type": "nic"},
+                },
+            },
+            {
+                "name": "gpu-passthrough",
+                "description": "NVIDIA GPU passthrough",
+                "config": {"nvidia.runtime": "true"},
+                "devices": {
+                    "gpu0": {"type": "gpu", "gputype": "physical", "pci": "0000:19:00.0"},
+                },
+            },
+        ],
+        "storage_pools": [
+            {"name": "default", "driver": "dir", "source": "/var/snap/lxd/common/lxd/storage-pools/default", "used_by": 2},
+            {"name": "gpu-pool", "driver": "zfs", "source": "tank/lxd", "used_by": 0},
+        ],
+        "networks": [
+            {"name": "lxdbr0", "type": "bridge", "managed": True, "ipv4": "10.10.2.1/24", "ipv6": "fd42::1/64", "used_by": 2},
+            {"name": "gpu-fabric", "type": "bridge", "managed": True, "ipv4": "10.150.0.1/24", "ipv6": "", "used_by": 0},
+        ],
+        "projects": [
+            {"name": "default", "description": "Default LXD project", "used_by": 2},
+            {"name": "inference", "description": "Inference workloads", "used_by": 0},
+        ],
+        "cluster": [
+            {"name": "node1", "url": "https://10.64.12.11:8443", "roles": ["database"], "architecture": "x86_64", "failure_domain": "default", "status": "Online"},
+            {"name": "node2", "url": "https://10.64.12.12:8443", "roles": ["database"], "architecture": "x86_64", "failure_domain": "default", "status": "Online"},
+            {"name": "node3", "url": "https://10.64.12.13:8443", "roles": ["database-standby"], "architecture": "x86_64", "failure_domain": "default", "status": "Online"},
+        ],
+        "images": [
+            {"alias": "ubuntu:22.04", "fingerprint": "a1b2c3d4e5f6", "public": True, "description": "ubuntu 22.04 LTS amd64 (cloud)", "architecture": "x86_64", "type": "container"},
+            {"alias": "ubuntu:24.04", "fingerprint": "f6e5d4c3b2a1", "public": True, "description": "ubuntu 24.04 LTS amd64 (cloud)", "architecture": "x86_64", "type": "container"},
+            {"alias": "ubuntu:22.04/vm", "fingerprint": "vm22aabbccdd", "public": True, "description": "ubuntu 22.04 LTS amd64 (VM)", "architecture": "x86_64", "type": "virtual-machine"},
+        ],
+        "operations": [],
+        "settings": {
+            "core.https_address": "[::]:8443",
+            "core.trust_password": True,
+            "images.auto_update_interval": "6",
+            "cluster.https_address": "10.64.12.11:8443",
+        },
+    }
+
+
+def _normalize_lxd_profiles(lxd: dict) -> None:
+    """Accept legacy string profile names and upgrade to profile dicts."""
+    profiles = lxd.get("profiles")
+    if not profiles:
+        lxd["profiles"] = _lxd_infra_seed()["profiles"]
+        return
+    if profiles and isinstance(profiles[0], str):
+        seed_by_name = {p["name"]: p for p in _lxd_infra_seed()["profiles"]}
+        upgraded = []
+        for name in profiles:
+            if name in seed_by_name:
+                upgraded.append(copy.deepcopy(seed_by_name[name]))
+            else:
+                upgraded.append({
+                    "name": name,
+                    "description": "",
+                    "config": {},
+                    "devices": {},
+                })
+        lxd["profiles"] = upgraded
+
+
+def _ensure_lxd_infra(state: dict) -> None:
+    lxd = state.setdefault("lxd", {})
+    seed = _lxd_infra_seed()
+    for key, value in seed.items():
+        if key not in lxd or lxd.get(key) is None:
+            lxd[key] = copy.deepcopy(value)
+    _normalize_lxd_profiles(lxd)
+    containers = lxd.setdefault("containers", [])
+    for c in containers:
+        _enrich_lxd_instance(c)
+    # Alias for callers that prefer "instances"
+    lxd["instances"] = containers
+
+
+def _find_lxd_instance(state: dict, name: str) -> dict | None:
+    for c in (state.get("lxd") or {}).get("containers") or []:
+        if (c.get("name") or "") == name:
+            return c
+    return None
+
+
+def _lxd_next_ipv4(state: dict) -> str:
+    used = set()
+    for c in (state.get("lxd") or {}).get("containers") or []:
+        ip = (c.get("ipv4") or "").strip()
+        if ip:
+            used.add(ip)
+    for n in range(5, 250):
+        candidate = f"10.10.2.{n}"
+        if candidate not in used:
+            return candidate
+    return "10.10.2.200"
+
+
+def _lxd_event(state: dict, message: str, severity: str = "info") -> None:
+    state.setdefault("events", []).insert(0, {
+        "time": _now_iso(),
+        "message": message,
+        "severity": severity,
+    })
+    ops = state.setdefault("lxd", {}).setdefault("operations", [])
+    ops.insert(0, {
+        "id": f"op-{int(_now())}-{len(ops)}",
+        "class": "task",
+        "description": message,
+        "status": "Success",
+        "created_at": _now_iso(),
+    })
+    del ops[40:]
+
+
 def _base_state() -> dict:
     m1 = _machine(1, "gpu-node-01", "Ready", "on", "10.10.1.11")
     m2 = _machine(2, "gpu-node-02", "Failed", "off", "")
@@ -484,17 +681,45 @@ def _base_state() -> dict:
         "fabrics": [{"name": "fabric-0", "vlans": ["pxe", "mgmt"]}],
     }
     maas.update(_maas_infra_seed())
+    lxd = {
+        "containers": [
+            _lxd_instance(
+                "infer-svc",
+                status="Running",
+                ipv4="10.10.2.5",
+                image="ubuntu:22.04",
+                profiles=["default"],
+                config={"limits.cpu": "2", "limits.memory": "2GiB"},
+            ),
+            _lxd_instance(
+                "batch-job",
+                status="Stopped",
+                ipv4="",
+                image="ubuntu:22.04",
+                profiles=["default"],
+            ),
+            _lxd_instance(
+                "gpu-worker-1",
+                status="Running",
+                ipv4="10.10.2.10",
+                image="ubuntu:22.04",
+                profiles=["default", "gpu-passthrough"],
+                devices={
+                    "root": {"path": "/", "pool": "default", "type": "disk"},
+                    "eth0": {"name": "eth0", "network": "lxdbr0", "type": "nic"},
+                    "gpu": {"type": "gpu", "gputype": "physical", "pci": "0000:19:00.0"},
+                },
+                nvidia_smi_ok=True,
+                location="node1",
+            ),
+        ],
+    }
+    lxd.update(_lxd_infra_seed())
     return {
         "session": {"logged_in": False, "user": ""},
         "summary": {"site": "fixitlab", "version": "MAAS 3.4 / LXD 5.x / KVM 8.x"},
         "maas": maas,
-        "lxd": {
-            "containers": [
-                {"name": "infer-svc", "status": "Running", "ipv4": "10.10.2.5", "image": "ubuntu:22.04"},
-                {"name": "batch-job", "status": "Stopped", "ipv4": "", "image": "ubuntu:22.04"},
-            ],
-            "profiles": ["default", "gpu-passthrough"],
-        },
+        "lxd": lxd,
         "kvm": {
             "vms": [
                 {"name": "train-vm-1", "state": "running", "vcpu": 8, "ram_gb": 32, "ip": "192.168.122.10"},
@@ -533,6 +758,17 @@ def _apply_preset(state: dict, slug: str) -> None:
     elif "commission" in slug and "stuck" in slug:
         state["goal"] = {"title": "Commission stuck", "objective": "Reset stuck commissioning state and redeploy the node."}
         state["broken"] = {"commission_stuck": 2}
+    elif "packer" in slug or "image-factory" in slug or "image_factory" in slug or "imagedev" in slug:
+        state["goal"] = {
+            "title": "Packer Image Factory",
+            "objective": "Build a GPU image, publish to MAAS boot-resources, and deploy a node from the custom image.",
+        }
+        state["broken"] = {
+            "packer_image_unpublished": True,
+            "needs_custom_image_deploy": True,
+            "missing_boot_resource": "custom/h100-jammy",
+        }
+        packer_factory.ensure_factory(state)
 
 
 # ── Wall-clock lifecycle advance ──────────────────────────────────────────────
@@ -713,8 +949,11 @@ def _ensure(session_id: str, slug: str = "") -> dict:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure(session_id, scenario_slug)
+    packer_factory.ensure_factory(entry["state"])
+    packer_factory.clear_needs_custom_image_deploy(entry["state"])
     ensure_v2(entry["state"])
     _ensure_maas_infra(entry["state"])
+    _ensure_lxd_infra(entry["state"])
     # Advance the lifecycle on read so status/progress reflect wall-clock time
     # even when no action has been taken since the phase started.
     _tick(entry["state"], session_id=str(session_id))
@@ -746,6 +985,21 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state.setdefault("events", []).insert(0, {"time": _now_iso(), "message": "Signed in to bare metal console", "severity": "info"})
         _save(session_id, entry)
         return {"ok": True, "message": "Logged in"}
+
+    # Packer Image Factory actions (available after login; get_state does not require write).
+    if action in packer_factory.ACTIONS:
+        if not state.get("session", {}).get("logged_in") and action != "packer_factory_get_state":
+            return {"ok": False, "error": "Sign in first"}
+        result = packer_factory.handle_action(state, action, payload)
+        if result is not None:
+            if result.get("ok"):
+                state.setdefault("events", []).insert(0, {
+                    "time": _now_iso(),
+                    "message": result.get("message") or action,
+                    "severity": "success" if "fail" not in (result.get("message") or "").lower() else "warning",
+                })
+            _save(session_id, entry)
+            return result
 
     if not state.get("session", {}).get("logged_in"):
         return {"ok": False, "error": "Sign in first"}
@@ -958,24 +1212,328 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": f"Machine {hostname} enlisted (New)", "machine_id": new_id}
 
+    # ── LXD instance lifecycle ─────────────────────────────────────────────
+    if action in ("lxd_start", "lxd_stop", "lxd_restart", "lxd_launch", "lxd_create",
+                  "create_lxd", "lxd_delete", "delete_lxd", "lxd_snapshot", "lxd_restore",
+                  "lxd_profile_create", "lxd_profile_set", "lxd_config_device_add",
+                  "lxd_project_create", "lxd_storage_list", "lxd_network_list",
+                  "lxd_cluster_list", "lxd_exec_echo", "lxd_config_set", "lxd_profile_assign",
+                  "lxd_publish"):
+        _ensure_lxd_infra(state)
+
     if action == "lxd_start":
         name = payload.get("name") or broken.get("container_stopped") or "batch-job"
-        for c in state["lxd"]["containers"]:
-            if c["name"] == name:
-                c["status"] = "Running"
-                c["ipv4"] = c.get("ipv4") or "10.10.2.6"
+        c = _find_lxd_instance(state, name)
+        if not c:
+            return {"ok": False, "error": f"Instance {name} not found"}
+        c["status"] = "Running"
+        c["ipv4"] = c.get("ipv4") or _lxd_next_ipv4(state)
         broken.pop("container_stopped", None)
+        _lxd_event(state, f"Instance {name} started", "success")
         _save(session_id, entry)
-        return {"ok": True, "message": f"Container {name} started"}
+        return {"ok": True, "message": f"Instance {name} started"}
 
     if action == "lxd_stop":
         name = payload.get("name") or ""
-        for c in state["lxd"]["containers"]:
-            if c["name"] == name:
-                c["status"] = "Stopped"
-                c["ipv4"] = ""
+        c = _find_lxd_instance(state, name)
+        if not c:
+            return {"ok": False, "error": f"Instance {name} not found"}
+        c["status"] = "Stopped"
+        c["ipv4"] = ""
+        _lxd_event(state, f"Instance {name} stopped")
         _save(session_id, entry)
-        return {"ok": True, "message": f"Container {name} stopped"}
+        return {"ok": True, "message": f"Instance {name} stopped"}
+
+    if action == "lxd_restart":
+        name = payload.get("name") or ""
+        c = _find_lxd_instance(state, name)
+        if not c:
+            return {"ok": False, "error": f"Instance {name} not found"}
+        c["status"] = "Running"
+        c["ipv4"] = c.get("ipv4") or _lxd_next_ipv4(state)
+        _lxd_event(state, f"Instance {name} restarted", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Instance {name} restarted"}
+
+    if action in ("lxd_launch", "lxd_create", "create_lxd"):
+        name = payload.get("name") or "new-svc"
+        if _find_lxd_instance(state, name):
+            return {"ok": False, "error": f"Instance {name} already exists"}
+        itype = payload.get("type") or payload.get("instance_type") or "container"
+        if itype in ("vm", "virtual-machine", "virtual_machine"):
+            itype = "virtual-machine"
+        else:
+            itype = "container"
+        image = payload.get("image") or "ubuntu:22.04"
+        profiles = payload.get("profiles") or ["default"]
+        if isinstance(profiles, str):
+            profiles = [p.strip() for p in profiles.split(",") if p.strip()]
+        project = payload.get("project") or "default"
+        start = action == "lxd_launch" or payload.get("start", True)
+        if action == "lxd_create" and payload.get("start") is False:
+            start = False
+        if action == "create_lxd" and payload.get("start") is None:
+            start = True
+        inst = _lxd_instance(
+            name,
+            status="Running" if start else "Stopped",
+            itype=itype,
+            ipv4=_lxd_next_ipv4(state) if start else "",
+            image=image,
+            profiles=profiles,
+            project=project,
+            location=payload.get("location") or "none",
+            config=payload.get("config") or {},
+            devices=payload.get("devices"),
+        )
+        state["lxd"]["containers"].append(inst)
+        verb = "Launched" if action == "lxd_launch" else "Created"
+        _lxd_event(state, f"Instance {name} {verb.lower()}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"{verb} {name}", "instance": inst}
+
+    if action in ("lxd_delete", "delete_lxd"):
+        name = payload.get("name") or ""
+        before = len(state["lxd"]["containers"])
+        state["lxd"]["containers"] = [
+            c for c in state["lxd"]["containers"] if (c.get("name") or "") != name
+        ]
+        removed = before - len(state["lxd"]["containers"])
+        if removed:
+            _lxd_event(state, f"Instance {name} deleted")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Instance {name} deleted" if removed else f"Instance {name} not found"}
+
+    if action == "lxd_snapshot":
+        name = payload.get("name") or payload.get("instance") or ""
+        snap_name = payload.get("snapshot") or payload.get("snapshot_name") or f"snap{int(_now()) % 10000}"
+        c = _find_lxd_instance(state, name)
+        if not c:
+            return {"ok": False, "error": f"Instance {name} not found"}
+        snaps = c.setdefault("snapshots", [])
+        if any(s.get("name") == snap_name for s in snaps):
+            return {"ok": False, "error": f"Snapshot {snap_name} already exists"}
+        snaps.append({
+            "name": snap_name,
+            "created_at": _now_iso(),
+            "stateful": bool(payload.get("stateful")),
+        })
+        _lxd_event(state, f"Snapshot {name}/{snap_name} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Snapshot {snap_name} created", "snapshot": snaps[-1]}
+
+    if action == "lxd_restore":
+        name = payload.get("name") or payload.get("instance") or ""
+        snap_name = payload.get("snapshot") or payload.get("snapshot_name") or ""
+        c = _find_lxd_instance(state, name)
+        if not c:
+            return {"ok": False, "error": f"Instance {name} not found"}
+        snaps = c.get("snapshots") or []
+        if snap_name and not any(s.get("name") == snap_name for s in snaps):
+            return {"ok": False, "error": f"Snapshot {snap_name} not found"}
+        if not snap_name and snaps:
+            snap_name = snaps[-1]["name"]
+        if not snap_name:
+            return {"ok": False, "error": "No snapshot to restore"}
+        # Restoring keeps the instance stopped until explicitly started (LXD-like).
+        c["status"] = "Stopped"
+        c["ipv4"] = ""
+        _lxd_event(state, f"Restored {name} from snapshot {snap_name}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Instance {name} restored from {snap_name}"}
+
+    if action == "lxd_profile_create":
+        pname = payload.get("name") or payload.get("profile") or ""
+        if not pname:
+            return {"ok": False, "error": "Profile name required"}
+        profiles = state["lxd"].setdefault("profiles", [])
+        if any((p.get("name") if isinstance(p, dict) else p) == pname for p in profiles):
+            return {"ok": False, "error": f"Profile {pname} already exists"}
+        row = {
+            "name": pname,
+            "description": payload.get("description") or "",
+            "config": payload.get("config") or {},
+            "devices": payload.get("devices") or {},
+        }
+        profiles.append(row)
+        _lxd_event(state, f"Profile {pname} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Profile {pname} created", "profile": row}
+
+    if action == "lxd_profile_set":
+        pname = payload.get("name") or payload.get("profile") or "default"
+        key = payload.get("key") or ""
+        value = payload.get("value")
+        profiles = state["lxd"].setdefault("profiles", [])
+        target = None
+        for p in profiles:
+            if isinstance(p, dict) and p.get("name") == pname:
+                target = p
+                break
+        if target is None:
+            return {"ok": False, "error": f"Profile {pname} not found"}
+        if key:
+            target.setdefault("config", {})[key] = value if value is not None else ""
+        if isinstance(payload.get("config"), dict):
+            target.setdefault("config", {}).update(payload["config"])
+        if isinstance(payload.get("devices"), dict):
+            target.setdefault("devices", {}).update(payload["devices"])
+        _lxd_event(state, f"Profile {pname} updated")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Profile {pname} updated", "profile": target}
+
+    if action == "lxd_profile_assign":
+        name = payload.get("name") or payload.get("instance") or ""
+        profiles = payload.get("profiles") or []
+        if isinstance(profiles, str):
+            profiles = [p.strip() for p in profiles.split(",") if p.strip()]
+        c = _find_lxd_instance(state, name)
+        if not c:
+            return {"ok": False, "error": f"Instance {name} not found"}
+        if not profiles:
+            return {"ok": False, "error": "profiles required"}
+        c["profiles"] = profiles
+        _lxd_event(state, f"Profiles on {name} set to {','.join(profiles)}")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Profiles updated on {name}"}
+
+    if action == "lxd_config_set":
+        name = payload.get("name") or payload.get("instance") or ""
+        key = payload.get("key") or ""
+        value = payload.get("value")
+        c = _find_lxd_instance(state, name)
+        if not c:
+            return {"ok": False, "error": f"Instance {name} not found"}
+        if not key:
+            return {"ok": False, "error": "config key required"}
+        c.setdefault("config", {})[key] = value if value is not None else ""
+        _lxd_event(state, f"Config {key} set on {name}")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Config {key} updated"}
+
+    if action == "lxd_config_device_add":
+        name = payload.get("name") or payload.get("instance") or ""
+        device = payload.get("device") or payload.get("device_name") or ""
+        dtype = (payload.get("type") or payload.get("device_type") or "disk").lower()
+        c = _find_lxd_instance(state, name)
+        if not c:
+            return {"ok": False, "error": f"Instance {name} not found"}
+        if not device:
+            device = {"disk": "disk1", "nic": "eth1", "gpu": "gpu"}.get(dtype, "dev0")
+        devices = c.setdefault("devices", {})
+        if dtype == "gpu":
+            devices[device] = {
+                "type": "gpu",
+                "gputype": payload.get("gputype") or "physical",
+                "pci": payload.get("pci") or "0000:19:00.0",
+            }
+            c["nvidia_smi_ok"] = True
+            # Convenience alias so labs can assert devices.gpu
+            if device != "gpu" and "gpu" not in devices:
+                devices["gpu"] = dict(devices[device])
+        elif dtype == "nic":
+            devices[device] = {
+                "type": "nic",
+                "name": payload.get("nictype_name") or device,
+                "network": payload.get("network") or "lxdbr0",
+                "nictype": payload.get("nictype") or "bridged",
+            }
+        else:  # disk
+            devices[device] = {
+                "type": "disk",
+                "path": payload.get("path") or f"/{device}",
+                "pool": payload.get("pool") or "default",
+                "source": payload.get("source") or "",
+                "size": payload.get("size") or "",
+            }
+        _lxd_event(state, f"Device {device} ({dtype}) added to {name}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Device {device} added", "devices": devices}
+
+    if action == "lxd_project_create":
+        pname = payload.get("name") or payload.get("project") or ""
+        if not pname:
+            return {"ok": False, "error": "Project name required"}
+        projects = state["lxd"].setdefault("projects", [])
+        if any(p.get("name") == pname for p in projects):
+            return {"ok": False, "error": f"Project {pname} already exists"}
+        row = {"name": pname, "description": payload.get("description") or "", "used_by": 0}
+        projects.append(row)
+        _lxd_event(state, f"Project {pname} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Project {pname} created", "project": row}
+
+    if action == "lxd_storage_list":
+        pools = state["lxd"].get("storage_pools") or []
+        _save(session_id, entry)
+        return {"ok": True, "message": "Storage pools", "storage_pools": pools}
+
+    if action == "lxd_network_list":
+        nets = state["lxd"].get("networks") or []
+        _save(session_id, entry)
+        return {"ok": True, "message": "Networks", "networks": nets}
+
+    if action == "lxd_cluster_list":
+        members = state["lxd"].get("cluster") or []
+        _save(session_id, entry)
+        return {"ok": True, "message": "Cluster members", "cluster": members}
+
+    if action == "lxd_exec_echo":
+        name = payload.get("name") or payload.get("instance") or "infer-svc"
+        cmd = payload.get("command") or payload.get("cmd") or "echo ok"
+        c = _find_lxd_instance(state, name)
+        # Canned bash output for labs (nvidia-smi, uname, etc.)
+        low_cmd = str(cmd).lower()
+        if "nvidia-smi" in low_cmd:
+            if c and c.get("nvidia_smi_ok"):
+                output = (
+                    "Thu Aug  6 00:00:00 2026\n"
+                    "+-----------------------------------------------------------------------------+\n"
+                    "| NVIDIA-SMI 535.104.05   Driver Version: 535.104.05   CUDA Version: 12.2     |\n"
+                    "|-------------------------------+----------------------+----------------------+\n"
+                    "| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |\n"
+                    "|   0  NVIDIA H100 80GB HBM3 Off | 00000000:19:00.0 Off |                    0 |\n"
+                    "+-------------------------------+----------------------+----------------------+"
+                )
+            else:
+                output = "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
+        elif "uname" in low_cmd:
+            output = "Linux " + name + " 5.15.0-91-generic #101-Ubuntu SMP x86_64 GNU/Linux"
+        elif low_cmd.strip() in ("bash", "sh", "/bin/bash"):
+            output = f"root@{name}:~#"
+        else:
+            # Generic echo / command marker
+            echoed = cmd
+            if low_cmd.startswith("echo "):
+                echoed = str(cmd)[5:]
+            output = echoed if echoed else "ok"
+        _save(session_id, entry)
+        return {
+            "ok": True,
+            "message": f"Executed on {name}",
+            "output": output,
+            "prompt": f"root@{name}:~#",
+        }
+
+    if action == "lxd_publish":
+        name = payload.get("name") or payload.get("instance") or ""
+        alias = payload.get("alias") or payload.get("image") or f"{name}-image"
+        c = _find_lxd_instance(state, name)
+        if not c:
+            return {"ok": False, "error": f"Instance {name} not found"}
+        images = state["lxd"].setdefault("images", [])
+        row = {
+            "alias": alias,
+            "fingerprint": f"pub{int(_now()) % 10_000_000:07d}",
+            "public": False,
+            "description": f"Published from {name}",
+            "architecture": "x86_64",
+            "type": c.get("type") or "container",
+        }
+        images.append(row)
+        _lxd_event(state, f"Published {name} as image {alias}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Image {alias} published", "image": row}
 
     if action == "kvm_start":
         name = payload.get("name") or broken.get("vm_stopped") or "train-vm-2"
@@ -1033,30 +1591,6 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         broken.pop("machine_needs_commission", None)
         _save(session_id, entry)
         return {"ok": True, "message": "Commission reset complete"}
-
-    if action == "create_lxd":
-        name = payload.get("name") or "new-svc"
-        state["lxd"]["containers"].append(
-            {"name": name, "status": "Running", "ipv4": "10.10.2.7", "image": payload.get("image") or "ubuntu:22.04"}
-        )
-        _save(session_id, entry)
-        return {"ok": True, "message": f"Container {name} created"}
-
-    if action == "delete_lxd":
-        name = payload.get("name") or ""
-        before = len(state["lxd"]["containers"])
-        state["lxd"]["containers"] = [
-            c for c in state["lxd"]["containers"] if (c.get("name") or "") != name
-        ]
-        removed = before - len(state["lxd"]["containers"])
-        if removed:
-            state["events"].insert(0, {
-                "time": _now_iso(),
-                "message": f"LXD container {name} deleted",
-                "severity": "info",
-            })
-        _save(session_id, entry)
-        return {"ok": True, "message": f"Container {name} deleted" if removed else f"Container {name} not found"}
 
     if action == "create_kvm":
         name = payload.get("name") or "new-vm"
@@ -1471,6 +2005,9 @@ def validate_baremetal_lab(session_id: str, scenario_slug: str = "") -> tuple[bo
     # Advance the wall-clock lifecycle before grading so a machine that finished
     # commissioning/deploying between requests is scored against its real state.
     if _tick(entry["state"]):
+        _save(session_id, entry)
+    # Optional Image Factory grading: clear when Deployed machine uses custom/* image.
+    if packer_factory.clear_needs_custom_image_deploy(entry["state"]):
         _save(session_id, entry)
     broken = entry["state"].get("broken") or {}
     if broken:
