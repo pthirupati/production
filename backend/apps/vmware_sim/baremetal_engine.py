@@ -216,6 +216,8 @@ def _resolve_boot_resource(state: dict, name: str | None) -> dict | None:
             rn = (r.get("name") or "")
             if rn == f"custom/{short}-jammy" or r.get("sku") == short:
                 return r
+        # Explicit name was requested but not present — do not silently default.
+        return None
     for r in resources:
         if "ubuntu/jammy" in (r.get("name") or ""):
             return r
