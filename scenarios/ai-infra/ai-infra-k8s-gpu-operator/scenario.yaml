@@ -1,0 +1,56 @@
+title: 'Kubernetes GPU Operator on MAAS-Deployed H100 Node'
+slug: ai-infra-k8s-gpu-operator
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1800
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: AI Infra Engineering — after MAAS deploy of an ImageDev H100 image, stand up
+  Kubernetes with the NVIDIA GPU Operator / device plugin so nvidia.com/gpu is schedulable.
+  This is infrastructure bring-up (not the application GPU course).
+
+
+  ENVIRONMENT: Lab Terminal (kubectl + nvidia-smi) + Bare Metal + optional Packer. Cross-tech
+  consoles for MAAS and Datacenter available from the lab strip.
+
+
+  SYMPTOM: Cluster up but nodes do not advertise nvidia.com/gpu; GPU pods Pending.
+
+
+  OBJECTIVE: Confirm GPUs via nvidia-smi; fix/apply GPU Operator or device-plugin DaemonSet;
+  verify allocatable nvidia.com/gpu; FIXED-OK.'
+objectives:
+- Confirm H100 GPUs on the Deployed node
+- Install or repair NVIDIA GPU Operator / device plugin
+- Verify nvidia.com/gpu is allocatable on the node
+initial_state: MAAS-deployed H100 node; K8s present; device plugin misconfigured.
+hints:
+- order: 1
+  cost: 0
+  content: Run nvidia-smi -L then kubectl get nodes -o custom-columns=NAME:.metadata.name,GPU:.status.allocatable.nvidia\.com/gpu
+- order: 2
+  cost: 20
+  content: Apply or repair the NVIDIA device-plugin DaemonSet / GPU Operator so the plugin mounts correctly.
+- order: 3
+  cost: 45
+  content: Confirm allocatable nvidia.com/gpu is non-zero and a smoke pod can schedule, then FIXED-OK.
+consoles:
+- terminal
+- baremetal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - terminal
+  - baremetal
+  - datacenter

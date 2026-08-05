@@ -469,6 +469,9 @@ export default function DatacenterSimulator({
                   `Badge-in ${id}`,
                 )
               }}
+              onEnterRoom={(room) => {
+                if (room?.id) enterRoom(room)
+              }}
               selectedServerId={selectedServerId}
               expandedRack={expandedRack}
               onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}

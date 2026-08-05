@@ -964,10 +964,103 @@ function CableTray() {
   )
 }
 
+/** Ticket objective marker — glowing beacon above the faulted rack/U (Steam quest marker). */
+function TicketWaypoint({ ticket, racks, serversByRack, onSelectServer }) {
+  const ref = useRef()
+  const pos = useMemo(() => {
+    const aid = ticket?.asset_id
+    if (!aid) return null
+    let rackIdx = -1
+    let uy = 1.2
+    racks.forEach((rack, i) => {
+      const list = serversByRack[rack.id] || []
+      const s = list.find((x) => x.id === aid)
+      if (s) {
+        rackIdx = i
+        uy = ((s.u_slot || 1) - 1) * U_H + U_H * 0.5 + 0.35
+      }
+    })
+    if (rackIdx < 0) return null
+    const { x, z } = rackPosition(rackIdx)
+    return [x, uy, z + RACK_D / 2 + 0.25]
+  }, [ticket, racks, serversByRack])
+
+  useFrame(({ clock }) => {
+    if (!ref.current || !pos) return
+    ref.current.position.y = pos[1] + Math.sin(clock.elapsedTime * 2.4) * 0.08
+    ref.current.rotation.y = clock.elapsedTime * 1.2
+  })
+  if (!pos) return null
+  const hot = /critical|high/i.test(ticket?.priority || '')
+  return (
+    <group
+      ref={ref}
+      position={pos}
+      onClick={(e) => {
+        e.stopPropagation()
+        if (ticket?.asset_id) onSelectServer?.(ticket.asset_id)
+      }}
+      onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }}
+      onPointerOut={() => { document.body.style.cursor = 'default' }}
+    >
+      <mesh castShadow>
+        <coneGeometry args={[0.12, 0.28, 4]} />
+        <meshStandardMaterial
+          color={hot ? '#ef4444' : '#f59e0b'}
+          emissive={hot ? '#dc2626' : '#d97706'}
+          emissiveIntensity={0.85}
+          metalness={0.2}
+          roughness={0.4}
+        />
+      </mesh>
+      <Html center distanceFactor={8} style={{ pointerEvents: 'none' }}>
+        <div className={`dc-3d-label ${hot ? 'dc-3d-label-hot' : ''}`}>
+          {(ticket.id || 'TKT').slice(0, 12)} · {(ticket.summary || ticket.title || 'fault').slice(0, 28)}
+        </div>
+      </Html>
+    </group>
+  )
+}
+
+/** Corridor door portal into another campus room (walk-up, not room-tab only). */
+function RoomPortal({ position, label, roomId, onEnterRoom, color = '#38bdf8' }) {
+  const matRef = useRef()
+  useFrame(({ clock }) => {
+    if (!matRef.current) return
+    matRef.current.emissiveIntensity = 0.25 + Math.sin(clock.elapsedTime * 2) * 0.12
+  })
+  return (
+    <group position={position}>
+      <mesh
+        castShadow
+        onClick={(e) => {
+          e.stopPropagation()
+          onEnterRoom?.({ id: roomId, name: label })
+        }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }}
+        onPointerOut={() => { document.body.style.cursor = 'default' }}
+      >
+        <boxGeometry args={[1.1, 2.1, 0.08]} />
+        <meshStandardMaterial
+          ref={matRef}
+          color="#0f172a"
+          emissive={color}
+          emissiveIntensity={0.3}
+          metalness={0.5}
+          roughness={0.35}
+        />
+      </mesh>
+      <Html position={[0, 1.25, 0.1]} center distanceFactor={10} style={{ pointerEvents: 'none' }}>
+        <div className="dc-3d-label">{label}</div>
+      </Html>
+    </group>
+  )
+}
+
 function SceneContent({
   racks, serversByRack, network, cooling, pdus, selectedId, expandedRack,
   onSelectServer, onSelectRack, onOpenBmc, onUnplugCable, onPlugCable, physicsEnabled, onFps, animBoost, intro,
-  walkMode = false, tickets = [], doorOpen = false,
+  walkMode = false, tickets = [], doorOpen = false, onEnterRoom,
 }) {
   const thermalStress = useMemo(() => {
     const units = cooling || []
@@ -1091,6 +1184,22 @@ function SceneContent({
       <Environment preset="warehouse" />
       <Floor />
       <CorridorShell dockBusy={dockBusy} doorOpen={doorOpen} />
+      <RoomPortal position={[-6.2, 1.05, 0.2]} label="Staging / dock" roomId="loading-dock" onEnterRoom={onEnterRoom} color="#f59e0b" />
+      <RoomPortal position={[-5.2, 1.05, 3.2]} label="Reception" roomId="reception" onEnterRoom={onEnterRoom} color="#94a3b8" />
+      <RoomPortal position={[5.8, 1.05, 0.4]} label="MDF" roomId="mdf" onEnterRoom={onEnterRoom} color="#38bdf8" />
+      <RoomPortal position={[3.2, 1.05, 3.4]} label="NOC" roomId="noc" onEnterRoom={onEnterRoom} color="#a78bfa" />
+      {(tickets || [])
+        .filter((t) => t?.asset_id && !['closed', 'resolved'].includes((t.status || '').toLowerCase()))
+        .slice(0, 8)
+        .map((t) => (
+          <TicketWaypoint
+            key={t.id || t.asset_id}
+            ticket={t}
+            racks={racks}
+            serversByRack={serversByRack}
+            onSelectServer={onSelectServer}
+          />
+        ))}
       <CeilingLights />
       <CableTray />
       <HotAisleGlow z={-1.6} />
@@ -1184,6 +1293,7 @@ export default function DatacenterTwin3D({
   tickets = [],
   access = null,
   onBadgeIn,
+  onEnterRoom,
   selectedServerId,
   expandedRack,
   onSelectServer,
@@ -1212,16 +1322,15 @@ export default function DatacenterTwin3D({
     return () => clearTimeout(id)
   }, [intro, walkMode])
 
-  // After cinematic enter, auto badge + walk so the learner is "in" the hall (Steam feel).
+  // After cinematic enter, offer Walk only once badge-in is done (Steam mantrap ritual).
   useEffect(() => {
-    if (intro || walkMode || !immersive || autoWalkStarted.current) return undefined
+    if (intro || walkMode || !immersive || !badgedIn || autoWalkStarted.current) return undefined
     const id = setTimeout(() => {
       autoWalkStarted.current = true
-      if (!badgedIn) onBadgeIn?.()
       setWalkMode(true)
-    }, 900)
+    }, 600)
     return () => clearTimeout(id)
-  }, [intro, walkMode, immersive, badgedIn, onBadgeIn])
+  }, [intro, walkMode, immersive, badgedIn])
 
   const inGame = immersive && walkMode && badgedIn
 
@@ -1291,7 +1400,7 @@ export default function DatacenterTwin3D({
       </div>
       {!walkMode && !intro && !immersive && (
         <div className="dc-3d-immersion-hint">
-          Tip: enable <strong>Immersive</strong> + <strong>Walk</strong> for Steam-style first-person hall
+          Tip: <strong>Badge-in</strong> at the mantrap, then Walk — ticket beacons mark DCOps faults on racks
         </div>
       )}
       <div className="dc-3d-canvas-wrap">
@@ -1331,6 +1440,7 @@ export default function DatacenterTwin3D({
                 walkMode={walkMode && badgedIn}
                 tickets={tickets}
                 doorOpen={badgedIn}
+                onEnterRoom={onEnterRoom}
               />
             </Physics>
           </Canvas>

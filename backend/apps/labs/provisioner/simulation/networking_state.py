@@ -141,6 +141,10 @@ class NetworkingState:
                 self.vyos_firewall_rules = []
             if path not in self.vyos_firewall_rules:
                 self.vyos_firewall_rules.append(path)
+        if "high-availability vrrp" in low or "vrrp" in low:
+            self.vyos_vrrp = True
+        if "nat" in low and ("source" in low or "destination" in low or "rule" in low):
+            self.vyos_nat = True
         return ""
 
     def vyos_delete(self, path: str) -> str:

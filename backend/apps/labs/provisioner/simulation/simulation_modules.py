@@ -196,6 +196,8 @@ def register_modules(engine: "UnifiedSimulationEngine", shell: RHELShell | None 
         modules |= {"baremetal", "gpu"}
         if "awx" in slug or "ansible" in slug:
             modules.add("ansible")
+        if any(k in slug for k in ("k8s", "kube", "operator", "device-plugin")):
+            modules |= {"kubernetes", "docker"}
     elif any(k in slug for k in ("maas", "lxd", "packer", "vyos", "pxe", "bmc")):
         modules.add("baremetal")
     if "gpu" in modules:
@@ -2398,6 +2400,34 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                     "    type: gpu\n"
                     "    gputype: physical\n"
                     "    pci: \"0000:19:00.0\""
+                )
+            if "cluster" in low or "list" in low and "member" in low:
+                return (
+                    "+-------+----------------+----------+--------------+-------------------+\n"
+                    "| NAME  | URL            | ROLES    | ARCHITECTURE | FAILURE DOMAIN    |\n"
+                    "+-------+----------------+----------+--------------+-------------------+\n"
+                    "| node1 | https://10.64.12.11:8443 | database | x86_64       | default           |\n"
+                    "| node2 | https://10.64.12.12:8443 | database | x86_64       | default           |\n"
+                    "| node3 | https://10.64.12.13:8443 | database | x86_64       | default           |\n"
+                    "+-------+----------------+----------+--------------+-------------------+"
+                )
+            if "storage" in low and "pool" in low:
+                return (
+                    "+---------+--------+-------------+\n"
+                    "| NAME    | DRIVER | SOURCE      |\n"
+                    "+---------+--------+-------------+\n"
+                    "| default | dir    | /var/snap…  |\n"
+                    "| gpu-pool| zfs    | tank/lxd    |\n"
+                    "+---------+--------+-------------+"
+                )
+            if "project" in low:
+                return (
+                    "+-------------------+\n"
+                    "| NAME              |\n"
+                    "+-------------------+\n"
+                    "| default           |\n"
+                    "| inference         |\n"
+                    "+-------------------+"
                 )
             if "launch" in low or "init" in low:
                 name = parts[-1] if len(parts) > 2 else "lab-container"

@@ -4992,6 +4992,7 @@ EXTRA_PROJECTS = [{'technology_slug': 'aws',
             {'jira_key': 'AII8-1', 'title': 'Confirm H100 inventory', 'description': 'nvidia-smi -L matches expected SXM count.', 'acceptance_criteria': 'All GPUs listed and driver healthy.', 'hint': 'nvidia-smi -L; dcgmi discovery.', 'order': 1},
             {'jira_key': 'AII8-2', 'title': 'Launch vLLM serve', 'description': 'Start vllm serve with tensor-parallel-size = GPU count.', 'acceptance_criteria': 'Log shows Uvicorn on :8000 and READY.', 'hint': 'vllm serve <model> --tensor-parallel-size 8', 'order': 2, 'depends_on': 'AII8-1'},
             {'jira_key': 'AII8-3', 'title': 'Smoke the API', 'description': 'Optional bench or curl /v1/models style check.', 'acceptance_criteria': 'Endpoint responds or bench Result PASS.', 'hint': 'vllm bench throughput --model …', 'order': 3, 'depends_on': 'AII8-2'},
+            {'jira_key': 'AII8-4', 'title': 'Hand off inference endpoint', 'description': 'Document host:8000, model, and TP size for the platform team.', 'acceptance_criteria': 'Handoff note includes endpoint URL + model + tensor parallel.', 'hint': 'Capture vllm READY line and nvidia-smi GPU count.', 'order': 4, 'depends_on': 'AII8-3'},
         ],
     },
     {

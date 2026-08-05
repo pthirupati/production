@@ -1526,7 +1526,7 @@ export default function LabRunner() {
   const _packerHay = `${scenario?.slug || ''} ${scenario?.title || ''} ${scenario?.topic || ''}`.toLowerCase()
   const isPackerLab = !isTerraformSimLab && (
     consolesInclude(scenario?.consoles, 'packer')
-    || (techSlugLc === 'ai-infra' && /packer|image[-_]?factory/.test(_packerHay))
+    || (techSlugLc === 'ai-infra' && /packer|image[-_]?factory|imagedev|libguestfs|cloud-init|e2e-image/.test(_packerHay))
     || /packer|image[-_]?factory/.test(_packerHay)
   )
   const isBaremetalGuiLab = !isCrossTech && (

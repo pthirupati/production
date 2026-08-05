@@ -1,0 +1,55 @@
+title: 'MAAS: Full PXE Lifecycle New → Deployed'
+slug: ai-infra-maas-pxe-full-lifecycle
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1800
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: Bare Metal / AI Infra — walk a GPU node through the full MAAS lifecycle:
+  New → Commissioning → Ready → Allocated → Deployed, with PXE stages (DHCP → TFTP → kernel →
+  Curtin → cloud-init → sshd). Prefer ImageDev custom boot resource when published.
+
+
+  ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin (PXE LED animation on the rack).
+
+
+  SYMPTOM: Node New; PXE path untested; Deploy never completed.
+
+
+  OBJECTIVE: Enlist/Commission to Ready; Deploy (custom image if available); verify PXE/cloud-init
+  path and nvidia-smi; FIXED-OK.'
+objectives:
+- Commission New node to Ready
+- Deploy via PXE with Curtin + cloud-init
+- Verify GPUs after Deployed
+initial_state: GPU node New in MAAS; not commissioned.
+hints:
+- order: 1
+  cost: 0
+  content: Open Bare Metal → Machines. Commission the New node and wait until status is Ready.
+- order: 2
+  cost: 20
+  content: Deploy with the ImageDev custom boot resource if listed; watch PXE DHCP→TFTP→Curtin→cloud-init.
+- order: 3
+  cost: 45
+  content: On Lab Terminal confirm cloud-init status done and nvidia-smi -L, then FIXED-OK.
+consoles:
+- baremetal
+- terminal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal
+  - datacenter

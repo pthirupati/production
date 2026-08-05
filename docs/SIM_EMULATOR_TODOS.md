@@ -51,6 +51,8 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 489. [x] Datacenter: auto-close ticket after burn-in pass (FRU loop finish)
 490. [x] AI Infra: ImageDev cloud-init GPU first-boot + gpu-sanity + vLLM serve + E2E image→inference
 491. [~] Datacenter Steam: immersive HUD / auto-walk / hide chrome (game-like, not button panel)
+492. [x] AI Infra: K8s GPU Operator hero + LXD cluster + MAAS PXE full lifecycle
+493. [~] Datacenter Steam: ticket waypoints + room portals + hard badge gate + PXE stage timeline
 26. [x] AWS console mount tests pass for fresh/legacy/corrupt localStorage
 27. [~] Production verify: academy-aws-001 Ec2 Learn loads without error boundary
 28. [x] Terraform / aws-* routing: slugHints no longer map bare aws-* to Terraform IDE
