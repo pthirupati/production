@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import api from '../api/client'
 import { labApi } from '../api/labs'
@@ -50,6 +50,7 @@ import {
   LazyAzureConsole,
   LazyGcpConsole,
   LazyCodingIDE,
+  LazyPackerWorkspaceIde,
   LazyPromptPlayground,
 } from '../components/lab/labSimLoader'
 import { isTerraformLab } from '../utils/iacFlavor'
@@ -415,6 +416,7 @@ export default function LabRunner() {
   const [simTerminalOpen, setSimTerminalOpen] = useState(false)
   const [showBaremetalSim, setShowBaremetalSim] = useState(false)
   const [showDatacenterSim, setShowDatacenterSim] = useState(false)
+  const [showPackerSim, setShowPackerSim] = useState(false)
   // Bumped by the sim error-boundary "Reset saved state" action to force a
   // clean remount of the primary simulator subtree after re-seeding its store.
   const [simResetNonce, setSimResetNonce] = useState(0)
@@ -1508,6 +1510,14 @@ export default function LabRunner() {
     ))
   )
   const techSlugLc = (scenario?.technology?.slug || '').toLowerCase()
+  // Packer image-factory labs keep the terminal primary (CVE/MAAS grading) and
+  // open a companion HCL workspace IDE — not coding_mode / CodingIDE.
+  const _packerHay = `${scenario?.slug || ''} ${scenario?.title || ''} ${scenario?.topic || ''}`.toLowerCase()
+  const isPackerLab = !isCrossTech && !isTerraformSimLab && (
+    consolesInclude(scenario?.consoles, 'packer')
+    || (techSlugLc === 'ai-infra' && /packer|image[-_]?factory/.test(_packerHay))
+    || /packer|image[-_]?factory/.test(_packerHay)
+  )
   const isBaremetalGuiLab = !isCrossTech && (
     consolesKind === 'baremetal'
     || (!consolesKind && (
@@ -1651,7 +1661,7 @@ export default function LabRunner() {
     showMonitoringSim || showNmapSim || showWiresharkSim
     || showDataDashboardSim || showAgentSim || showWindowsSim || showPeopleSoftSim
     || showAwxSim || showBaremetalSim || showTerraformSim || showAwsSim || showCicdSim
-    || showDatacenterSim
+    || showDatacenterSim || showPackerSim
   )
   const primarySimKind = isAwsLab ? 'aws'
     : isK8sLab ? 'k8s'
@@ -3069,6 +3079,17 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open Terraform
             </button>
           )}
+          {isPackerLab && (
+            <button
+              type="button"
+              onClick={() => setShowPackerSim(true)}
+              title="Open Packer workspace — edit .pkr.hcl, validate, and build (CVE gate → MAAS)"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(2,168,239,.45)', color: '#02A8EF', background: 'rgba(2,168,239,.12)' }}
+            >
+              <ExternalLink size={12} /> Open Packer
+            </button>
+          )}
           {isAwsLab && !isSimPrimaryLab && (
             <button
               type="button"
@@ -3526,6 +3547,22 @@ export default function LabRunner() {
           onExit={() => setShowTerraformSim(false)}
           {...simChromeProps}
         />
+      )}
+
+      {isPackerLab && showPackerSim && (
+        <Suspense fallback={<div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center text-sm text-sky-200">Loading Packer workspace…</div>}>
+          <LazyPackerWorkspaceIde
+            sessionId={sessionId}
+            scenario={scenario}
+            terminalSession={terminalSession}
+            terminalHost={terminalHost}
+            blockedCommands={blockedCmds}
+            isMobile={isMobile}
+            onExit={() => setShowPackerSim(false)}
+            {...simChromeProps}
+            showLabControls
+          />
+        </Suspense>
       )}
 
       {isTerraformSimLab && showAwsSim && (
