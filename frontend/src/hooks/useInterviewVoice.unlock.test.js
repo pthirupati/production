@@ -72,6 +72,13 @@ describe('interview speech unlock across startRound', () => {
     expect(speak).toHaveBeenCalledTimes(1)
   })
 
+  it('reassert with allowPrime:false resumes unlock without enqueueing', () => {
+    const { speak } = mockSpeechSynthesis()
+    reassertSpeechUnlockAfterAwait({ allowPrime: false })
+    expect(_getSpeechUnlockStateForTests().gestureUnlocked).toBe(true)
+    expect(speak).not.toHaveBeenCalled()
+  })
+
   it('reassert skips priming while synth is speaking or primes paused', () => {
     const { speak } = mockSpeechSynthesis({ speaking: true })
     reassertSpeechUnlockAfterAwait()

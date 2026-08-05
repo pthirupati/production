@@ -205,6 +205,8 @@ export default function InterviewRoom() {
   const [mobileTranscriptOpen, setMobileTranscriptOpen] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(true)
   const [ttsSupported, setTtsSupported] = useState(true)
+  const [soundVerified, setSoundVerified] = useState(false)
+  const [soundTesting, setSoundTesting] = useState(false)
   const voiceUnavailableToastRef = useRef(false)
   // When TTS fails after Join (gesture unlock lost), offer a one-tap replay
   // instead of spamming toasts — tap restores the user-gesture unlock.
@@ -900,7 +902,9 @@ export default function InterviewRoom() {
       // main post-Join silence bug (Chrome drops the gesture grant after await).
       await gestureWarm
       pauseSpeechHoldPrimes()
-      reassertSpeechUnlockAfterAwait()
+      // Resume only — do NOT enqueue another '.' prime right before speak();
+      // that prime + cancel race was silencing the intro/first question.
+      reassertSpeechUnlockAfterAwait({ allowPrime: false })
       unlockSpeech({ soft: true })
       resumeSpeechSynthesis()
       const bootstrap = [introText, firstQ?.content].filter(Boolean).join(' ')
@@ -1395,16 +1399,9 @@ export default function InterviewRoom() {
           metadata: { backchannel: true },
         },
       ])
-      // Soft low-volume cue via browser TTS — never barge the candidate's pickup.
-      if (!interviewerMutedRef.current && typeof window !== 'undefined' && window.speechSynthesis) {
-        try {
-          const u = new SpeechSynthesisUtterance(cue)
-          u.volume = 0.22
-          u.rate = 0.95
-          u.pitch = 1.0
-          window.speechSynthesis.speak(u)
-        } catch { /* ignore */ }
-      }
+      // Visual-only backchannel — speaking over the live mic pollutes Web Speech
+      // STT and causes "unable to hear you" / unclear-audio loops.
+      // (Audio backchannel stays off until server-side STT or better barge isolation.)
     }
     const id = setInterval(tick, 1200)
     tick()
@@ -2003,25 +2000,43 @@ export default function InterviewRoom() {
               </select>
               <button
                 type="button"
-                onClick={() => {
-                  // ALWAYS produce sound on Test — even before the async
-                  // voiceschanged event has populated getVoices(). unlockSpeech()
-                  // primes the (possibly paused) engine after this user gesture,
-                  // and speak() falls back to the browser default voice when the
-                  // list is still empty, so the candidate always hears something.
-                  unlockSpeech()
-                  speak('Hi, this is how I will sound during your interview.', round.persona_voice_id)
+                disabled={soundTesting}
+                onClick={async () => {
+                  // ALWAYS produce sound on Test — unlock during this user gesture
+                  // so Join can reuse the same Chrome autoplay grant.
+                  setSoundTesting(true)
+                  try {
+                    unlockSpeech()
+                    holdSpeechUnlock()
+                    const { spoken } = await speak(
+                      'Hi, this is how I will sound during your interview. If you can hear me, you are ready to join.',
+                      round.persona_voice_id,
+                    ) || {}
+                    if (spoken) {
+                      setSoundVerified(true)
+                      toast.success('Speaker check passed — you can join.', { duration: 2500 })
+                    } else {
+                      setSoundVerified(false)
+                      toast.error('No audio detected. Unmute your speakers, then tap Test again.')
+                    }
+                  } finally {
+                    releaseSpeechHold()
+                    setSoundTesting(false)
+                  }
                 }}
-                className="btn-secondary text-xs whitespace-nowrap inline-flex items-center gap-1"
-                title="Preview voice"
+                className={`btn-secondary text-xs whitespace-nowrap inline-flex items-center gap-1 ${soundVerified ? 'border-emerald-500/50 text-emerald-300' : ''}`}
+                title="Preview voice — required before Join"
               >
-                <Volume2 size={12} /> Test
+                {soundTesting ? <Loader2 size={12} className="animate-spin" /> : <Volume2 size={12} />}
+                {soundVerified ? 'Heard ✓' : 'Test speakers'}
               </button>
             </div>
             <p className="text-[10px] text-surface-600">
-              {browserVoices.length > 0
-                ? 'Voices are free and run in your browser. Pick a “Natural”/“Neural” one if available — they sound the most human.'
-                : 'Voices are free and run in your browser. Tap Test to hear your device’s default voice — more options appear here once your browser finishes loading them.'}
+              {soundVerified
+                ? 'Speakers verified. Join will keep this unlock so the interviewer can speak after Start.'
+                : browserVoices.length > 0
+                  ? 'Tap Test speakers and confirm you hear the voice before Join — required for reliable interview audio.'
+                  : 'Voices are free and run in your browser. Tap Test speakers first — more options appear once voices load.'}
             </p>
           </div>
         )}
@@ -2074,11 +2089,14 @@ export default function InterviewRoom() {
         )}
         <button
           type="button"
-          disabled={!micOn || !cameraOn || !consentAccepted}
+          disabled={!micOn || !cameraOn || !consentAccepted || (ttsSupported && !soundVerified)}
           onClick={beginInterview}
           className="w-full interview-media-btn interview-media-btn-primary py-3.5 text-base disabled:opacity-40"
+          title={ttsSupported && !soundVerified ? 'Tap Test speakers first and confirm you hear audio' : undefined}
         >
-          I'm ready — start interview
+          {ttsSupported && !soundVerified
+            ? 'Test speakers first — then start'
+            : "I'm ready — start interview"}
         </button>
       </div>
       </>
