@@ -1,0 +1,52 @@
+title: 'VyOS: BGP Underlay for GPU Fabric'
+slug: ai-infra-vyos-bgp-underlay
+technology: AI Infrastructure Engineering
+category: Operate
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: Networking / Bare Metal — GPU fabric underlay BGP on VyOS is stuck
+  in Idle/Active. AI Infra Engineering owns the VyOS underlay that MAAS PXE and LXD
+  overlays depend on.
+
+
+  ENVIRONMENT: Lab Terminal VyOS CLI (configure/commit/compare/rollback) + Bare Metal.
+
+
+  SYMPTOM: BGP neighbor down; routes missing. Fix, commit, verify show ip bgp summary.
+
+
+  OBJECTIVE: Enter configure; fix neighbor/ASN; commit; verify BGP Established; FIXED-OK.'
+objectives:
+- Repair VyOS BGP neighbor config
+- Commit cleanly (rollback if needed)
+- Verify BGP Established
+initial_state: BGP neighbor Idle; fabric routes missing.
+hints:
+- order: 1
+  cost: 0
+  content: show ip bgp summary — note Idle/Active peers.
+- order: 2
+  cost: 20
+  content: configure; set protocols bgp …; compare; commit.
+- order: 3
+  cost: 45
+  content: If commit breaks reachability, rollback 1 and re-apply; then FIXED-OK.
+consoles:
+- terminal
+- baremetal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - terminal
+  - baremetal
