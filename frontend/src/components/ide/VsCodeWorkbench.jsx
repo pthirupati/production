@@ -35,8 +35,10 @@ export default function VsCodeWorkbench({
   }
 
   return (
-    <div className={`vsc-workbench ${theme === 'app' ? 'vsc-app-theme' : ''} ${className}`} style={style}>
-      {titleBar || (
+    <div
+      className={`vsc-workbench ${theme === 'app' ? 'vsc-app-theme' : ''} ${theme === 'light' ? 'vsc-light-theme' : ''} ${theme === 'hc' ? 'vsc-hc-theme' : ''} ${className}`}
+      style={style}
+    >      {titleBar || (
         (title || toolbar) && (
           <div className="vsc-titlebar">
             {title && <span className="vsc-titlebar-title">{title}</span>}

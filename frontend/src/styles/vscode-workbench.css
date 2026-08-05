@@ -400,3 +400,66 @@
   white-space: nowrap;
   max-width: 160px;
 }
+
+.vsc-workbench.vsc-light-theme {
+  --vsc-bg: #ffffff;
+  --vsc-sidebar: #f3f3f3;
+  --vsc-panel: #f8f8f8;
+  --vsc-tab-bar: #ececec;
+  --vsc-tab-active: #ffffff;
+  --vsc-border: #e0e0e0;
+  --vsc-text: #333333;
+  --vsc-muted: #6e6e6e;
+  --vsc-activity: #2c2c2c;
+}
+
+.vsc-workbench.vsc-hc-theme {
+  --vsc-bg: #000000;
+  --vsc-sidebar: #000000;
+  --vsc-panel: #000000;
+  --vsc-tab-bar: #000000;
+  --vsc-tab-active: #000000;
+  --vsc-border: #ffffff;
+  --vsc-text: #ffffff;
+  --vsc-muted: #ffffff;
+  --vsc-accent: #f38518;
+  --vsc-activity: #000000;
+  --vsc-status: #000000;
+}
+
+.vsc-file-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0;
+}
+
+.vsc-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 3px 8px;
+  color: var(--vsc-text);
+  background: transparent;
+  border: 0;
+  text-align: left;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.vsc-tree-row:hover {
+  background: color-mix(in srgb, var(--vsc-accent) 18%, transparent);
+}
+
+.vsc-tree-children {
+  padding-left: 12px;
+}
+
+.vsc-tree-file {
+  padding-left: 18px !important;
+}
+
+.vsc-breadcrumb {
+  min-width: 0;
+}
