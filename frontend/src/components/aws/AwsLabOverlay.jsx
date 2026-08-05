@@ -44,6 +44,9 @@ export default function AwsLabOverlay({
   useEffect(() => {
     if (!sessionId) return undefined
     try { useAwsStore.getState().resetSimulation() } catch { /* ignore */ }
+    // Lab sessions own a clean seed — drop persisted blob so a late rehydrate
+    // cannot undo the reset (was a common Lab environment error path).
+    try { useAwsStore.persist?.clearStorage?.() } catch { /* ignore */ }
     const slug = `${scenario?.slug || ''}`.toLowerCase()
     if (/vpc-routing|vpc_routing/.test(slug)) {
       try { useAwsStore.getState().hydrateVpcRoutingBroken() } catch { /* ignore */ }

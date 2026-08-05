@@ -10,7 +10,7 @@ import useSessionTimeout from './hooks/useSessionTimeout'
 import { useThemeStore } from './store/themeStore'
 import { useAuthStore } from './store/authStore'
 import { authApi } from './api/auth'
-import { rehydrateAwsSimForUser } from './components/aws/store/awsStore'
+import { rehydrateAwsSimForUser, useAwsStore } from './components/aws/store/awsStore'
 
 function SessionMonitor() {
   useSessionTimeout()
@@ -23,30 +23,58 @@ function ThemeInit() {
   return null
 }
 
-/** Validate persisted auth against the server on boot; clear stale local state. */
-function AuthBootValidator() {
-  const [checked, setChecked] = useState(() => !useAuthStore.getState().isAuthenticated)
+async function waitAwsPersistHydrated(timeoutMs = 2500) {
+  const persist = useAwsStore?.persist
+  if (!persist?.hasHydrated) return
+  if (persist.hasHydrated()) return
+  await new Promise((resolve) => {
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      resolve()
+    }
+    const unsub = persist.onFinishHydration?.(() => {
+      try { unsub?.() } catch { /* ignore */ }
+      finish()
+    })
+    setTimeout(finish, timeoutMs)
+  })
+}
+
+/** Validate persisted auth against the server on boot; clear stale local state.
+ * Gates children so LabRunner / AWS console never mount mid-rehydrate (race that
+ * undoes AwsLabOverlay's clean-seed reset and can throw Lab environment error).
+ */
+function AuthBootValidator({ children }) {
+  const [checked, setChecked] = useState(false)
   const logout = useAuthStore((s) => s.logout)
   const setAuth = useAuthStore((s) => s.setAuth)
 
   useEffect(() => {
-    if (checked) return
     let cancelled = false
     ;(async () => {
       try {
-        const profile = await authApi.getProfile()
-        if (cancelled) return
-        const { accessToken, refreshToken } = useAuthStore.getState()
-        setAuth(profile, accessToken, refreshToken)
-        await rehydrateAwsSimForUser()
-      } catch {
-        if (!cancelled) logout()
+        if (useAuthStore.getState().isAuthenticated) {
+          try {
+            const profile = await authApi.getProfile()
+            if (cancelled) return
+            const { accessToken, refreshToken } = useAuthStore.getState()
+            setAuth(profile, accessToken, refreshToken)
+            await rehydrateAwsSimForUser()
+          } catch {
+            if (!cancelled) logout()
+            await waitAwsPersistHydrated()
+          }
+        } else {
+          await waitAwsPersistHydrated()
+        }
       } finally {
         if (!cancelled) setChecked(true)
       }
     })()
     return () => { cancelled = true }
-  }, [checked, logout, setAuth])
+  }, [logout, setAuth])
 
   if (!checked) {
     return (
@@ -55,7 +83,7 @@ function AuthBootValidator() {
       </div>
     )
   }
-  return null
+  return children
 }
 
 export default function App() {
@@ -63,13 +91,14 @@ export default function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <ThemeInit />
-        <AuthBootValidator />
-        <ScrollToTop />
-        <OfflineBanner />
-        <SessionMonitor />
-        <DismissableToaster />
-        <ChangelogModal />
-        <AppRouter />
+        <AuthBootValidator>
+          <ScrollToTop />
+          <OfflineBanner />
+          <SessionMonitor />
+          <DismissableToaster />
+          <ChangelogModal />
+          <AppRouter />
+        </AuthBootValidator>
       </BrowserRouter>
     </ErrorBoundary>
   )

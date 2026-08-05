@@ -507,9 +507,9 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 
 ### U0 — Critical learner blockers (ship first)
 329. [~] AWS "Lab environment error": distinguish ChunkLoadError vs Zustand — hide Reset for chunk fails; hard-reload copy — *wave1 UX*
-330. [ ] AWS: gate LabRunner on persist rehydrate so overlay reset is not undone by async merge
-331. [ ] AWS: `mergePersistedAws` keep string chrome arrays (`favorites` / `recentServices` / `homeWidgets`)
-332. [ ] AWS: null-safe ConsoleHome / S3Pages / InstanceList post-nav reads
+330. [~] AWS: gate LabRunner on persist rehydrate so overlay reset is not undone by async merge — *AuthBoot wraps AppRouter*
+331. [~] AWS: `mergePersistedAws` keep string chrome arrays (`favorites` / `recentServices` / `homeWidgets`) — *this PR*
+332. [~] AWS: null-safe ConsoleHome / S3Pages / InstanceList post-nav reads — *ConsoleHome done; S3/EC2 follow*
 333. [ ] AWS: verify CDN/edge never caches `index.html` over nginx no-cache
 334. [ ] AWS: production verify academy-aws + aws-ec2 heroes load after deploy without boundary
 335. [~] Primary GUI labs (AWX/Bare Metal/DC/Terraform): always-visible Hints/Check/+30m/Stop on companion strip — *wave1*
@@ -519,15 +519,14 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 339. [~] Packer IDE: allow `cross_technology` academy packer labs (`isPackerLab` gate) — *wave1*
 340. [ ] Packer labs YAML: `consoles: [terminal, packer]` + drop or keep cross_tech intentionally
 341. [ ] AWX primary labs: CI assert LabChromeBar + companion strip both receive four handlers
-342. [ ] Close / merge storage lsblk E2E + Packer IDE PRs into main + 4D deploy
+342. [x] Close / merge storage lsblk E2E + Packer IDE PRs into main + 4D deploy — *via #146*
 
 ### U1 — Steam-class Datacenter immersion (target: Data Center Simulator Game feel)
 343. [ ] Default entry: optional "Enter facility" cinematic (camera truck through security → reception → hall)
 344. [ ] First-person / badge-walk mode (even low-poly) for campus rooms — not orbit-only
 345. [ ] 3D corridor meshes linking reception → staging → data-hall → MDF (progressive; ErrorBoundary)
-346. [ ] Keep 2D floor default; "Enter hall (3D)" CTA with chrome intact + dedicated R3F ErrorBoundary
-347. [ ] Ambient CRAC/PDU/fan audio bed + thermal alarm stinger tied to DC tickets
-348. [ ] LED blink / fan spin / thermal aisle haze volume FX (extend Q 180–185)
+346. [~] Keep 2D floor default; "Enter hall (3D)" CTA with chrome intact + dedicated R3F ErrorBoundary — *#147*
+347. [~] Ambient CRAC/PDU/fan audio bed + thermal alarm stinger tied to DC tickets — *#147*348. [ ] LED blink / fan spin / thermal aisle haze volume FX (extend Q 180–185)
 349. [ ] Cable bend + port LED realism on ToR / MDF trunks
 350. [ ] Full FRU RMA loop: locate → order → dock receive → repair bay swap → burn-in → close ticket
 351. [ ] Parts warehouse ↔ dock ↔ repair bay inventory sync with Jira FRU tickets
@@ -588,8 +587,7 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 ### U6 — AWS console depth & stability
 397. [ ] Expand service coverage only after mount stability green
 398. [ ] Persist schema version bump + migration for aws-sim blobs
-399. [ ] Soft-gate AppRouter/LabRunner until AWS rehydrate finishes
-400. [ ] E2E Playwright: open aws-ec2 lab, navigate EC2/S3, no boundary
+399. [~] Soft-gate AppRouter/LabRunner until AWS rehydrate finishes — *AuthBootValidator children gate*400. [ ] E2E Playwright: open aws-ec2 lab, navigate EC2/S3, no boundary
 
 ### U7 — Continue twin connectivity / leftover spine
 401. [ ] Terraform destroy/MAAS fan-out already partially shipped — extend other `maas_*` types
@@ -598,14 +596,39 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 404. [ ] Interview P2 voice + framing (322)
 405. [ ] Unified asset registry finish (§S1) across AWS/DC/MAAS/AWX
 
+### U8 — Extra audit lines from mega brief (do not skip)
+406. [ ] AI Infra AWX lab: regression test that companion LabChromeControls never unmount on JT navigate
+407. [ ] AI Infra catalog: seed VyOS commit/rollback CLI scenarios (at least 5 graded)
+408. [ ] AI Infra catalog: seed Packer→libguestfs inspect→MAAS boot-resource publish chain
+409. [ ] AI Infra catalog: seed MAAS enlist/commission/deploy/release with PXE timeline asserts
+410. [ ] AI Infra catalog: seed LXD projects + GPU passthrough + live migration heroes
+411. [ ] AI Infra: Bare Metal Jira ticket templates mirrored as scenario briefs (dcops/thermal/SXM)
+412. [ ] AI Infra: ImageDev Packer base GPU image from upstream (RHEL/Ubuntu) hero project
+413. [ ] AI Infra: AWX JT inventory sourced from MAAS machines tagged gpu
+414. [ ] Datacenter Steam: rack install animation (slide tray + click rails + power LED cascade)
+415. [ ] Datacenter Steam: cable pull physics (drag length + bend radius warn)
+416. [ ] Datacenter Steam: thermal heatmap aisle overlay synced to ticket severity
+417. [ ] Datacenter Steam: badge/door access mini-game before hall entry
+418. [ ] Datacenter Steam: warehouse forklift / pallet receive for FRU RMA
+419. [ ] IDE: file explorer create/rename/delete + drag-drop into workspace
+420. [ ] IDE: split editor + terminal panel resize + command palette (Ctrl/Cmd+P)
+421. [ ] IDE: syntax themes (light/dark/high-contrast) persisted per user
+422. [ ] Terraform popup: remove leftover bottom-panel cloud tabs entirely after overlay path
+423. [ ] AWS: InstanceList / S3Pages null-safe maps (332 companion)
+424. [~] AWS: bump persist version 3→4 after chrome string-array merge ships — *this PR*425. [ ] Scenario crawl: every ai-infra scenario has working consoles[] entries
+426. [ ] Projects: multi-team AI cluster bring-up (MAAS+VyOS+LXD+AWX+DC) company template
+427. [ ] Cross-tech: terraform→aws create/destroy already shipped — assert no dual AWS chips
+428. [ ] Production smoke: academy-aws-001 + ai-infra AWX primary after each 4D deploy
+
 ---
 
 ## Execution order (updated)
 
-1. **Wave1 (this PR):** AWS chunk-error UX, primary-lab chrome, AWX ai-infra entitlement, TF overlay popup + AWS chip dedupe, Packer cross-tech gate, merge storage+Packer
-2. AWS rehydrate/persist harden (330–334, 397–400)
-3. Steam DC immersion U1 (343–356) — start with 3D corridor + audio + FRU loop
-4. AI Infra growth U2 (359–375) — VyOS/Packer/MAAS/AWX/DCOps from BM tickets
-5. Company projects U3 + scenario crawl U4
-6. IDE excellence U5
-7. Twin leftovers U7 / Interview / registry
+1. **Wave1 (merged #146):** AWS chunk-error UX, primary-lab chrome, AWX ai-infra entitlement, TF overlay popup + AWS chip dedupe, Packer cross-tech gate, storage lsblk
+2. **Steam DC enter+audio (#147):** TODOs 346–347
+3. **AWS rehydrate harden (this PR):** AuthBoot gates AppRouter; mergePersisted string chrome; lab clearStorage; ConsoleHome null-safe (330–332, 399, 423–424)
+4. Steam DC immersion U1 remaining (343–356, 414–418)
+5. AI Infra growth U2 + U8 (359–375, 406–413, 425–426)
+6. Company projects U3 + scenario crawl U4
+7. IDE excellence U5 (389–396, 419–421)
+8. Twin leftovers U7 / Interview / registry

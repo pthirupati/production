@@ -16,7 +16,7 @@ const ACTIONS = [
 export default function InstanceList() {
   const navigate = useNavigate()
   const region = useAwsStore((s) => s.region)
-  const instances = scoped(useAwsStore((s) => s.instances), region)
+  const instances = scoped(useAwsStore((s) => s.instances) || [], region)
   const instanceAction = useAwsStore((s) => s.instanceAction)
   const pushFlash = useAwsStore((s) => s.pushFlash)
   const [selected, setSelected] = useState([])
