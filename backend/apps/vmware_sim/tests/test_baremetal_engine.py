@@ -631,3 +631,118 @@ class BaremetalLifecycleTests(TestCase):
             self.assertIn("config", c)
             self.assertIn("project", c)
             self.assertIn("location", c)
+
+    # ── Rescue mode (Entering/Exiting) ─────────────────────────────────────
+    def test_enter_rescue_then_exit_rescue_lifecycle(self):
+        sid = self._session("maas-rescue")
+        state = bm.get_state(sid)["state"]
+        self.assertIn("needs_rescue_enter", state.get("broken") or {})
+        m3_start = next(m for m in state["maas"]["machines"] if m["id"] == 2)
+        self.assertEqual(m3_start["status"], "Deployed")
+
+        base = 13_000_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            res = bm.apply_action(sid, "maas_enter_rescue", {"machine_id": 2})
+            self.assertTrue(res["ok"], res)
+            m = self._machine(sid, 2)
+            self.assertEqual(m["status"], "Entering rescue mode")
+        self.assertNotIn("needs_rescue_enter", bm.get_state(sid)["state"].get("broken") or {})
+
+        with mock.patch.object(bm, "_now", return_value=base + bm.RESCUE_SECONDS + 1):
+            m = self._machine(sid, 2)
+            self.assertEqual(m["status"], "Rescue mode")
+            t_exit = base + bm.RESCUE_SECONDS + 1
+
+        with mock.patch.object(bm, "_now", return_value=t_exit):
+            res = bm.apply_action(sid, "maas_exit_rescue", {"machine_id": 2})
+            self.assertTrue(res["ok"], res)
+            m = self._machine(sid, 2)
+            self.assertEqual(m["status"], "Exiting rescue mode")
+
+        with mock.patch.object(bm, "_now", return_value=t_exit + bm.RESCUE_SECONDS + 1):
+            m = self._machine(sid, 2)
+            self.assertEqual(m["status"], "Deployed")
+
+    def test_exit_rescue_requires_rescue_mode(self):
+        sid = self._session("maas-commission")
+        res = bm.apply_action(sid, "maas_exit_rescue", {"machine_id": 1})
+        self.assertFalse(res["ok"])
+
+    # ── Action aliases ──────────────────────────────────────────────────────
+    def test_dhcp_configure_alias_enables_and_clears_broken(self):
+        sid = self._session("maas-dhcp")
+        state = bm.get_state(sid)["state"]
+        self.assertFalse(state["maas"]["dhcp"]["enabled"])
+        self.assertIn("dhcp_disabled", state.get("broken") or {})
+        res = bm.apply_action(sid, "maas_dhcp_configure", {"enabled": True})
+        self.assertTrue(res["ok"], res)
+        state = bm.get_state(sid)["state"]
+        self.assertTrue(state["maas"]["dhcp"]["enabled"])
+        self.assertNotIn("dhcp_disabled", state.get("broken") or {})
+
+    def test_add_zone_alias_creates_zone(self):
+        sid = self._session("maas-commission")
+        res = bm.apply_action(sid, "maas_add_zone", {"name": "az-c"})
+        self.assertTrue(res["ok"], res)
+        zones = bm.get_state(sid)["state"]["maas"]["zones"]
+        self.assertTrue(any(z["name"] == "az-c" for z in zones))
+
+    def test_add_pool_alias_creates_pool(self):
+        sid = self._session("maas-commission")
+        res = bm.apply_action(sid, "maas_add_pool", {"name": "inference"})
+        self.assertTrue(res["ok"], res)
+        pools = bm.get_state(sid)["state"]["maas"]["resource_pools"]
+        self.assertTrue(any(p["name"] == "inference" for p in pools))
+
+    # ── DNS records / users ──────────────────────────────────────────────────
+    def test_add_dns_record(self):
+        sid = self._session("maas-commission")
+        res = bm.apply_action(sid, "maas_add_dns_record", {"name": "new-host", "data": "10.10.1.99"})
+        self.assertTrue(res["ok"], res)
+        domains = bm.get_state(sid)["state"]["maas"]["domains"]
+        domain = next(d for d in domains if d["name"] == "maas")
+        self.assertTrue(any(
+            r["name"] == "new-host" and r["data"] == "10.10.1.99" for r in domain["records"]
+        ))
+
+    def test_create_and_delete_user(self):
+        sid = self._session("maas-commission")
+        res = bm.apply_action(sid, "maas_create_user", {"username": "lab-user", "email": "lab@maas.local"})
+        self.assertTrue(res["ok"], res)
+        users = bm.get_state(sid)["state"]["maas"]["users"]
+        self.assertTrue(any(u["username"] == "lab-user" for u in users))
+        res = bm.apply_action(sid, "maas_delete_user", {"username": "lab-user"})
+        self.assertTrue(res["ok"], res)
+        users = bm.get_state(sid)["state"]["maas"]["users"]
+        self.assertFalse(any(u["username"] == "lab-user" for u in users))
+
+    # ── Settings leaves clear scenario blockers ───────────────────────────
+    def test_settings_update_clears_ntp_and_commissioning_flags(self):
+        sid = self._session("maas-settings")
+        state = bm.get_state(sid)["state"]
+        self.assertIn("settings_ntp_wrong", state.get("broken") or {})
+        self.assertIn("settings_commissioning_incomplete", state.get("broken") or {})
+        res = bm.apply_action(sid, "maas_update_settings", {
+            "ntp_servers": "ntp.ubuntu.com",
+            "commissioning_distro_series": "jammy",
+        })
+        self.assertTrue(res["ok"], res)
+        state = bm.get_state(sid)["state"]
+        self.assertNotIn("settings_ntp_wrong", state.get("broken") or {})
+        self.assertNotIn("settings_commissioning_incomplete", state.get("broken") or {})
+
+    # ── Commissioning script attach clears scripts_unattached ─────────────
+    def test_attach_script_clears_scripts_unattached(self):
+        sid = self._session("ai-infra-maas-scripts-users")
+        state = bm.get_state(sid)["state"]
+        self.assertIn("scripts_unattached", state.get("broken") or {})
+        self.assertIn("needs_operator_user", state.get("broken") or {})
+        self.assertFalse(any(u.get("username") == "operator" for u in state["maas"]["users"]))
+        res = bm.apply_action(sid, "maas_attach_script", {"name": "60-fixitlab-custom-check"})
+        self.assertTrue(res["ok"], res)
+        state = bm.get_state(sid)["state"]
+        self.assertNotIn("scripts_unattached", state.get("broken") or {})
+        res = bm.apply_action(sid, "maas_create_user", {"username": "operator", "email": "ops@maas.local"})
+        self.assertTrue(res["ok"], res)
+        state = bm.get_state(sid)["state"]
+        self.assertNotIn("needs_operator_user", state.get("broken") or {})

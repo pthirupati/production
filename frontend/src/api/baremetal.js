@@ -47,6 +47,12 @@ export const baremetalApi = {
   unlock(sessionId, machineId) {
     return baremetalApi.action(sessionId, 'maas_unlock', { machine_id: machineId })
   },
+  enterRescue(sessionId, machineId) {
+    return baremetalApi.action(sessionId, 'maas_enter_rescue', { machine_id: machineId })
+  },
+  exitRescue(sessionId, machineId) {
+    return baremetalApi.action(sessionId, 'maas_exit_rescue', { machine_id: machineId })
+  },
   setZone(sessionId, machineId, zone) {
     return baremetalApi.action(sessionId, 'maas_set_zone', { machine_id: machineId, zone })
   },
@@ -78,6 +84,24 @@ export const baremetalApi = {
   updateSettings(sessionId, settings = {}) {
     return baremetalApi.action(sessionId, 'maas_update_settings', settings)
   },
+  createUser(sessionId, fields = {}) {
+    return baremetalApi.action(sessionId, 'maas_create_user', fields)
+  },
+  deleteUser(sessionId, username) {
+    return baremetalApi.action(sessionId, 'maas_delete_user', { username })
+  },
+  addDnsRecord(sessionId, fields = {}) {
+    return baremetalApi.action(sessionId, 'maas_add_dns_record', fields)
+  },
+  createZone(sessionId, name, description = '') {
+    return baremetalApi.action(sessionId, 'maas_create_zone', { name, description })
+  },
+  createPool(sessionId, name, description = '') {
+    return baremetalApi.action(sessionId, 'maas_create_pool', { name, description })
+  },
+  dhcpConfigure(sessionId, enabled, extra = {}) {
+    return baremetalApi.action(sessionId, 'maas_dhcp_toggle', { enabled, ...extra })
+  },
   /**
    * Run the same MAAS action against many machines.
    * Prefer machine_ids when the engine supports bulk; otherwise fan out.
@@ -87,6 +111,7 @@ export const baremetalApi = {
     if (!ids.length) return { ok: false, error: 'No machines selected' }
     const bulkCapable = new Set([
       'maas_commission', 'maas_deploy', 'maas_release', 'maas_abort', 'maas_power',
+      'maas_enter_rescue', 'maas_exit_rescue',
     ])
     if (bulkCapable.has(action)) {
       return baremetalApi.action(sessionId, action, {

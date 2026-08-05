@@ -1,0 +1,58 @@
+title: 'MAAS: Rescue Mode Diagnostics on a Deployed GPU Node'
+slug: ai-infra-maas-rescue-mode
+technology: AI Infrastructure Engineering
+category: Operate
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: Bare Metal / AI Infra — gpu-node-01 is Deployed and serving training jobs; on-call
+  needs to inspect disk and network state without disturbing the running OS, so MAAS Rescue mode is used
+  to network-boot an ephemeral, in-memory diagnostic environment on top of the existing deployment.
+
+
+  ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin (rack LED reflects power/boot state).
+
+
+  SYMPTOM: Node is Deployed; the on-call engineer must enter Rescue mode, confirm the ephemeral rescue
+  shell (not the deployed root filesystem), then exit Rescue and return the node to Deployed without losing
+  the workload.
+
+
+  OBJECTIVE: Release gpu-node-01 into Rescue mode from Bare Metal; on Lab Terminal confirm the ephemeral
+  rescue environment rather than the live deployed root; Exit Rescue and confirm status returns to Deployed;
+  FIXED-OK.'
+objectives:
+- Enter Rescue mode on the Deployed node
+- Verify the ephemeral rescue environment on Lab Terminal
+- Exit Rescue and confirm the node returns to Deployed
+initial_state: GPU node gpu-node-01 is Deployed in MAAS; Rescue mode has not been used yet.
+hints:
+- order: 1
+  cost: 0
+  content: Open Bare Metal → Machines → gpu-node-01. With status Deployed, choose Rescue mode from the take action menu.
+- order: 2
+  cost: 20
+  content: Wait for status to reach Rescue mode, then switch to Lab Terminal and confirm you are in the ephemeral in-memory environment, not the deployed root disk.
+- order: 3
+  cost: 45
+  content: Back in Bare Metal, choose Exit rescue mode and confirm gpu-node-01 returns to Deployed, then FIXED-OK.
+consoles:
+- baremetal
+- terminal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - baremetal
+  - terminal
+  - datacenter

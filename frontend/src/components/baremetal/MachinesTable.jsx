@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState, useRef, useEffect } from 'react'
-import { ChevronDown, Plus, Lock } from 'lucide-react'
+import { ChevronDown, Plus, Lock, LifeBuoy } from 'lucide-react'
 import { MaasStatusBadge, PowerIcon } from './MaasStatusBadge'
 
 const PAGE_SIZE = 25
@@ -308,6 +308,12 @@ export default function MachinesTable({
           <button type="button" className="maas-btn maas-btn-sm" disabled={busy} onClick={() => runBulk('test')}>Test</button>
           <button type="button" className="maas-btn maas-btn-sm" disabled={busy} onClick={() => runBulk('lock')}>
             <Lock size={12} /> Lock
+          </button>
+          <button type="button" className="maas-btn maas-btn-sm" disabled={busy} onClick={() => runBulk('enterRescue')}>
+            <LifeBuoy size={12} /> Enter rescue
+          </button>
+          <button type="button" className="maas-btn maas-btn-sm" disabled={busy} onClick={() => runBulk('exitRescue')}>
+            <LifeBuoy size={12} /> Exit rescue
           </button>
           <button type="button" className="maas-btn maas-btn-sm" disabled={busy} onClick={() => openDialog('zone')}>Set zone</button>
           <button type="button" className="maas-btn maas-btn-sm" disabled={busy} onClick={() => openDialog('pool')}>Set pool</button>

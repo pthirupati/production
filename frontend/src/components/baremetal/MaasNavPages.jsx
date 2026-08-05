@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Play, Square, Power, RefreshCw, Plus } from 'lucide-react'
 import { MaasStatusBadge, PowerIcon } from './MaasStatusBadge'
 import { baremetalApi } from '../../api/baremetal'
+import MaasSettingsPages from './MaasSettingsPages'
 
 function healthClass(h) {
   const v = (h || 'ok').toLowerCase()
@@ -334,7 +335,7 @@ export function DomainsPage({ state, busy, sessionId, run }) {
             className="maas-btn maas-btn-positive"
             disabled={busy || !name || !data}
             onClick={() => run(
-              () => baremetalApi.action(sessionId, 'maas_add_dns_record', {
+              () => baremetalApi.addDnsRecord(sessionId, {
                 domain: domainName, type, name, data,
               }),
               'DNS record added',
@@ -397,7 +398,7 @@ export function ZonesPage({ state, busy, sessionId, run }) {
             className="maas-btn maas-btn-positive"
             disabled={busy || !name}
             onClick={() => run(
-              () => baremetalApi.action(sessionId, 'maas_add_zone', { name, description: desc }),
+              () => baremetalApi.createZone(sessionId, name, desc),
               'Zone created',
             )}
           >
@@ -461,7 +462,7 @@ export function PoolsPage({ state, busy, sessionId, run }) {
             className="maas-btn maas-btn-positive"
             disabled={busy || !name}
             onClick={() => run(
-              () => baremetalApi.action(sessionId, 'maas_add_pool', { name, description: desc }),
+              () => baremetalApi.createPool(sessionId, name, desc),
               'Pool created',
             )}
           >
@@ -640,72 +641,6 @@ export function SubnetsPage({ state, busy, sessionId, run }) {
   )
 }
 
-export function SettingsPage({ state, busy, sessionId, run }) {
-  const settings = state?.settings || state?.maas?.settings || {}
-  const [form, setForm] = useState({
-    maas_name: settings.maas_name || 'maas',
-    maas_url: settings.maas_url || 'http://region.maas:5240/MAAS',
-    default_distro: settings.default_distro || 'ubuntu/jammy',
-    ntp_servers: settings.ntp_servers || 'ntp.ubuntu.com',
-    dns_forwarder: settings.dns_forwarder || '8.8.8.8',
-    http_proxy: settings.http_proxy || settings.proxy || '',
-    enable_http_proxy: settings.enable_http_proxy ?? false,
-  })
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
-  return (
-    <div>
-      <h1 className="maas-page-title">Settings</h1>
-      <p className="maas-page-sub">Region configuration</p>
-      <div className="maas-card">
-        <div className="maas-card-body maas-form-grid">
-          <label className="maas-label">
-            MAAS name
-            <input className="maas-input" value={form.maas_name} onChange={(e) => set('maas_name', e.target.value)} />
-          </label>
-          <label className="maas-label">
-            MAAS URL
-            <input className="maas-input" value={form.maas_url} onChange={(e) => set('maas_url', e.target.value)} />
-          </label>
-          <label className="maas-label">
-            Default distro series
-            <input className="maas-input" value={form.default_distro} onChange={(e) => set('default_distro', e.target.value)} />
-          </label>
-          <label className="maas-label">
-            NTP servers
-            <input className="maas-input" value={form.ntp_servers} onChange={(e) => set('ntp_servers', e.target.value)} />
-          </label>
-          <label className="maas-label">
-            Upstream DNS
-            <input className="maas-input" value={form.dns_forwarder} onChange={(e) => set('dns_forwarder', e.target.value)} />
-          </label>
-          <label className="maas-label">
-            HTTP proxy
-            <input className="maas-input" value={form.http_proxy} onChange={(e) => set('http_proxy', e.target.value)} />
-          </label>
-          <label className="maas-label" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={!!form.enable_http_proxy}
-              onChange={(e) => set('enable_http_proxy', e.target.checked)}
-            />
-            Enable HTTP proxy
-          </label>
-        </div>
-        <div className="maas-dialog-foot">
-          <button
-            type="button"
-            className="maas-btn maas-btn-positive"
-            disabled={busy}
-            onClick={() => run(() => baremetalApi.updateSettings(sessionId, form), 'Settings saved')}
-          >
-            Save configuration
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export function DhcpPage({ state, busy, sessionId, run }) {
   const dhcp = state?.dhcp || state?.maas?.dhcp || {}
   const enabled = dhcp.enabled !== false
@@ -733,10 +668,7 @@ export function DhcpPage({ state, busy, sessionId, run }) {
               className="maas-btn maas-btn-positive"
               disabled={busy}
               onClick={() => run(
-                () => baremetalApi.action(sessionId, 'maas_dhcp_configure', {
-                  enabled: true,
-                  vlan: dhcp.vlan || 'untagged',
-                }),
+                () => baremetalApi.dhcpConfigure(sessionId, true, { vlan: dhcp.vlan || 'untagged' }),
                 'DHCP enabled',
               )}
             >
@@ -747,7 +679,7 @@ export function DhcpPage({ state, busy, sessionId, run }) {
               className="maas-btn"
               disabled={busy}
               onClick={() => run(
-                () => baremetalApi.action(sessionId, 'maas_dhcp_configure', { enabled: false }),
+                () => baremetalApi.dhcpConfigure(sessionId, false),
                 'DHCP disabled',
               )}
             >
@@ -938,7 +870,7 @@ export default function MaasNavPages({ page, state, busy, sessionId, run, machin
     case 'subnets':
       return <SubnetsPage state={state} busy={busy} sessionId={sessionId} run={run} />
     case 'settings':
-      return <SettingsPage state={state} busy={busy} sessionId={sessionId} run={run} />
+      return <MaasSettingsPages state={state} busy={busy} sessionId={sessionId} run={run} />
     case 'dhcp':
       return <DhcpPage state={state} busy={busy} sessionId={sessionId} run={run} />
     case 'lxd':

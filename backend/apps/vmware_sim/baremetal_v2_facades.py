@@ -123,6 +123,9 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
             row = existing
         else:
             scripts.append(row)
+        broken = state.get("broken")
+        if isinstance(broken, dict):
+            broken.pop("scripts_unattached", None)
         return {"ok": True, "message": f"Commissioning script {name} attached", "script": row}
 
     if action in ("maas_publish_boot_resource", "maas_import_boot_resource", "packer_publish_maas"):

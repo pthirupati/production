@@ -1,0 +1,9 @@
+/* Canonical Vanilla Framework (npm: vanilla-framework) for Bare Metal / MAAS chrome.
+   Loaded only with the lazy BaremetalSimulator chunk so the rest of the app
+   is unaffected until a MAAS lab opens. */
+$color-brand: #77216f !default;
+$color-link: #0066cc !default;
+$font-base-family: '"Ubuntu", "Ubuntu Regular", system-ui, sans-serif' !default;
+
+@import 'vanilla-framework';
+@include vanilla;

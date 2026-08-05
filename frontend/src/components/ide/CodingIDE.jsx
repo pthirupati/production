@@ -312,6 +312,433 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   // first so their definitions are in scope, entrypoint last).
   const composedSource = useCallback(() => {
     const paths = Object.keys(files)
+    const ordered = [...paths.filter((p) => p !== entrypoint), entrypoint].filter(Boolean)
+    return ordered.map((p) => files[p]).join('\n\n')
+  }, [files, entrypoint])
+
+  const handleEditorChange = useCallback((text) => {
+    if (!activePath) return
+    setFiles((prev) => {
+      if (prev[activePath] === text) return prev
+      dirtyRef.current = true   // genuine edit — enable autosave
+      return { ...prev, [activePath]: text }
+    })
+    setDirtyPaths((prev) => (prev.has(activePath) ? prev : new Set(prev).add(activePath)))
+  }, [activePath])
+
+  const isJs = ['javascript', 'js', 'node', 'nodejs'].includes((language || '').toLowerCase())
+  const isPython = (language || '').toLowerCase() === 'python'
+  const canRunInBrowser = isJs || isPython
+
+  // ── Run (client-side, instant) ──
+  const handleRun = useCallback(async () => {
+    if (running || checking) return
+    setRunning(true)
+    setBottomTab('output')
+    setOutput('')
+    setLogsText('')
+    appendTerminal(`$ run ${entrypoint || 'solution'} (${LANG_LABEL[language] || language})`)
+    const source = composedSource()
+    let stdout = ''
+    let stderr = ''
+    try {
+      if (isPython) {
+        setPyLoading(true)
+        const res = await runPython(source)
+        setPyLoading(false)
+        if (!mountedRef.current) return
+        stdout = res.stdout || (res.ok ? '(no output)' : '')
+        stderr = [res.stderr, res.error].filter(Boolean).join('\n')
+        setOutput(stdout)
+        if (stderr) { setLogsText(stderr); setBottomTab('logs') }
+      } else if (isJs) {
+        const res = await runJavaScript(source, { timeoutMs: 8000 })
+        if (!mountedRef.current) return
+        stdout = res.stdout || (res.ok ? '(no output)' : '')
+        stderr = res.error || ''
+        setOutput(stdout)
+        if (stderr) { setLogsText(stderr); setBottomTab('logs') }
+      } else {
+        stdout = `Running ${LANG_LABEL[language] || language} in the browser is not supported.\nUse "Check Solution" — the server will run and grade your code.`
+        setOutput(stdout)
+      }
+      appendTerminal(stderr ? 'run finished with errors (see Logs)' : 'run finished')
+    } catch (err) {
+      stderr = String(err?.message || err)
+      setLogsText(stderr)
+      setBottomTab('logs')
+      appendTerminal('run crashed (see Logs)')
+    } finally {
+      if (mountedRef.current) { setRunning(false); setPyLoading(false) }
+      lastCtx.current = { output: stdout, error: stderr, tests: lastCtx.current.tests }
+      const lineCount = composedSource().split('\n').length
+      setDebugText(tsLine(
+        `Run · lang=${language} · file=${entrypoint} · lines=${lineCount} · stdout=${stdout.length}b · stderr=${stderr.length}b`
+      ))
+    }
+  }, [running, checking, composedSource, isPython, isJs, language, entrypoint, appendTerminal])
+
+  // ── Run visible tests in-browser for fast feedback (no completion here) ──
+  const runVisibleTests = useCallback(async () => {
+    const tests = spec?.visible_tests || []
+    if (!tests.length) return null
+    const source = composedSource()
+    if (isPython) {
+      setPyLoading(true)
+      const r = await runPythonTests(source, tests)
+      setPyLoading(false)
+      return r
+    }
+    if (isJs) {
+      return runJavaScriptTests(source, tests, { timeoutMs: 8000 })
+    }
+    return null
+  }, [spec, composedSource, isPython, isJs])
+
+  // ── Check Solution: authoritative backend grade (visible + HIDDEN tests) ──
+  const handleCheck = useCallback(async () => {
+    if (checking || running || solved) return
+    setChecking(true)
+    setBottomTab('tests')
+    setTestResults(null)
+    appendTerminal('$ check-solution (grading on server: visible + hidden tests)')
+
+    // Optional fast local preview of visible tests while the server grades.
+    let localPreview = null
+    if (canRunInBrowser) {
+      try { localPreview = await runVisibleTests() } catch { /* non-fatal */ }
+      if (localPreview && mountedRef.current) {
+        setTestResults({
+          tests: (localPreview.results || []).map((r) => ({ ...r, hidden: false })),
+          passed_count: (localPreview.results || []).filter((r) => r.passed).length,
+          total_count: (localPreview.results || []).length,
+          hidden_total: spec?.hidden_test_count || 0,
+          preview: true,
+        })
+      }
+    }
+
+    try {
+      const result = await labApi.codeValidate(sessionId, {
+        language,
+        files,
+        entrypoint,
+      })
+      if (!mountedRef.current) return
+
+      const tests = result.tests || []
+      setTestResults({
+        tests,
+        passed_count: result.passed_count ?? 0,
+        total_count: result.total_count ?? 0,
+        hidden_total: spec?.hidden_test_count || 0,
+        preview: false,
+      })
+      if (result.stdout) setOutput(result.stdout)
+      // Feed the mentor's context from the authoritative grade.
+      lastCtx.current = { output: result.stdout || '', error: result.error || '', tests }
+      setDebugText(tsLine(
+        `Check · file=${entrypoint} · passed=${result.passed_count ?? 0}/${result.total_count ?? 0}` +
+        ` · hidden=${spec?.hidden_test_count || 0} · verdict=${result.passed ? 'PASS' : result.needs_review ? 'NEEDS_REVIEW' : 'FAIL'}` +
+        (result.error ? ` · err=${String(result.error).slice(0, 120)}` : '')
+      ))
+
+      if (result.needs_review) {
+        appendTerminal('server: needs manual review')
+        toast(result.message || 'Submission needs manual review.', { icon: '🔎' })
+        return
+      }
+      if (result.passed) {
+        setSolved(true)
+        clearDraft(sessionId)  // solved — discard the autosaved draft
+        appendTerminal('server: ALL TESTS PASSED — solved')
+        toast.success(result.message || 'All tests passed! Challenge solved.', { duration: 6000 })
+        onSolved?.(result)
+      } else {
+        if (result.error) { setLogsText(result.error) }
+        appendTerminal(`server: ${result.passed_count ?? 0}/${result.total_count ?? 0} passed — not solved`)
+        toast(result.message || 'Some tests failed. Keep trying!', { icon: '🔍' })
+      }
+    } catch (err) {
+      appendTerminal('check failed (network/validation error)')
+      toast.error(err?.response?.data?.error || 'Validation error')
+    } finally {
+      if (mountedRef.current) setChecking(false)
+    }
+  }, [checking, running, solved, canRunInBrowser, runVisibleTests, sessionId, language, files, entrypoint, spec, onSolved, appendTerminal])
+
+  // ── AI Mentor (rule-based, free) ──
+  const askMentor = useCallback(async (requested = 'all', { unlock = false } = {}) => {
+    setRightTab('mentor')
+    setMentorLoading(true)
+    try {
+      const ctx = lastCtx.current
+      const data = await labApi.codeMentor(sessionId, {
+        language,
+        code: composedSource(),
+        output: ctx.output,
+        error: ctx.error,
+        test_results: ctx.tests,
+        requested,
+        unlock_reference: unlock,
+      })
+      if (!mountedRef.current) return
+      // Preserve an already-unlocked reference across follow-up asks.
+      setMentor((prev) => {
+        if (prev?.reference?.unlocked && data?.reference && !data.reference.unlocked) {
+          return { ...data, reference: prev.reference }
+        }
+        return data
+      })
+      if (data?.summary) setDebugText((p) => (p ? p + '\n' : '') + tsLine(`Mentor: ${data.summary}`))
+    } catch (err) {
+      if (mountedRef.current) {
+        setMentor({
+          summary: 'The mentor is offline right now.',
+          notes: [{ kind: 'info', title: 'Mentor unavailable', detail: 'Could not reach the mentor service. Your code still runs and grades normally.' }],
+          reveals_solution: false,
+          reference: { unlocked: false, reference_available: false },
+        })
+      }
+    } finally {
+      if (mountedRef.current) setMentorLoading(false)
+    }
+  }, [sessionId, language, composedSource])
+
+  const handleUnlockReference = useCallback(() => askMentor('all', { unlock: true }), [askMentor])
+
+  // ── Manual save (Ctrl/Cmd+S or toolbar) — forces an immediate draft flush ──
+  const handleSave = useCallback(() => {
+    const editable = {}
+    Object.keys(files).forEach((p) => {
+      if (!readonlyPaths.has(p)) editable[p] = files[p]
+    })
+    if (saveDraft(sessionId, editable)) {
+      setSavedAt(Date.now())
+      setDirtyPaths(new Set())
+      dirtyRef.current = false
+      appendTerminal('saved to browser storage')
+    }
+  }, [files, readonlyPaths, sessionId, appendTerminal])
+
+  // ── Explorer: folders, files, tabs ──
+  const toggleDir = useCallback((path) => {
+    setExpandedDirs((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }, [])
+
+  const openFile = useCallback((path) => {
+    setActivePath(path)
+    setOpenTabs((prev) => (prev.includes(path) ? prev : [...prev, path]))
+  }, [])
+
+  const closeTab = useCallback((path, e) => {
+    e?.stopPropagation?.()
+    setOpenTabs((prev) => {
+      const idx = prev.indexOf(path)
+      const next = prev.filter((p) => p !== path)
+      setActivePath((cur) => {
+        if (cur !== path) return cur
+        if (!next.length) return ''
+        return next[Math.max(0, idx - 1)] || next[0]
+      })
+      return next
+    })
+  }, [])
+
+  const createFile = useCallback(() => {
+    const existing = Object.keys(files)
+    const suggestion = newFileHint(language, existing)
+    const input = window.prompt('New file path', suggestion)
+    if (!input) return
+    const path = input.trim().replace(/^\/+/, '')
+    if (!path) return
+    if (files[path] !== undefined) { toast.error('A file already exists at that path'); return }
+    setFiles((prev) => ({ ...prev, [path]: stubContentForPath(path, language) }))
+    setExpandedDirs((prev) => {
+      const next = new Set(prev)
+      parentDirs(path).forEach((d) => next.add(d))
+      return next
+    })
+    setOpenTabs((prev) => (prev.includes(path) ? prev : [...prev, path]))
+    setActivePath(path)
+    dirtyRef.current = true
+    setDirtyPaths((prev) => new Set(prev).add(path))
+    appendTerminal(`created ${path}`)
+  }, [files, language, appendTerminal])
+
+  const createFolder = useCallback(() => {
+    const input = window.prompt('New folder path', 'new-folder')
+    if (!input) return
+    const dir = input.trim().replace(/^\/+|\/+$/g, '')
+    if (!dir) return
+    const keepPath = `${dir}/.keep`
+    if (files[keepPath] !== undefined) return
+    setFiles((prev) => ({ ...prev, [keepPath]: '' }))
+    setExpandedDirs((prev) => {
+      const next = new Set(prev)
+      next.add(dir)
+      parentDirs(keepPath).forEach((d) => next.add(d))
+      return next
+    })
+    dirtyRef.current = true
+    appendTerminal(`created folder ${dir}/`)
+  }, [files, appendTerminal])
+
+  const deleteFile = useCallback((path) => {
+    if (readonlyPaths.has(path)) return
+    if (!window.confirm(`Delete ${path}? This cannot be undone.`)) return
+    setFiles((prev) => {
+      const next = { ...prev }
+      delete next[path]
+      return next
+    })
+    setOpenTabs((prev) => {
+      const idx = prev.indexOf(path)
+      const next = prev.filter((p) => p !== path)
+      setActivePath((cur) => {
+        if (cur !== path) return cur
+        if (!next.length) return ''
+        return next[Math.max(0, idx - 1)] || next[0]
+      })
+      return next
+    })
+    setDirtyPaths((prev) => {
+      if (!prev.has(path)) return prev
+      const next = new Set(prev)
+      next.delete(path)
+      return next
+    })
+    dirtyRef.current = true
+    appendTerminal(`deleted ${path}`)
+  }, [readonlyPaths, appendTerminal])
+
+  const renameFile = useCallback((path) => {
+    if (readonlyPaths.has(path)) return
+    const input = window.prompt('Rename file', path)
+    if (!input) return
+    const next = input.trim().replace(/^\/+/, '')
+    if (!next || next === path) return
+    if (files[next] !== undefined) { toast.error('A file already exists at that path'); return }
+    setFiles((prev) => {
+      const copy = { ...prev }
+      copy[next] = copy[path]
+      delete copy[path]
+      return copy
+    })
+    setOpenTabs((prev) => prev.map((p) => (p === path ? next : p)))
+    setActivePath((prev) => (prev === path ? next : prev))
+    setDirtyPaths((prev) => {
+      if (!prev.has(path)) return prev
+      const copy = new Set(prev)
+      copy.delete(path)
+      copy.add(next)
+      return copy
+    })
+    dirtyRef.current = true
+    appendTerminal(`renamed ${path} → ${next}`)
+  }, [files, readonlyPaths, appendTerminal])
+
+  // ── Reload starter files from the server, discarding local drafts ──
+  const handleRefresh = useCallback(async () => {
+    if (solved || loading) return
+    if (dirtyRef.current && !window.confirm('Reload starter files? This discards local edits.')) return
+    try {
+      const data = await labApi.getCodingSpec(sessionId)
+      const s = data.spec || {}
+      setSpec(s)
+      applySpecFiles(s, { mergeDraft: false, announce: false })
+      clearDraft(sessionId)
+      appendTerminal('reloaded starter files from server')
+      toast.success('Starter files reloaded')
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Could not reload starter files')
+    }
+  }, [solved, loading, sessionId, applySpecFiles, appendTerminal])
+
+  if (!authenticated) {
+    const submitLogin = (e) => {
+      e.preventDefault()
+      const ok = loginUser.trim().toLowerCase() === IDE_LAB_USER && loginPass === IDE_LAB_PASS
+      if (ok) {
+        try { sessionStorage.setItem(IDE_AUTH_KEY, '1') } catch { /* ignore */ }
+        setLoginError('')
+        setAuthenticated(true)
+      } else {
+        setLoginError(`Invalid credentials. Use ${IDE_LAB_USER} / ${IDE_LAB_PASS} for training labs.`)
+      }
+    }
+
+    return (
+      <div className="flex-1 min-h-0 bg-[#1e1e1e] text-[#cccccc] flex flex-col">
+        <div className="h-9 bg-[#2d2d30] border-b border-[#3e3e42] flex items-center px-4 text-xs">
+          <span className="font-semibold text-white">FixitLab IDE</span>
+          <span className="ml-2 text-[#858585]">{scenario?.title || 'Coding Lab'}</span>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="w-full max-w-sm bg-[#252526] border border-[#3e3e42] shadow-2xl rounded overflow-hidden">
+            <div className="px-5 py-4 bg-[#007acc] text-white font-semibold flex items-center gap-2">
+              <FileCode size={18} /> VS Code Workbench
+            </div>
+            <form onSubmit={submitLogin} className="p-5 space-y-4">
+              <p className="text-sm text-[#cccccc]">Sign in to the multi-language IDE training environment.</p>
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#969696] mb-1">Username</label>
+                <input value={loginUser} onChange={(e) => setLoginUser(e.target.value)} autoFocus autoComplete="username"
+                  placeholder={IDE_LAB_USER}
+                  className="w-full bg-[#1e1e1e] border border-[#3e3e42] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#007acc]" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#969696] mb-1">Password</label>
+                <input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} autoComplete="current-password"
+                  className="w-full bg-[#1e1e1e] border border-[#3e3e42] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#007acc]" />
+              </div>
+              {loginError && <p className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{loginError}</p>}
+              <button type="submit" className="w-full py-2 rounded bg-[#007acc] text-white font-semibold">
+                Sign In
+              </button>
+              <button type="button"
+                onClick={() => { setLoginUser(IDE_LAB_USER); setLoginPass(IDE_LAB_PASS); setLoginError('') }}
+                className="w-full py-1.5 text-xs text-[#cccccc] border border-[#3e3e42] rounded hover:bg-[#2d2d30]">
+                Use lab credentials (autofill)
+              </button>
+              <p className="text-[10px] text-[#969696] text-center pt-2 border-t border-[#3e3e42]">
+                Training credentials: <span className="font-mono text-white">{IDE_LAB_USER}</span> / <span className="font-mono text-white">{IDE_LAB_PASS}</span>
+              </p>
+            </form>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-surface-950">
+        <div className="flex flex-col items-center gap-3 text-surface-400">
+          <Loader2 size={28} className="animate-spin text-accent-cyan" />
+          <span className="text-sm">Loading coding environment…</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-surface-950 p-6">
+        <div className="max-w-md text-center glass-card p-8 space-y-3">
+          <AlertTriangle size={32} className="text-accent-amber mx-auto" />
+          <h2 className="text-lg font-bold text-white">Coding environment unavailable</h2>
+          <p className="text-sm text-surface-400">{loadError}</p>
+        </div>
+      </div>
+    )
+  }
+
   const visibleTests = spec?.visible_tests || []
   const hiddenCount = spec?.hidden_test_count || 0
   const objectives = scenario?.objectives || []
@@ -464,7 +891,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       ) : (
         <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--vsc-muted)] text-sm p-6 text-center">
           <FileCode size={36} className="opacity-40" />
-          <p>{paths.length ? 'Select a file from the Explorer' : 'No file open'}</p>
+          <p>{Object.keys(files).length ? 'Select a file from the Explorer' : 'No file open'}</p>
           {!solved && (
             <button type="button" onClick={createFile} className="vsc-btn vsc-btn-primary">
               <Plus size={13} /> New File

@@ -11,6 +11,7 @@ import { TRANSIENT_STATUSES } from './MaasStatusBadge'
 import MachinesTable from './MachinesTable'
 import MachineDetail from './MachineDetail'
 import MaasNavPages from './MaasNavPages'
+import './maas-vanilla.scss'
 import './maas.css'
 
 const ACCENT = '#77216F'
@@ -191,17 +192,120 @@ export default function BaremetalSimulator({
     [machines],
   )
 
+  // ── Live updates over WebSocket, with polling fallbacks ──
+  const wsRef = useRef(null)
+  const [wsConnected, setWsConnected] = useState(false)
+  const wsAttemptsRef = useRef(0)
+  const wsReconnectTimerRef = useRef(null)
+  const slowPollRef = useRef(null)
+
+  const applyWsPayload = useCallback((raw) => {
+    if (!raw || typeof raw !== 'object') return
+    if (raw.type === 'ping' || raw.type === 'pong') return
+    const payload = raw.payload && typeof raw.payload === 'object' ? raw.payload : raw
+    if (payload.state && typeof payload.state === 'object') {
+      setState(payload)
+    } else if (payload.maas || payload.session) {
+      setState({ state: payload })
+    }
+  }, [])
+
+  // Same-origin WS (like LabTerminal), max 5 reconnect attempts with backoff;
+  // once exhausted the slow/fast poll effects below take over permanently
+  // (until this effect re-runs, e.g. after a re-login).
   useEffect(() => {
-    if (!loggedIn || !anyTransient) {
+    if (!loggedIn) return undefined
+    let disposed = false
+
+    const clearReconnectTimer = () => {
+      if (wsReconnectTimerRef.current) {
+        clearTimeout(wsReconnectTimerRef.current)
+        wsReconnectTimerRef.current = null
+      }
+    }
+
+    const buildWsUrl = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+      return `${protocol}://${window.location.host}/ws/baremetal/${sessionId}/`
+    }
+
+    const connect = () => {
+      if (disposed) return
+      clearReconnectTimer()
+      let ws
+      try {
+        ws = new WebSocket(buildWsUrl())
+      } catch {
+        return
+      }
+      wsRef.current = ws
+      ws.onopen = () => {
+        if (disposed) return
+        wsAttemptsRef.current = 0
+        setWsConnected(true)
+      }
+      ws.onmessage = (event) => {
+        try { applyWsPayload(JSON.parse(event.data)) } catch { /* ignore malformed frame */ }
+      }
+      ws.onerror = () => { /* handled by onclose */ }
+      ws.onclose = (e) => {
+        if (wsRef.current === ws) wsRef.current = null
+        setWsConnected(false)
+        if (disposed || e.code === 1000) return
+        wsAttemptsRef.current += 1
+        if (wsAttemptsRef.current > 5) return  // give up — polling fallbacks take over
+        const delay = Math.min(1000 * 2 ** (wsAttemptsRef.current - 1), 16000)
+        wsReconnectTimerRef.current = setTimeout(connect, delay)
+      }
+    }
+
+    connect()
+
+    return () => {
+      disposed = true
+      clearReconnectTimer()
+      const ws = wsRef.current
+      if (ws) {
+        ws.onclose = null
+        ws.onerror = null
+        ws.onmessage = null
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close(1000)
+      }
+      wsRef.current = null
+      wsAttemptsRef.current = 0
+      setWsConnected(false)
+    }
+  }, [loggedIn, sessionId, applyWsPayload])
+
+  // Slow baseline poll — only while the WebSocket is connecting, retrying, or
+  // has permanently given up (transient-only status changes are still caught
+  // faster by the 2s poll below).
+  useEffect(() => {
+    if (!loggedIn || wsConnected) {
+      if (slowPollRef.current) { clearInterval(slowPollRef.current); slowPollRef.current = null }
+      return undefined
+    }
+    if (slowPollRef.current) return undefined
+    slowPollRef.current = setInterval(() => { refresh() }, 8000)
+    return () => { if (slowPollRef.current) { clearInterval(slowPollRef.current); slowPollRef.current = null } }
+  }, [loggedIn, wsConnected, refresh])
+
+  // Fast transient-only poll — a stopgap for machines mid-commission/deploy
+  // while the WebSocket is down; the WS pushes updates instantly once back up.
+  useEffect(() => {
+    if (!loggedIn || !anyTransient || wsConnected) {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
       return undefined
     }
     if (pollRef.current) return undefined
     pollRef.current = setInterval(() => { refresh() }, 2000)
     return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }
-  }, [loggedIn, anyTransient, refresh])
+  }, [loggedIn, anyTransient, wsConnected, refresh])
 
-  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+  useEffect(() => () => {
+    if (pollRef.current) clearInterval(pollRef.current)
+    if (slowPollRef.current) clearInterval(slowPollRef.current)
+  }, [])
 
   const run = async (fn, okMsg) => {
     if (busy) return
@@ -244,6 +348,10 @@ export default function BaremetalSimulator({
         return run(() => baremetalApi.lock(sessionId, mid), 'Locked')
       case 'unlock':
         return run(() => baremetalApi.unlock(sessionId, mid), 'Unlocked')
+      case 'enterRescue':
+        return run(() => baremetalApi.enterRescue(sessionId, mid), 'Entering rescue mode')
+      case 'exitRescue':
+        return run(() => baremetalApi.exitRescue(sessionId, mid), 'Exiting rescue mode')
       case 'markBroken':
         return run(() => baremetalApi.markBroken(sessionId, mid, extra.comment || ''), 'Marked broken')
       case 'markFixed':
@@ -282,6 +390,8 @@ export default function BaremetalSimulator({
       delete: 'maas_delete',
       setZone: 'maas_set_zone',
       setPool: 'maas_set_pool',
+      enterRescue: 'maas_enter_rescue',
+      exitRescue: 'maas_exit_rescue',
     }
     if (action === 'addTag') {
       setBusy(true)
@@ -377,22 +487,26 @@ export default function BaremetalSimulator({
       </div>
 
       <div className="maas-body">
-        <nav className="maas-sidenav" aria-label="MAAS navigation">
-          {sections.map((sec) => (
-            <div key={sec}>
-              <div className="maas-sidenav-section">{sec}</div>
-              {NAV.filter((n) => n.section === sec).map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={`maas-sidenav-item ${nav === key && !detailMachine ? 'is-active' : ''}`}
-                  onClick={() => { setNav(key); setDetailId(null) }}
-                >
-                  <Icon size={15} /> {label}
-                </button>
-              ))}
-            </div>
-          ))}
+        <nav className="maas-sidenav p-side-navigation" aria-label="MAAS navigation">
+          <ul className="p-side-navigation__list">
+            {sections.map((sec) => (
+              <li key={sec} className="maas-sidenav-group">
+                <div className="maas-sidenav-section p-side-navigation__label">{sec}</div>
+                {NAV.filter((n) => n.section === sec).map(({ key, label, icon: Icon }) => (
+                  <div className="p-side-navigation__item" key={key}>
+                    <button
+                      type="button"
+                      className={`maas-sidenav-item p-side-navigation__link ${nav === key && !detailMachine ? 'is-active' : ''}`}
+                      aria-current={nav === key && !detailMachine ? 'page' : undefined}
+                      onClick={() => { setNav(key); setDetailId(null) }}
+                    >
+                      <Icon size={15} /> {label}
+                    </button>
+                  </div>
+                ))}
+              </li>
+            ))}
+          </ul>
         </nav>
 
         <main className="maas-main">

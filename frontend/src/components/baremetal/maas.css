@@ -809,3 +809,144 @@
   background: var(--maas-light);
   color: var(--maas-cool-grey);
 }
+
+/* ── Vanilla Framework side-navigation: neutralize its own chrome and defer
+   to the maas-* layout classes it is layered onto. ─────────────────────── */
+.maas-sidenav.p-side-navigation,
+.maas-settings-nav.p-side-navigation {
+  background: transparent;
+}
+
+.maas-sidenav .p-side-navigation__list,
+.maas-settings-nav .p-side-navigation__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.maas-sidenav .p-side-navigation__item,
+.maas-settings-nav .p-side-navigation__item {
+  margin: 0;
+  padding: 0;
+}
+
+.maas-sidenav .p-side-navigation__link {
+  width: 100%;
+  border-radius: 0;
+}
+
+/* ── Settings leaf navigation ─────────────────────────────────────────── */
+.maas-settings-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.maas-settings-nav {
+  width: 220px;
+  flex-shrink: 0;
+  background: #fafafa;
+  border: 1px solid var(--maas-border);
+  border-radius: 2px;
+  padding: 0.35rem 0;
+}
+
+.maas-settings-leaf {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.83rem;
+  font-family: inherit;
+  color: var(--maas-cool-grey);
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.maas-settings-leaf:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.maas-settings-leaf.is-active {
+  background: #fff;
+  border-left-color: var(--maas-orange);
+  font-weight: 500;
+  color: #000;
+}
+
+.maas-settings-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.maas-settings-heading {
+  font-size: 1.05rem;
+  font-weight: 500;
+  margin: 0 0 0.75rem;
+  color: #111;
+}
+
+@media (max-width: 720px) {
+  .maas-settings-layout {
+    flex-direction: column;
+  }
+
+  .maas-settings-nav {
+    width: 100%;
+  }
+}
+
+/* ── Rescue mode ──────────────────────────────────────────────────────── */
+.maas-banner-rescue {
+  border-left: 4px solid var(--maas-orange);
+  background: #fff4ec;
+}
+
+.maas-badge-rescue {
+  color: var(--maas-orange);
+  background: rgba(233, 84, 32, 0.12);
+}
+
+.maas-card-rescue {
+  border-color: var(--maas-orange);
+}
+
+/* ── Vanilla-style brand buttons: square corners, like real MAAS/Canonical
+   chrome (positive/brand actions get 0 border-radius; neutral buttons keep
+   their existing 2px so they still read as buttons at small sizes). ────── */
+.maas-btn-positive,
+.maas-btn-brand,
+.maas-btn-negative {
+  border-radius: 0;
+}
+
+/* ── Contrast safety net: never let a form control or card blend into a
+   white background regardless of where it's nested (dialogs, cards, tabs). */
+.maas-input,
+.maas-select,
+.maas-textarea {
+  background: #fff;
+  color: var(--maas-cool-grey);
+  border-color: var(--maas-border);
+}
+
+.maas-input::placeholder,
+.maas-textarea::placeholder {
+  color: #9a9a9a;
+}
+
+.maas-input:disabled,
+.maas-select:disabled,
+.maas-textarea:disabled {
+  background: #f2f2f2;
+  color: #888;
+}
+
+.maas-card,
+.maas-dialog,
+.maas-table-wrap {
+  background: #fff;
+  color: var(--maas-cool-grey);
+}

@@ -34,6 +34,7 @@ COMMISSION_SECONDS = 18
 DEPLOY_SECONDS = 22
 TEST_SECONDS = 6
 RELEASE_SECONDS = 3
+RESCUE_SECONDS = 4
 
 # Canonical MAAS lifecycle order used for detail-view rendering / validation.
 LIFECYCLE = [
@@ -54,6 +55,14 @@ LIFECYCLE = [
 
 _GPU_HOST_HINTS = ("gpu", "h100", "h200", "b300", "mi300")
 
+# Legacy/alternate action names accepted from the frontend, normalized to the
+# canonical action handled below.
+_ALIASES = {
+    "maas_dhcp_configure": "maas_dhcp_toggle",
+    "maas_add_zone": "maas_create_zone",
+    "maas_add_pool": "maas_create_pool",
+}
+
 
 def _session_key(session_id: str) -> str:
     return f"baremetal_session:{session_id}"
@@ -68,6 +77,23 @@ def _load(session_id: str) -> dict | None:
 
 def _save(session_id: str, entry: dict) -> None:
     cache.set(_session_key(str(session_id)), json.dumps(entry, default=str), SESSION_TTL)
+    _notify_session(session_id)
+
+
+def _notify_session(session_id: str) -> None:
+    """Best-effort push to any open baremetal WebSocket for this session."""
+    try:
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+        layer = get_channel_layer()
+        if not layer:
+            return
+        async_to_sync(layer.group_send)(
+            f"baremetal_{session_id}",
+            {"type": "baremetal.push", "session_id": str(session_id)},
+        )
+    except Exception:
+        pass
 
 
 def _now_iso() -> str:
@@ -443,6 +469,23 @@ def _maas_infra_seed() -> dict:
             "upstream_dns": "8.8.8.8",
             "enable_http_proxy": False,
             "commissioning_distro_series": "jammy",
+            "kernel_opts": "",
+            "enable_disk_erasing_on_release": False,
+            "network_discovery": "enabled",
+            "syslog_host": "",
+            "package_repositories": ["main", "restricted", "universe", "multiverse"],
+            "default_min_hwe_kernel": "ga-22.04",
+            "windows_kms_host": "",
+            "hardware_sync_interval": "15m",
+            "curtin_verbose": False,
+            "apt_http_proxy": "",
+            "maas_auto_ipmi_user": "maas",
+            "maas_auto_ipmi_user_privilege_level": "ADMIN",
+            "remote_syslog": "",
+            "use_peer_proxy": False,
+            "prefer_v4_proxy": True,
+            "dnssec_validation": "auto",
+            "active_discovery_interval": "10m",
         },
         "users": [
             {"username": "admin", "is_admin": True, "email": "admin@maas.local"},
@@ -743,6 +786,48 @@ def _apply_preset(state: dict, slug: str) -> None:
     elif "kvm" in slug or "virsh" in slug:
         state["goal"] = {"title": "KVM VM", "objective": "Start the shut-off VM and confirm it is running."}
         state["broken"] = {"vm_stopped": "train-vm-2"}
+    elif "rescue" in slug:
+        machines = state["maas"]["machines"]
+        m2 = next((m for m in machines if m.get("id") == 2), None)
+        if "exit" in slug or "leave" in slug:
+            state["goal"] = {
+                "title": "Exit rescue mode",
+                "objective": "Exit rescue mode on gpu-node-02 and confirm it returns to Deployed.",
+            }
+            if m2 is not None:
+                m2["status"] = "Rescue mode"
+                m2["power"] = "on"
+                m2["os"] = m2.get("os") or "Ubuntu 22.04 LTS"
+                m2["status_before_rescue"] = "Deployed"
+            state["broken"] = {"needs_rescue_exit": 2}
+        else:
+            state["goal"] = {
+                "title": "Enter rescue mode",
+                "objective": "Boot gpu-node-02 into rescue mode to recover its filesystem.",
+            }
+            if m2 is not None:
+                m2["status"] = "Deployed"
+                m2["power"] = "on"
+                m2["os"] = m2.get("os") or "Ubuntu 22.04 LTS"
+            state["broken"] = {"needs_rescue_enter": 2}
+    elif ("dhcp" in slug and "maas" in slug) or "enable-dhcp" in slug:
+        state["goal"] = {"title": "Enable MAAS DHCP", "objective": "Enable DHCP on the PXE VLAN so machines can enlist."}
+        state["maas"].setdefault("dhcp", {})["enabled"] = False
+        state["broken"] = {"dhcp_disabled": True}
+    elif "settings" in slug:
+        state["goal"] = {"title": "Fix MAAS settings", "objective": "Configure NTP servers and the commissioning distro series."}
+        state["maas"].setdefault("settings", {})["ntp_servers"] = ""
+        state["maas"]["settings"]["commissioning_distro_series"] = ""
+        state["broken"] = {"settings_ntp_wrong": True, "settings_commissioning_incomplete": True}
+    elif "scripts" in slug and "maas" in slug:
+        state["goal"] = {
+            "title": "Scripts and users",
+            "objective": "Attach the commissioning script and create an operator user.",
+        }
+        # Drop the seeded operator so the learner must create one.
+        users = state["maas"].setdefault("users", [])
+        state["maas"]["users"] = [u for u in users if u.get("username") != "operator"]
+        state["broken"] = {"scripts_unattached": True, "needs_operator_user": True}
     elif "maas" in slug:
         state["goal"] = {"title": "MAAS commission", "objective": "Commission gpu-node-02 and deploy Ubuntu."}
         state["broken"] = {"machine_needs_commission": 2, "bmc_unreachable": True}
@@ -801,6 +886,15 @@ _RELEASE_STEPS = [
     (50, "Powering down and clearing allocated owner"),
     (100, "Release complete — machine Ready"),
 ]
+_RESCUE_ENTER_STEPS = [
+    (40, "Booting ephemeral rescue environment via PXE"),
+    (75, "Mounting rescue kernel + initrd"),
+    (100, "Ephemeral rescue environment ready"),
+]
+_RESCUE_EXIT_STEPS = [
+    (50, "Exiting rescue mode — rebooting into deployed OS"),
+    (100, "Rescue mode exited — machine back online"),
+]
 
 
 def _boot_resource_os_label(resource: dict | None) -> str:
@@ -846,7 +940,10 @@ def _advance_machine(m: dict, now: float, *, session_id: str = "") -> None:
     status = m.get("status")
     started = m.get("phase_started_at")
     duration = m.get("phase_duration") or 0
-    async_statuses = ("Commissioning", "Deploying", "Testing", "Releasing")
+    async_statuses = (
+        "Commissioning", "Deploying", "Testing", "Releasing",
+        "Entering rescue mode", "Exiting rescue mode",
+    )
     if status not in async_statuses or not started or duration <= 0:
         return
 
@@ -860,6 +957,10 @@ def _advance_machine(m: dict, now: float, *, session_id: str = "") -> None:
         steps = _DEPLOY_STEPS
     elif status == "Testing":
         steps = _TEST_STEPS
+    elif status == "Entering rescue mode":
+        steps = _RESCUE_ENTER_STEPS
+    elif status == "Exiting rescue mode":
+        steps = _RESCUE_EXIT_STEPS
     else:
         steps = _RELEASE_STEPS
     for threshold, message in steps:
@@ -907,6 +1008,15 @@ def _advance_machine(m: dict, now: float, *, session_id: str = "") -> None:
                 m.pop("erase_disks_on_release", None)
                 _log(m, "Disks erased on release")
             _machine_event(m, "Node changed status - Ready")
+        elif status == "Entering rescue mode":
+            m["status"] = "Rescue mode"
+            m["power"] = "on"
+            _log(m, "Ephemeral rescue environment ready")
+            _machine_event(m, "Node changed status - Rescue mode")
+        elif status == "Exiting rescue mode":
+            m["status"] = m.pop("status_before_rescue", None) or "Deployed"
+            _log(m, f"Rescue mode exited — status {m['status']}")
+            _machine_event(m, f"Node changed status - {m['status']}")
         # S1: Ready/Deployed → unified asset registry (same session as AWX/DC).
         if session_id and m.get("status") in ("Ready", "Deployed"):
             try:
@@ -978,6 +1088,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     # Advance wall-clock lifecycle before handling the action so decisions are
     # made against the up-to-date state.
     _tick(state)
+    action = _ALIASES.get(action, action)
     broken = state.get("broken") or {}
 
     if action == "login":
@@ -1937,6 +2048,13 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             if key in ("machine_id", "machine_ids"):
                 continue
             settings[key] = value
+        # Clear scenario blockers once the relevant leaf setting looks configured.
+        if str(settings.get("ntp_servers") or "").strip():
+            broken.pop("settings_ntp_wrong", None)
+        if str(settings.get("commissioning_distro_series") or "").strip():
+            broken.pop("settings_commissioning_incomplete", None)
+        if settings.get("enable_http_proxy") and str(settings.get("http_proxy") or "").strip():
+            broken.pop("settings_proxy_required", None)
         state["events"].insert(0, {
             "time": _now_iso(),
             "message": "MAAS configuration updated",
@@ -1952,6 +2070,8 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if enabled is None:
             enabled = not dhcp.get("enabled", True)
         dhcp["enabled"] = bool(enabled)
+        if dhcp["enabled"]:
+            broken.pop("dhcp_disabled", None)
         state["events"].insert(0, {
             "time": _now_iso(),
             "message": f"DHCP {'enabled' if dhcp['enabled'] else 'disabled'} on VLAN {dhcp.get('vlan') or 'untagged'}",
@@ -1959,6 +2079,112 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         })
         _save(session_id, entry)
         return {"ok": True, "message": f"DHCP {'enabled' if dhcp['enabled'] else 'disabled'}", "dhcp": dhcp}
+
+    if action == "maas_enter_rescue":
+        mid = int(payload.get("machine_id") or broken.get("needs_rescue_enter") or 2)
+        m = _find_machine(state, mid)
+        if not m:
+            return {"ok": False, "error": f"Machine {mid} not found"}
+        if m.get("status") not in ("Deployed", "Ready"):
+            return {"ok": False, "error": f"Machine {mid} must be Deployed or Ready to enter rescue mode (is {m.get('status')})"}
+        m["status_before_rescue"] = m.get("status")
+        m["status"] = "Entering rescue mode"
+        m["progress"] = 0
+        m["phase_started_at"] = _now()
+        m["phase_duration"] = RESCUE_SECONDS
+        _log(m, "Entering rescue mode — booting ephemeral environment")
+        _machine_event(m, "Node changed status - Entering rescue mode")
+        broken.pop("needs_rescue_enter", None)
+        state["events"].insert(0, {
+            "time": _now_iso(),
+            "message": f"Machine {mid} entering rescue mode",
+            "severity": "info",
+        })
+        _save(session_id, entry)
+        return {"ok": True, "message": "Entering rescue mode", "machine_id": mid}
+
+    if action == "maas_exit_rescue":
+        mid = int(payload.get("machine_id") or broken.get("needs_rescue_exit") or 2)
+        m = _find_machine(state, mid)
+        if not m:
+            return {"ok": False, "error": f"Machine {mid} not found"}
+        if m.get("status") != "Rescue mode":
+            return {"ok": False, "error": f"Machine {mid} must be in Rescue mode to exit (is {m.get('status')})"}
+        m["status"] = "Exiting rescue mode"
+        m["progress"] = 0
+        m["phase_started_at"] = _now()
+        m["phase_duration"] = RESCUE_SECONDS
+        _log(m, "Exiting rescue mode — rebooting into deployed OS")
+        _machine_event(m, "Node changed status - Exiting rescue mode")
+        broken.pop("needs_rescue_exit", None)
+        broken.pop("machine_in_rescue", None)
+        state["events"].insert(0, {
+            "time": _now_iso(),
+            "message": f"Machine {mid} exiting rescue mode",
+            "severity": "info",
+        })
+        _save(session_id, entry)
+        return {"ok": True, "message": "Exiting rescue mode", "machine_id": mid}
+
+    if action == "maas_add_dns_record":
+        _ensure_maas_infra(state)
+        domain_name = (payload.get("domain") or "maas").strip()
+        domains = state["maas"].setdefault("domains", [])
+        domain = next((d for d in domains if d.get("name") == domain_name), None)
+        if not domain:
+            domain = {"name": domain_name, "authoritative": True, "records": []}
+            domains.append(domain)
+        record = {
+            "type": (payload.get("type") or "A").strip().upper(),
+            "name": (payload.get("name") or "record").strip(),
+            "data": (payload.get("data") or payload.get("value") or "").strip(),
+        }
+        domain.setdefault("records", []).append(record)
+        state["events"].insert(0, {
+            "time": _now_iso(),
+            "message": f"DNS record {record['name']} added to {domain_name}",
+            "severity": "success",
+        })
+        _save(session_id, entry)
+        return {"ok": True, "message": f"DNS record added to {domain_name}", "record": record}
+
+    if action == "maas_create_user":
+        _ensure_maas_infra(state)
+        users = state["maas"].setdefault("users", [])
+        username = (payload.get("username") or "new-user").strip()
+        if any(u.get("username") == username for u in users):
+            return {"ok": False, "error": f"User {username} already exists"}
+        row = {
+            "username": username,
+            "is_admin": bool(payload.get("is_admin")),
+            "email": payload.get("email") or f"{username}@maas.local",
+        }
+        users.append(row)
+        if username == "operator" or not row["is_admin"]:
+            broken.pop("needs_operator_user", None)
+        state["events"].insert(0, {
+            "time": _now_iso(),
+            "message": f"User {username} created",
+            "severity": "success",
+        })
+        _save(session_id, entry)
+        return {"ok": True, "message": f"User {username} created", "user": row}
+
+    if action == "maas_delete_user":
+        _ensure_maas_infra(state)
+        users = state["maas"].setdefault("users", [])
+        username = (payload.get("username") or "").strip()
+        before = len(users)
+        state["maas"]["users"] = [u for u in users if u.get("username") != username]
+        removed = before - len(state["maas"]["users"])
+        if removed:
+            state["events"].insert(0, {
+                "time": _now_iso(),
+                "message": f"User {username} deleted",
+                "severity": "info",
+            })
+        _save(session_id, entry)
+        return {"ok": True, "message": f"User {username} deleted" if removed else f"User {username} not found"}
 
     if action == "maas_create_zone":
         _ensure_maas_infra(state)

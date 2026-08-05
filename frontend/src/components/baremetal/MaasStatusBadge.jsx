@@ -5,6 +5,8 @@ export const TRANSIENT_STATUSES = new Set([
   'Deploying',
   'Releasing',
   'Testing',
+  'Entering rescue mode',
+  'Exiting rescue mode',
 ])
 
 const READY_LIKE = new Set(['Ready', 'Deployed'])
@@ -20,7 +22,8 @@ export function statusClass(status) {
   if (TRANSIENT_STATUSES.has(status)) return 'maas-badge-transient'
   if (READY_LIKE.has(status)) return status === 'Deployed' ? 'maas-badge-deployed' : 'maas-badge-ready'
   if (FAILED_LIKE.has(status)) return status === 'Broken' ? 'maas-badge-broken' : 'maas-badge-failed'
-  if (status === 'Allocated' || status === 'Rescue mode') return 'maas-badge-allocated'
+  if (status === 'Rescue mode') return 'maas-badge-rescue'
+  if (status === 'Allocated') return 'maas-badge-allocated'
   return 'maas-badge-neutral'
 }
 

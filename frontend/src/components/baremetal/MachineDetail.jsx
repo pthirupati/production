@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronLeft, Power, Rocket } from 'lucide-react'
+import { ChevronLeft, Power, Rocket, LifeBuoy } from 'lucide-react'
 import { MaasStatusBadge, PowerIcon, TRANSIENT_STATUSES } from './MaasStatusBadge'
 
 const TABS = [
@@ -22,6 +22,7 @@ const LAYOUTS = [
 ]
 
 function bannerClass(status) {
+  if (status === 'Rescue mode' || status === 'Entering rescue mode' || status === 'Exiting rescue mode') return 'maas-banner-rescue'
   if (TRANSIENT_STATUSES.has(status)) return 'maas-banner-transient'
   if (status === 'Ready' || status === 'Deployed') return 'maas-banner-ready'
   if (status === 'Failed' || status === 'Broken' || (status || '').startsWith('Failed')) return 'maas-banner-failed'
@@ -32,6 +33,7 @@ function primaryAction(status) {
   if (status === 'New' || status === 'Failed' || status === 'Failed commissioning') return 'commission'
   if (status === 'Ready' || status === 'Allocated') return 'deploy'
   if (status === 'Deployed') return 'release'
+  if (status === 'Rescue mode') return 'exitRescue'
   if (TRANSIENT_STATUSES.has(status)) return 'abort'
   if (status === 'Broken') return 'markFixed'
   if (status === 'Failed testing') return 'override'
@@ -49,6 +51,7 @@ export default function MachineDetail({
 }) {
   const [tab, setTab] = useState('Summary')
   const [layout, setLayout] = useState(machine?.storage_layout || 'flat')
+  const [eraseOnRelease, setEraseOnRelease] = useState(false)
   const m = machine || {}
   const fqdn = m.fqdn || `${m.hostname || 'node'}.${m.domain || 'maas'}`
   const action = primaryAction(m.status)
@@ -83,6 +86,17 @@ export default function MachineDetail({
               {!bootResources.length && <option value="">ubuntu/jammy</option>}
             </select>
           </label>
+        )}
+        {m.status === 'Deployed' && (
+          <button
+            type="button"
+            className="maas-btn"
+            disabled={busy}
+            onClick={() => run('enterRescue')}
+            title="Boot into an ephemeral rescue environment without releasing the machine"
+          >
+            <LifeBuoy size={13} /> Enter rescue mode
+          </button>
         )}
         <button
           type="button"
@@ -123,6 +137,11 @@ export default function MachineDetail({
         )}
         {action === 'release' && (
           <button type="button" className="maas-btn" disabled={busy} onClick={() => run('release')}>Release</button>
+        )}
+        {action === 'exitRescue' && (
+          <button type="button" className="maas-btn maas-btn-positive" disabled={busy} onClick={() => run('exitRescue')}>
+            <LifeBuoy size={13} /> Exit rescue mode
+          </button>
         )}
         {action === 'abort' && (
           <button type="button" className="maas-btn maas-btn-negative" disabled={busy} onClick={() => run('abort')}>Abort</button>
@@ -427,7 +446,24 @@ export default function MachineDetail({
                 <button type="button" className="maas-btn" disabled={busy} onClick={() => run('lock')}>Lock</button>
               )}
               {(m.status === 'Deployed' || m.status === 'Allocated') && (
-                <button type="button" className="maas-btn" disabled={busy} onClick={() => run('release')}>Release</button>
+                <label className="maas-label" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="checkbox"
+                    checked={eraseOnRelease}
+                    onChange={(e) => setEraseOnRelease(e.target.checked)}
+                  />
+                  Erase disks on release
+                </label>
+              )}
+              {(m.status === 'Deployed' || m.status === 'Allocated') && (
+                <button
+                  type="button"
+                  className="maas-btn"
+                  disabled={busy}
+                  onClick={() => run('release', { erase: eraseOnRelease })}
+                >
+                  Release{eraseOnRelease ? ' & erase' : ''}
+                </button>
               )}
               {m.status !== 'Broken' && (
                 <button type="button" className="maas-btn" disabled={busy} onClick={() => run('markBroken')}>Mark broken</button>
@@ -438,6 +474,41 @@ export default function MachineDetail({
               <button type="button" className="maas-btn maas-btn-negative" disabled={busy} onClick={() => run('delete')}>
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'Configuration' && (
+        <div className={`maas-card ${bannerClass(m.status) === 'maas-banner-rescue' ? 'maas-card-rescue' : ''}`}>
+          <div className="maas-card-head">Rescue mode</div>
+          <div className="maas-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: '#555' }}>
+              Rescue mode boots an ephemeral in-memory environment over SSH so you can repair a
+              deployed machine without releasing it or losing its disks.
+            </p>
+            {(m.status === 'Entering rescue mode' || m.status === 'Exiting rescue mode') && (
+              <div className="maas-banner maas-banner-rescue" style={{ margin: 0 }}>
+                <span className="maas-spinner" aria-hidden /> {m.status}…
+              </div>
+            )}
+            <div className="maas-toolbar" style={{ margin: 0 }}>
+              {m.status === 'Deployed' && (
+                <button type="button" className="maas-btn maas-btn-positive" disabled={busy} onClick={() => run('enterRescue')}>
+                  <LifeBuoy size={13} /> Enter rescue mode
+                </button>
+              )}
+              {m.status === 'Rescue mode' && (
+                <button type="button" className="maas-btn maas-btn-positive" disabled={busy} onClick={() => run('exitRescue')}>
+                  <LifeBuoy size={13} /> Exit rescue mode
+                </button>
+              )}
+              {m.status !== 'Deployed' && m.status !== 'Rescue mode'
+                && m.status !== 'Entering rescue mode' && m.status !== 'Exiting rescue mode' && (
+                <span style={{ fontSize: '0.8rem', color: '#888' }}>
+                  Only available once the machine is Deployed.
+                </span>
+              )}
             </div>
           </div>
         </div>

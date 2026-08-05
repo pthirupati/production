@@ -363,6 +363,36 @@ def _bridge_ansible_result(session_id: str, template_name: str, playbook: str,
         pass
 
 
+def _maybe_trigger_maas_deploy(session_id: str, job: dict, state: dict) -> None:
+    """Cross-tech: launching a MAAS repave/deploy job template kicks off a real
+    MAAS deploy on a Ready machine so the bare-metal Lab Environment advances
+    in lockstep. Best-effort — a missing/uninitialized baremetal session must
+    never fail the AWX job launch."""
+    haystack = f"{job.get('name', '')} {job.get('playbook', '')}".lower()
+    if not any(k in haystack for k in ("maas", "repave", "deploy")):
+        return
+    try:
+        from apps.vmware_sim import baremetal_engine as be
+
+        bm_state = (be.get_state(session_id, "") or {}).get("state") or {}
+        machines = (bm_state.get("maas") or {}).get("machines") or []
+        target = next((m for m in machines if m.get("status") == "Ready"), None)
+        if not target:
+            return
+        boot_resources = (bm_state.get("maas") or {}).get("boot_resources") or []
+        deploy_payload = {"machine_id": target.get("id")}
+        if any(r.get("name") == "custom/h100-jammy" for r in boot_resources):
+            deploy_payload["boot_resource"] = "custom/h100-jammy"
+        res = be.apply_action(session_id, "maas_deploy", deploy_payload)
+        if res.get("ok"):
+            job["maas_deploy_triggered"] = True
+            broken = state.get("broken")
+            if isinstance(broken, dict):
+                broken.pop("needs_maas_deploy", None)
+    except Exception:
+        pass
+
+
 def _base_state() -> dict:
     return {
         "session": {"logged_in": False, "user": ""},
@@ -734,6 +764,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         # Cross-tech: a service-configuring template launched successfully →
         # publish its intended end state so the Linux terminal reveals it.
         _bridge_ansible_result(session_id, job.get("name", ""), job.get("playbook", ""), payload)
+        _maybe_trigger_maas_deploy(session_id, job, state)
         return {"ok": True, "message": "Job launched", "job_id": job["id"]}
 
     if action == "create_template":
