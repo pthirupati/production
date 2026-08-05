@@ -623,7 +623,10 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 428. [ ] Production smoke: academy-aws-001 + ai-infra AWX primary after each 4D deploy
 429. [~] Datacenter: default entry is Steam 3D hall (not 2D) with mobile/reduced-motion 2D fallback — *this PR*
 430. [~] Datacenter: rack tray slide-in install animation with rail click + LED cascade — *slide+stagger #154*
-431. [ ] Datacenter: FRU RMA full loop UI (locate → dock → repair → burn-in)
+431. [~] Datacenter: FRU RMA full loop UI (locate → dock → repair → burn-in) — *partial #154*
+456. [~] Scenario hero: ai-infra-packer-gpu-image-factory (align project_data_extra AII4) — *seeded*
+458. [~] Scenario heroes: ai-infra-vyos-* (BGP/DHCP/firewall/commit-rollback) ×5 — *1/5 DHCP seeded*
+467. [~] DCOps RMA deep scenario graded against FRU state machine (431/441) — *scenario seeded; grader still marker*
 432. [ ] AI Infra: grow scenario count with VyOS/Packer/libguestfs heroes beyond academy packer markers
 433. [ ] Verify AWS labs on prod after #148 AuthBoot harden (hard refresh + reset path)
 434. [~] AWX companion LabChromeControls visible on every ai-infra primary GUI lab (regression) — *isAwxLab no longer steals ai-infra; companion uses onExit Close + fixed shell*
@@ -633,8 +636,8 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 438. [~] ai-infra unlocks Datacenter companion without separate datacenter sub (AWX parity) — *#154 follow-up*
 439. [~] showAwxLink: allow ai-infra + consoles:awx even when cross_technology — *#154 follow-up*
 440. [~] FRU Issue spare always sends asset_id (selected server); disable without selection — *#154 follow-up*
-441. [ ] FRU RMA orchestrator: ship_rma → dock ASN(ticket+asset) → receive → kits_staged → repair_bay_swap → burn-in → close
-442. [ ] Repair bay UI: swap/consume staged kit actions (not copy-only)
+441. [~] FRU RMA orchestrator: ship_rma → dock ASN(ticket+asset) → receive → kits_staged → repair_bay_swap → burn-in → close — *ASN+kit+swap in #154; burn-in/close auto still open*
+442. [~] Repair bay UI: swap/consume staged kit actions (not copy-only) — *Install kit button*
 443. [ ] Datacenter: expose RackPhysicsFruPanel on 3D path (today 2D-only)
 444. [ ] Datacenter: ToR backbone cables interactive + bend-radius warn in InteractiveCable
 445. [ ] Datacenter: aisle thermal heatmap keyed by ticket severity + BMC inlet (beyond single ThermalHaze plane)
