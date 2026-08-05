@@ -1,0 +1,61 @@
+title: 'E2E: Packer Image → MAAS Deploy → GPU Sanity → vLLM'
+slug: ai-infra-e2e-image-to-inference
+technology: AI Infrastructure Engineering
+category: Production
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 2400
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Critical
+description: 'CONTEXT: End-to-end Bare Metal + ImageDev path owned by AI Infra Engineering.
+  Build/publish a GPU image (Packer), deploy via MAAS, pass ImageDev GPU sanity + cloud-init,
+  then bring up vLLM inference. This mirrors real BM/ImageDev handoffs — not the GPU app course.
+
+
+  ENVIRONMENT: Packer IDE, Bare Metal (MAAS), Lab Terminal, optional AWX/Datacenter companions.
+  Lab chrome (Hints/Check/+30m/Stop) must remain usable when companions open.
+
+
+  SYMPTOM: No custom image in MAAS; node not Deployed; sanity not run; vLLM down.
+
+
+  OBJECTIVE: Packer build → Publish to MAAS → Deploy → cloud-init/gpu-sanity PASS → vllm serve
+  READY → FIXED-OK.'
+objectives:
+- Build and publish Packer GPU image to MAAS
+- Deploy node and pass cloud-init / GPU sanity
+- Start vLLM and confirm inference endpoint
+initial_state: Stock jammy only; no custom image; no inference service.
+hints:
+- order: 1
+  cost: 0
+  content: Open Packer, validate/build the GPU template, then Publish to MAAS so Images lists the custom boot resource.
+- order: 2
+  cost: 15
+  content: In Bare Metal Deploy a Ready node with that image; wait for cloud-init status done on the Lab Terminal.
+- order: 3
+  cost: 35
+  content: Run gpu-sanity and dcgmi diag -r 1; confirm ALL PASS before starting inference.
+- order: 4
+  cost: 55
+  content: Start vllm serve with tensor parallel; confirm READY on :8000, then leave FIXED-OK.
+consoles:
+- packer
+- baremetal
+- terminal
+- awx
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - packer
+  - baremetal
+  - terminal
+  - awx

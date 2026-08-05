@@ -1197,6 +1197,9 @@ export default function DatacenterTwin3D({
   const [intro, setIntro] = useState(true)
   const [walkMode, setWalkMode] = useState(false)
   const [fps, setFps] = useState(0)
+  // Steam-class default: start immersive (game view) — toolbar auto-hides until hover.
+  const [immersive, setImmersive] = useState(true)
+  const autoWalkStarted = useRef(false)
 
   const badgedIn = useMemo(() => {
     const ev = access?.events || []
@@ -1209,15 +1212,36 @@ export default function DatacenterTwin3D({
     return () => clearTimeout(id)
   }, [intro, walkMode])
 
+  // After cinematic enter, auto badge + walk so the learner is "in" the hall (Steam feel).
+  useEffect(() => {
+    if (intro || walkMode || !immersive || autoWalkStarted.current) return undefined
+    const id = setTimeout(() => {
+      autoWalkStarted.current = true
+      if (!badgedIn) onBadgeIn?.()
+      setWalkMode(true)
+    }, 900)
+    return () => clearTimeout(id)
+  }, [intro, walkMode, immersive, badgedIn, onBadgeIn])
+
+  const inGame = immersive && walkMode && badgedIn
+
   return (
     <motion.div
-      className="dc-3d-root"
+      className={`dc-3d-root${immersive ? ' dc-3d-immersive' : ''}`}
       initial={{ opacity: 0, scale: 0.985 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.55, ease: 'easeOut' }}
     >
       <div className="dc-3d-toolbar">
         <span className="dc-twin-title">3D Lab Twin · Steam immersion</span>
+        <label className="dc-3d-toggle">
+          <input
+            type="checkbox"
+            checked={immersive}
+            onChange={(e) => setImmersive(e.target.checked)}
+          />
+          Immersive
+        </label>
         <label className="dc-3d-toggle">
           <input
             type="checkbox"
@@ -1241,7 +1265,6 @@ export default function DatacenterTwin3D({
             onChange={(e) => {
               const on = e.target.checked
               if (on && !badgedIn) {
-                // Steam mantrap: badge before free walk into the hall.
                 onBadgeIn?.()
               }
               setWalkMode(on)
@@ -1259,22 +1282,32 @@ export default function DatacenterTwin3D({
           </button>
         )}
         <span className="dc-muted">
-          ~{fps || '—'} FPS · {walkMode
-            ? (badgedIn ? 'badged · WASD move · Shift sprint' : 'badge required · click Badge-in')
-            : 'cinematic enter · Motions · enable Walk for first-person'}
+          ~{fps || '—'} FPS · {inGame
+            ? 'click to look · WASD · Shift sprint · Esc release mouse'
+            : walkMode
+              ? (badgedIn ? 'badged · WASD' : 'badge required')
+              : 'cinematic enter → auto Walk'}
         </span>
       </div>
-      {!walkMode && !intro && (
+      {!walkMode && !intro && !immersive && (
         <div className="dc-3d-immersion-hint">
-          Tip: <strong>Badge-in</strong> then enable <strong>Walk (WASD)</strong> for Steam-style hall exploration
+          Tip: enable <strong>Immersive</strong> + <strong>Walk</strong> for Steam-style first-person hall
         </div>
       )}
       <div className="dc-3d-canvas-wrap">
+        {inGame && <div className="dc-3d-hud-crosshair" aria-hidden />}
+        {inGame && (
+          <div className="dc-3d-hud">
+            <div><strong>DATA HALL A</strong> · on-site</div>
+            <div>WASD move · mouse look · Shift sprint</div>
+            <div>Hover top edge for tools · dock / mantrap / MDF ahead</div>
+          </div>
+        )}
         <Suspense fallback={<LoadingFallback />}>
           <Canvas
             shadows
             dpr={[1, Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio : 1.5)]}
-            camera={{ position: [12, 9, 14], fov: 42, near: 0.1, far: 80 }}
+            camera={{ position: [12, 9, 14], fov: inGame ? 68 : 42, near: 0.1, far: 80 }}
             gl={{ antialias: true, powerPreference: 'high-performance' }}
           >
             <Physics gravity={[0, -9.81, 0]} colliders={false} paused={!physicsEnabled}>

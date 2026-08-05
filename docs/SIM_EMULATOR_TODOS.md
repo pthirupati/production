@@ -49,6 +49,8 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 487. [~] AI Infra: more VyOS BGP/firewall/commit-rollback scenarios (4 more) — BGP + DHCP + firewall + commit-rollback seeded
 488. [~] Datacenter Steam: forklift pallet + badge door before Walk — corridor forklift + mantrap door meshes
 489. [x] Datacenter: auto-close ticket after burn-in pass (FRU loop finish)
+490. [x] AI Infra: ImageDev cloud-init GPU first-boot + gpu-sanity + vLLM serve + E2E image→inference
+491. [~] Datacenter Steam: immersive HUD / auto-walk / hide chrome (game-like, not button panel)
 26. [x] AWS console mount tests pass for fresh/legacy/corrupt localStorage
 27. [~] Production verify: academy-aws-001 Ec2 Learn loads without error boundary
 28. [x] Terraform / aws-* routing: slugHints no longer map bare aws-* to Terraform IDE

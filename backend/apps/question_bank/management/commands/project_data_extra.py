@@ -4923,4 +4923,97 @@ EXTRA_PROJECTS = [{'technology_slug': 'aws',
             {'jira_key': 'AII5-6', 'title': 'Close ticket with evidence', 'description': 'Attach before/after metrics and return node to production pool.', 'acceptance_criteria': 'Ticket closed with evidence pack linked.', 'hint': 'Include nvidia-smi, dcgmi, and BMC sensor snippets.', 'order': 6, 'depends_on': 'AII5-5'},
         ],
     },
+    {
+        'technology_slug': 'ai-infra',
+        'title': 'ImageDev cloud-init GPU First Boot',
+        'slug': 'ai-infra-imagedev-cloud-init-gpu',
+        'architecture_type': 'custom',
+        'description': (
+            'Own the ImageDev first-boot path: Packer userdata with DataSourceMAAS, '
+            'nvidia-persistenced, and gpu-sanity hooks so Deployed nodes finish cloud-init cleanly.'
+        ),
+        'objectives': [
+            'Validate cloud-init datasource and status',
+            'Confirm GPU runcmd hooks on first boot',
+            'Verify nvidia-smi after cloud-init final',
+        ],
+        'difficulty': 'intermediate',
+        'estimated_hours': 4,
+        'order': 6,
+        'tasks': [
+            {'jira_key': 'AII6-1', 'title': 'Inspect cloud-init status', 'description': 'Confirm DataSourceMAAS and status done on a Deployed GPU node.', 'acceptance_criteria': '`cloud-init status` shows done; `cloud-id` returns maas.', 'hint': 'cloud-init status --long; cloud-id.', 'order': 1},
+            {'jira_key': 'AII6-2', 'title': 'Validate GPU userdata', 'description': 'Ensure runcmd enables persistenced and runs sanity.', 'acceptance_criteria': 'Userdata includes nvidia-persistenced and gpu-sanity.', 'hint': 'Review Packer write_files / cloud-init snippets.', 'order': 2, 'depends_on': 'AII6-1'},
+            {'jira_key': 'AII6-3', 'title': 'Confirm GPUs after final', 'description': 'After cloud-init final, enumerate GPUs.', 'acceptance_criteria': '`nvidia-smi -L` lists expected SKUs.', 'hint': 'Wait for final_message then nvidia-smi -L.', 'order': 3, 'depends_on': 'AII6-2'},
+        ],
+    },
+    {
+        'technology_slug': 'ai-infra',
+        'title': 'ImageDev GPU Sanity Gate',
+        'slug': 'ai-infra-imagedev-gpu-sanity-suite',
+        'architecture_type': 'custom',
+        'description': (
+            'Run the ImageDev GPU sanity suite (deviceQuery, bandwidthTest, nvidia-smi, '
+            'dcgmi diag -r 1) before publishing Packer artifacts to MAAS.'
+        ),
+        'objectives': [
+            'Execute gpu-sanity harness',
+            'Pass DCGM level-1 diagnostics',
+            'Clear the MAAS publish gate',
+        ],
+        'difficulty': 'intermediate',
+        'estimated_hours': 3,
+        'order': 7,
+        'tasks': [
+            {'jira_key': 'AII7-1', 'title': 'Run gpu-sanity', 'description': 'Execute the ImageDev sanity harness on the baked image.', 'acceptance_criteria': 'Report shows ALL PASS.', 'hint': 'gpu-sanity or deviceQuery + bandwidthTest.', 'order': 1},
+            {'jira_key': 'AII7-2', 'title': 'DCGM r1 gate', 'description': 'Run dcgmi diag -r 1 as the release gate.', 'acceptance_criteria': 'All diagnostic rows Pass.', 'hint': 'dcgmi diag -r 1', 'order': 2, 'depends_on': 'AII7-1'},
+            {'jira_key': 'AII7-3', 'title': 'Publish to MAAS', 'description': 'Upload boot resource only after gate green.', 'acceptance_criteria': 'custom GPU image listed in MAAS Images.', 'hint': 'Packer Publish to MAAS / maas boot-resources.', 'order': 3, 'depends_on': 'AII7-2'},
+        ],
+    },
+    {
+        'technology_slug': 'ai-infra',
+        'title': 'vLLM on H100 Inference Bring-Up',
+        'slug': 'ai-infra-vllm-h100-serve',
+        'architecture_type': 'custom',
+        'description': (
+            'AI Infra bring-up of vLLM on a MAAS-deployed H100 node: tensor parallel serve, '
+            'OpenAI-compatible API on :8000, optional throughput bench — infra path, not app ML.'
+        ),
+        'objectives': [
+            'Validate GPU health on Deployed node',
+            'Start vLLM with tensor parallelism',
+            'Confirm OpenAI API readiness',
+        ],
+        'difficulty': 'advanced',
+        'estimated_hours': 5,
+        'order': 8,
+        'tasks': [
+            {'jira_key': 'AII8-1', 'title': 'Confirm H100 inventory', 'description': 'nvidia-smi -L matches expected SXM count.', 'acceptance_criteria': 'All GPUs listed and driver healthy.', 'hint': 'nvidia-smi -L; dcgmi discovery.', 'order': 1},
+            {'jira_key': 'AII8-2', 'title': 'Launch vLLM serve', 'description': 'Start vllm serve with tensor-parallel-size = GPU count.', 'acceptance_criteria': 'Log shows Uvicorn on :8000 and READY.', 'hint': 'vllm serve <model> --tensor-parallel-size 8', 'order': 2, 'depends_on': 'AII8-1'},
+            {'jira_key': 'AII8-3', 'title': 'Smoke the API', 'description': 'Optional bench or curl /v1/models style check.', 'acceptance_criteria': 'Endpoint responds or bench Result PASS.', 'hint': 'vllm bench throughput --model …', 'order': 3, 'depends_on': 'AII8-2'},
+        ],
+    },
+    {
+        'technology_slug': 'ai-infra',
+        'title': 'E2E Image Factory to Inference',
+        'slug': 'ai-infra-e2e-image-to-inference',
+        'architecture_type': 'custom',
+        'description': (
+            'Full Bare Metal + ImageDev handoff: Packer build → MAAS publish/deploy → '
+            'cloud-init + GPU sanity → vLLM serve. End-to-end AI Infra Engineering project.'
+        ),
+        'objectives': [
+            'Publish Packer GPU image to MAAS',
+            'Deploy and pass ImageDev gates',
+            'Serve inference with vLLM',
+        ],
+        'difficulty': 'advanced',
+        'estimated_hours': 8,
+        'order': 9,
+        'tasks': [
+            {'jira_key': 'AII9-1', 'title': 'Packer build + publish', 'description': 'Build GPU image and publish boot resource.', 'acceptance_criteria': 'MAAS Images lists custom GPU series.', 'hint': 'Packer IDE → Publish to MAAS.', 'order': 1},
+            {'jira_key': 'AII9-2', 'title': 'MAAS deploy', 'description': 'Deploy Ready node with custom image.', 'acceptance_criteria': 'Machine Deployed; cloud-init done.', 'hint': 'Deploy with boot_resource picker; cloud-init status.', 'order': 2, 'depends_on': 'AII9-1'},
+            {'jira_key': 'AII9-3', 'title': 'Sanity gate', 'description': 'gpu-sanity + dcgmi diag -r 1 PASS.', 'acceptance_criteria': 'ALL PASS report.', 'hint': 'gpu-sanity; dcgmi diag -r 1.', 'order': 3, 'depends_on': 'AII9-2'},
+            {'jira_key': 'AII9-4', 'title': 'vLLM ready', 'description': 'Start vLLM and confirm :8000 READY.', 'acceptance_criteria': 'OpenAI-compatible server ready.', 'hint': 'vllm serve … --tensor-parallel-size N', 'order': 4, 'depends_on': 'AII9-3'},
+        ],
+    },
 ]

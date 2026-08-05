@@ -667,7 +667,8 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         # other scenarios keep using the normal Linux handlers.
         gpu_tools = ("nvidia-smi", "dcgmi", "dcgm-exporter", "dcgm", "gpustat", "rocm-smi",
                      "amd-smi", "nvcc", "all_reduce_perf", "all_gather_perf",
-                     "reduce_scatter_perf", "broadcast_perf", "nccl-tests")
+                     "reduce_scatter_perf", "broadcast_perf", "nccl-tests",
+                     "vllm", "gpu-sanity", "cuda-samples", "bandwidthTest", "deviceQuery")
         kernel_tools = ("modprobe", "rmmod", "lspci", "lsmod", "modinfo")
         if any(low.startswith(c) for c in gpu_tools):
             pass
@@ -678,6 +679,52 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         else:
             return None
         healthy = engine.shell.state.gpu_healthy
+        # ImageDev GPU sanity harness (pre-publish / post-deploy).
+        if low.startswith("gpu-sanity") or low.startswith("cuda-samples") or low.startswith("devicequery") or low.startswith("bandwidthtest"):
+            if not healthy and sku.get("vendor") != "amd":
+                return "gpu-sanity: FAIL — driver/NVML unreachable"
+            return (
+                "=== ImageDev GPU Sanity Suite ===\n"
+                f"SKU: {_SMI_GPU_NAME} × {_SMI_GPU_COUNT}\n"
+                "deviceQuery ........................ PASS\n"
+                "bandwidthTest (H2D/D2H/D2D) ........ PASS\n"
+                "nvidia-smi -L ....................... PASS\n"
+                "dcgmi diag -r 1 ..................... PASS\n"
+                "Persistence mode .................... PASS\n"
+                "Result: ALL PASS — /tmp/gpu-sanity-report.json"
+            )
+        # vLLM inference server (AI Infra — not application GPU course).
+        if low.startswith("vllm"):
+            if "serve" in low or "openai" in low or "--model" in low:
+                model = "meta-llama/Llama-3.1-70B-Instruct"
+                for i, p in enumerate(parts):
+                    if p in ("--model", "-m") and i + 1 < len(parts):
+                        model = parts[i + 1]
+                        break
+                return (
+                    f"INFO  vllm.entrypoints.openai.api_server: Starting vLLM on {_SMI_GPU_NAME} × {_SMI_GPU_COUNT}\n"
+                    f"INFO  model={model}\n"
+                    "INFO  tensor_parallel_size=8\n"
+                    "INFO  CUDA graphs captured\n"
+                    "INFO  Avg prompt throughput: 1842.3 tokens/s\n"
+                    "INFO  Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)\n"
+                    "vllm: READY — OpenAI-compatible /v1/completions"
+                )
+            if "bench" in low or "benchmark" in low:
+                return (
+                    "vllm bench throughput\n"
+                    f"  GPUs: {_SMI_GPU_COUNT} × {_SMI_GPU_NAME}\n"
+                    "  Request throughput: 42.8 req/s\n"
+                    "  Output token throughput: 6120.4 tok/s\n"
+                    "  Mean TTFT: 48.2 ms\n"
+                    "Result: PASS"
+                )
+            return (
+                "vLLM — high-throughput LLM serving\n"
+                "Usage: vllm serve <model> --tensor-parallel-size N\n"
+                "       vllm bench throughput --model <model>\n"
+                "OpenAI API on :8000 when serve is running."
+            )
         if low.startswith("nvidia-smi"):
             if sku.get("vendor") == "amd":
                 return (
@@ -2127,10 +2174,38 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
 
         bare_tools = (
             "ipmitool", "dmidecode", "esxcli", "maas", "lxc", "lxd", "virsh",
-            "packer", "vyos", "vyatta",
+            "packer", "vyos", "vyatta", "cloud-init", "cloud-id", "cloud-init-per",
         )
         if not any(low.startswith(t) for t in bare_tools):
             return None
+        if low.startswith("cloud-init") or low.startswith("cloud-id"):
+            if "status" in low:
+                return (
+                    "status: done\n"
+                    "extended_status: done\n"
+                    "boot_status_code: enabled-by-generator\n"
+                    "detail: DataSourceMAAS\n"
+                    "errors: []"
+                )
+            if "query" in low or low.startswith("cloud-id"):
+                return "maas"
+            if "schema" in low:
+                return "Valid schema"
+            if "clean" in low:
+                return "cleaned cloud-init artifacts under /var/lib/cloud"
+            # Default: show ImageDev-style userdata summary for GPU images.
+            return (
+                "cloud-init 24.1.3\n"
+                "datasource: DataSourceMAAS\n"
+                "modules: [migrator, seed_random, bootcmd, write_files, users_groups,\n"
+                "          disk_setup, mounts, set_hostname, update_hostname,\n"
+                "          update_etc_hosts, ca_certs, rsyslog, users_groups,\n"
+                "          ssh, growpart, resizefs, disk_setup, mounts, set_passwords,\n"
+                "          package_update_upgrade_install, landscape, timezone,\n"
+                "          disable_ec2_metadata, runcmd, byobu]\n"
+                "runcmd: nvidia-smi -L; systemctl enable nvidia-persistenced; gpu-sanity\n"
+                "final_message: ImageDev GPU image cloud-init finished in 42.1 seconds"
+            )
         if low.startswith("ipmitool"):
             if "power status" in low:
                 return f"Chassis Power is {engine._power_state}"

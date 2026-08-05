@@ -47,6 +47,21 @@ build {
     script = "scripts/install-gpu-\${var.sku}.sh"
   }
 
+  provisioner "file" {
+    content = <<-EOF
+      #cloud-config
+      datasource:
+        MAAS: {}
+      package_update: true
+      runcmd:
+        - systemctl enable --now nvidia-persistenced
+        - gpu-sanity || true
+        - cloud-init status --wait
+      final_message: "ImageDev GPU image cloud-init finished in $UPTIME seconds"
+    EOF
+    destination = "/tmp/gpu-cloud-init.cfg"
+  }
+
   post-processor "shell-local" {
     inline = [
       "trivy image --exit-code 1 --severity HIGH,CRITICAL output-gpu-\${var.sku}/",

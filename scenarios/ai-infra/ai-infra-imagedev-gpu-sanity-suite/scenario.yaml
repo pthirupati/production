@@ -1,0 +1,55 @@
+title: 'ImageDev: GPU Sanity Suite Before MAAS Publish'
+slug: ai-infra-imagedev-gpu-sanity-suite
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: ImageDev release gate — before publishing a Packer GPU artifact to MAAS,
+  run the GPU sanity suite (deviceQuery, bandwidthTest, nvidia-smi -L, dcgmi diag -r 1).
+  AI Infra Engineering owns ImageDev gates for H100/H200/B300/AMD fleets.
+
+
+  ENVIRONMENT: Lab Terminal on a baked image / canary node. Packer + Bare Metal companions.
+
+
+  SYMPTOM: Image built but sanity gate not run; MAAS publish blocked by ImageDev checklist.
+
+
+  OBJECTIVE: Run gpu-sanity (or cuda-samples / deviceQuery + bandwidthTest + dcgmi diag);
+  confirm ALL PASS; FIXED-OK.'
+objectives:
+- Run ImageDev GPU sanity suite
+- Confirm deviceQuery / bandwidth / DCGM r1 PASS
+- Clear publish gate with FIXED-OK
+initial_state: Packer artifact ready; GPU sanity report missing.
+hints:
+- order: 1
+  cost: 0
+  content: On Lab Terminal run gpu-sanity (or deviceQuery then bandwidthTest) against the baked GPU image.
+- order: 2
+  cost: 20
+  content: Run dcgmi diag -r 1 and nvidia-smi -L; confirm Pass for all GPUs before publishing.
+- order: 3
+  cost: 45
+  content: When Result shows ALL PASS, publish to MAAS if needed and leave FIXED-OK.
+consoles:
+- terminal
+- packer
+- baremetal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - terminal
+  - packer
+  - baremetal

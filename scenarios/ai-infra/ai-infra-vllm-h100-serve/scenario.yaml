@@ -1,0 +1,53 @@
+title: 'vLLM: Serve Llama on H100 Tensor-Parallel Cluster'
+slug: ai-infra-vllm-h100-serve
+technology: AI Infrastructure Engineering
+category: Operate
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: AI Infra Engineering brings up inference infra — not the application ML
+  course. After MAAS deploy of an ImageDev H100 image, start vLLM with tensor parallel across
+  the node GPUs and verify OpenAI-compatible serving on :8000.
+
+
+  ENVIRONMENT: Lab Terminal on a Deployed H100 node + Bare Metal. Optional Datacenter twin for rack.
+
+
+  SYMPTOM: Node Deployed with healthy nvidia-smi; vLLM not serving; no /v1 endpoint.
+
+
+  OBJECTIVE: Confirm GPUs; start `vllm serve` with tensor parallel; verify READY on :8000;
+  optional bench; FIXED-OK.'
+objectives:
+- Confirm H100 GPUs via nvidia-smi
+- Start vLLM serve with tensor parallelism
+- Verify OpenAI API ready on port 8000
+initial_state: H100 node Deployed; vLLM not running.
+hints:
+- order: 1
+  cost: 0
+  content: Run nvidia-smi -L to confirm H100 count before launching the inference server.
+- order: 2
+  cost: 20
+  content: Start vllm serve with --tensor-parallel-size matching GPU count; watch for Uvicorn :8000.
+- order: 3
+  cost: 45
+  content: Confirm vllm READY OpenAI-compatible message (optional vllm bench), then FIXED-OK.
+consoles:
+- terminal
+- baremetal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - terminal
+  - baremetal
