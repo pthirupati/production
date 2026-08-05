@@ -13,6 +13,7 @@ const ACCENT = '#0d9488'
 
 const TABS = [
   { key: 'maas', label: 'MAAS', icon: Server },
+  { key: 'images', label: 'Images', icon: HardDrive },
   { key: 'spaces', label: 'Spaces & Tags', icon: Cable },
   { key: 'lxd', label: 'LXD', icon: Box },
   { key: 'kvm', label: 'KVM', icon: Cpu },
@@ -253,6 +254,42 @@ export default function BaremetalSimulator({
                   {TRANSIENT.has(m.status) && (
                     <ProgressBar pct={m.progress} label={m.status === 'Commissioning' ? 'Commissioning' : 'Deploying'} />
                   )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {tab === 'images' && (
+            <div className="space-y-3">
+              <div className="flex justify-between items-center gap-3 flex-wrap">
+                <div>
+                  <h2 className="text-lg font-semibold">Boot resources</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Synced images + Packer-published custom GPU artifacts</p>
+                </div>
+                <button
+                  disabled={busy}
+                  onClick={() => run(
+                    () => baremetalApi.publishBootResource(sessionId, { sku: 'h100', source: 'manual upload' }),
+                    'Boot resource published',
+                  )}
+                  className="text-xs flex items-center gap-1 border px-2 py-1 rounded bg-white"
+                >
+                  <Plus size={12} /> Import custom/h100-jammy
+                </button>
+              </div>
+              {(st.maas?.boot_resources || []).length === 0 && (
+                <div className="bm-card p-4 text-sm text-slate-500">No boot resources yet — publish from Packer or import above.</div>
+              )}
+              {(st.maas?.boot_resources || []).map((r) => (
+                <div key={r.name} className="bm-card p-3 flex justify-between items-start gap-3">
+                  <div>
+                    <div className="font-medium font-mono text-sm">{r.name}</div>
+                    <div className="text-xs text-slate-500 mt-1">
+                      {r.architecture || 'amd64/generic'} · {r.type || 'Synced'} · {r.size_gb != null ? `${r.size_gb} GB` : '—'}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-0.5">{r.source || 'images.maas.io'}</div>
+                  </div>
+                  <StatusBadge status={r.status || 'Synced'} />
                 </div>
               ))}
             </div>
