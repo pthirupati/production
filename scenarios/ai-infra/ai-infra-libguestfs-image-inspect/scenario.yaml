@@ -1,0 +1,56 @@
+title: 'ImageDev: libguestfs Inspect Packer GPU Artifact'
+slug: ai-infra-libguestfs-image-inspect
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: ImageDev — before publishing to MAAS, inspect the Packer-built GPU
+  qcow2 with libguestfs (guestfish / virt-inspect / virt-customize). Catch missing NVIDIA
+  modules or wrong kernel before fleet deploy.
+
+
+  ENVIRONMENT: Lab Terminal with Packer + libguestfs tools. Bare Metal Images for publish.
+
+
+  SYMPTOM: Artifact built; not yet published. Must inspect and virt-customize a marker,
+  then publish custom/h100-jammy.
+
+
+  OBJECTIVE: Run virt-inspect/guestfish on the artifact; virt-customize as needed; Publish
+  to MAAS; FIXED-OK.'
+objectives:
+- Inspect Packer GPU image with libguestfs
+- Customize/fix if inspect finds gaps
+- Publish boot resource to MAAS
+initial_state: Packer output present; MAAS missing custom image until inspect passes.
+hints:
+- order: 1
+  cost: 0
+  content: After packer build, run virt-inspect -a output-gpu-h100/*.qcow2
+- order: 2
+  cost: 20
+  content: Use guestfish or virt-customize to verify /usr/bin/nvidia-smi exists in the image.
+- order: 3
+  cost: 45
+  content: Publish to MAAS Images, then FIXED-OK.
+consoles:
+- packer
+- baremetal
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - packer
+  - baremetal
+  - terminal

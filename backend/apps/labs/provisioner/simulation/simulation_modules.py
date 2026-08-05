@@ -2393,6 +2393,40 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                 "    validate        check template validity\n"
                 "    fmt             reformat HCL2 config"
             )
+        if low.startswith("virt-inspect") or low.startswith("virt-filesystems"):
+            return (
+                "Root device: /dev/sda1\n"
+                "  Operating system: Ubuntu 22.04 LTS (jammy)\n"
+                "  Package format: deb\n"
+                "  Kernel: 5.15.0-gpu\n"
+                "  Applications:\n"
+                "    nvidia-driver-550\n"
+                "    datacenter-gpu-manager\n"
+                "    cuda-toolkit-12-4"
+            )
+        if low.startswith("virt-customize") or low.startswith("virt-builder"):
+            if "--run-command" in low or "nvidia-smi" in low or "install" in low:
+                return "[ OK ]"
+            return (
+                "[   0.0] Examining the guest …\n"
+                "[   1.2] Setting a random seed\n"
+                "[   2.0] Finishing off"
+            )
+        if low.startswith("guestfish") or low.startswith("guestmount"):
+            if "ls" in low or "nvidia" in low:
+                return (
+                    "usr\n"
+                    "usr/bin\n"
+                    "usr/bin/nvidia-smi\n"
+                    "usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1"
+                )
+            return (
+                "Welcome to guestfish, the guest filesystem shell for editing virtual machine filesystems.\n"
+                "Type: 'help' for help with commands\n"
+                "      'quit' to quit the shell\n"
+                "\n"
+                "><fs> "
+            )
         if low.startswith("vyos") or low.startswith("vyatta"):
             if engine.networking is None:
                 engine.networking = NetworkingState(engine.scenario_slug)
