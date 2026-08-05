@@ -30,6 +30,24 @@ def seed_v2() -> dict[str, Any]:
             {"name": "20-maas-hardware-info", "type": "commissioning", "applied_to": ["*"]},
             {"name": "50-fixitlab-gpu-check", "type": "commissioning", "applied_to": ["gpu"]},
         ],
+        "boot_resources": [
+            {
+                "name": "ubuntu/jammy",
+                "architecture": "amd64/generic",
+                "type": "Synced",
+                "size_gb": 2.1,
+                "status": "Synced",
+                "source": "images.maas.io",
+            },
+            {
+                "name": "ubuntu/noble",
+                "architecture": "amd64/generic",
+                "type": "Synced",
+                "size_gb": 2.4,
+                "status": "Synced",
+                "source": "images.maas.io",
+            },
+        ],
     }
 
 
@@ -106,5 +124,41 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         else:
             scripts.append(row)
         return {"ok": True, "message": f"Commissioning script {name} attached", "script": row}
+
+    if action in ("maas_publish_boot_resource", "maas_import_boot_resource", "packer_publish_maas"):
+        sku = (payload.get("sku") or payload.get("name") or "h100").strip().lower()
+        sku = sku.replace("custom/", "").replace("-jammy", "")
+        name = (payload.get("boot_resource") or f"custom/{sku}-jammy").strip()
+        arch = (payload.get("architecture") or "amd64/generic").strip()
+        resources = maas.setdefault("boot_resources", [])
+        existing = next((r for r in resources if r.get("name") == name), None)
+        row = {
+            "name": name,
+            "architecture": arch,
+            "type": "Uploaded",
+            "size_gb": float(payload.get("size_gb") or 12.0),
+            "status": "Synced",
+            "source": payload.get("source") or f"packer output-gpu-{sku}/",
+            "sku": sku,
+            "published_at": _now(),
+        }
+        if existing:
+            existing.update(row)
+            row = existing
+        else:
+            resources.append(row)
+        # Clear image-factory broken flag when present (Packer→MAAS graded labs).
+        broken = state.get("broken")
+        if isinstance(broken, dict):
+            broken.pop("missing_boot_resource", None)
+            broken.pop("packer_image_unpublished", None)
+            if not broken:
+                state["broken"] = {}
+        return {
+            "ok": True,
+            "message": f"Published {name} to MAAS boot-resources",
+            "boot_resource": row,
+            "boot_resources": resources,
+        }
 
     return None

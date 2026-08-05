@@ -240,3 +240,31 @@ class BaremetalLifecycleTests(TestCase):
         with mock.patch.object(bm, "_now", return_value=base + bm.COMMISSION_SECONDS + 1):
             m = next(m for m in bm.get_state(sid)["state"]["maas"]["machines"] if m["id"] == mid)
             self.assertEqual(m["status"], "Ready")
+
+    def test_boot_resources_seeded_and_packer_publish(self):
+        sid = self._session("maas-commission")
+        resources = bm.get_state(sid)["state"]["maas"]["boot_resources"]
+        names = {r["name"] for r in resources}
+        self.assertIn("ubuntu/jammy", names)
+        self.assertIn("ubuntu/noble", names)
+        res = bm.apply_action(sid, "maas_publish_boot_resource", {"sku": "h200"})
+        self.assertTrue(res["ok"], res)
+        self.assertEqual(res["boot_resource"]["name"], "custom/h200-jammy")
+        updated = {r["name"] for r in bm.get_state(sid)["state"]["maas"]["boot_resources"]}
+        self.assertIn("custom/h200-jammy", updated)
+
+    def test_packer_publish_clears_missing_boot_resource_flag(self):
+        sid = self._session("packer-gpu")
+        entry_state = bm.get_state(sid)["state"]
+        entry_state["broken"] = {"packer_image_unpublished": True, "missing_boot_resource": "custom/h100-jammy"}
+        # Persist broken flags via commission path: re-save through enlist noop then publish.
+        from django.core.cache import cache
+        import json
+        key = f"baremetal_session:{sid}"
+        raw = cache.get(key)
+        data = json.loads(raw) if isinstance(raw, str) else raw
+        data["state"]["broken"] = {"packer_image_unpublished": True, "missing_boot_resource": "custom/h100-jammy"}
+        cache.set(key, json.dumps(data), 7200)
+        res = bm.apply_action(sid, "packer_publish_maas", {"sku": "h100"})
+        self.assertTrue(res["ok"], res)
+        self.assertEqual(bm.get_state(sid)["state"].get("broken") or {}, {})

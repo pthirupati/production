@@ -548,7 +548,7 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 365. [ ] Ingest Bare Metal + ImageDev + DCOps wiki/Jira/GitHub readmes → scenario matrix spreadsheet
 366. [ ] NVIDIA H100 / H200 / B300 + AMD MI300 command matrices in graded labs (not only GPU tech)
 367. [ ] libguestfs / virt-customize image inspect labs under ai-infra
-368. [ ] Packer-built artifact selectable as MAAS boot-resource in same session (end-to-end)
+368. [~] Packer-built artifact selectable as MAAS boot-resource in same session (end-to-end) — *#149*
 369. [ ] Open MAAS / Open AWX / Open Datacenter / Open Packer always visible on ai-infra labs when entitled
 370. [ ] Ai-infra must NOT dump all work into `gpu` tech — keep GPU app-platform separate
 371. [ ] Integrated stack graded project: MAAS + VyOS + LXD + AWX + DC + GPU CLI as one flow
@@ -580,7 +580,7 @@ Source: learner report (Steam Data Center Simulator parity, AI Infra as first-cl
 391. [ ] Terraform IDE: integrated terminal that creates/edits files under `/root/terraform`
 392. [ ] Terraform IDE: color themes, breadcrumbs, problems panel, command palette
 393. [ ] Packer IDE: sync edited `.pkr.hcl` into sim shell filesystem before build
-394. [ ] Packer IDE: variables UI + build log panel + artifact → MAAS publish button
+394. [~] Packer IDE: variables UI + build log panel + artifact → MAAS publish button — *publish+sync in #149*
 395. [ ] Coding IDE: file/folder structure, run/debug, multi-file tests (318)
 396. [ ] Unified IDE shell shared by TF/Packer/Coding (VsCodeWorkbench extensions)
 

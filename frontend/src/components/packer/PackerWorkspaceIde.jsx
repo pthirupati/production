@@ -4,8 +4,9 @@ import CodeEditor from '../ide/CodeEditor'
 import LabTerminal, { scheduleReadySend } from '../LabTerminal'
 import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab, VscActivityButton } from '../ide/VsCodeWorkbench'
 import { LabChromeControls } from '../lab/LabChromeBar'
+import { baremetalApi } from '../../api/baremetal'
 import {
-  FileCode, FolderOpen, Play, Plus, Trash2, RefreshCw, Terminal, Files, ExternalLink,
+  FileCode, FolderOpen, Play, Plus, Trash2, RefreshCw, Terminal, Files, ExternalLink, Upload,
 } from 'lucide-react'
 import '../../styles/vscode-workbench.css'
 
@@ -162,6 +163,44 @@ export default function PackerWorkspaceIde({
   const fileList = Object.keys(files)
   const mainFile = fileList.find((f) => f.endsWith('.pkr.hcl') && !f.startsWith('variables')) || 'gpu-h100.pkr.hcl'
 
+  const detectSku = useCallback(() => {
+    const blob = `${mainFile}\n${files[mainFile] || ''}\n${scenario?.slug || ''}`.toLowerCase()
+    for (const key of ['b300', 'h200', 'h100', 'a100', 'mi300']) {
+      if (blob.includes(key)) return key
+    }
+    return 'h100'
+  }, [files, mainFile, scenario?.slug])
+
+  const syncFilesToShell = useCallback(() => {
+    const entries = Object.entries(filesRef.current || {})
+    if (!entries.length) return
+    // Write IDE buffers into the lab shell so packer build sees learner edits.
+    const script = entries.map(([name, content]) => {
+      const body = String(content ?? '').replace(/\r\n/g, '\n')
+      return `cat > ${name} <<'FIXITLAB_EOF'\n${body}\nFIXITLAB_EOF`
+    }).join('\n')
+    sendToTerminal(script)
+    setOutput((prev) => `${prev ? `${prev}\n` : ''}Synced ${entries.length} file(s) to lab workspace.`)
+  }, [sendToTerminal])
+
+  const publishToMaas = useCallback(async () => {
+    const sku = detectSku()
+    try {
+      const res = await baremetalApi.publishBootResource(sessionId, {
+        sku,
+        source: `packer output-gpu-${sku}/`,
+      })
+      const name = res?.boot_resource?.name || `custom/${sku}-jammy`
+      setOutput((prev) => `${prev ? `${prev}\n` : ''}Published ${name} → MAAS Images (boot-resources). Open MAAS → Images to deploy.`)
+      toast.success(`Published ${name} to MAAS`)
+      try {
+        window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind: 'baremetal' } }))
+      } catch { /* ignore */ }
+    } catch (err) {
+      toast.error(err?.response?.data?.error || err?.message || 'MAAS publish failed')
+    }
+  }, [detectSku, sessionId])
+
   const bottomContent = () => {
     if (bottomTab === 'terminal' && showTerminal && canTerminal) {
       return (
@@ -189,11 +228,30 @@ export default function PackerWorkspaceIde({
           </button>
           <button
             type="button"
-            onClick={() => sendToTerminal(`packer build ${mainFile}`)}
+            onClick={() => {
+              syncFilesToShell()
+              sendToTerminal(`packer build ${mainFile}`)
+            }}
             className="vsc-btn vsc-btn-primary"
             style={{ background: '#02A8EF', borderColor: '#02A8EF' }}
           >
             <Play size={11} /> packer build
+          </button>
+          <button
+            type="button"
+            onClick={() => { syncFilesToShell(); publishToMaas() }}
+            className="vsc-btn"
+            title="Register Packer artifact as MAAS boot-resource"
+          >
+            <Upload size={11} /> Publish to MAAS
+          </button>
+          <button
+            type="button"
+            onClick={syncFilesToShell}
+            className="vsc-btn"
+            title="Write IDE files into the lab shell"
+          >
+            Sync files
           </button>
           <button
             type="button"

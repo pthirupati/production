@@ -52,4 +52,12 @@ export const baremetalApi = {
   attachScript(sessionId, name, appliedTo = ['*']) {
     return baremetalApi.action(sessionId, 'maas_attach_script', { name, applied_to: appliedTo })
   },
+  publishBootResource(sessionId, { sku = 'h100', name, architecture = 'amd64/generic', source } = {}) {
+    return baremetalApi.action(sessionId, 'maas_publish_boot_resource', {
+      sku,
+      boot_resource: name || `custom/${sku}-jammy`,
+      architecture,
+      source: source || `packer output-gpu-${sku}/`,
+    })
+  },
 }
