@@ -967,7 +967,7 @@ function CableTray() {
 function SceneContent({
   racks, serversByRack, network, cooling, pdus, selectedId, expandedRack,
   onSelectServer, onSelectRack, onOpenBmc, onUnplugCable, onPlugCable, physicsEnabled, onFps, animBoost, intro,
-  walkMode = false, tickets = [],
+  walkMode = false, tickets = [], doorOpen = false,
 }) {
   const thermalStress = useMemo(() => {
     const units = cooling || []
@@ -1090,7 +1090,7 @@ function SceneContent({
       <PulsingLight />
       <Environment preset="warehouse" />
       <Floor />
-      <CorridorShell dockBusy={dockBusy} />
+      <CorridorShell dockBusy={dockBusy} doorOpen={doorOpen} />
       <CeilingLights />
       <CableTray />
       <HotAisleGlow z={-1.6} />
