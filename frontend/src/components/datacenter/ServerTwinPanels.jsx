@@ -827,7 +827,7 @@ export function CampusRoomView({ room, campus, access = null, rooms = [], busy =
   }
   if (room.id === 'repair') {
     const quarantine = (c.spares?.quarantine || [])
-    const kits = (c.spares?.kits_staged || []).slice(0, 4)
+    const kits = (c.spares?.kits_staged || []).slice(0, 6)
     return (
       <div className="dc-campus-grid">
         <CampusCard
@@ -840,15 +840,34 @@ export function CampusRoomView({ room, campus, access = null, rooms = [], busy =
             ? quarantine.slice(0, 4).map((q) => `${q.sku || q.id || 'FRU'} · ${q.reason || q.status || 'quarantine'}`).join(' · ')
             : 'No quarantined parts — pull from Spare Inventory or Warehouse'}
         />
-        <CampusCard
-          title="Staged kits"
-          body={kits.length
-            ? kits.map((k) => `${k.id}: ${k.sku} → ${k.for_asset} (${k.status})`).join(' · ')
-            : 'No kits staged — issue from stockroom then return here to assemble'}
-        />
+        {(kits.length ? kits : [{ id: '_empty' }]).map((k) => (
+          k.id === '_empty' ? (
+            <CampusCard
+              key="empty-kit"
+              title="Staged kits"
+              body="No kits staged — Issue from stockroom (select server first) or Receive FRU at dock after ship_rma"
+            />
+          ) : (
+            <CampusCard
+              key={k.id}
+              title={k.id}
+              body={`${k.sku} → ${k.for_asset} · ${k.status}${k.rma_number ? ` · ${k.rma_number}` : ''}`}
+              actions={onOp && k.status === 'staged' && (
+                <button
+                  type="button"
+                  className="dc-btn-sm"
+                  disabled={busy}
+                  onClick={() => act('repair_bay_swap', { kit_id: k.id, asset_id: k.for_asset || selectedServerId })}
+                >
+                  Install kit
+                </button>
+              )}
+            />
+          )
+        ))}
         <CampusCard
           title="Bay workflow"
-          body="1) Receive from dock/warehouse · 2) Diagnose on bench · 3) Burn-in · 4) Restock or RMA"
+          body="1) ship_rma → dock ASN · 2) Receive FRU · 3) Install kit here · 4) Burn-in · 5) Close ticket"
         />
         {exits}
       </div>

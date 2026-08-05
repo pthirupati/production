@@ -625,7 +625,24 @@ def campus_plant_op(campus: dict, power_chain: dict | None, op: str, **kwargs) -
         dock["received_today"] = int(dock.get("received_today") or 0) + 1
         dock["occupied_bays"] = max(0, int(dock.get("occupied_bays") or 1) - 1)
         restocked = _restock_from_contents(c["spares"], item.get("contents") or "")
+        # RMA ASNs stage a kit for the ticket asset so repair bay can consume it.
+        asset = item.get("asset_id")
+        sku = item.get("sku") or (item.get("contents") or "FRU").split("·")[0].strip()
+        if asset:
+            spares = c["spares"]
+            spares.setdefault("kits_staged", []).insert(0, {
+                "id": f"KIT-{item.get('rma_number') or item.get('id')}",
+                "sku": sku,
+                "bin_id": restocked or "dock",
+                "for_asset": asset,
+                "ticket_id": item.get("ticket_id"),
+                "rma_number": item.get("rma_number"),
+                "status": "staged",
+            })
+            spares["kits_staged"] = spares["kits_staged"][:20]
         extra = f" · restocked {restocked}" if restocked else ""
+        if asset:
+            extra += f" · kit staged for {asset}"
         _log(f"Dock received {item['id']} · {item.get('contents')}{extra}")
         return True, f"Received {item['id']}{extra}", c
 
@@ -700,6 +717,33 @@ def campus_plant_op(campus: dict, power_chain: dict | None, op: str, **kwargs) -
         spares["quarantine"] = spares["quarantine"][:30]
         _log(f"Quarantined 1× {bin_row.get('sku')} from {bid}")
         return True, f"Quarantined {bin_row.get('sku')}", c
+
+    if op == "repair_bay_swap":
+        spares = c["spares"]
+        kits = spares.get("kits_staged") or []
+        kit_id = kwargs.get("kit_id") or kwargs.get("id")
+        asset = kwargs.get("asset_id")
+        kit = next((k for k in kits if k.get("id") == kit_id), None) if kit_id else None
+        if kit is None and asset:
+            kit = next((k for k in kits if k.get("for_asset") == asset and k.get("status") == "staged"), None)
+        if kit is None and kits:
+            kit = next((k for k in kits if k.get("status") == "staged"), kits[0])
+        if not kit:
+            return False, "No staged kit — issue from stockroom or receive RMA at dock first", c
+        kit["status"] = "installed"
+        kit["installed_at"] = _now()
+        # Quarantine the failed part for RMA return.
+        spares.setdefault("quarantine", []).insert(0, {
+            "id": f"Q-SWAP-{kit.get('id')}",
+            "sku": kwargs.get("failed_sku") or "failed-FRU",
+            "reason": "replaced_at_repair_bay",
+            "for_asset": kit.get("for_asset"),
+            "ticket_id": kit.get("ticket_id"),
+            "time": _now(),
+        })
+        spares["quarantine"] = spares["quarantine"][:30]
+        _log(f"Repair bay installed {kit.get('sku')} on {kit.get('for_asset')} · kit {kit.get('id')}")
+        return True, f"Installed {kit.get('sku')} on {kit.get('for_asset')}", c
 
     if op in ("start_chiller", "stop_chiller"):
         cid = kwargs.get("chiller_id") or kwargs.get("id")

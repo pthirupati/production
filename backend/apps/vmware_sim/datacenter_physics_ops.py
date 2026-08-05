@@ -248,15 +248,28 @@ def advance_ticket(ticket: dict, action: str, **kwargs) -> dict:
         hist.insert(0, {"time": _now(), "event": f"escalated L{ticket['escalation']}"})
     elif action == "ship_rma":
         ticket["type"] = "rma"
+        rma_number = f"RMA-{int(time.time()) % 1000000:06d}"
+        part = kwargs.get("part") or ticket.get("component") or "FRU"
         ticket["rma"] = {
-            "rma_number": f"RMA-{int(time.time()) % 1000000:06d}",
-            "part": kwargs.get("part") or ticket.get("component") or "FRU",
-            "carrier": "FedEx",
-            "eta_days": 2,
+            "rma_number": rma_number,
+            "part": part,
+            "carrier": kwargs.get("carrier") or "FedEx",
+            "eta_days": int(kwargs.get("eta_days") or 2),
             "status": "parts_shipped",
+            "asset_id": ticket.get("asset_id"),
+            "ticket_id": ticket.get("id"),
         }
         ticket["status"] = "awaiting_parts"
-        hist.insert(0, {"time": _now(), "event": f"rma:{ticket['rma']['rma_number']}"})
+        # Hint for facility dock enqueue (engine wires ASN onto campus).
+        ticket["_pending_dock_asn"] = {
+            "carrier": ticket["rma"]["carrier"],
+            "contents": f"{part} · {rma_number}",
+            "ticket_id": ticket.get("id"),
+            "asset_id": ticket.get("asset_id"),
+            "rma_number": rma_number,
+            "sku": kwargs.get("sku") or part,
+        }
+        hist.insert(0, {"time": _now(), "event": f"rma:{rma_number}"})
     elif action == "schedule_visit":
         ticket["type"] = "field_visit"
         ticket["maintenance_window"] = {

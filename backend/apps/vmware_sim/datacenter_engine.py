@@ -2758,9 +2758,31 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 root_cause=payload.get("root_cause"),
                 corrective=payload.get("corrective"),
                 duration_min=payload.get("duration_min"),
+                sku=payload.get("sku"),
+                carrier=payload.get("carrier"),
             )
         except ValueError as exc:
             return {"ok": False, "error": str(exc)}
+        # Close FRU loop: ship_rma enqueues a loading-dock ASN tied to ticket+asset.
+        pending = ticket.pop("_pending_dock_asn", None)
+        if pending:
+            from apps.vmware_sim.datacenter_facility_ops import ensure_campus_plant
+            campus = ensure_campus_plant(state.get("campus") or {}, state.get("power_chain"))
+            dock = campus.setdefault("loading_dock", {})
+            queue = dock.setdefault("queue", [])
+            asn_id = f"ASN-RMA-{pending.get('rma_number') or len(queue) + 1}"
+            queue.insert(0, {
+                "id": asn_id,
+                "carrier": pending.get("carrier") or "FedEx",
+                "contents": pending.get("contents") or "FRU",
+                "status": "inbound",
+                "ticket_id": pending.get("ticket_id"),
+                "asset_id": pending.get("asset_id"),
+                "rma_number": pending.get("rma_number"),
+                "sku": pending.get("sku"),
+            })
+            state["campus"] = campus
+            _event(state, f"Dock ASN {asn_id} queued for {pending.get('rma_number')}", "info")
         _event(state, f"Ticket {ticket_id} → {ticket.get('status')}", "info")
         _save(session_id, entry)
         return {"ok": True, "message": f"Ticket {ticket_id} updated", "ticket": ticket}

@@ -1,0 +1,64 @@
+title: 'ImageDev: Packer H100 Jammy GPU Image Factory → MAAS'
+slug: ai-infra-packer-gpu-image-factory
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1800
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: ImageDev (PSINFRA/ImageDev board) needs a new H100 Jammy base image. Upstream
+  Ubuntu jammy is the source; Packer builds the GPU-ready artifact, then publishes it into MAAS as
+  custom/h100-jammy so Bare Metal can Deploy Ready nodes with the factory image.
+
+
+  ENVIRONMENT: AI Infrastructure Engineering lab — Packer workspace IDE, MAAS Images pane, Lab Terminal.
+  No external cloud. Treat Packer→MAAS as the production image factory path.
+
+
+  SYMPTOM / STARTING STATE: custom/h100-jammy is missing from MAAS boot-resources. Ready nodes still
+  deploy stock ubuntu/jammy. ImageDev ticket blocks fleet bring-up.
+
+
+  OBJECTIVE: Open Packer; validate and build the H100 template (CVE gate must pass); Publish to MAAS;
+  confirm Images lists custom/h100-jammy; Deploy a Ready machine selecting that boot resource; leave
+  FIXED-OK when the node shows the custom image OS.
+
+
+  VERIFY: MAAS Images shows custom/h100-jammy; Deployed machine os references custom/h100-jammy.'
+objectives:
+- Build Packer H100 Jammy image (CVE gate green)
+- Publish boot resource custom/h100-jammy to MAAS
+- Deploy a Ready node using the custom image
+initial_state: Packer template present; MAAS missing custom/h100-jammy.
+hints:
+- order: 1
+  cost: 0
+  content: Open Packer from the lab strip. Review the .pkr.hcl, run validate, then build.
+- order: 2
+  cost: 15
+  content: After a successful build, use Publish to MAAS (or maas boot-resources) so Images lists custom/h100-jammy.
+- order: 3
+  cost: 35
+  content: In Bare Metal → Machines, pick Image custom/h100-jammy and Deploy a Ready node.
+- order: 4
+  cost: 55
+  content: Confirm the Deployed OS string includes custom/h100-jammy, then mark FIXED-OK.
+consoles:
+- packer
+- baremetal
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - packer
+  - baremetal
+  - terminal
