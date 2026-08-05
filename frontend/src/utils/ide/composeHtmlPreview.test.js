@@ -23,7 +23,8 @@ describe('composeHtmlPreview', () => {
 
   it('picks language from path', () => {
     expect(editorLanguageForPath('src/app.js', 'python')).toBe('javascript')
-    expect(editorLanguageForPath('index.html', 'javascript')).toBe('markdown')
+    expect(editorLanguageForPath('index.html', 'javascript')).toBe('html')
+    expect(editorLanguageForPath('styles.css')).toBe('css')
     expect(editorLanguageForPath('main.py')).toBe('python')
   })
 })

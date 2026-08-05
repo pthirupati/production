@@ -3,28 +3,32 @@ import {
   Play, CheckCircle2, XCircle, FileCode, Loader2, Terminal as TerminalIcon,
   ListChecks, FileText, Lightbulb, Lock, EyeOff, AlertTriangle, Trophy,
   Sparkles, Search, Sun, Moon, ZoomIn, ZoomOut, Bug, ScrollText, Save, Eye,
+  Plus, Folder, RefreshCw, X, Files, Settings2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CodeEditor from './CodeEditor'
 import MentorPanel from './MentorPanel'
 import HtmlPreviewPane from './HtmlPreviewPane'
-import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab } from './VsCodeWorkbench'
+import IdeExplorer from './IdeExplorer'
+import VsCodeWorkbench, { VscEditorTab, VscPanelTab, VscActivityButton } from './VsCodeWorkbench'
 import '../../styles/vscode-workbench.css'
 import { runPython, runPythonTests } from '../../utils/ide/pyodideRunner'
 import { runJavaScript, runJavaScriptTests } from '../../utils/ide/jsRunner'
 import { hasHtmlPreview, editorLanguageForPath, listHtmlPaths } from '../../utils/ide/composeHtmlPreview'
+import {
+  parentDirs, fileBasename, stubContentForPath, newFileHint,
+} from '../../utils/ide/fileTree'
 import { labApi } from '../../api/labs'
 import { useThemeStore } from '../../store/themeStore'
 
 const LANG_LABEL = {
-  python: 'Python', javascript: 'JavaScript', js: 'JavaScript', node: 'Node.js',
-  bash: 'Bash', typescript: 'TypeScript', json: 'JSON', yaml: 'YAML', markdown: 'Markdown',
-  html: 'HTML', css: 'CSS',
+  python: 'Python', javascript: 'JavaScript', js: 'JavaScript', node: 'Node.js', nodejs: 'Node.js',
+  bash: 'Bash', shell: 'Shell', sh: 'Shell', typescript: 'TypeScript', ts: 'TypeScript',
+  json: 'JSON', yaml: 'YAML', markdown: 'Markdown', html: 'HTML', css: 'CSS', java: 'Java',
 }
 
 function fileName(path) {
-  const parts = (path || '').split('/')
-  return parts[parts.length - 1] || path
+  return fileBasename(path)
 }
 
 function tsLine(text) {
@@ -143,6 +147,12 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   const [files, setFiles] = useState({})        // { path: content }
   const [readonlyPaths, setReadonlyPaths] = useState(new Set())
   const [activePath, setActivePath] = useState('')
+  const [openTabs, setOpenTabs] = useState([])  // ordered open editor tabs
+  const [dirtyPaths, setDirtyPaths] = useState(() => new Set())
+  const [expandedDirs, setExpandedDirs] = useState(() => new Set())
+  const [showExplorer, setShowExplorer] = useState(true)
+  const seedFilesRef = useRef({})               // last server template (for Refresh)
+  const seedReadonlyRef = useRef(new Set())
 
   // Bottom panel: terminal | output | logs | tests | debug
   const [bottomTab, setBottomTab] = useState('output')
@@ -193,7 +203,10 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     if (!showHtmlPreview || !htmlPaths.length) return
     if (activePath && /\.html?$/i.test(activePath)) return
     const preferred = htmlPaths.find((p) => /index\.html?$/i.test(p)) || htmlPaths[0]
-    if (preferred) setActivePath(preferred)
+    if (preferred) {
+      setActivePath(preferred)
+      setOpenTabs((tabs) => (tabs.includes(preferred) ? tabs : [...tabs, preferred]))
+    }
     setRightTab((tab) => (tab === 'instructions' ? 'preview' : tab))
   // eslint-disable-next-line react-hooks/exhaustive-deps -- only on first html detection / file set change
   }, [showHtmlPreview, htmlPaths.join('|')])
@@ -203,6 +216,53 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   }, [])
 
   // ── Load the coding spec (hidden tests stripped server-side) ──
+  const applySpecFiles = useCallback((s, { mergeDraft = true, announce = false } = {}) => {
+    const fileMap = {}
+    const ro = new Set()
+    ;(s.files || []).forEach((f) => {
+      if (!f?.path) return
+      fileMap[f.path] = f.content || ''
+      if (f.readonly) ro.add(f.path)
+    })
+    seedFilesRef.current = { ...fileMap }
+    seedReadonlyRef.current = new Set(ro)
+
+    if (mergeDraft) {
+      const draft = loadDraft(sessionId)
+      if (draft?.files) {
+        let restored = false
+        Object.entries(draft.files).forEach(([path, content]) => {
+          if (ro.has(path) || typeof content !== 'string') return
+          // Restore edits AND learner-created files not in the server seed.
+          if (!(path in fileMap) || content !== fileMap[path]) {
+            fileMap[path] = content
+            restored = true
+          }
+        })
+        if (restored) {
+          setSavedAt(draft.ts || Date.now())
+          if (announce) appendTerminal('restored your autosaved work from this browser')
+        }
+      }
+    }
+
+    const dirs = new Set()
+    Object.keys(fileMap).forEach((p) => parentDirs(p).forEach((d) => dirs.add(d)))
+    setExpandedDirs(dirs)
+    setFiles(fileMap)
+    setReadonlyPaths(ro)
+    setDirtyPaths(new Set())
+    hydratedRef.current = true
+    dirtyRef.current = false
+
+    const entry = s.entrypoint && fileMap[s.entrypoint] !== undefined
+      ? s.entrypoint
+      : Object.keys(fileMap)[0] || ''
+    setActivePath(entry)
+    setOpenTabs(entry ? [entry] : Object.keys(fileMap).slice(0, 8))
+    return Object.keys(fileMap).length
+  }, [sessionId, appendTerminal])
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -211,38 +271,10 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         if (cancelled) return
         const s = data.spec || {}
         setSpec(s)
-        const fileMap = {}
-        const ro = new Set()
-        ;(s.files || []).forEach((f) => {
-          fileMap[f.path] = f.content || ''
-          if (f.readonly) ro.add(f.path)
-        })
-        // Restore autosaved drafts: overlay saved content for editable files
-        // that still exist in the spec, so a reload doesn't lose work. Readonly
-        // (scaffold) files always come from the server.
-        const draft = loadDraft(sessionId)
-        if (draft?.files) {
-          let restored = false
-          Object.entries(draft.files).forEach(([path, content]) => {
-            if (path in fileMap && !ro.has(path) && typeof content === 'string' && content !== fileMap[path]) {
-              fileMap[path] = content
-              restored = true
-            }
-          })
-          if (restored) {
-            setSavedAt(draft.ts || Date.now())
-            appendTerminal('restored your autosaved work from this browser')
-          }
+        const n = applySpecFiles(s, { mergeDraft: true, announce: true })
+        if (n === 0) {
+          appendTerminal('warning: this lab has no starter files — use New File to begin')
         }
-        setFiles(fileMap)
-        setReadonlyPaths(ro)
-        // Mark hydrated on the next tick so the save-effect doesn't immediately
-        // re-persist the initial state (it only fires on genuine edits after).
-        hydratedRef.current = true
-        const entry = s.entrypoint && fileMap[s.entrypoint] !== undefined
-          ? s.entrypoint
-          : Object.keys(fileMap)[0] || ''
-        setActivePath(entry)
         if (data.validation_passed) setSolved(true)
       })
       .catch((err) => {
@@ -251,6 +283,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per session
   }, [sessionId])
 
   // ── Autosave editable files to localStorage (debounced) ──
@@ -262,7 +295,10 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     })
     if (Object.keys(editable).length === 0) return
     const id = setTimeout(() => {
-      if (saveDraft(sessionId, editable)) setSavedAt(Date.now())
+      if (saveDraft(sessionId, editable)) {
+        setSavedAt(Date.now())
+        setDirtyPaths(new Set())
+      }
     }, 600)
     return () => clearTimeout(id)
   }, [files, readonlyPaths, sessionId, loading])
@@ -276,285 +312,13 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   // first so their definitions are in scope, entrypoint last).
   const composedSource = useCallback(() => {
     const paths = Object.keys(files)
-    const ordered = [...paths.filter((p) => p !== entrypoint), entrypoint].filter(Boolean)
-    return ordered.map((p) => files[p]).join('\n\n')
-  }, [files, entrypoint])
-
-  const handleEditorChange = useCallback((text) => {
-    if (!activePath) return
-    setFiles((prev) => {
-      if (prev[activePath] === text) return prev
-      dirtyRef.current = true   // genuine edit — enable autosave
-      return { ...prev, [activePath]: text }
-    })
-  }, [activePath])
-
-  const isJs = ['javascript', 'js', 'node', 'nodejs'].includes((language || '').toLowerCase())
-  const isPython = (language || '').toLowerCase() === 'python'
-  const canRunInBrowser = isJs || isPython
-
-  // ── Run (client-side, instant) ──
-  const handleRun = useCallback(async () => {
-    if (running || checking) return
-    setRunning(true)
-    setBottomTab('output')
-    setOutput('')
-    setLogsText('')
-    appendTerminal(`$ run ${entrypoint || 'solution'} (${LANG_LABEL[language] || language})`)
-    const source = composedSource()
-    let stdout = ''
-    let stderr = ''
-    try {
-      if (isPython) {
-        setPyLoading(true)
-        const res = await runPython(source)
-        setPyLoading(false)
-        if (!mountedRef.current) return
-        stdout = res.stdout || (res.ok ? '(no output)' : '')
-        stderr = [res.stderr, res.error].filter(Boolean).join('\n')
-        setOutput(stdout)
-        if (stderr) { setLogsText(stderr); setBottomTab('logs') }
-      } else if (isJs) {
-        const res = await runJavaScript(source, { timeoutMs: 8000 })
-        if (!mountedRef.current) return
-        stdout = res.stdout || (res.ok ? '(no output)' : '')
-        stderr = res.error || ''
-        setOutput(stdout)
-        if (stderr) { setLogsText(stderr); setBottomTab('logs') }
-      } else {
-        stdout = `Running ${LANG_LABEL[language] || language} in the browser is not supported.\nUse "Check Solution" — the server will run and grade your code.`
-        setOutput(stdout)
-      }
-      appendTerminal(stderr ? 'run finished with errors (see Logs)' : 'run finished')
-    } catch (err) {
-      stderr = String(err?.message || err)
-      setLogsText(stderr)
-      setBottomTab('logs')
-      appendTerminal('run crashed (see Logs)')
-    } finally {
-      if (mountedRef.current) { setRunning(false); setPyLoading(false) }
-      lastCtx.current = { output: stdout, error: stderr, tests: lastCtx.current.tests }
-      const lineCount = composedSource().split('\n').length
-      setDebugText(tsLine(
-        `Run · lang=${language} · file=${entrypoint} · lines=${lineCount} · stdout=${stdout.length}b · stderr=${stderr.length}b`
-      ))
-    }
-  }, [running, checking, composedSource, isPython, isJs, language, entrypoint, appendTerminal])
-
-  // ── Run visible tests in-browser for fast feedback (no completion here) ──
-  const runVisibleTests = useCallback(async () => {
-    const tests = spec?.visible_tests || []
-    if (!tests.length) return null
-    const source = composedSource()
-    if (isPython) {
-      setPyLoading(true)
-      const r = await runPythonTests(source, tests)
-      setPyLoading(false)
-      return r
-    }
-    if (isJs) {
-      return runJavaScriptTests(source, tests, { timeoutMs: 8000 })
-    }
-    return null
-  }, [spec, composedSource, isPython, isJs])
-
-  // ── Check Solution: authoritative backend grade (visible + HIDDEN tests) ──
-  const handleCheck = useCallback(async () => {
-    if (checking || running || solved) return
-    setChecking(true)
-    setBottomTab('tests')
-    setTestResults(null)
-    appendTerminal('$ check-solution (grading on server: visible + hidden tests)')
-
-    // Optional fast local preview of visible tests while the server grades.
-    let localPreview = null
-    if (canRunInBrowser) {
-      try { localPreview = await runVisibleTests() } catch { /* non-fatal */ }
-      if (localPreview && mountedRef.current) {
-        setTestResults({
-          tests: (localPreview.results || []).map((r) => ({ ...r, hidden: false })),
-          passed_count: (localPreview.results || []).filter((r) => r.passed).length,
-          total_count: (localPreview.results || []).length,
-          hidden_total: spec?.hidden_test_count || 0,
-          preview: true,
-        })
-      }
-    }
-
-    try {
-      const result = await labApi.codeValidate(sessionId, {
-        language,
-        files,
-        entrypoint,
-      })
-      if (!mountedRef.current) return
-
-      const tests = result.tests || []
-      setTestResults({
-        tests,
-        passed_count: result.passed_count ?? 0,
-        total_count: result.total_count ?? 0,
-        hidden_total: spec?.hidden_test_count || 0,
-        preview: false,
-      })
-      if (result.stdout) setOutput(result.stdout)
-      // Feed the mentor's context from the authoritative grade.
-      lastCtx.current = { output: result.stdout || '', error: result.error || '', tests }
-      setDebugText(tsLine(
-        `Check · file=${entrypoint} · passed=${result.passed_count ?? 0}/${result.total_count ?? 0}` +
-        ` · hidden=${spec?.hidden_test_count || 0} · verdict=${result.passed ? 'PASS' : result.needs_review ? 'NEEDS_REVIEW' : 'FAIL'}` +
-        (result.error ? ` · err=${String(result.error).slice(0, 120)}` : '')
-      ))
-
-      if (result.needs_review) {
-        appendTerminal('server: needs manual review')
-        toast(result.message || 'Submission needs manual review.', { icon: '🔎' })
-        return
-      }
-      if (result.passed) {
-        setSolved(true)
-        clearDraft(sessionId)  // solved — discard the autosaved draft
-        appendTerminal('server: ALL TESTS PASSED — solved')
-        toast.success(result.message || 'All tests passed! Challenge solved.', { duration: 6000 })
-        onSolved?.(result)
-      } else {
-        if (result.error) { setLogsText(result.error) }
-        appendTerminal(`server: ${result.passed_count ?? 0}/${result.total_count ?? 0} passed — not solved`)
-        toast(result.message || 'Some tests failed. Keep trying!', { icon: '🔍' })
-      }
-    } catch (err) {
-      appendTerminal('check failed (network/validation error)')
-      toast.error(err?.response?.data?.error || 'Validation error')
-    } finally {
-      if (mountedRef.current) setChecking(false)
-    }
-  }, [checking, running, solved, canRunInBrowser, runVisibleTests, sessionId, language, files, entrypoint, spec, onSolved, appendTerminal])
-
-  // ── AI Mentor (rule-based, free) ──
-  const askMentor = useCallback(async (requested = 'all', { unlock = false } = {}) => {
-    setRightTab('mentor')
-    setMentorLoading(true)
-    try {
-      const ctx = lastCtx.current
-      const data = await labApi.codeMentor(sessionId, {
-        language,
-        code: composedSource(),
-        output: ctx.output,
-        error: ctx.error,
-        test_results: ctx.tests,
-        requested,
-        unlock_reference: unlock,
-      })
-      if (!mountedRef.current) return
-      // Preserve an already-unlocked reference across follow-up asks.
-      setMentor((prev) => {
-        if (prev?.reference?.unlocked && data?.reference && !data.reference.unlocked) {
-          return { ...data, reference: prev.reference }
-        }
-        return data
-      })
-      if (data?.summary) setDebugText((p) => (p ? p + '\n' : '') + tsLine(`Mentor: ${data.summary}`))
-    } catch (err) {
-      if (mountedRef.current) {
-        setMentor({
-          summary: 'The mentor is offline right now.',
-          notes: [{ kind: 'info', title: 'Mentor unavailable', detail: 'Could not reach the mentor service. Your code still runs and grades normally.' }],
-          reveals_solution: false,
-          reference: { unlocked: false, reference_available: false },
-        })
-      }
-    } finally {
-      if (mountedRef.current) setMentorLoading(false)
-    }
-  }, [sessionId, language, composedSource])
-
-  const handleUnlockReference = useCallback(() => askMentor('all', { unlock: true }), [askMentor])
-
-  if (!authenticated) {
-    const submitLogin = (e) => {
-      e.preventDefault()
-      const ok = loginUser.trim().toLowerCase() === IDE_LAB_USER && loginPass === IDE_LAB_PASS
-      if (ok) {
-        try { sessionStorage.setItem(IDE_AUTH_KEY, '1') } catch { /* ignore */ }
-        setLoginError('')
-        setAuthenticated(true)
-      } else {
-        setLoginError(`Invalid credentials. Use ${IDE_LAB_USER} / ${IDE_LAB_PASS} for training labs.`)
-      }
-    }
-
-    return (
-      <div className="flex-1 min-h-0 bg-[#1e1e1e] text-[#cccccc] flex flex-col">
-        <div className="h-9 bg-[#2d2d30] border-b border-[#3e3e42] flex items-center px-4 text-xs">
-          <span className="font-semibold text-white">FixitLab IDE</span>
-          <span className="ml-2 text-[#858585]">{scenario?.title || 'Coding Lab'}</span>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="w-full max-w-sm bg-[#252526] border border-[#3e3e42] shadow-2xl rounded overflow-hidden">
-            <div className="px-5 py-4 bg-[#007acc] text-white font-semibold flex items-center gap-2">
-              <FileCode size={18} /> VS Code Workbench
-            </div>
-            <form onSubmit={submitLogin} className="p-5 space-y-4">
-              <p className="text-sm text-[#cccccc]">Sign in to the multi-language IDE training environment.</p>
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#969696] mb-1">Username</label>
-                <input value={loginUser} onChange={(e) => setLoginUser(e.target.value)} autoFocus autoComplete="username"
-                  placeholder={IDE_LAB_USER}
-                  className="w-full bg-[#1e1e1e] border border-[#3e3e42] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#007acc]" />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#969696] mb-1">Password</label>
-                <input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} autoComplete="current-password"
-                  className="w-full bg-[#1e1e1e] border border-[#3e3e42] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#007acc]" />
-              </div>
-              {loginError && <p className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{loginError}</p>}
-              <button type="submit" className="w-full py-2 rounded bg-[#007acc] text-white font-semibold">
-                Sign In
-              </button>
-              <button type="button"
-                onClick={() => { setLoginUser(IDE_LAB_USER); setLoginPass(IDE_LAB_PASS); setLoginError('') }}
-                className="w-full py-1.5 text-xs text-[#cccccc] border border-[#3e3e42] rounded hover:bg-[#2d2d30]">
-                Use lab credentials (autofill)
-              </button>
-              <p className="text-[10px] text-[#969696] text-center pt-2 border-t border-[#3e3e42]">
-                Training credentials: <span className="font-mono text-white">{IDE_LAB_USER}</span> / <span className="font-mono text-white">{IDE_LAB_PASS}</span>
-              </p>
-            </form>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-surface-950">
-        <div className="flex flex-col items-center gap-3 text-surface-400">
-          <Loader2 size={28} className="animate-spin text-accent-cyan" />
-          <span className="text-sm">Loading coding environment…</span>
-        </div>
-      </div>
-    )
-  }
-
-  if (loadError) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-surface-950 p-6">
-        <div className="max-w-md text-center glass-card p-8 space-y-3">
-          <AlertTriangle size={32} className="text-accent-amber mx-auto" />
-          <h2 className="text-lg font-bold text-white">Coding environment unavailable</h2>
-          <p className="text-sm text-surface-400">{loadError}</p>
-        </div>
-      </div>
-    )
-  }
-
-  const paths = Object.keys(files)
   const visibleTests = spec?.visible_tests || []
   const hiddenCount = spec?.hidden_test_count || 0
   const objectives = scenario?.objectives || []
   const langLabel = LANG_LABEL[(language || '').toLowerCase()] || language
   const mentorDisabled = !lastCtx.current.output && !lastCtx.current.error && !lastCtx.current.tests.length && !mentor
+  const tabPaths = openTabs.filter((p) => files[p] !== undefined)
+  const protectedPaths = new Set(Object.keys(seedFilesRef.current).filter((p) => seedReadonlyRef.current.has(p)))
 
   const BOTTOM_TABS = [
     { key: 'terminal', label: 'Terminal', icon: TerminalIcon },
@@ -572,21 +336,37 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       subtitle={scenario?.title || 'Coding Lab'}
       toolbar={(
         <>
-          <button onClick={handleRun} disabled={running || checking || solved} className="vsc-btn" title="Run (Ctrl/Cmd+Enter)">
+          <button type="button" onClick={handleRun} disabled={running || checking || solved || !activePath} className="vsc-btn" title="Run (Ctrl/Cmd+Enter)">
             {running ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
             {pyLoading && running ? 'Loading…' : 'Run'}
           </button>
-          <button onClick={handleCheck} disabled={checking || running || solved} className="vsc-btn vsc-btn-primary" title="Grade on server">
+          <button type="button" onClick={handleCheck} disabled={checking || running || solved} className="vsc-btn vsc-btn-primary" title="Grade on server">
             {checking ? <Loader2 size={13} className="animate-spin" /> : solved ? <Trophy size={13} /> : <ListChecks size={13} />}
             {solved ? 'Solved' : 'Check Solution'}
           </button>
-          <button onClick={() => editorRef.current?.openSearch()} className="vsc-btn" title="Find"><Search size={13} /></button>
-          <button onClick={() => setVimMode((v) => !v)} className={`vsc-btn ${vimMode ? 'vsc-btn-primary' : ''}`}>Vim</button>
-          <button onClick={() => editorRef.current?.formatDocument?.()} className="vsc-btn">Format</button>
-          <button onClick={() => setFontSize((f) => Math.max(10, f - 1))} className="vsc-btn" title="Zoom out"><ZoomOut size={13} /></button>
-          <button onClick={() => setFontSize((f) => Math.min(22, f + 1))} className="vsc-btn" title="Zoom in"><ZoomIn size={13} /></button>
-          <button onClick={toggleTheme} className="vsc-btn" title="Toggle theme">{isDark ? <Sun size={13} /> : <Moon size={13} />}</button>
-          <button onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }} className="vsc-btn"><Sparkles size={13} /> Mentor</button>
+          <button type="button" onClick={handleSave} disabled={solved} className="vsc-btn" title="Save (Ctrl/Cmd+S)">
+            <Save size={13} /> Save
+          </button>
+          <button type="button" onClick={handleRefresh} disabled={solved || loading} className="vsc-btn" title="Reload lab starter files">
+            <RefreshCw size={13} /> Refresh
+          </button>
+          <button type="button" onClick={() => editorRef.current?.openSearch()} className="vsc-btn" title="Find (Ctrl/Cmd+F)"><Search size={13} /></button>
+          <button type="button" onClick={() => setVimMode((v) => !v)} className={`vsc-btn ${vimMode ? 'vsc-btn-primary' : ''}`} title="Toggle Vim keybindings">
+            Vim
+          </button>
+          <button type="button" onClick={() => editorRef.current?.formatDocument?.()} className="vsc-btn" title="Format document">Format</button>
+          <button
+            type="button"
+            onClick={() => setFormatOnSave((v) => !v)}
+            className={`vsc-btn ${formatOnSave ? 'vsc-btn-primary' : ''}`}
+            title="Format on Save"
+          >
+            <Settings2 size={13} /> FoS
+          </button>
+          <button type="button" onClick={() => setFontSize((f) => Math.max(10, f - 1))} className="vsc-btn" title="Zoom out"><ZoomOut size={13} /></button>
+          <button type="button" onClick={() => setFontSize((f) => Math.min(22, f + 1))} className="vsc-btn" title="Zoom in"><ZoomIn size={13} /></button>
+          <button type="button" onClick={toggleTheme} className="vsc-btn" title="Toggle theme">{isDark ? <Sun size={13} /> : <Moon size={13} />}</button>
+          <button type="button" onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }} className="vsc-btn"><Sparkles size={13} /> Mentor</button>
           {showHtmlPreview && (
             <button
               type="button"
@@ -597,29 +377,100 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
               <Eye size={13} /> Preview
             </button>
           )}
-          {savedAt && !solved && <span className="text-[10px] text-emerald-400 flex items-center gap-1"><Save size={11} /> Saved</span>}
+          {(savedAt && !solved) && (
+            <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+              <Save size={11} /> {dirtyPaths.size ? 'Edited' : 'Saved'}
+            </span>
+          )}
           <span className="text-[10px] text-[var(--vsc-muted)] hidden lg:inline flex items-center gap-1"><EyeOff size={10} /> {hiddenCount} hidden</span>
         </>
       )}
-      sidebarHeader="Explorer"
-      sidebar={paths.map((p) => (
-        <VscFileItem key={p} active={activePath === p} onClick={() => setActivePath(p)}>
-          <FileCode size={13} className="shrink-0 opacity-70" />
-          <span className="truncate">{fileName(p)}</span>
-          {readonlyPaths.has(p) && <Lock size={10} className="ml-auto opacity-50" />}
-        </VscFileItem>
-      ))}
-      editorTabs={paths.map((p) => (
-        <VscEditorTab key={p} active={activePath === p} onClick={() => setActivePath(p)}>
-          <FileCode size={12} /> {fileName(p)}{readonlyPaths.has(p) ? ' 🔒' : ''}
+      activityBar={(
+        <div className="vsc-activity-bar hidden sm:flex">
+          <VscActivityButton active={showExplorer} onClick={() => setShowExplorer((v) => !v)} title="Explorer">
+            <Files size={22} />
+          </VscActivityButton>
+          <VscActivityButton active={bottomTab === 'terminal'} onClick={() => setBottomTab('terminal')} title="Terminal">
+            <TerminalIcon size={22} />
+          </VscActivityButton>
+          <VscActivityButton active={bottomTab === 'tests'} onClick={() => setBottomTab('tests')} title="Test Results">
+            <ListChecks size={22} />
+          </VscActivityButton>
+        </div>
+      )}
+      showSidebar={showExplorer}
+      sidebarHeader={(
+        <div className="flex items-center justify-between gap-1 w-full">
+          <span>EXPLORER</span>
+          <div className="flex items-center gap-0.5">
+            <button type="button" onClick={createFolder} disabled={solved} className="p-0.5 text-[var(--vsc-accent)]" title="New folder"><Folder size={12} /></button>
+            <button type="button" onClick={createFile} disabled={solved} className="p-0.5 text-[var(--vsc-accent)]" title="New file"><Plus size={12} /></button>
+            <button type="button" onClick={handleRefresh} disabled={solved} className="p-0.5 text-[var(--vsc-muted)]" title="Refresh"><RefreshCw size={12} /></button>
+          </div>
+        </div>
+      )}
+      sidebar={(
+        <IdeExplorer
+          files={files}
+          activePath={activePath}
+          dirtyPaths={dirtyPaths}
+          readonlyPaths={readonlyPaths}
+          protectedPaths={protectedPaths}
+          expandedDirs={expandedDirs}
+          onToggleDir={toggleDir}
+          onOpenFile={openFile}
+          onDeleteFile={solved ? undefined : deleteFile}
+          onRenameFile={solved ? undefined : renameFile}
+          onCreateFile={solved ? undefined : createFile}
+          emptyHint="No files in this lab yet. Create a file or folder, or ask support if the lab should have starters."
+        />
+      )}
+      editorTabs={tabPaths.length ? tabPaths.map((p) => (
+        <VscEditorTab key={p} active={activePath === p} onClick={() => openFile(p)}>
+          <FileCode size={12} />
+          <span className="truncate max-w-[120px]">{fileName(p)}</span>
+          {dirtyPaths.has(p) && !readonlyPaths.has(p) && <span className="text-amber-400">●</span>}
+          {readonlyPaths.has(p) && <Lock size={10} className="opacity-50" />}
+          {!solved && (
+            <span
+              role="button"
+              tabIndex={0}
+              className="ml-1 opacity-50 hover:opacity-100"
+              title="Close"
+              onClick={(e) => closeTab(p, e)}
+              onKeyDown={(e) => { if (e.key === 'Enter') closeTab(p, e) }}
+            >
+              <X size={11} />
+            </span>
+          )}
         </VscEditorTab>
-      ))}
-      editor={activePath ? (
-        <CodeEditor ref={editorRef} key={activePath} value={files[activePath] ?? ''} onChange={handleEditorChange}
-          language={editorLanguage} readOnly={solved || readonlyPaths.has(activePath)} onRun={handleRun}
-          fontSize={fontSize} vimMode={vimMode} formatOnSave={formatOnSave} />
+      )) : (
+        <div className="px-3 py-1.5 text-[11px] text-[var(--vsc-muted)]">No open editors</div>
+      )}
+      editor={activePath && files[activePath] !== undefined ? (
+        <CodeEditor
+          ref={editorRef}
+          key={`${activePath}:${vimMode ? 'vim' : 'norm'}`}
+          value={files[activePath] ?? ''}
+          onChange={handleEditorChange}
+          onSave={handleSave}
+          language={editorLanguage}
+          readOnly={solved || readonlyPaths.has(activePath)}
+          onRun={handleRun}
+          fontSize={fontSize}
+          vimMode={vimMode}
+          formatOnSave={formatOnSave}
+        />
       ) : (
-        <div className="h-full flex items-center justify-center text-[var(--vsc-muted)] text-sm">No file open</div>
+        <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--vsc-muted)] text-sm p-6 text-center">
+          <FileCode size={36} className="opacity-40" />
+          <p>{paths.length ? 'Select a file from the Explorer' : 'No file open'}</p>
+          {!solved && (
+            <button type="button" onClick={createFile} className="vsc-btn vsc-btn-primary">
+              <Plus size={13} /> New File
+            </button>
+          )}
+        </div>
       )}
       bottomPanel={{
         height: 224,
@@ -743,9 +594,15 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         ),
       }}
       statusBar={{
-        left: activePath ? fileName(activePath) : 'No file',
-        center: `${langLabel} · UTF-8 · Spaces: 4${vimMode ? ' · VIM' : ''}`,
-        right: <><span>{fontSize}px</span><span>{solved ? 'Read-only' : 'Editing'}</span></>,
+        left: activePath || 'No file',
+        center: `${langLabel} · UTF-8 · Spaces: 4${vimMode ? ' · --VIM--' : ''}${formatOnSave ? ' · FoS' : ''}`,
+        right: (
+          <>
+            <span>{Object.keys(files).length} files</span>
+            <span>{fontSize}px</span>
+            <span>{solved ? 'Read-only' : dirtyPaths.size ? 'Unsaved' : 'Editing'}</span>
+          </>
+        ),
       }}
     />
   )
