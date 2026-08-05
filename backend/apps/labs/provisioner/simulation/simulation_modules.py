@@ -2237,7 +2237,11 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
         )
 
     def _sync_maas_from_gui() -> None:
-        """Prefer the MAAS console session inventory when this lab has one."""
+        """Prefer the MAAS console session inventory when this lab has one.
+
+        Merge — do not replace — so CLI-seeded nodes (e.g. gpu-node-04) remain
+        commissionable even when the GUI session only seeded a subset.
+        """
         sid = _session_id()
         if not sid:
             return
@@ -2246,7 +2250,8 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
             data = bm.get_state(sid, engine.scenario_slug or "")
             machines = (data.get("state") or {}).get("maas", {}).get("machines") or []
             if machines:
-                engine._maas_machines = [
+                prior = list(getattr(engine, "_maas_machines", None) or [])
+                merged = [
                     {
                         "name": m.get("hostname") or m.get("name") or f"node-{m.get('id')}",
                         "status": m.get("status") or "New",
@@ -2259,6 +2264,11 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                     }
                     for m in machines
                 ]
+                gui_names = {m["name"] for m in merged}
+                for m in prior:
+                    if m.get("name") and m["name"] not in gui_names:
+                        merged.append(m)
+                engine._maas_machines = merged
             br = (data.get("state") or {}).get("maas", {}).get("boot_resources") or []
             if br:
                 engine._maas_boot_resources = [
