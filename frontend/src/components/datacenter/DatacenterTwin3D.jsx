@@ -93,16 +93,17 @@ function CameraIntro({ enabled, cinematic = false }) {
 }
 
 /** Corridor walls: reception → staging → data hall → MDF (low-poly Steam layout). */
-function CorridorShell({ dockBusy = false }) {
+function CorridorShell({ dockBusy = false, doorOpen = false }) {
   const wall = '#1e293b'
   const trim = '#334155'
   const door = useRef()
   const forklift = useRef()
   useFrame(({ clock }) => {
     if (door.current) {
-      // Mantrap door swings open when walking toward the hall (subtle idle motion).
-      const t = (Math.sin(clock.elapsedTime * 0.35) + 1) * 0.5
-      door.current.rotation.y = -0.15 - t * 0.95
+      // Closed until badge-in; then swings open (Steam mantrap).
+      const target = doorOpen ? -1.15 : -0.05
+      const cur = door.current.rotation.y
+      door.current.rotation.y = cur + (target - cur) * Math.min(1, 0.08 + Math.sin(clock.elapsedTime) * 0.01)
     }
     if (forklift.current) {
       const bob = dockBusy ? Math.sin(clock.elapsedTime * 2.2) * 0.04 : 0
@@ -1181,6 +1182,8 @@ export default function DatacenterTwin3D({
   cooling = [],
   pdus = [],
   tickets = [],
+  access = null,
+  onBadgeIn,
   selectedServerId,
   expandedRack,
   onSelectServer,
@@ -1194,6 +1197,11 @@ export default function DatacenterTwin3D({
   const [intro, setIntro] = useState(true)
   const [walkMode, setWalkMode] = useState(false)
   const [fps, setFps] = useState(0)
+
+  const badgedIn = useMemo(() => {
+    const ev = access?.events || []
+    return ev.some((e) => (e.type || '') === 'allow' || /ALLOW|badge/i.test(e.message || ''))
+  }, [access])
 
   useEffect(() => {
     if (!intro || walkMode) return undefined
@@ -1232,6 +1240,10 @@ export default function DatacenterTwin3D({
             checked={walkMode}
             onChange={(e) => {
               const on = e.target.checked
+              if (on && !badgedIn) {
+                // Steam mantrap: badge before free walk into the hall.
+                onBadgeIn?.()
+              }
               setWalkMode(on)
               if (on) setIntro(false)
             }}
@@ -1241,13 +1253,20 @@ export default function DatacenterTwin3D({
         <button type="button" className="dc-btn-outline dc-btn-xs" onClick={() => { setWalkMode(false); setIntro(true) }}>
           Replay enter
         </button>
+        {!badgedIn && (
+          <button type="button" className="dc-btn-outline dc-btn-xs" onClick={() => onBadgeIn?.()}>
+            Badge-in
+          </button>
+        )}
         <span className="dc-muted">
-          ~{fps || '—'} FPS · {walkMode ? 'click canvas to look · WASD move · Shift sprint' : 'cinematic enter · Motions · enable Walk for first-person'}
+          ~{fps || '—'} FPS · {walkMode
+            ? (badgedIn ? 'badged · WASD move · Shift sprint' : 'badge required · click Badge-in')
+            : 'cinematic enter · Motions · enable Walk for first-person'}
         </span>
       </div>
       {!walkMode && !intro && (
         <div className="dc-3d-immersion-hint">
-          Tip: enable <strong>Walk (WASD)</strong> for Steam-style first-person hall exploration
+          Tip: <strong>Badge-in</strong> then enable <strong>Walk (WASD)</strong> for Steam-style hall exploration
         </div>
       )}
       <div className="dc-3d-canvas-wrap">
@@ -1276,8 +1295,9 @@ export default function DatacenterTwin3D({
                 onFps={setFps}
                 animBoost={animBoost}
                 intro={intro}
-                walkMode={walkMode}
+                walkMode={walkMode && badgedIn}
                 tickets={tickets}
+                doorOpen={badgedIn}
               />
             </Physics>
           </Canvas>

@@ -459,6 +459,16 @@ export default function DatacenterSimulator({
               cooling={cooling}
               pdus={pdus.length ? pdus : (powerChain.rack_pdus || [])}
               tickets={st?.tickets || []}
+              access={accessControl}
+              onBadgeIn={() => {
+                const badges = accessControl?.badges || []
+                const staff = badges.find((b) => !(b.role === 'visitor' || b.escort_required))
+                const id = staff?.id || badges[0]?.id || 'BADGE-1001'
+                doAction(
+                  () => datacenterApi.accessOps(sessionId, 'badge_in', { badge_id: id, zone: 'reception' }),
+                  `Badge-in ${id}`,
+                )
+              }}
               selectedServerId={selectedServerId}
               expandedRack={expandedRack}
               onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}

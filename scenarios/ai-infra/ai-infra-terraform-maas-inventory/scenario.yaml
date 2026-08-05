@@ -1,0 +1,55 @@
+title: 'Terraform: Generate MAAS GPU Inventory for AWX'
+slug: ai-infra-terraform-maas-inventory
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: terraform
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: ImageDev / Bare Metal — Terraform manages the MAAS machine inventory export
+  that AWX consumes for GPU fleet jobs. AI Infra Engineering owns this Terraform→MAAS→AWX path.
+
+
+  ENVIRONMENT: Terraform IDE + Bare Metal + Lab Terminal. Offline; no external cloud provider required
+  for the inventory module.
+
+
+  SYMPTOM: inventory.tf / outputs missing GPU host groups; AWX inventory empty for H100 canaries.
+
+
+  OBJECTIVE: Fix Terraform so plan/apply emits MAAS GPU inventory; confirm outputs list nodes;
+  FIXED-OK.'
+objectives:
+- Repair Terraform MAAS inventory module
+- terraform plan / apply successfully
+- Confirm outputs list GPU nodes for AWX
+initial_state: Terraform inventory module broken or incomplete.
+hints:
+- order: 1
+  cost: 0
+  content: Open Terraform IDE from the lab strip and review the MAAS inventory .tf files for missing GPU host groups.
+- order: 2
+  cost: 20
+  content: Run terraform plan, fix resource/output errors, then apply so outputs list Ready GPU hostnames.
+- order: 3
+  cost: 45
+  content: Confirm outputs include gpu-node hosts usable by AWX inventory, then leave FIXED-OK.
+consoles:
+- terraform
+- baremetal
+- terminal
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - terraform
+  - baremetal
+  - terminal
