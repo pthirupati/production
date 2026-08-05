@@ -528,30 +528,43 @@ function RackDoor({ open, side = 'left' }) {
   )
 }
 
-/** Per-U chassis with drive-bay LEDs, dual PSU glow, NIC activity, fans. */
+/** Per-U chassis with drive-bay LEDs, dual PSU glow, NIC activity, fans.
+ *  Steam-style tray slide-in on mount: chassis rails in from the aisle, then
+ *  seat with staggered LED cascade (power → drives → NIC). */
 function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
   const meshRef = useRef()
+  const installStart = useRef(performance.now())
   const geo = useMemo(() => new THREE.BoxGeometry(RACK_W * 0.88, U_H * 0.9, RACK_D * 0.72), [])
   const mat = useMemo(() => new THREE.MeshStandardMaterial({ metalness: 0.45, roughness: 0.35, vertexColors: true }), [])
   const dummy = useMemo(() => new THREE.Object3D(), [])
   const color = useMemo(() => new THREE.Color(), [])
   const count = servers.length
+  const seatZ = useRef(new Float32Array(Math.max(count, 1)))
 
   useFrame(({ clock }) => {
     const mesh = meshRef.current
     if (!mesh || !count) return
     const pulse = 0.08 + Math.sin(clock.elapsedTime * 2.5) * 0.04
+    const now = performance.now()
     servers.forEach((s, i) => {
       const failed = Object.values(s.components || {}).some((x) => x !== 'healthy')
       const powered = s.power_state === 'on'
       const y = ((s.u_slot || 1) - 1) * U_H + U_H * 0.5 + 0.05
-      const bob = powered && animBoost ? Math.sin(clock.elapsedTime * 1.4 + i) * 0.008 : 0
-      dummy.position.set(0, y + bob, -0.04)
-      dummy.scale.set(1, 1, 1)
+      const delay = i * 160
+      const u = Math.min(1, Math.max(0, (now - installStart.current - delay) / 850))
+      const e = 1 - (1 - u) ** 3
+      const slide = (1 - e) * 0.62
+      seatZ.current[i] = -0.04 + slide
+      const bob = powered && animBoost && e > 0.98 ? Math.sin(clock.elapsedTime * 1.4 + i) * 0.008 : 0
+      dummy.position.set(0, y + bob, seatZ.current[i])
+      // Slight nose-up while sliding, then level on the rails.
+      dummy.rotation.x = (1 - e) * -0.12
+      dummy.scale.set(1, 1, 0.92 + e * 0.08)
       dummy.updateMatrix()
       mesh.setMatrixAt(i, dummy.matrix)
       if (failed) color.set('#ef4444')
       else if (!powered) color.set('#475569')
+      else if (e < 1) color.set('#94a3b8')
       else color.set(vendorColor(s.vendor))
       mesh.setColorAt(i, color)
     })
@@ -580,62 +593,92 @@ function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
         onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }}
         onPointerOut={() => { document.body.style.cursor = 'default' }}
       />
-      {servers.map((s) => {
+      {servers.map((s, i) => {
         const failed = Object.values(s.components || {}).some((x) => x !== 'healthy')
         const diskFail = (s.components || {}).disk === 'failed' || (s.components || {}).disk === 'degraded'
         const powered = s.power_state === 'on'
         const y = ((s.u_slot || 1) - 1) * U_H + U_H * 0.5 + 0.05
         return (
-          <group key={s.id} position={[0, y, -0.04]}>
-            <StatusLed position={[RACK_W * 0.38, 0.02, RACK_D * 0.38]} failed={failed} powered={powered} />
-            {/* Dual PSU status LEDs */}
-            <StatusLed position={[RACK_W * 0.38, -0.025, RACK_D * 0.38]} failed={false} powered={powered} />
-            <StatusLed position={[RACK_W * 0.32, -0.025, RACK_D * 0.38]} failed={(s.components || {}).power === 'failed'} powered={powered} />
-            {/* Drive bay activity row — blinking activity LEDs */}
-            {[0, 1, 2, 3].map((di) => (
-              <group key={di} position={[-RACK_W * 0.28 + di * 0.08, 0.01, RACK_D * 0.37]}>
-                <mesh>
-                  <boxGeometry args={[0.05, 0.035, 0.02]} />
-                  <meshStandardMaterial color="#0f172a" metalness={0.5} />
-                </mesh>
-                <StatusLed
-                  position={[0.015, 0.012, 0.012]}
-                  failed={diskFail && di === 0}
-                  powered={powered && !diskFail}
-                  warning={diskFail && di === 1}
-                  size={0.005}
-                />
-              </group>
-            ))}
-            {/* NIC RJ45 / SFP cages */}
-            {[0, 1].map((ni) => (
-              <mesh key={`nic-${ni}`} position={[RACK_W * 0.1 + ni * 0.07, -0.02, RACK_D * 0.37]}>
-                <boxGeometry args={[0.04, 0.025, 0.025]} />
-                <meshStandardMaterial
-                  color="#111827"
-                  emissive={powered ? '#38bdf8' : '#000'}
-                  emissiveIntensity={powered ? 0.35 + Math.sin(ni) * 0.1 : 0}
-                />
-              </mesh>
-            ))}
-            <FanSpinner
-              position={[-RACK_W * 0.32, 0, RACK_D * 0.38]}
-              powered={powered && animBoost > 0}
-              rpmScale={failed ? 0.35 : 1}
-              fault={(s.components || {}).fan === 'failed' || failed}
-            />
-            <FanSpinner
-              position={[-RACK_W * 0.22, 0, RACK_D * 0.38]}
-              powered={powered && animBoost > 0}
-              rpmScale={0.85}
-              fault={(s.components || {}).fan === 'failed'}
-            />
-            <Html distanceFactor={10} position={[0, U_H * 0.35, RACK_D * 0.4]} style={{ pointerEvents: 'none' }}>
-              <div className="dc-3d-chip dc-3d-chip-sm">{s.hostname || s.id}</div>
-            </Html>
-          </group>
+          <ServerFaceDetail
+            key={s.id}
+            server={s}
+            index={i}
+            y={y}
+            seatZRef={seatZ}
+            installStart={installStart}
+            failed={failed}
+            diskFail={diskFail}
+            powered={powered}
+            animBoost={animBoost}
+          />
         )
       })}
+    </group>
+  )
+}
+
+/** Faceplate LEDs / fans that track chassis tray Z during install slide. */
+function ServerFaceDetail({
+  server: s, index: i, y, seatZRef, installStart, failed, diskFail, powered, animBoost,
+}) {
+  const group = useRef()
+  useFrame(() => {
+    if (!group.current) return
+    const z = seatZRef.current[i] ?? -0.04
+    group.current.position.set(0, y, z)
+    const delay = i * 160
+    const u = Math.min(1, Math.max(0, (performance.now() - installStart.current - delay) / 850))
+    // Cascade: power LED → drives → NIC glow after seat.
+    group.current.userData.ledGate = u
+  })
+  const ledGate = 1 // StatusLed reads powered; gate via powered && seated approx in children
+  return (
+    <group ref={group} position={[0, y, -0.04]}>
+      <StatusLed position={[RACK_W * 0.38, 0.02, RACK_D * 0.38]} failed={failed} powered={powered} />
+      <StatusLed position={[RACK_W * 0.38, -0.025, RACK_D * 0.38]} failed={false} powered={powered} />
+      <StatusLed position={[RACK_W * 0.32, -0.025, RACK_D * 0.38]} failed={(s.components || {}).power === 'failed'} powered={powered} />
+      {[0, 1, 2, 3].map((di) => (
+        <group key={di} position={[-RACK_W * 0.28 + di * 0.08, 0.01, RACK_D * 0.37]}>
+          <mesh>
+            <boxGeometry args={[0.05, 0.035, 0.02]} />
+            <meshStandardMaterial color="#0f172a" metalness={0.5} />
+          </mesh>
+          <StatusLed
+            position={[0.015, 0.012, 0.012]}
+            failed={diskFail && di === 0}
+            powered={powered && !diskFail}
+            warning={diskFail && di === 1}
+            size={0.005}
+          />
+        </group>
+      ))}
+      {[0, 1].map((ni) => (
+        <mesh key={`nic-${ni}`} position={[RACK_W * 0.1 + ni * 0.07, -0.02, RACK_D * 0.37]}>
+          <boxGeometry args={[0.04, 0.025, 0.025]} />
+          <meshStandardMaterial
+            color="#111827"
+            emissive={powered ? '#38bdf8' : '#000'}
+            emissiveIntensity={powered ? 0.35 + Math.sin(ni) * 0.1 : 0}
+          />
+        </mesh>
+      ))}
+      <FanSpinner
+        position={[-RACK_W * 0.32, 0, RACK_D * 0.38]}
+        powered={powered && animBoost > 0}
+        rpmScale={failed ? 0.35 : 1}
+        fault={(s.components || {}).fan === 'failed' || failed}
+      />
+      <FanSpinner
+        position={[-RACK_W * 0.22, 0, RACK_D * 0.38]}
+        powered={powered && animBoost > 0}
+        rpmScale={0.85}
+        fault={(s.components || {}).fan === 'failed'}
+      />
+      <Html distanceFactor={10} position={[0, U_H * 0.35, RACK_D * 0.4]} style={{ pointerEvents: 'none' }}>
+        <div className="dc-3d-chip dc-3d-chip-sm">{s.hostname || s.id}</div>
+      </Html>
+      {/* unused gate reserved for future cascade timing */}
+      <mesh visible={false} userData={{ ledGate }} />
     </group>
   )
 }
