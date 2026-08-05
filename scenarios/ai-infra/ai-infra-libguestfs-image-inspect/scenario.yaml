@@ -33,13 +33,13 @@ initial_state: Packer output present; MAAS missing custom image until inspect pa
 hints:
 - order: 1
   cost: 0
-  content: After packer build, run virt-inspect -a output-gpu-h100/*.qcow2
+  content: After packer build finishes, locate the qcow2 under output-gpu-h100/ and run virt-inspect -a on that artifact before publishing.
 - order: 2
   cost: 20
-  content: Use guestfish or virt-customize to verify /usr/bin/nvidia-smi exists in the image.
+  content: Use guestfish or virt-customize to verify /usr/bin/nvidia-smi exists inside the image; fix gaps before MAAS publish.
 - order: 3
   cost: 45
-  content: Publish to MAAS Images, then FIXED-OK.
+  content: Publish the inspected image to MAAS Images as custom/h100-jammy, confirm it lists under Boot resources, then mark FIXED-OK.
 consoles:
 - packer
 - baremetal
