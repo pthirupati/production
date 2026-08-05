@@ -1311,6 +1311,18 @@ export default function LabRunner() {
     sendToHostTerminal(cmd, host)
   }, [sendToHostTerminal])
 
+  // ImageDev / Packer labs: auto-open Packer IDE (must run before any early return).
+  useEffect(() => {
+    if (!sessionId || loading || provisioning || !scenario) return undefined
+    const tech = (scenario?.technology?.slug || '').toLowerCase()
+    const hay = `${scenario?.slug || ''} ${scenario?.title || ''} ${scenario?.topic || ''}`.toLowerCase()
+    const packer = consolesInclude(scenario?.consoles, 'packer')
+      || (tech === 'ai-infra' && /packer|image[-_]?factory|imagedev|libguestfs|cloud-init|e2e-image|gpu-image/.test(hay))
+      || /packer|image[-_]?factory|imagedev/.test(hay)
+    if (packer) setShowPackerSim(true)
+    return undefined
+  }, [sessionId, loading, provisioning, scenario])
+
   if (loading || provisioning) {
     const cloudSteps = [
       { label: 'Launching cloud server', done: provisioningStep >= 1 },
@@ -1554,13 +1566,6 @@ export default function LabRunner() {
       || /maas|lxd|lxc|kvm|virsh|ipmi|pxe/.test((scenario?.slug || '').toLowerCase())
     ))
   )
-
-  // ImageDev / Packer labs: auto-open the Packer workspace so the IDE is visible immediately.
-  useEffect(() => {
-    if (!sessionId || !isPackerLab) return undefined
-    setShowPackerSim(true)
-    return undefined
-  }, [sessionId, isPackerLab])
   // Enterprise storage / DC / SOC simulators — each is a dedicated technology
   // (see scenarios/<tech>/technology.yaml) with a matching backend engine under
   // apps/vmware_sim/. Gate on simulation_type OR technology slug OR slug prefix,
