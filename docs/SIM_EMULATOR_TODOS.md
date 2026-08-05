@@ -39,7 +39,16 @@ Status legend: `[ ]` pending · `[~]` in progress · `[x]` done
 22. [x] Disable VAD barge-in during Join bootstrap; raise barge threshold
 23. [x] Stop 1Hz React re-render from interview clock (DOM-only paint)
 24. [x] Harden Chrome SpeechSynthesis unlock across async startRound
-25. [ ] E2E: sound-test → Join → audible first question (no silent join)
+25. [~] E2E: sound-test → Join → audible first question (no silent join) — *Test speakers gate + no cancel-before-speak*
+481. [ ] Interview: optional Piper/sherpa-onnx local TTS blob playback (free, replaces flaky OS voices)
+482. [ ] Interview: Vosk STT engine finish (INTERVIEW_STT_ENGINE=vosk currently NotImplemented)
+483. [ ] Interview lab narration reacting to streamed practical commands (P2.R3)
+484. [ ] Interview: reduce backchannel collisions with STT (mute cues first 2s of listen)
+485. [ ] AI Infra: seed H200/B300/MI300X commission heroes
+486. [ ] AI Infra: libguestfs guestfish/virt-customize handlers + inspect scenario
+487. [ ] AI Infra: more VyOS BGP/firewall/commit-rollback scenarios (4 more)
+488. [ ] Datacenter Steam: forklift pallet + badge door before Walk
+489. [ ] Datacenter: auto-close ticket after burn-in pass (FRU loop finish)
 26. [x] AWS console mount tests pass for fresh/legacy/corrupt localStorage
 27. [~] Production verify: academy-aws-001 Ec2 Learn loads without error boundary
 28. [x] Terraform / aws-* routing: slugHints no longer map bare aws-* to Terraform IDE

@@ -366,11 +366,12 @@ export function releaseSpeechHold() {
  * Re-assert unlock after an await leaves the user-gesture stack (startRound).
  * Safe to call mid-hold: resumes synth/audio graph and primes only if idle.
  */
-export function reassertSpeechUnlockAfterAwait() {
+export function reassertSpeechUnlockAfterAwait({ allowPrime = true } = {}) {
   if (typeof window === 'undefined') return
   _speechGestureUnlocked = true
   resumeSpeechSynthesis()
   ensureAudioGraph()
+  if (!allowPrime) return
   if (!window.speechSynthesis) return
   if (_speakInFlight || window.speechSynthesis.speaking || window.speechSynthesis.pending) return
   if (_holdPrimesPaused) return
@@ -384,6 +385,30 @@ export function reassertSpeechUnlockAfterAwait() {
     u.pitch = 1
     window.speechSynthesis.speak(u)
   } catch { /* non-fatal */ }
+}
+
+/** Wait for SpeechSynthesis to go idle without cancel() (cancel drops Chrome unlock). */
+function waitForSynthIdle(maxMs = 900) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      resolve()
+      return
+    }
+    const start = Date.now()
+    const tick = () => {
+      const s = window.speechSynthesis
+      if (!s.speaking && !s.pending) {
+        resolve()
+        return
+      }
+      if (Date.now() - start >= maxMs) {
+        resolve()
+        return
+      }
+      setTimeout(tick, 40)
+    }
+    tick()
+  })
 }
 
 /** Test-only: reset module speech unlock flags between Vitest cases. */
@@ -492,6 +517,7 @@ function speakBrowserUtterance(seg, { voice, locale, rate, pitch }) {
       if (settled) return
       settled = true
       clearTimeout(stuckTimer)
+      clearTimeout(earlyStartTimer)
       clearInterval(speakingPoll)
       if (!started && window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) {
         started = true
@@ -510,6 +536,19 @@ function speakBrowserUtterance(seg, { voice, locale, rate, pitch }) {
     const speakingPoll = setInterval(() => {
       if (window.speechSynthesis?.speaking || window.speechSynthesis?.pending) started = true
     }, 80)
+    // Fast fail/retry path: if onstart never fires within 900ms, resume and
+    // re-speak once — Chrome often queues then never starts after cancel().
+    const earlyStartTimer = setTimeout(() => {
+      if (started || settled) return
+      try {
+        if (window.speechSynthesis?.paused) window.speechSynthesis.resume()
+        if (!window.speechSynthesis?.speaking && !window.speechSynthesis?.pending) {
+          window.speechSynthesis.speak(u)
+        } else {
+          window.speechSynthesis.resume?.()
+        }
+      } catch { /* */ }
+    }, 900)
     const stuckMs = Math.min(20000, Math.max(2500, 1200 + seg.length * 65))
     const stuckTimer = setTimeout(() => {
       if (!started && window.speechSynthesis?.paused) {
@@ -746,16 +785,22 @@ export function useInterviewVoice() {
       }
 
       // Chrome: cancel() after an await often kills the gesture unlock and the
-      // next utterance never starts. If Join/Test already unlocked speech, leave
-      // the queue alone — EXCEPT clear near-silent hold primes so they cannot
-      // starve the real interviewer line (holdSpeechUnlock ticks every ~1.8s).
+      // next utterance never starts. Prefer waiting for hold primes to drain
+      // instead of cancel — cancel is the #1 silent-join cause.
       const synth = window.speechSynthesis
       pauseSpeechHoldPrimes()
+      if (synth.speaking || synth.pending) {
+        await waitForSynthIdle(_speechHoldActive ? 1200 : 600)
+        resumeSpeechSynthesis()
+        ensureAudioGraph()
+      }
+      // Last resort: only cancel leftover near-silent primes (never mid-sentence).
       if (_speechHoldActive && (synth.speaking || synth.pending)) {
         try { synth.cancel() } catch { /* */ }
-        await new Promise((r) => setTimeout(r, 40))
-        // Re-resume immediately — cancel after a long await is the silent-join path.
+        await new Promise((r) => setTimeout(r, 60))
         resumeSpeechSynthesis()
+        ensureAudioGraph()
+        // Re-prime unlock with a soft AudioContext tick (not SpeechSynthesis).
         ensureAudioGraph()
       } else if (!_speechGestureUnlocked && (synth.speaking || synth.pending)) {
         try { synth.cancel() } catch { /* */ }
