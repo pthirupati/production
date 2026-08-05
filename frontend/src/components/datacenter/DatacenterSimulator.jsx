@@ -458,6 +458,7 @@ export default function DatacenterSimulator({
               network={network}
               cooling={cooling}
               pdus={pdus.length ? pdus : (powerChain.rack_pdus || [])}
+              tickets={st?.tickets || []}
               selectedServerId={selectedServerId}
               expandedRack={expandedRack}
               onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}
