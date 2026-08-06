@@ -25,4 +25,11 @@ export const useDataStore = create((set, get) => ({
   },
 
   invalidateTechnologies: () => set({ technologies: null, technologiesLoadedAt: null }),
+
+  /**
+   * Wipe cached catalogue state. Called on logout — the technologies payload is
+   * overlaid with per-user entitlement/progress, so it must not survive into the
+   * next account on the same tab (logout is an SPA navigation, not a reload).
+   */
+  reset: () => set({ technologies: null, technologiesLoadedAt: null }),
 }))

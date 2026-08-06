@@ -2,6 +2,13 @@ import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
 import toast from 'react-hot-toast'
 
+/**
+ * In-flight token refresh, shared by every concurrent 401 (single-flight).
+ * Module scope on purpose: the interceptor runs per-request, so a local would
+ * give each request its own refresh and defeat the point. See the 401 handler.
+ */
+let refreshPromise = null
+
 const api = axios.create({
   baseURL: '/api',
   headers: {
@@ -68,20 +75,37 @@ api.interceptors.response.use(
       // an active session (cookies will carry the refresh_token automatically).
       if (refreshToken || isAuthenticated) {
         try {
-          // Send refresh token in body when available (backwards compat).
-          // When omitted, the backend reads it from the httpOnly cookie.
-          const refreshPayload = refreshToken ? { refresh: refreshToken } : {}
-          const { data } = await axios.post('/api/auth/refresh/', refreshPayload, {
-            withCredentials: true,
-          })
-          useAuthStore.getState().setAuth(
-            useAuthStore.getState().user,
-            data.access,
-            data.refresh || refreshToken
-          )
-          // Update Authorization header on the retried request if token in store
-          if (data.access) {
-            original.headers.Authorization = `Bearer ${data.access}`
+          // Single-flight refresh. Every concurrent 401 awaits the SAME promise
+          // instead of firing its own POST /api/auth/refresh/.
+          //
+          // Without this, any page issuing parallel requests that 401 together
+          // fired N refreshes — Dashboard fires ten. The backend rotates refresh
+          // tokens and blacklists the old one (ROTATE_REFRESH_TOKENS +
+          // BLACKLIST_AFTER_ROTATION), so the first call succeeded and the other
+          // nine presented a token that had just been blacklisted, failed, and hit
+          // redirectToLogin() — throwing the user to /login mid-session with
+          // "Your session has expired." on the busiest screen in the app.
+          if (!refreshPromise) {
+            const payload = refreshToken ? { refresh: refreshToken } : {}
+            refreshPromise = axios
+              .post('/api/auth/refresh/', payload, { withCredentials: true })
+              .then(({ data }) => {
+                useAuthStore.getState().setAuth(
+                  useAuthStore.getState().user,
+                  data.access,
+                  data.refresh || useAuthStore.getState().refreshToken,
+                )
+                return data.access
+              })
+              .finally(() => {
+                // Clear before the awaiters resume so a genuinely later 401 can
+                // start a fresh refresh rather than reusing a settled promise.
+                refreshPromise = null
+              })
+          }
+          const newAccess = await refreshPromise
+          if (newAccess) {
+            original.headers.Authorization = `Bearer ${newAccess}`
           }
           return api(original)
         } catch {
