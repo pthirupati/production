@@ -59,16 +59,17 @@ lab_servers:
   role: primary
   hostname: pxe-router-01
   persona: baremetal
-appears_in:
-  - vyos
-  - baremetal
-  - terminal
-  - datacenter
-  - lxd
+  appears_in:
+    - vyos
+    - baremetal
+    - terminal
+    - datacenter
+    - lxd
+- id: pxe-router-02
   role: secondary
   hostname: pxe-router-02
   persona: baremetal
   appears_in:
-  - vyos
-  - terminal
-  - baremetal
+    - vyos
+    - terminal
+    - baremetal
