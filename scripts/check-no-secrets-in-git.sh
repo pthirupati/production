@@ -45,51 +45,18 @@ done
 SECRET_ASSIGN_RE='(SECRET_KEY|_PASSWORD|_PASS|PASSWORD|KEY_SECRET|API_TOKEN|ACCESS_KEY|PRIVATE_KEY|_TOKEN)[[:space:]]*[:=][[:space:]]*["'"'"']?[^[:space:]"'"'"']{16,}'
 SIM_MARKER='SIMULATED-CREDENTIAL'
 
-check_generic_secrets() {
-  local file="$1" line lineno
-  # Paths that are definitionally non-secret. Every exclusion here was verified
-  # against a real hit during the 2026-08-06 audit — see the triage table in
-  # docs/AUDIT_2026_08_TODO.md §S2. Keeping these out is what makes the signal
-  # trustworthy; a scanner that cries wolf gets switched off.
-  case "$file" in
-    # Env EXAMPLES and docs placeholders are legitimately committed.
-    *.example|*example*|env.production.example) return 0 ;;
-    # scenarios/ is LAB CONTENT. Its YAML deliberately contains fake credentials
-    # (a lab that teaches you to rotate a DB password has to name one).
-    scenarios/*) return 0 ;;
-    # Simulation engines seed fake console state for the same reason.
-    backend/apps/vmware_sim/*|backend/apps/labs/provisioner/simulation/*) return 0 ;;
-    # Tutorial/curriculum content — teaching material. Real hit: a Kubernetes
-    # Secret manifest inside tutorials_extra.json, which is the lesson itself.
-    */management/commands/data/*|*/curriculum/*) return 0 ;;
-    # Test fixtures. Real hit: RAZORPAY_KEY_SECRET in test_billing_webhooks.py.
-    */tests/*|*/test_*.py|*_test.py|*.test.js|*.test.jsx) return 0 ;;
-    # CI workflow env holds throwaway SECRET_KEYs for the ephemeral test DB;
-    # genuine CI secrets come from GitHub Environments, never literals. The
-    # FORBIDDEN_TRACKED + prefix passes above still cover these files.
-    .github/workflows/*) return 0 ;;
-  esac
-  while IFS=: read -r lineno line; do
-    [ -z "$lineno" ] && continue
-    # Placeholders and indirection are fine: ${VAR}, $(cmd), {{ tpl }},
-    # os.environ[...], env(...), getenv(...), <YOUR_KEY>, change-me, …
-    # NOTE: keep these anchored to placeholder *phrases*. A bare /your/ was tried
-    # and it silently suppressed a real AWS_SECRET_ACCESS_KEY leak whose value
-    # happened to contain the substring — a false negative is far worse here than
-    # a false positive, so require the placeholder word to look deliberate.
-    if printf '%s' "$line" | grep -qiE 'change[-_ ]?me|your[-_ ]?(key|token|secret|password|pass|value|domain|email|account|id)|YOUR_|<[a-z_]+>|xxxx|placeholder|replace[-_ ]?me|example\.com|\$\{|\$\(|\{\{|os\.environ|env\(|getenv|process\.env|secrets\.|vault_|REDACTED|token-here|app-password|^[[:space:]]*#'; then
-      continue
-    fi
-    # Skip if a SIMULATED-CREDENTIAL marker sits just above (the annotation is a
-    # 5-line comment block, so look back a little further than that).
-    local from=$(( lineno > 8 ? lineno - 8 : 1 ))
-    if sed -n "${from},${lineno}p" "$file" 2>/dev/null | grep -q "$SIM_MARKER"; then
-      continue
-    fi
-    echo "  FAIL: $file:$lineno assigns a high-entropy secret in plain text"
-    FAIL=1
-  done < <(grep -nE "$SECRET_ASSIGN_RE" "$file" 2>/dev/null)
-}
+# Placeholders and indirection that are legitimately committed: ${VAR}, $(cmd),
+# {{ tpl }}, os.environ[...], env(...), getenv(...), <YOUR_KEY>, change-me, …
+#
+# NOTE: keep these anchored to placeholder *phrases*. A bare /your/ was tried and
+# it silently suppressed a real AWS_SECRET_ACCESS_KEY leak whose value happened to
+# contain that substring — a false negative is far worse here than a false
+# positive, so require the placeholder word to look deliberate.
+# `\{[A-Za-z_][A-Za-z0-9_.\[\]]*\}` covers Python f-string / .format() fields, e.g.
+# print(f"GMAIL_OAUTH_REFRESH_TOKEN={creds.refresh_token}") in the OAuth helper
+# script — that line *emits* a secret at runtime, it does not contain one. The
+# earlier `\$\{` only caught shell-style ${VAR}.
+PLACEHOLDER_RE='change[-_ ]?me|your[-_ ]?(key|token|secret|password|pass|value|domain|email|account|id)|YOUR_|<[a-z_]+>|xxxx|placeholder|replace[-_ ]?me|example\.com|\$\{|\$\(|\{\{|\{[A-Za-z_][A-Za-z0-9_.]*\}|os\.environ|env\(|getenv|process\.env|secrets\.|vault_|REDACTED|token-here|app-password|^[[:space:]]*#'
 
 # Build patterns from parts so this script's source does not match its own rules.
 DOP_PREFIX='dop_v1_'
@@ -104,25 +71,76 @@ PATTERNS=(
   'AKIA[0-9A-Z]{16}'
 )
 
-while IFS= read -r -d '' f; do
-  [[ "$f" == "$SELF" ]] && continue
-  # AWS console / engine seed data uses documentation-style example access key
-  # IDs (not real secrets). Same exclusion as frontend/src/components/aws/*.
-  [[ "$f" == frontend/src/components/aws/* ]] && continue
-  [[ "$f" == backend/apps/vmware_sim/aws_engine.py ]] && continue
-  for pat in "${PATTERNS[@]}"; do
-    if grep -qE "$pat" "$f" 2>/dev/null; then
-      echo "  FAIL: $f matches high-confidence secret pattern"
-      FAIL=1
-      break
-    fi
-  done
-  # Text-ish files also get the generic NAME=value entropy pass.
-  case "$f" in
-    *.md|*.txt|*.env|*.sh|*.yml|*.yaml|*.json|*.py|*.js|*.jsx|*.conf|*.ini|*.cfg|*.toml)
-      check_generic_secrets "$f" ;;
-  esac
-done < <(git ls-files -z)
+# ── Pass 1: high-confidence prefix patterns, one `git grep` for all of them ───
+#
+# PERFORMANCE: this used to be a per-file bash loop that spawned `grep` once per
+# file per pattern — 16,372 tracked files x 8 patterns is ~131,000 process
+# spawns, and the whole script took 8m10s (228s of that pure system time). As a
+# PR gate that is long enough that someone eventually deletes the step, which
+# would be worse than having no scanner. `git grep` does the whole tree in one
+# process with its own pathspec exclusions, so keep it that way: do NOT
+# reintroduce a per-file loop here.
+COMBINED_PREFIX_RE="$(IFS='|'; printf '%s' "${PATTERNS[*]}")"
+
+# Documentation-style example AWS keys live in the AWS console sim and engine.
+PREFIX_EXCLUDES=(
+  ":!$SELF"
+  ':!frontend/src/components/aws/**'
+  ':!backend/apps/vmware_sim/aws_engine.py'
+)
+
+while IFS= read -r hit; do
+  [ -z "$hit" ] && continue
+  echo "  FAIL: $hit matches high-confidence secret pattern"
+  FAIL=1
+done < <(git grep -lIE "$COMBINED_PREFIX_RE" -- . "${PREFIX_EXCLUDES[@]}" 2>/dev/null)
+
+# ── Pass 2: generic NAME=value entropy, again a single `git grep` ──────────────
+#
+# Path exclusions are expressed as git pathspecs so they are applied by git
+# rather than by re-testing every path in bash. They mirror the `case` list in
+# check_generic_secrets(), which still guards the per-match path for anything
+# that slips through.
+GENERIC_INCLUDES=(
+  '*.md' '*.txt' '*.env' '*.sh' '*.yml' '*.yaml' '*.json'
+  '*.py' '*.js' '*.jsx' '*.conf' '*.ini' '*.cfg' '*.toml'
+)
+GENERIC_EXCLUDES=(
+  ":!$SELF"
+  ':!*example*'
+  ':!scenarios/**'
+  ':!backend/apps/vmware_sim/**'
+  ':!backend/apps/labs/provisioner/simulation/**'
+  ':!**/management/commands/data/**'
+  ':!**/curriculum/**'
+  ':!**/tests/**'
+  ':!**/test_*.py'
+  # `test/` singular is a real top-level dir here (smoketest_e2e.py), and its
+  # filename does not match test_*.py — both misses were caught by a live run.
+  ':!test/**'
+  ':!**/*smoketest*'
+  ':!.github/workflows/**'
+)
+
+# `git grep -n` gives file:line:content in one shot. Only matched lines reach
+# the (cheap) per-line placeholder + marker checks.
+while IFS= read -r hit; do
+  [ -z "$hit" ] && continue
+  file="${hit%%:*}"
+  rest="${hit#*:}"
+  lineno="${rest%%:*}"
+  line="${rest#*:}"
+
+  if printf '%s' "$line" | grep -qiE "$PLACEHOLDER_RE"; then
+    continue
+  fi
+  from=$(( lineno > 8 ? lineno - 8 : 1 ))
+  if sed -n "${from},${lineno}p" "$file" 2>/dev/null | grep -q "$SIM_MARKER"; then
+    continue
+  fi
+  echo "  FAIL: $file:$lineno assigns a high-entropy secret in plain text"
+  FAIL=1
+done < <(git grep -nIE "$SECRET_ASSIGN_RE" -- "${GENERIC_INCLUDES[@]}" "${GENERIC_EXCLUDES[@]}" 2>/dev/null)
 
 if [ $FAIL -eq 0 ]; then
   echo "  OK: no secrets detected in tracked files"
