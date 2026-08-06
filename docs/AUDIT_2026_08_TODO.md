@@ -3981,3 +3981,85 @@ not measure.
       sites bypass it, including two that log the address **at deletion**.
 - [ ] **§Z5-1/Z5-2** the `_SIM_SESSIONS` cross-process leak and the full-VFS JSONB
       write per command — the two things that will bite before growth does.
+
+---
+
+# IMPLEMENTATION LOG — 2026-08-06 (session 5)
+
+## ✅ Landed
+
+### §Z1-8 — a refund returned the money but not the access
+- [x] `RazorpayRefundView` touched only the `PaymentTransaction` row, so a refunded
+      customer kept a **full year** of paid access. `FAQ.jsx:46` publicly promises
+      refunds within 7 days, which made this a standing leak rather than an edge case.
+- [x] `_revoke_entitlement_for_transaction` now deactivates the linked
+      `TechnologySubscription` (or one resolved from gateway metadata via the
+      existing `technology_id_from_transaction`), a `CertificationTrackSubscription`
+      for cert purchases, and zeroes `InterviewEntitlement.interviews_remaining`.
+- [x] **Only on FULL refund** — a goodwill credit or price adjustment must not
+      strip access that was partly paid for.
+- [x] Never raises (a gateway refund already succeeded), but logs at ERROR with the
+      transaction and user id so a mismatch is reconcilable. 5 tests, including that
+      revocation **cannot leak across users**.
+- [x] FAQ copy corrected: manual path, realistic turnaround, and it now states that
+      a full refund ends access — true only as of this change.
+- [ ] Still open: `RazorpayRefundView` has **no frontend caller**, so every refund
+      is a manual gateway/shell operation.
+
+### §Z1-9 — interview certificates: a paid feature enforced nowhere
+- [x] `certificate_enabled` is seeded False on Free / True on Pro+Premium, exposed
+      in the entitlement payload and shown in pricing — and **nothing checked it**.
+      `_finalize_campaign` called `issue_certificate()` unconditionally, so Free
+      tier received the artefact Premium (₹2,499) is partly sold on. Grepping the
+      flag returned only serializers, admin, seeds and the payload: no enforcement
+      site existed.
+- [x] Now gated, and **fails closed** on lookup error — withholding is recoverable,
+      over-issuing the paid artefact is not. Idempotency preserved so a plan
+      downgrade does not retroactively void an earned certificate. 5 tests; full
+      interviews suite (82) green.
+
+### §Z5-2 — a database write per keystroke-line — **and a correction to this document**
+- [x] **The audit overstated this.** It called the snapshot "multi-hundred-KB".
+      Measured: **15,121 bytes fresh, 15,446 after eight commands** — it barely
+      grows. The problem was never per-write size, it was **frequency**.
+- [x] Real numbers at 60 concurrent labs × ~20 commands/min:
+
+      | | writes/min | volume | per hour |
+      |---|---|---|---|
+      | before | 1,200 | 17.3 MB/min | **1.01 GB/hour** |
+      | after | 240 | 3.5 MB/min | 0.20 GB/hour |
+
+      **5× fewer** full-row JSONB rewrites and dead tuples. (Not 30× — the debounce
+      is per-session and there are 60 sessions.)
+- [x] 15s debounce **plus an unconditional flush in `disconnect()`**, so debouncing
+      cannot lose work even if the last command lands inside the window. The
+      snapshot is a durability backstop — the authoritative engine is in memory and
+      the snapshot exists for cross-process team-bot actions and restart recovery —
+      so a slightly stale backstop is acceptable; a lost session is not.
+- [x] 7 tests. **These are the first tests `apps/terminal` has ever had** — zero
+      coverage is how a per-keystroke database write survived this long.
+
+## Verification
+Local full suite: **1,710 tests, OK, 52 skipped** (baseline was 1,677; the delta is
+the tests added in sessions 4–5). CI on PR #161: frontend, CodeQL, all three
+Analyze jobs and **Grader integrity (17m)** green; `backend` still running.
+
+## Corrections made to this document by measurement
+| Claim | Reality |
+|---|---|
+| §Z5-2 snapshot is "multi-hundred-KB" | **15 KB**; frequency was the problem |
+| §Y2e IDE credentials are a security hole | **Simulation flavour** across 14 consoles; deleting would strip intended UX |
+| §S2 "add generic PASSWORD= patterns" | Would have produced **14+ false positives** and muted the scanner |
+| `apps.tutorials` test error blamed on §C2 | **Isolation artefact** — does not reproduce in the full suite |
+
+## Still open — the single largest operational risk
+- [ ] **§Z5-1 `_SIM_SESSIONS` cross-process leak.** A process-local dict across 4
+      uvicorn workers + celery, populated in one and freed from one, no TTL, no
+      bound. Uvicorn workers never recycle, so D2's 5 GB cgroup OOM-kills all four
+      and every in-flight lab dies. **The fix pattern is already in the repo** — all
+      22 `apps/vmware_sim/*_engine.py` modules are cache-backed with
+      `SESSION_TTL=7200`. Porting `UnifiedSimulationEngine` to the same shape also
+      fixes §Z5-3 (sim side) and the reconnect-lands-on-wrong-engine bug.
+      *Interim mitigation available today: set `UVICORN_WORKERS=2` (halves the
+      fan-out, matches the 2 vCPU box) and export `len(_SIM_SESSIONS)` so the leak
+      is at least observable.*
