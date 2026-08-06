@@ -15,6 +15,11 @@ import { renderSocV2Page } from './SocV2Panels'
 import '../../styles/sim-products.css'
 import './soc.css'
 
+/* SIMULATED-CREDENTIAL: lab-console flavour, not a real secret. Shown to the
+   learner on screen (with an autofill button) so the fake console feels real, and
+   the gate is bypassed entirely once a provisioned lab session exists. Grants no
+   access to anything. Secret scanners should allowlist this marker rather than
+   flagging these lines. See docs/AUDIT_2026_08_TODO.md §Y2e. */
 const SOC_LAB_USER = 'lab_soc'
 const SOC_LAB_PASS = 'lab_soc@123'
 const ACCENT = '#ef4444'
@@ -100,7 +105,7 @@ export default function SocSimulator({
       <div className={simPanelRoot(embedded, 'bg-[#0a0c12]')}>
         <LabChromeBar title="SOC Console" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-[#12141c] border border-[#232838] rounded-lg shadow-2xl w-[400px] overflow-hidden">
+          <div className="bg-[#12141c] border border-[#232838] rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold flex items-center gap-2" style={{ background: '#1a1015' }}>
               <ShieldAlert size={18} className="text-red-400" /> FixItLab SIEM
             </div>

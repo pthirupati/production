@@ -643,3 +643,12 @@
 .vm-usage-bar-fill {
   box-shadow: 0 0 10px currentColor;
 }
+
+/* Mobile (≤640px): let the inventory table scroll instead of forcing a
+   520px floor that pushed the whole vSphere layout wider than the screen. */
+@media (max-width: 640px) {
+  .vm-table { min-width: 0; }
+  .vm-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .vm-table th,
+  .vm-table td { padding-left: 8px; padding-right: 8px; font-size: 12px; }
+}

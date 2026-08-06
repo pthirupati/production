@@ -9,6 +9,11 @@ import TerraformCloudShell from './TerraformCloudShell'
 import '../../styles/lab-chrome.css'
 import '../../styles/sim-products.css'
 
+/* SIMULATED-CREDENTIAL: lab-console flavour, not a real secret. Shown to the
+   learner on screen (with an autofill button) so the fake console feels real, and
+   the gate is bypassed entirely once a provisioned lab session exists. Grants no
+   access to anything. Secret scanners should allowlist this marker rather than
+   flagging these lines. See docs/AUDIT_2026_08_TODO.md §Y2e. */
 const TFC_LAB_USER = 'lab_terraform'
 const TFC_LAB_PASS = 'lab_terraform@123'
 const TFC_AUTH_KEY = 'fixitlab_terraform_auth'

@@ -12,6 +12,11 @@ import { renderCommvaultV2Page } from './CommvaultV2Panels'
 import '../../styles/sim-products.css'
 import './commvault.css'
 
+/* SIMULATED-CREDENTIAL: lab-console flavour, not a real secret. Shown to the
+   learner on screen (with an autofill button) so the fake console feels real, and
+   the gate is bypassed entirely once a provisioned lab session exists. Grants no
+   access to anything. Secret scanners should allowlist this marker rather than
+   flagging these lines. See docs/AUDIT_2026_08_TODO.md §Y2e. */
 const CV_LAB_USER = 'lab_commvault'
 const CV_LAB_PASS = 'lab_commvault@123'
 
@@ -120,7 +125,7 @@ export default function CommvaultSimulator({
       <div className={simPanelRoot(embedded, 'bg-[#0c1930]')}>
         <LabChromeBar title="Commvault Command Center" subtitle={scenario?.title || slug} accent="#0b3d78" {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-[400px] overflow-hidden">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold bg-[#0b3d78] flex items-center gap-2">
               <Database size={18} /> CommCell Console
             </div>
