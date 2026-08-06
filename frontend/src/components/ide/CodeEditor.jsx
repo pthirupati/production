@@ -260,6 +260,7 @@ const CodeEditor = forwardRef(function CodeEditor(
     openSearch: () => { const v = viewRef.current; if (v) { openSearchPanel(v); v.focus() } },
     focus: () => viewRef.current?.focus(),
     formatDocument: () => formatDoc(viewRef.current),
+    getValue: () => viewRef.current?.state.doc.toString() ?? '',
   }), [])
 
   const fontTheme = (px) => EditorView.theme({
@@ -300,6 +301,21 @@ const CodeEditor = forwardRef(function CodeEditor(
   useEffect(() => { onSaveRef.current = onSave }, [onSave])
   useEffect(() => { formatOnSaveRef.current = formatOnSave }, [formatOnSave])
 
+  // Wire Vim :w / :write / :x once — calls the same Save handler as Cmd-S.
+  useEffect(() => {
+    const saveFromVim = () => {
+      const view = viewRef.current
+      if (view && formatOnSaveRef.current) formatDoc(view)
+      onSaveRef.current?.(view?.state.doc.toString() ?? '')
+    }
+    try {
+      Vim.defineEx('write', 'w', () => { saveFromVim() })
+      Vim.defineEx('update', 'up', () => { saveFromVim() })
+      Vim.defineEx('xit', 'x', () => { saveFromVim() })
+      Vim.map('jj', '<Esc>', 'insert')
+    } catch { /* already defined across remounts */ }
+  }, [])
+
   useEffect(() => {
     if (!hostRef.current) return
 
@@ -308,10 +324,6 @@ const CodeEditor = forwardRef(function CodeEditor(
         onChangeRef.current?.(update.state.doc.toString())
       }
     })
-
-    if (vimMode) {
-      try { Vim.map('jj', '<Esc>', 'insert') } catch { /* already mapped */ }
-    }
 
     const state = EditorState.create({
       doc: value,
@@ -343,7 +355,24 @@ const CodeEditor = forwardRef(function CodeEditor(
     const view = new EditorView({ state, parent: hostRef.current })
     viewRef.current = view
     return () => { view.destroy(); viewRef.current = null }
-    // Remount when vim toggles so status panel + keymap stay consistent.
+    // Create once — vim/lang/theme reconfigure via compartments below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Toggle Vim without destroying undo history when possible.
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    try {
+      view.dispatch({
+        effects: [
+          vimCompartment.current.reconfigure(vimMode ? vim({ status: true }) : []),
+          keymapCompartment.current.reconfigure(editorKeymaps(vimMode)),
+        ],
+      })
+    } catch {
+      /* ignore */
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vimMode])
 

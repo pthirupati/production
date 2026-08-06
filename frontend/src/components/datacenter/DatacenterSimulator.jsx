@@ -27,28 +27,59 @@ import {
 import '../../styles/sim-products.css'
 import './DatacenterSimulator.css'
 import DcAmbientAudio from './DcAmbientAudio'
+import { detectWebGL } from './webglSupport'
 
 const LazyDatacenterTwin3D = lazyWithRetry(() => import('./DatacenterTwin3D'))
 
-/** If WebGL/R3F throws, drop to 2D floor instead of the whole-lab error banner. */
+/**
+ * Catch R3F/WebGL crashes WITHOUT silently forcing 2D.
+ * Show a dismissible banner + Retry so learners (and CI/debug) see the reason.
+ */
 class Twin3DSafe extends Component {
   constructor(props) {
     super(props)
-    this.state = { failed: false }
+    this.state = { failed: false, error: null, retryKey: 0 }
   }
 
-  static getDerivedStateFromError() {
-    return { failed: true }
+  static getDerivedStateFromError(error) {
+    return { failed: true, error }
   }
 
   componentDidCatch(error, info) {
-    console.error('Datacenter 3D twin failed — falling back to 2D floor', error, info)
-    try { this.props.onFallback?.() } catch { /* ignore */ }
+    // eslint-disable-next-line no-console
+    console.error('Datacenter 3D twin failed', error, info)
+    try { this.props.onError?.(error, info) } catch { /* ignore */ }
+  }
+
+  handleRetry = () => {
+    this.setState((s) => ({ failed: false, error: null, retryKey: s.retryKey + 1 }))
   }
 
   render() {
-    if (this.state.failed) return null
-    return this.props.children
+    if (this.state.failed) {
+      const msg = this.state.error?.message || String(this.state.error || 'Unknown WebGL/R3F error')
+      return (
+        <div className="dc-3d-fail-banner" role="alert">
+          <div className="dc-3d-fail-title">3D hall failed to load</div>
+          <p className="dc-3d-fail-msg">
+            Using a recoverable path — the isometric floor is optional. Reason: <code>{msg}</code>
+          </p>
+          <div className="dc-3d-fail-actions">
+            <button type="button" className="dc-btn-primary dc-btn-xs" onClick={this.handleRetry}>
+              Retry 3D
+            </button>
+            <button
+              type="button"
+              className="dc-btn-outline dc-btn-xs"
+              onClick={() => this.props.onFallback?.()}
+            >
+              Use 2D floor
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return <div key={this.state.retryKey} className="dc-3d-safe-slot">{this.props.children}</div>
   }
 }
 
@@ -127,17 +158,33 @@ export default function DatacenterSimulator({
   // Mirrors the 3D twin's own immersive flag so this shell can collapse its
   // tab bar / status strip / goal banner into the twin's thin in-world HUD.
   const [twinImmersive, setTwinImmersive] = useState(true)
+  const [webglGate, setWebglGate] = useState(() => detectWebGL())
   const [floorView, setFloorView] = useState(() => {
-    // Steam-class default: immersive 3D hall. Fall back to 2D on phones /
-    // reduced-motion so Twin3DSafe never bricks the lab chrome.
+    // Game-style default is always 3D walk. Only honor an explicit prefer2d
+    // flag (set when the learner clicks "2D floor") — legacy `floorView=2d`
+    // alone used to trap people in the isometric plan forever.
     try {
       if (typeof window !== 'undefined') {
-        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return '2d'
-        if (window.matchMedia('(max-width: 900px)').matches) return '2d'
+        if (window.localStorage?.getItem('fixitlab.dc.prefer2d') === '1') return '2d'
+        const saved = window.localStorage?.getItem('fixitlab.dc.floorView')
+        if (saved === '3d') return '3d'
       }
     } catch { /* ignore */ }
     return '3d'
   })
+  const setFloorViewPersist = useCallback((v) => {
+    setFloorView(v)
+    try {
+      window.localStorage?.setItem('fixitlab.dc.floorView', v)
+      if (v === '2d') window.localStorage?.setItem('fixitlab.dc.prefer2d', '1')
+      else window.localStorage?.removeItem('fixitlab.dc.prefer2d')
+    } catch { /* ignore */ }
+  }, [])
+  const retryWebgl3d = useCallback(() => {
+    const gate = detectWebGL()
+    setWebglGate(gate)
+    if (gate.ok) setFloorViewPersist('3d')
+  }, [setFloorViewPersist])
   const dragRef = useRef(null)
   const movedRef = useRef(false)
   const liveTickInFlight = useRef(false)
@@ -216,6 +263,18 @@ export default function DatacenterSimulator({
     { key: 'tickets', label: 'Ops tickets', keywords: 'rma work order' },
   ]), [])
   const searchResources = useMemo(() => indexDatacenterState(st), [st])
+
+  const nocWallMetrics = useMemo(() => {
+    const gpuSeries = monitoring?.series?.dcgm_gpu_utilization || []
+    const gpuVals = gpuSeries.map((s) => s.value).filter((v) => typeof v === 'number')
+    const openTickets = (st?.tickets || [])
+      .filter((t) => !['closed', 'resolved'].includes((t.status || '').toLowerCase()))
+    return {
+      gpuUtil: gpuVals.length ? gpuVals.reduce((a, b) => a + b, 0) / gpuVals.length : undefined,
+      pue: monitoring?.pue ?? facility?.pue,
+      ticketsOpen: (st?.tickets || []).length ? openTickets.length : undefined,
+    }
+  }, [monitoring, facility, st])
 
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
@@ -344,39 +403,41 @@ export default function DatacenterSimulator({
   }
 
   return (
-    <div className={simPanelRoot(embedded, 'dc-shell sim-product')}>
-      <LabChromeBar title="Data Center Console" subtitle={scenario?.title || slug}
-        accent={ACCENT} className="lab-chrome-bar !bg-[#1a1d2b]" {...chromeProps}>
-        <GlobalSearch
-          services={searchServices}
-          resources={searchResources}
-          placeholder="Search racks, servers, rooms… (/)"
-          onSelect={(hit) => {
-            if (hit.navKey === 'rooms' || hit.meta?.type) {
-              const room = rooms.find((r) => r.id === hit.id) || hit.meta
-              if (room?.id) enterRoom(room)
-              return
-            }
-            if (hit.meta?.hostname || hit.navKey === 'floor') {
-              const srv = servers.find((s) => s.id === hit.id) || hit.meta
-              if (srv?.rack || srv?.rack_id) {
-                const rack = racks.find((r) => r.id === (srv.rack || srv.rack_id))
-                const room = rooms.find((r) => (r.racks || []).includes(rack?.id))
-                if (room) enterRoom(room)
+    <div className={simPanelRoot(embedded, `dc-shell sim-product${immersed3d ? ' dc-shell-game' : ''}`)}>
+      {!immersed3d && (
+        <LabChromeBar title="Data Center Console" subtitle={scenario?.title || slug}
+          accent={ACCENT} className="lab-chrome-bar !bg-[#1a1d2b]" {...chromeProps}>
+          <GlobalSearch
+            services={searchServices}
+            resources={searchResources}
+            placeholder="Search racks, servers, rooms… (/)"
+            onSelect={(hit) => {
+              if (hit.navKey === 'rooms' || hit.meta?.type) {
+                const room = rooms.find((r) => r.id === hit.id) || hit.meta
+                if (room?.id) enterRoom(room)
+                return
               }
-              if (srv?.id) {
-                setSelectedServerId(srv.id)
-                setDrawerTab('overview')
+              if (hit.meta?.hostname || hit.navKey === 'floor') {
+                const srv = servers.find((s) => s.id === hit.id) || hit.meta
+                if (srv?.rack || srv?.rack_id) {
+                  const rack = racks.find((r) => r.id === (srv.rack || srv.rack_id))
+                  const room = rooms.find((r) => (r.racks || []).includes(rack?.id))
+                  if (room) enterRoom(room)
+                }
+                if (srv?.id) {
+                  setSelectedServerId(srv.id)
+                  setDrawerTab('overview')
+                }
               }
-            }
-          }}
-        />
-        {onToggleTerminal && (
-          <button type="button" className="lab-chrome-btn flex items-center gap-1" onClick={onToggleTerminal}>
-            <Terminal size={13} /> {simTerminalOpen ? 'Hide terminal' : 'Terminal'}
-          </button>
-        )}
-      </LabChromeBar>
+            }}
+          />
+          {onToggleTerminal && (
+            <button type="button" className="lab-chrome-btn flex items-center gap-1" onClick={onToggleTerminal}>
+              <Terminal size={13} /> {simTerminalOpen ? 'Hide terminal' : 'Terminal'}
+            </button>
+          )}
+        </LabChromeBar>
+      )}
 
       {goal.objective && !immersed3d && (
         <div className="sim-goal-banner">
@@ -431,7 +492,7 @@ export default function DatacenterSimulator({
                 <button
                   type="button"
                   className={`dc-btn-outline dc-btn-xs ${floorView === '2d' ? 'dc-view-active' : ''}`}
-                  onClick={() => setFloorView('2d')}
+                  onClick={() => setFloorViewPersist('2d')}
                   title="Isometric 2D floor plan"
                 >
                   <Move size={11} /> 2D floor
@@ -439,7 +500,7 @@ export default function DatacenterSimulator({
                 <button
                   type="button"
                   className={`dc-btn-outline dc-btn-xs ${floorView === '3d' ? 'dc-view-active' : ''}`}
-                  onClick={() => setFloorView('3d')}
+                  onClick={() => setFloorViewPersist('3d')}
                   title="Steam-class animated 3D hall — Walk (WASD) · falls back to 2D on GPU errors"
                 >
                   <Box size={11} /> 3D hall
@@ -453,9 +514,26 @@ export default function DatacenterSimulator({
         </div>
       )}
 
-      {currentRoom.type === 'data_hall' && floorView === '3d' && (
-        <Twin3DSafe onFallback={() => setFloorView('2d')}>
-          <Suspense fallback={<div className="dc-3d-loading">Loading 3D twin…</div>}>
+      {currentRoom.type === 'data_hall' && floorView === '3d' && !webglGate.ok && (
+        <div className="dc-3d-fail-banner" role="alert">
+          <div className="dc-3d-fail-title">3D hall unavailable</div>
+          <p className="dc-3d-fail-msg">
+            WebGL is required for the Steam-class walk. Reason: <code>{webglGate.reason || 'no WebGL'}</code>
+          </p>
+          <div className="dc-3d-fail-actions">
+            <button type="button" className="dc-btn-primary dc-btn-xs" onClick={retryWebgl3d}>
+              Retry 3D
+            </button>
+            <button type="button" className="dc-btn-outline dc-btn-xs" onClick={() => setFloorViewPersist('2d')}>
+              Use 2D floor
+            </button>
+          </div>
+        </div>
+      )}
+
+      {currentRoom.type === 'data_hall' && floorView === '3d' && webglGate.ok && (
+        <Twin3DSafe onFallback={() => setFloorViewPersist('2d')}>
+          <Suspense fallback={<div className="dc-3d-loading"><div className="dc-3d-loading-spin" /> Loading 3D twin…</div>}>
             <LazyDatacenterTwin3D
               racks={roomRacks}
               serversByRack={serversByRack}
@@ -466,7 +544,7 @@ export default function DatacenterSimulator({
               access={accessControl}
               objective={goal.objective ? `${goal.title ? `${goal.title}: ` : ''}${goal.objective}` : ''}
               onImmersiveChange={setTwinImmersive}
-              onExitTo2D={() => setFloorView('2d')}
+              onExitTo2D={() => setFloorViewPersist('2d')}
               audioControl={(
                 <DcAmbientAudio
                   alert={Boolean(
@@ -491,7 +569,14 @@ export default function DatacenterSimulator({
               expandedRack={expandedRack}
               onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}
               onSelectRack={(id) => setExpandedRack((cur) => (cur === id ? null : id))}
-              onOpenBmc={(id) => { setSelectedServerId(id); setDrawerTab('bmc') }}
+              onOpenBmc={(id) => {
+                // Field-kit HUD calls this with no id — keep whatever server is
+                // already selected and just switch the drawer to the BMC tab.
+                setSelectedServerId((cur) => id ?? cur)
+                setDrawerTab('bmc')
+              }}
+              nocMetrics={nocWallMetrics}
+              currentRoomLabel={currentRoom.name || 'Data Hall A'}
               onUnplugCable={({ serverId, cableId } = {}) => {
                 const srv = (serverId && servers.find((s) => s.id === serverId))
                   || (selectedServerId && servers.find((s) => s.id === selectedServerId))

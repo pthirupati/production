@@ -232,6 +232,34 @@ class TerminalSshHostRegistrationTests(SimpleTestCase):
         self.assertNotIn("Connection refused", out)
 
     def test_sync_gcp_instance_ssh_by_ip(self):
+        # GCP private IPs are unreachable from an Azure underlay (cross-cloud
+        # denial). Rebind this session as GCP so SSH matches Fortune-100 L3.
+        from apps.labs.provisioner.simulation.shell import drop_sim_session, register_sim_session
+        from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
+
+        drop_sim_session(self.sid)
+        si.drop_session(self.sid)
+        cache.clear()
+        self.engine = UnifiedSimulationEngine(scenario_slug="gcp-batch", simulation_type="gcp")
+        self.engine.shell.state.session_id = self.sid
+        self.engine.shell._scenario_slug = "gcp-batch"
+        self.engine.shell.state.host_platform = "gcp"
+        self.engine.shell.state.scenario_slug = "gcp-batch"
+        register_sim_session(
+            self.sid,
+            f"sim-{self.sid}",
+            "gcp",
+            {
+                "engine": self.engine,
+                "scenario_slug": "gcp-batch",
+                "hosts": {"primary": {"name": "primary", "ip": "10.128.0.10", "ssh_user": "ubuntu"}},
+                "host_ips": {"10.128.0.10": "primary"},
+            },
+        )
+        self.engine.shell._host_names = {"primary": {"name": "primary", "ip": "10.128.0.10"}}
+        self.engine.shell._host_ips = {"10.128.0.10": "primary"}
+        self.engine.shell._engine = self.engine
+
         si.sync_gcp_instance(
             self.sid,
             {
@@ -246,6 +274,7 @@ class TerminalSshHostRegistrationTests(SimpleTestCase):
         out = self.engine.shell.run("ssh ubuntu@10.128.0.55")
         self.assertIn("Permanently added", out)
         self.assertNotIn("Connection refused", out)
+        self.assertNotIn("No route to host", out)
 
 
 class S1AssetRegistryTests(SimpleTestCase):

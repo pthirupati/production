@@ -1,0 +1,56 @@
+title: 'NVIDIA Device Plugin CrashLoop on GPU Worker'
+slug: ai-infra-k8s-device-plugin
+technology: AI Infrastructure Engineering
+category: Troubleshoot
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: AI Infra Engineering — after MAAS deployed an ImageDev H100 image and kubeadm joined
+  the node, the NVIDIA device-plugin DaemonSet is CrashLooping on a broken image tag. Nodes do not advertise
+  nvidia.com/gpu, so inference pods stay Pending.
+
+
+  ENVIRONMENT: Lab Terminal (kubectl + nvidia-smi) + Bare Metal + Datacenter twin. Cross-tech consoles
+  for MAAS and Datacenter available from the lab strip.
+
+
+  SYMPTOM: nvidia-device-plugin pods CrashLoopBackOff; kubectl custom-columns show GPU as <none>.
+
+
+  OBJECTIVE: Confirm host GPUs with nvidia-smi; repair/apply a healthy NVIDIA device-plugin DaemonSet;
+  verify allocatable nvidia.com/gpu is non-zero.'
+objectives:
+- Confirm host GPUs with nvidia-smi -L
+- Repair the NVIDIA device-plugin DaemonSet image
+- Verify nvidia.com/gpu is allocatable on the GPU worker
+initial_state: Device plugin CrashLooping; nvidia.com/gpu not allocatable.
+hints:
+- order: 1
+  cost: 0
+  content: Run nvidia-smi -L then kubectl -n gpu-operator get pods and kubectl get nodes -o custom-columns=NAME:.metadata.name,GPU:.status.allocatable.nvidia\.com/gpu
+- order: 2
+  cost: 20
+  content: Apply a DaemonSet (or patch) using nvcr.io/nvidia/k8s-device-plugin:v0.14.1 without the broken tag.
+- order: 3
+  cost: 40
+  content: Re-check custom-columns — GPU worker must show a non-zero allocatable count.
+consoles:
+- terminal
+- baremetal
+- datacenter
+hosted_as: baremetal
+lab_servers:
+- id: gpu-node-01
+  role: primary
+  hostname: gpu-node-01
+  persona: baremetal
+  appears_in:
+  - terminal
+  - baremetal
+  - datacenter

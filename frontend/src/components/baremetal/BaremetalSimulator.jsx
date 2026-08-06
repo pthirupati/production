@@ -372,6 +372,11 @@ export default function BaremetalSimulator({
         return run(() => baremetalApi.setBootInterface(sessionId, mid, extra.iface), 'Boot interface set')
       case 'applyStorageLayout':
         return run(() => baremetalApi.applyStorageLayout(sessionId, mid, extra.layout || 'flat'), 'Storage layout applied')
+      case 'createBond':
+        return run(
+          () => baremetalApi.createBond(sessionId, mid, extra.interfaces || ['eth0', 'eth1'], extra.name || 'bond0'),
+          'Bond created',
+        )
       default:
         return run(() => baremetalApi.action(sessionId, action, { machine_id: mid, ...extra }), 'Done')
     }

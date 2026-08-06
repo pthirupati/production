@@ -829,6 +829,30 @@ def _apply_simulation_fix(session) -> tuple[bool, str]:
         if "crashloop" in slug or ("k8s" in slug and "pod" in slug):
             shell.run("kubectl rollout restart deployment/nginx")
             return True, "k8s pods fixed"
+        if (
+            "gpu-operator" in slug
+            or "device-plugin" in slug
+            or ("k8s" in slug and "gpu" in slug)
+        ):
+            if engine.cluster is not None:
+                engine.cluster.enable_gpu_device_plugin()
+            else:
+                shell.run(
+                    "kubectl apply -f - <<'EOF'\n"
+                    "apiVersion: apps/v1\n"
+                    "kind: DaemonSet\n"
+                    "metadata:\n"
+                    "  name: nvidia-device-plugin-daemonset\n"
+                    "  namespace: gpu-operator\n"
+                    "spec:\n"
+                    "  template:\n"
+                    "    spec:\n"
+                    "      containers:\n"
+                    "      - name: nvidia-device-plugin-ctr\n"
+                    "        image: nvcr.io/nvidia/k8s-device-plugin:v0.14.1\n"
+                    "EOF"
+                )
+            return True, "k8s GPU Operator / device plugin fixed"
 
         if "node-notready" in slug:
             shell.run("kubectl uncordon worker-1")

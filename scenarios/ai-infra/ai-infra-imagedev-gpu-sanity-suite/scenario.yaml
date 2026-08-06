@@ -40,16 +40,20 @@ hints:
   cost: 45
   content: When Result shows ALL PASS, publish to MAAS if needed and leave FIXED-OK.
 consoles:
-- terminal
 - packer
 - baremetal
+- terminal
+- awx
+- lxd
 hosted_as: baremetal
 lab_servers:
 - id: gpu-node-01
   role: primary
   hostname: gpu-node-01
   persona: baremetal
-  appears_in:
-  - terminal
+appears_in:
   - packer
   - baremetal
+  - terminal
+  - awx
+  - lxd

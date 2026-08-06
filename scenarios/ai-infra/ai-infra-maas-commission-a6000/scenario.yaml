@@ -1,0 +1,58 @@
+title: 'MAAS Commission RTX 6000 Ada Generation Node'
+slug: ai-infra-maas-commission-a6000
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: AI Infra Engineering — HPE/Dell 1× RTX 6000 Ada workstation/server for fine-tune
+  and viz workloads. Same MAAS lifecycle as H100 rows, different SKU and power envelope.
+
+
+  ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin.
+
+
+  SYMPTOM: Node New; not commissioned; must report RTX 6000 Ada after deploy.
+
+
+  OBJECTIVE: Commission → Deploy; verify nvidia-smi -L shows RTX 6000 Ada Generation.'
+objectives:
+- Commission the 6000 Ada node in MAAS
+- Deploy and reach Deployed state
+- Confirm nvidia-smi -L shows RTX 6000 Ada
+initial_state: Node New in MAAS; 6000 Ada not commissioned.
+hints:
+- order: 1
+  cost: 0
+  content: Commission the New node; watch commissioning scripts complete.
+- order: 2
+  cost: 20
+  content: Deploy once Ready; confirm Deployed in MAAS.
+- order: 3
+  cost: 40
+  content: nvidia-smi -L must include RTX 6000 Ada Generation.
+consoles:
+- baremetal
+- terminal
+- lxd
+- awx
+- datacenter
+datacenter_link: true
+hosted_as: baremetal
+lab_servers:
+- id: gpu-ws-a6000-01
+  role: primary
+  hostname: gpu-ws-a6000-01
+  persona: baremetal
+appears_in:
+  - baremetal
+  - terminal
+  - lxd
+  - awx
+  - datacenter

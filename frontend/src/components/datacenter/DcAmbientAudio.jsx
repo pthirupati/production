@@ -69,10 +69,16 @@ function startBed(ctx, { muted }) {
   }
 }
 
+/** Hall-center anchor used for proximity attenuation (roughly the cold-aisle midpoint). */
+const HALL_CENTER = { x: -1, z: 0 }
+const PROXIMITY_MAX_DIST = 9
+
 export default function DcAmbientAudio({
   enabled = true,
   alert = false,
   storageKey = 'fixitlab-dc-ambient-mute',
+  posRef = null,
+  distanceToHall = null,
 }) {
   const [muted, setMuted] = useState(() => {
     try { return sessionStorage.getItem(storageKey) === '1' } catch { return false }
@@ -80,11 +86,39 @@ export default function DcAmbientAudio({
   const [armed, setArmed] = useState(false)
   const bedRef = useRef(null)
   const ctxRef = useRef(null)
+  // Simple HTMLAudioElement-style volume scaling by walk-position proximity to the
+  // hall center — no Three AudioListener needed for this procedural oscillator bed.
+  const hasProximity = !!posRef || typeof distanceToHall === 'number'
 
   useEffect(() => {
     try { sessionStorage.setItem(storageKey, muted ? '1' : '0') } catch { /* */ }
-    bedRef.current?.setMuted?.(muted)
-  }, [muted, storageKey])
+    if (!hasProximity) bedRef.current?.setMuted?.(muted)
+  }, [muted, storageKey, hasProximity])
+
+  useEffect(() => {
+    if (!armed || !enabled || !hasProximity) return undefined
+    let raf
+    const tick = () => {
+      const bed = bedRef.current
+      const ctx = ctxRef.current
+      if (bed && ctx) {
+        let dist = 0
+        if (posRef?.current) {
+          const dx = (posRef.current.x ?? 0) - HALL_CENTER.x
+          const dz = (posRef.current.z ?? 0) - HALL_CENTER.z
+          dist = Math.hypot(dx, dz)
+        } else if (typeof distanceToHall === 'number') {
+          dist = distanceToHall
+        }
+        const proximity = 1 - Math.min(1, Math.max(0, dist) / PROXIMITY_MAX_DIST)
+        const target = muted ? 0 : 0.045 * (0.35 + proximity * 0.65)
+        bed.master.gain.setTargetAtTime(target, ctx.currentTime, 0.3)
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [armed, enabled, hasProximity, posRef, distanceToHall, muted])
 
   useEffect(() => {
     if (!enabled || !armed) return undefined

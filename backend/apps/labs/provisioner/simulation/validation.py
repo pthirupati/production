@@ -551,6 +551,14 @@ def _run_line_check(
         # GPU healthy. An uninitialised flag must NOT count as resolved.
         if not getattr(state, "gpu_healthy", False):
             failures.append("GPU still unhealthy — load the nvidia driver first")
+            return True
+        # SKU-specific commission labs (A4000 / 6000 Ada) — product string must match.
+        if shell is not None and ("a4000" in stripped.lower() or "6000" in stripped.lower() or "ada" in stripped.lower()):
+            listing = shell.run("nvidia-smi -L") or ""
+            if "a4000" in stripped.lower() and "A4000" not in listing:
+                failures.append("nvidia-smi -L does not show RTX A4000 — wrong SKU or node not deployed")
+            if ("6000" in stripped.lower() or "ada" in stripped.lower()) and "6000" not in listing and "Ada" not in listing:
+                failures.append("nvidia-smi -L does not show RTX 6000 Ada — wrong SKU or node not deployed")
         return True
 
     if "systemctl is-active mysqld" in stripped or "systemctl is-active mysql" in stripped:
@@ -627,6 +635,26 @@ def _run_line_check(
         cluster = engine.cluster if engine else None
         if not cluster or any(n.status != "Ready" for n in cluster.nodes):
             failures.append("not all nodes are Ready")
+        return True
+
+    # AI Infra — GPU Operator / device plugin: nvidia.com/gpu must be allocatable.
+    if (
+        "kubectl get nodes" in stripped
+        and (
+            "nvidia.com/gpu" in stripped
+            or "custom-columns" in stripped
+            or ("allocatable" in stripped and "gpu" in stripped.lower())
+        )
+    ):
+        cluster = engine.cluster if engine else None
+        if not cluster:
+            failures.append("kubernetes cluster not available")
+        elif not any(getattr(n, "gpu_allocatable", 0) > 0 for n in cluster.nodes):
+            failures.append(
+                "nvidia.com/gpu not allocatable — repair/apply the NVIDIA device plugin or GPU Operator"
+            )
+        elif getattr(cluster, "_gpu_plugin_broken", False):
+            failures.append("GPU device plugin still CrashLooping — apply a healthy DaemonSet image")
         return True
 
     if "kubectl get endpoints" in stripped:

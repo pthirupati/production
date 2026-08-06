@@ -746,3 +746,95 @@ class BaremetalLifecycleTests(TestCase):
         self.assertTrue(res["ok"], res)
         state = bm.get_state(sid)["state"]
         self.assertNotIn("needs_operator_user", state.get("broken") or {})
+
+    # ── V2 facades: devices, images, DHCP, USB, failed testing, bond ───────
+    def test_commission_fills_usb_inventory(self):
+        sid = self._session("maas-commission")
+        base = 8_100_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+        with mock.patch.object(bm, "_now", return_value=base + bm.COMMISSION_SECONDS + 1):
+            m = self._machine(sid, 2)
+            self.assertEqual(m["status"], "Ready")
+            self.assertTrue(m.get("usb_devices"))
+            self.assertTrue(any(u.get("product") for u in m["usb_devices"]))
+
+    def test_failed_testing_and_override(self):
+        sid = self._session("maas-commission")
+        base = 8_200_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+        with mock.patch.object(bm, "_now", return_value=base + bm.COMMISSION_SECONDS + 1):
+            self.assertEqual(self._machine(sid, 2)["status"], "Ready")
+            t_test = base + bm.COMMISSION_SECONDS + 1
+        with mock.patch.object(bm, "_now", return_value=t_test):
+            res = bm.apply_action(sid, "maas_test", {"machine_id": 2, "fail": True})
+            self.assertTrue(res["ok"], res)
+            self.assertEqual(self._machine(sid, 2)["status"], "Testing")
+        with mock.patch.object(bm, "_now", return_value=t_test + bm.TEST_SECONDS + 1):
+            m = self._machine(sid, 2)
+            self.assertEqual(m["status"], "Failed testing")
+            self.assertTrue(any(r.get("status") == "failed" for r in m.get("test_results") or []))
+        res = bm.apply_action(sid, "maas_override_failed_testing", {"machine_id": 2})
+        self.assertTrue(res["ok"], res)
+        self.assertEqual(self._machine(sid, 2)["status"], "Ready")
+
+    def test_create_bond(self):
+        sid = self._session("maas-commission")
+        m = self._machine(sid, 1)
+        self.assertGreaterEqual(len(m.get("interfaces") or []), 2)
+        res = bm.apply_action(sid, "maas_create_bond", {
+            "machine_id": 1,
+            "interfaces": ["eth0", "eth1"],
+            "name": "bond0",
+        })
+        self.assertTrue(res["ok"], res)
+        m = self._machine(sid, 1)
+        bond = next(i for i in m["interfaces"] if i.get("name") == "bond0")
+        self.assertEqual(bond.get("bond_members"), ["eth0", "eth1"])
+        self.assertTrue(bond.get("is_boot"))
+
+    def test_add_device_and_dhcp_snippet(self):
+        sid = self._session("maas-commission")
+        res = bm.apply_action(sid, "maas_add_device", {
+            "hostname": "pdu-rack-c",
+            "mac": "52:54:00:aa:bb:cc",
+            "ip": "10.10.1.55",
+        })
+        self.assertTrue(res["ok"], res)
+        devices = bm.get_state(sid)["state"]["maas"]["devices"]
+        self.assertTrue(any(d.get("hostname") == "pdu-rack-c" for d in devices))
+        res = bm.apply_action(sid, "maas_dhcp_snippet_add", {
+            "name": "opt66",
+            "value": 'option tftp-server-name "10.10.1.2";',
+            "scope": "global",
+        })
+        self.assertTrue(res["ok"], res)
+        dhcp = bm.get_state(sid)["state"]["maas"]["dhcp"]
+        self.assertTrue(any(s.get("name") == "opt66" for s in dhcp.get("snippets") or []))
+
+    def test_sync_and_upload_images(self):
+        sid = self._session("maas-commission")
+        res = bm.apply_action(sid, "maas_sync_images", {"releases": ["ubuntu/jammy", "ubuntu/focal"]})
+        self.assertTrue(res["ok"], res)
+        names = {r["name"] for r in bm.get_state(sid)["state"]["maas"]["boot_resources"]}
+        self.assertIn("ubuntu/focal", names)
+        res = bm.apply_action(sid, "maas_upload_boot_resource", {
+            "name": "custom/b300-jammy",
+            "title": "B300 Ubuntu 22.04",
+            "architecture": "amd64/generic",
+        })
+        self.assertTrue(res["ok"], res)
+        names = {r["name"] for r in bm.get_state(sid)["state"]["maas"]["boot_resources"]}
+        self.assertIn("custom/b300-jammy", names)
+
+    def test_compose_kvm(self):
+        sid = self._session("maas-commission")
+        res = bm.apply_action(sid, "maas_compose_kvm", {
+            "name": "vm-lab-01",
+            "vcpu": 4,
+            "ram_gb": 8,
+        })
+        self.assertTrue(res["ok"], res)
+        vms = bm.get_state(sid)["state"]["kvm"]["vms"]
+        self.assertTrue(any(v.get("name") == "vm-lab-01" for v in vms))

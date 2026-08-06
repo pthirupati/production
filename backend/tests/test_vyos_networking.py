@@ -133,3 +133,51 @@ class VyosNetworkingDepthTests(TestCase):
         self.assertTrue("connected" in route.lower() or "C>*" in route)
         self.assertIn("VyOS", str(engine.shell.run("show version")))
         self.assertIn("Done", str(engine.shell.run("save")))
+
+
+class VyosFidelityTests(TestCase):
+    def test_static_route_commit_appears_in_rib(self):
+        n = NetworkingState("ai-infra-vyos")
+        n.vyos_enter_configure()
+        n.vyos_set("protocols static route 10.99.0.0/16 next-hop 10.64.1.2")
+        self.assertIn("Commit complete", n.vyos_commit())
+        rib = n.show_ip_route()
+        self.assertIn("10.99.0.0/16", rib)
+        self.assertIn("via 10.64.1.2", rib)
+        self.assertTrue(n.has_route("10.99.0.0/16"))
+        dash = n.to_dashboard()
+        self.assertTrue(any("10.99.0.0/16" in r for r in dash["routes"]))
+
+    def test_static_route_without_nexthop_rejected(self):
+        n = NetworkingState("ai-infra-vyos")
+        n.vyos_enter_configure()
+        n.vyos_set("protocols static route 10.88.0.0/16")
+        err = n.vyos_commit()
+        self.assertIn("Commit failed", err)
+        self.assertIn("next-hop", err.lower())
+
+    def test_ospf_neighbor_show(self):
+        n = NetworkingState("ai-infra-vyos")
+        n.vyos_enter_configure()
+        n.vyos_set("protocols ospf area 0")
+        n.vyos_set("protocols ospf interface eth0")
+        self.assertIn("Commit complete", n.vyos_commit())
+        out = n.show_ip_ospf_neighbor()
+        self.assertIn("Neighbor ID", out)
+        self.assertIn("Full", out)
+        dash = n.to_dashboard()
+        self.assertTrue(dash["ospf"]["configured"])
+        self.assertTrue(dash["ospf"]["neighbors"])
+
+    def test_tab_completion_and_help(self):
+        n = NetworkingState("ai-infra-vyos")
+        ops = n.vyos_complete("")
+        self.assertIn("show", ops)
+        self.assertIn("configure", ops)
+        n.vyos_enter_configure()
+        cfg = n.vyos_complete("set ")
+        self.assertIn("interfaces", cfg)
+        self.assertIn("protocols", cfg)
+        help_out = n.vyos_help("show ip")
+        self.assertIn("route", help_out)
+        self.assertIn("bgp", help_out)

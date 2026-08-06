@@ -1267,6 +1267,11 @@ class RHELOSState:
         other.emergency_mode = self.emergency_mode
         other.fstab_valid = self.fstab_valid
         other.editor = None
+        # Preserve session + platform so ICMP/SSH reachability gates still apply
+        # after `ssh user@host` switches into the peer's OS state.
+        other.session_id = self.session_id
+        other.host_platform = getattr(self, "host_platform", None) or "linux"
+        other.scenario_slug = self.scenario_slug
         other._write_file("/etc/hostname", hostname + "\n")
         other.env["HOSTNAME"] = hostname
         return other

@@ -224,7 +224,132 @@ def _validate_candidate_tree(tree: dict) -> str | None:
                     f"  Must configure 'remote-as' or 'peer-group' for neighbor\n"
                     f"Commit failed"
                 )
+    # Static route must have a next-hop.
+    static = _tree_get(tree, ["protocols", "static", "route"]) or {}
+    if isinstance(static, dict):
+        for prefix, body in static.items():
+            if not isinstance(body, dict):
+                return (
+                    f"Validation failed for: protocols static route {prefix}\n"
+                    f"  Must configure 'next-hop'\n"
+                    f"Commit failed"
+                )
+            nh = body.get("next-hop") or body.get("nexthop")
+            if nh is None:
+                return (
+                    f"Validation failed for: protocols static route {prefix}\n"
+                    f"  Must configure 'next-hop'\n"
+                    f"Commit failed"
+                )
     return None
+
+
+# Grammar tokens for tab-completion / `?` help (VyOS-shaped next-token lists).
+_ROOT_OP_CMDS = (
+    "show", "configure", "ping", "traceroute", "reboot", "poweroff",
+    "reset", "clear", "monitor", "run",
+)
+_ROOT_CFG_CMDS = (
+    "set", "delete", "edit", "up", "top", "show", "compare", "commit",
+    "commit-confirm", "confirm", "discard", "save", "load", "rollback", "exit", "run",
+)
+_SHOW_TOKENS = (
+    "interfaces", "ip", "configuration", "firewall", "nat", "vrrp",
+    "dhcp", "version", "log", "system", "protocols", "high-availability",
+)
+_SET_TOP = (
+    "interfaces", "protocols", "service", "system", "firewall", "nat",
+    "high-availability", "policy", "vpn", "vrf", "traffic-policy",
+)
+_IFACE_TYPES = (
+    "ethernet", "bonding", "bridge", "dummy", "loopback", "tunnel",
+    "wireguard", "vxlan",
+)
+_PROTO_TYPES = ("static", "bgp", "ospf", "ospfv3", "rip", "isis")
+
+
+def _complete_tokens(partial: str, *, configure_mode: bool, edit_path: list[str]) -> list[str]:
+    """Return valid next tokens given a partial CLI line (no trailing ?)."""
+    parts = (partial or "").strip().split()
+    trailing_space = (partial or "").endswith(" ")
+    if not parts:
+        return list(_ROOT_CFG_CMDS if configure_mode else _ROOT_OP_CMDS)
+
+    head = parts[0].lower()
+    if len(parts) == 1 and not trailing_space:
+        pool = _ROOT_CFG_CMDS if configure_mode else _ROOT_OP_CMDS
+        return [t for t in pool if t.startswith(head)]
+
+    if head == "show":
+        if len(parts) == 1 and not trailing_space:
+            return [t for t in _SHOW_TOKENS if t.startswith(head)]  # unreachable for show alone after head match
+        if len(parts) == 1 or (len(parts) == 2 and not trailing_space and parts[1].lower() not in (
+            "ip", "system", "interfaces", "configuration", "firewall", "nat", "vrrp", "dhcp", "version", "log", "protocols", "high-availability",
+        )):
+            stem = parts[1] if len(parts) > 1 else ""
+            return [t for t in _SHOW_TOKENS if t.startswith(stem)]
+        if len(parts) == 1 or (len(parts) == 2 and trailing_space and parts[0].lower() == "show"):
+            # "show " → list show tokens
+            if len(parts) == 1:
+                return list(_SHOW_TOKENS)
+        if len(parts) >= 2 and parts[1].lower() == "ip":
+            if len(parts) == 2:
+                opts = ("route", "bgp", "ospf", "ospfv3")
+                return list(opts)
+            if len(parts) == 3 and not trailing_space:
+                opts = ("route", "bgp", "ospf", "ospfv3")
+                return [t for t in opts if t.startswith(parts[2])]
+            if len(parts) >= 3 and parts[2].lower() == "bgp":
+                opts = ("summary", "neighbors", "nexthop")
+                cur = "" if trailing_space or len(parts) == 3 else parts[-1]
+                if len(parts) == 3:
+                    return list(opts)
+                return [t for t in opts if t.startswith(parts[-1] if not trailing_space else "")]
+            if len(parts) >= 3 and parts[2].lower() == "ospf":
+                opts = ("neighbor", "database", "route", "interface")
+                if len(parts) == 3:
+                    return list(opts)
+                return [t for t in opts if t.startswith(parts[-1] if not trailing_space else "")]
+        if len(parts) >= 2 and parts[1].lower() == "system":
+            opts = ("commit", "image", "login", "memory")
+            if len(parts) == 2:
+                return list(opts)
+            return [t for t in opts if t.startswith(parts[-1] if not trailing_space else "")]
+        return []
+
+    if head in ("set", "delete", "edit") and configure_mode:
+        if len(parts) == 1 or (len(parts) == 2 and not trailing_space):
+            stem = parts[1] if len(parts) > 1 else ""
+            base = list(_SET_TOP)
+            if edit_path:
+                # Relative under edit context — suggest children of edit path
+                return [t for t in base if t.startswith(stem)]
+            return [t for t in base if t.startswith(stem)]
+        if len(parts) >= 2 and parts[1].lower() == "interfaces":
+            if len(parts) == 2 or (len(parts) == 3 and not trailing_space):
+                cur = parts[2] if len(parts) > 2 else ""
+                return [t for t in _IFACE_TYPES if t.startswith(cur)]
+            if len(parts) >= 4 and parts[2].lower() == "ethernet":
+                leaves = ("address", "description", "mtu", "disable", "hw-id", "vif", "duplex", "speed")
+                if len(parts) == 4 or (len(parts) == 5 and not trailing_space):
+                    # eth name already chosen; next is leaf
+                    cur = parts[4] if len(parts) > 4 else ""
+                    return [t for t in leaves if t.startswith(cur)]
+        if len(parts) >= 2 and parts[1].lower() == "protocols":
+            if len(parts) == 2 or (len(parts) == 3 and not trailing_space):
+                cur = parts[2] if len(parts) > 2 else ""
+                return [t for t in _PROTO_TYPES if t.startswith(cur)]
+            if len(parts) >= 3 and parts[2].lower() == "static":
+                return [t for t in ("route", "table") if t.startswith(parts[-1] if not trailing_space and len(parts) > 3 else "")]
+            if len(parts) >= 3 and parts[2].lower() == "bgp":
+                return [t for t in ("neighbor", "address-family", "parameters", "listen") if t.startswith(parts[-1] if not trailing_space and len(parts) > 3 else "")]
+            if len(parts) >= 3 and parts[2].lower() == "ospf":
+                return [t for t in ("area", "interface", "parameters", "passive-interface") if t.startswith(parts[-1] if not trailing_space and len(parts) > 3 else "")]
+        return []
+
+    if head == "commit" and configure_mode:
+        return [t for t in ("confirm",) if t.startswith(parts[-1] if not trailing_space and len(parts) > 1 else "")]
+    return []
 
 
 class NetworkingState:
@@ -531,6 +656,10 @@ class NetworkingState:
         self.vyos_running_tree = copy.deepcopy(self.vyos_candidate_tree)
         self.revision += 1
         self._sync_from_running_tree()
+        # Sync BGP neighbor table from the committed tree so show / dashboard agree.
+        tree_nbs = _collect_bgp_neighbors_from_tree(self.vyos_running_tree)
+        if tree_nbs:
+            self.bgp_neighbors = tree_nbs
         for n in self.bgp_neighbors:
             if n.get("remote_as") is not None and n.get("state") == "Idle":
                 n["state"] = "Established"
@@ -690,7 +819,8 @@ class NetworkingState:
                     continue
                 addr = body.get("address") or "-"
                 desc = body.get("description") or ""
-                lines.append(f"{name:<16} {str(addr):<32} u/u  {desc}")
+                sl = "A/D" if "disable" in body else "u/u"
+                lines.append(f"{name:<16} {str(addr):<32} {sl}  {desc}")
                 vifs = body.get("vif") or {}
                 if isinstance(vifs, dict):
                     for vid, vbody in sorted(vifs.items(), key=lambda x: str(x[0])):
@@ -765,6 +895,120 @@ class NetworkingState:
     def show_ip_bgp_summary(self) -> str:
         self._maybe_auto_rollback()
         return self.bgp_summary()
+
+    def show_ip_ospf_neighbor(self) -> str:
+        self._maybe_auto_rollback()
+        ospf = _tree_get(self.vyos_running_tree, ["protocols", "ospf"])
+        if not ospf:
+            return "OSPFv2 is not running"
+        lines = [
+            "Neighbor ID     Pri State           Dead Time Address         Interface",
+        ]
+        # Derive neighbors from configured interfaces / areas
+        areas = (ospf.get("area") if isinstance(ospf, dict) else None) or {}
+        ifaces = (ospf.get("interface") if isinstance(ospf, dict) else None) or {}
+        if not isinstance(areas, dict):
+            # `set protocols ospf area 0` may leave a scalar
+            areas = {str(areas): {}} if areas not in (None, {}, "") else {}
+        if not isinstance(ifaces, dict):
+            ifaces = {str(ifaces): {}} if ifaces not in (None, {}, "") else {}
+        if ifaces:
+            for i, (iname, body) in enumerate(sorted(ifaces.items())):
+                rid = f"10.64.1.{10 + i}"
+                if isinstance(body, dict) and body.get("router-id"):
+                    rid = str(body.get("router-id"))
+                lines.append(
+                    f"{rid:<15} 1   Full/DR          00:00:38  10.64.1.{20 + i:<3}   {iname}"
+                )
+        elif areas:
+            for i, area in enumerate(sorted(areas.keys())):
+                lines.append(
+                    f"10.64.1.{10 + i:<6} 1   Full/BDR         00:00:35  10.64.1.{30 + i:<3}   eth0  area {area}"
+                )
+        else:
+            lines.append("10.64.1.2       1   Full/DR          00:00:40  10.64.1.2       eth0")
+        return "\n".join(lines)
+
+    def show_log(self) -> str:
+        self._maybe_auto_rollback()
+        lines = [
+            f"{time.strftime('%b %d %H:%M:%S')} vyos kernel: eth0: link up",
+            f"{time.strftime('%b %d %H:%M:%S')} vyos bgpd[1201]: neighbor state change",
+            f"{time.strftime('%b %d %H:%M:%S')} vyos dhcpd: DHCPREQUEST on eth1",
+        ]
+        return "\n".join(lines)
+
+    def vyos_complete(self, partial: str) -> str:
+        """Tab-completion — list possible next tokens."""
+        tokens = _complete_tokens(
+            partial,
+            configure_mode=self.vyos_configure_mode,
+            edit_path=self.vyos_edit_path,
+        )
+        if not tokens:
+            return ""
+        return "\n".join(tokens)
+
+    def vyos_help(self, partial: str) -> str:
+        """`?` context help — same token list with a brief description."""
+        tokens = _complete_tokens(
+            partial.rstrip("?").rstrip(),
+            configure_mode=self.vyos_configure_mode,
+            edit_path=self.vyos_edit_path,
+        )
+        if not tokens:
+            return "  <cr>"
+        descriptions = {
+            "show": "Show system information",
+            "configure": "Enter configuration mode",
+            "set": "Set the value of a parameter or create a new element",
+            "delete": "Delete a configuration element",
+            "edit": "Edit a sub-element",
+            "commit": "Commit the current set of changes",
+            "commit-confirm": "Commit with auto-rollback unless confirmed",
+            "compare": "Compare configuration revisions",
+            "discard": "Discard uncommitted changes",
+            "save": "Save configuration to /config/config.boot",
+            "load": "Load configuration from /config/config.boot",
+            "rollback": "Rollback to a prior revision",
+            "exit": "Exit from current mode",
+            "interfaces": "Network interfaces",
+            "ip": "IP information",
+            "route": "Routing table",
+            "bgp": "Border Gateway Protocol",
+            "ospf": "Open Shortest Path First",
+            "neighbor": "Neighbor information",
+            "ethernet": "Ethernet interface",
+            "static": "Static routes",
+            "firewall": "Firewall",
+            "nat": "Network Address Translation",
+            "vrrp": "Virtual Router Redundancy Protocol",
+            "version": "Show system version",
+            "dhcp": "DHCP server leases",
+            "configuration": "Show configuration",
+            "system": "System information",
+            "protocols": "Routing protocols",
+            "service": "System services",
+            "high-availability": "High availability (VRRP)",
+            "vpn": "VPN (IPsec / WireGuard)",
+            "address": "IP address",
+            "description": "Description",
+            "mtu": "Maximum transmission unit",
+            "disable": "Administratively disable",
+            "next-hop": "Next-hop address",
+            "remote-as": "Remote autonomous system",
+            "area": "OSPF area",
+            "summary": "Summary",
+        }
+        lines = []
+        for t in tokens:
+            lines.append(f"  {t:<22} {descriptions.get(t, '')}")
+        return "\n".join(lines)
+
+    def has_route(self, prefix: str) -> bool:
+        """True if the RIB contains this prefix (connected/static/OSPF/BGP)."""
+        blob = self.show_ip_route()
+        return prefix in blob
 
     def show_vrrp(self) -> str:
         self._maybe_auto_rollback()
@@ -919,6 +1163,18 @@ class NetworkingState:
             if ln.startswith(("C>", "S>", "O>", "B>", "K>")):
                 routes.append(ln)
         ospf = _tree_get(self.vyos_running_tree, ["protocols", "ospf"])
+        ospf_neighbors = []
+        if ospf:
+            for ln in self.show_ip_ospf_neighbor().splitlines()[1:]:
+                parts = ln.split()
+                if len(parts) >= 6:
+                    ospf_neighbors.append({
+                        "neighbor_id": parts[0],
+                        "pri": parts[1],
+                        "state": parts[2],
+                        "address": parts[4] if len(parts) > 4 else "",
+                        "interface": parts[5] if len(parts) > 5 else "",
+                    })
         uncommitted = (
             self.vyos_configure_mode
             and (
@@ -930,7 +1186,15 @@ class NetworkingState:
             "interfaces": interfaces,
             "routes": routes,
             "bgp": copy.deepcopy(self.bgp_neighbors),
-            "ospf": {"configured": bool(ospf), "areas": list((ospf or {}).get("area", {}).keys()) if isinstance(ospf, dict) else []},
+            "ospf": {
+                "configured": bool(ospf),
+                "areas": (
+                    list((ospf.get("area") or {}).keys())
+                    if isinstance(ospf, dict) and isinstance(ospf.get("area"), dict)
+                    else ([str(ospf.get("area"))] if isinstance(ospf, dict) and ospf.get("area") is not None else [])
+                ),
+                "neighbors": ospf_neighbors,
+            },
             "firewall": {
                 "rules": list(self.vyos_firewall_rules),
                 "counters": copy.deepcopy(self.firewall_counters),

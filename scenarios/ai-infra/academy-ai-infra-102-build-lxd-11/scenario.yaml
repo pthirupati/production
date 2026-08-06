@@ -114,14 +114,18 @@ hints:
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 consoles:
+- lxd
 - baremetal
 - terminal
+- awx
 hosted_as: baremetal
 lab_servers:
 - id: gpu-node-01
   role: primary
   hostname: gpu-node-01
   persona: baremetal
-  appears_in:
+appears_in:
+  - lxd
   - baremetal
   - terminal
+  - awx

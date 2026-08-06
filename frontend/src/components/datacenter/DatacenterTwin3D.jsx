@@ -2,7 +2,9 @@
  * Phase 7+ — Animated Lab Environment 3D digital twin (R3F + Rapier).
  * Camera intro, rack doors, LED/power pulse, fans, cable packets, airflow.
  */
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Suspense, cloneElement, isValidElement, useEffect, useMemo, useRef, useState,
+} from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import {
   OrbitControls, Html, Environment, ContactShadows, RoundedBox, Float, Bvh,
@@ -11,11 +13,29 @@ import { Physics, RigidBody } from '@react-three/rapier'
 import { motion } from 'framer-motion'
 import * as THREE from 'three'
 import { StatusLed, InteractiveCable, CablePhysicsBits } from './DcCableSystem'
+import PhysicsSafe from './PhysicsSafe'
 
 const RACK_W = 0.6
 const RACK_D = 1.05
 const RACK_H = 2.0
 const U_H = RACK_H / 42
+
+/** AR HUD overlay cycle — Off / Thermal / Power / Network (key `V`). */
+const AR_MODES = ['off', 'thermal', 'power', 'network']
+const AR_MODE_LABELS = { off: 'Off', thermal: 'Thermal', power: 'Power', network: 'Network' }
+
+/** Lerp between two `#rrggbb` colors without allocating a THREE.Color per call. */
+function lerpHex(a, b, t) {
+  const clamped = Math.max(0, Math.min(1, t))
+  const ah = parseInt(a.slice(1), 16)
+  const bh = parseInt(b.slice(1), 16)
+  const ar = (ah >> 16) & 255; const ag = (ah >> 8) & 255; const ab = ah & 255
+  const br = (bh >> 16) & 255; const bg = (bh >> 8) & 255; const bb = bh & 255
+  const rr = Math.round(ar + (br - ar) * clamped)
+  const rg = Math.round(ag + (bg - ag) * clamped)
+  const rb = Math.round(ab + (bb - ab) * clamped)
+  return `rgb(${rr}, ${rg}, ${rb})`
+}
 
 function vendorColor(vendor) {
   const v = (vendor || '').toLowerCase()
@@ -69,7 +89,7 @@ function CameraIntro({ enabled, cinematic = false }) {
 
   useFrame(() => {
     if (!enabled || done.current || t0.current == null) return
-    const dur = cinematic ? 4200 : 2200
+    const dur = cinematic ? 2600 : 1600
     const u = Math.min(1, (performance.now() - t0.current) / dur)
     const e = 1 - (1 - u) ** 3
     if (cinematic) {
@@ -260,8 +280,8 @@ function WalkController({ enabled, paused = false, posRef }) {
     const move = (e) => {
       if (paused) return
       if (document.pointerLockElement !== gl.domElement) return
-      yaw.current -= e.movementX * 0.0022
-      pitch.current = Math.max(-1.2, Math.min(1.2, pitch.current - e.movementY * 0.0022))
+      yaw.current -= e.movementX * 0.0026
+      pitch.current = Math.max(-1.25, Math.min(1.25, pitch.current - e.movementY * 0.0026))
     }
     const click = () => { if (!paused) gl.domElement.requestPointerLock?.() }
     window.addEventListener('keydown', down)
@@ -269,7 +289,13 @@ function WalkController({ enabled, paused = false, posRef }) {
     window.addEventListener('mousemove', move)
     gl.domElement.addEventListener('click', click)
     camera.position.copy(pos.current)
+    // Auto-grab mouse look on walk start (game FPS feel); browsers may still
+    // require a click if gesture policy blocks programmatic lock.
+    const lockId = setTimeout(() => {
+      try { if (!paused) gl.domElement.requestPointerLock?.() } catch { /* */ }
+    }, 120)
     return () => {
+      clearTimeout(lockId)
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
       window.removeEventListener('mousemove', move)
@@ -282,7 +308,7 @@ function WalkController({ enabled, paused = false, posRef }) {
     if (!enabled) return
     if (paused) { keys.current = {}; return }
     const sprinting = !!keys.current.ShiftLeft
-    const speed = (sprinting ? 4.2 : 2.4) * dt
+    const speed = (sprinting ? 6.1 : 3.15) * dt
     const forward = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current))
     const right = new THREE.Vector3(Math.cos(yaw.current), 0, -Math.sin(yaw.current))
     let moving = false
@@ -294,19 +320,48 @@ function WalkController({ enabled, paused = false, posRef }) {
     pos.current.x = Math.max(-8.5, Math.min(7.5, pos.current.x))
     pos.current.z = Math.max(-5.5, Math.min(6.5, pos.current.z))
 
-    // Steam-style boot-fall head-bob while walking — settles instantly when idle.
-    const bobFreq = sprinting ? 11.5 : 7.5
-    const bobTarget = moving ? (sprinting ? 0.045 : 0.028) : 0
-    bobAmount.current += (bobTarget - bobAmount.current) * Math.min(1, dt * 8)
+    // Game-style boot-fall head-bob — stronger while sprinting.
+    const bobFreq = sprinting ? 15.5 : 9.5
+    const bobTarget = moving ? (sprinting ? 0.09 : 0.055) : 0
+    bobAmount.current += (bobTarget - bobAmount.current) * Math.min(1, dt * 12)
+    const prevPhase = bobPhase.current
     if (moving) bobPhase.current += dt * bobFreq
     const bob = Math.sin(bobPhase.current) * bobAmount.current
-    const sway = Math.cos(bobPhase.current * 0.5) * bobAmount.current * 0.4
+    const sway = Math.cos(bobPhase.current * 0.5) * bobAmount.current * 0.7
+    // Soft procedural footfall when bob crosses zero (raised-floor thump feel).
+    if (moving && Math.sin(prevPhase) <= 0 && Math.sin(bobPhase.current) > 0) {
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext
+        if (AC) {
+          const ctx = WalkController._ac || (WalkController._ac = new AC())
+          if (ctx.state === 'suspended') ctx.resume?.()
+          const o = ctx.createOscillator()
+          const g = ctx.createGain()
+          o.type = 'sine'
+          o.frequency.value = sprinting ? 95 : 78
+          g.gain.value = 0.0001
+          o.connect(g)
+          g.connect(ctx.destination)
+          const t = ctx.currentTime
+          g.gain.exponentialRampToValueAtTime(sprinting ? 0.028 : 0.016, t + 0.01)
+          g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09)
+          o.start(t)
+          o.stop(t + 0.1)
+        }
+      } catch { /* autoplay / no audio */ }
+    }
 
     camera.position.set(pos.current.x + sway, pos.current.y + bob, pos.current.z)
     pos.current.y = 1.55
     camera.rotation.order = 'YXZ'
     camera.rotation.y = yaw.current
-    camera.rotation.x = pitch.current + bob * 0.15
+    camera.rotation.x = pitch.current + bob * 0.28
+    // Sprint FOV punch
+    const targetFov = sprinting && moving ? 82 : 70
+    if (camera.isPerspectiveCamera) {
+      camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 7)
+      camera.updateProjectionMatrix()
+    }
 
     if (posRef) {
       posRef.current.x = pos.current.x
@@ -315,6 +370,38 @@ function WalkController({ enabled, paused = false, posRef }) {
     }
   })
   return null
+}
+
+/** Floating dust motes in the cold aisle — cheap game-atmosphere particles. */
+function HallDust({ count = 80 }) {
+  const ref = useRef()
+  const positions = useMemo(() => {
+    const arr = new Float32Array(count * 3)
+    for (let i = 0; i < count; i += 1) {
+      arr[i * 3] = (Math.random() - 0.5) * 14
+      arr[i * 3 + 1] = 0.4 + Math.random() * 2.4
+      arr[i * 3 + 2] = (Math.random() - 0.5) * 10
+    }
+    return arr
+  }, [count])
+  useFrame(({ clock }) => {
+    if (!ref.current) return
+    const t = clock.elapsedTime
+    const pos = ref.current.geometry.attributes.position.array
+    for (let i = 0; i < count; i += 1) {
+      pos[i * 3 + 1] += Math.sin(t * 0.4 + i) * 0.0008
+      if (pos[i * 3 + 1] > 2.9) pos[i * 3 + 1] = 0.35
+    }
+    ref.current.geometry.attributes.position.needsUpdate = true
+  })
+  return (
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" count={count} array={positions} itemSize={3} />
+      </bufferGeometry>
+      <pointsMaterial size={0.025} color="#94a3b8" transparent opacity={0.45} depthWrite={false} sizeAttenuation />
+    </points>
+  )
 }
 
 /** "E" key fires a synthetic click at the crosshair (screen center) so mouse-locked
@@ -567,7 +654,8 @@ function FanSpinner({ position, powered, rpmScale = 1, fault = false }) {
   )
 }
 
-function PduStrips({ racks = [], pdus = [], onSelectPdu }) {
+function PduStrips({ racks = [], pdus = [], onSelectPdu, arMode = 'off' }) {
+  const powerBoost = arMode === 'power'
   return (
     <group>
       {racks.map((rack, i) => {
@@ -585,7 +673,7 @@ function PduStrips({ racks = [], pdus = [], onSelectPdu }) {
               <meshStandardMaterial
                 color={tripped ? '#7f1d1d' : '#1e293b'}
                 emissive={tripped ? '#ef4444' : '#22c55e'}
-                emissiveIntensity={tripped ? 0.55 : 0.12}
+                emissiveIntensity={tripped ? 0.55 : (powerBoost ? 0.4 : 0.12)}
                 metalness={0.65}
               />
             </mesh>
@@ -599,7 +687,7 @@ function PduStrips({ racks = [], pdus = [], onSelectPdu }) {
                   <meshStandardMaterial
                     color={lit ? '#0f172a' : '#334155'}
                     emissive={tripped ? '#ef4444' : lit ? '#22c55e' : '#000'}
-                    emissiveIntensity={tripped ? 0.7 : lit ? 0.45 : 0}
+                    emissiveIntensity={tripped ? 0.7 : lit ? (powerBoost ? 0.85 : 0.45) : (powerBoost ? 0.12 : 0)}
                   />
                 </mesh>
               )
@@ -660,6 +748,7 @@ function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
   const color = useMemo(() => new THREE.Color(), [])
   const count = servers.length
   const seatZ = useRef(new Float32Array(Math.max(count, 1)))
+  const [hoverIdx, setHoverIdx] = useState(null)
 
   useFrame(({ clock }) => {
     const mesh = meshRef.current
@@ -676,14 +765,16 @@ function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
       const slide = (1 - e) * 0.62
       seatZ.current[i] = -0.04 + slide
       const bob = powered && animBoost && e > 0.98 ? Math.sin(clock.elapsedTime * 1.4 + i) * 0.008 : 0
+      const hoverBoost = hoverIdx === i ? 1.04 : 1
       dummy.position.set(0, y + bob, seatZ.current[i])
       // Slight nose-up while sliding, then level on the rails.
       dummy.rotation.x = (1 - e) * -0.12
-      dummy.scale.set(1, 1, 0.92 + e * 0.08)
+      dummy.scale.set(hoverBoost, hoverBoost, (0.92 + e * 0.08) * hoverBoost)
       dummy.updateMatrix()
       mesh.setMatrixAt(i, dummy.matrix)
       if (failed) color.set('#ef4444')
       else if (!powered) color.set('#475569')
+      else if (hoverIdx === i) color.set('#fdba74')
       else if (e < 1) color.set('#94a3b8')
       else color.set(vendorColor(s.vendor))
       mesh.setColorAt(i, color)
@@ -694,6 +785,10 @@ function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
   })
 
   if (!count) return null
+  const hovered = hoverIdx != null ? servers[hoverIdx] : null
+  const hoverY = hovered
+    ? ((hovered.u_slot || 1) - 1) * U_H + U_H * 0.5 + 0.05
+    : 0
   return (
     <group>
       <instancedMesh
@@ -710,9 +805,39 @@ function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
           const id = e.instanceId
           if (id != null && servers[id]) onOpenBmc?.(servers[id].id)
         }}
-        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }}
-        onPointerOut={() => { document.body.style.cursor = 'default' }}
+        onPointerMove={(e) => {
+          e.stopPropagation()
+          const id = e.instanceId
+          if (id != null) setHoverIdx(id)
+          document.body.style.cursor = 'pointer'
+        }}
+        onPointerOut={() => {
+          setHoverIdx(null)
+          document.body.style.cursor = 'default'
+        }}
       />
+      {hovered && (
+        <Html position={[0, hoverY + 0.22, RACK_D * 0.55]} center distanceFactor={7} style={{ pointerEvents: 'none' }}>
+          <div className="dc-3d-nameplate">
+            <div className="dc-3d-nameplate-host">{hovered.hostname || hovered.id}</div>
+            <div className="dc-3d-nameplate-meta">
+              U{hovered.u_slot || '—'}
+              {hovered.service_tag ? ` · ${hovered.service_tag}` : ''}
+              {hovered.vendor ? ` · ${hovered.vendor}` : ''}
+              {' · '}
+              <span className={
+                Object.values(hovered.components || {}).some((x) => x !== 'healthy')
+                  ? 'dc-3d-np-bad'
+                  : 'dc-3d-np-ok'
+              }
+              >
+                {Object.values(hovered.components || {}).some((x) => x !== 'healthy') ? 'FAULT' : 'OK'}
+              </span>
+            </div>
+            <div className="dc-3d-nameplate-hint">Click · field tablet · dbl-click BMC</div>
+          </div>
+        </Html>
+      )}
       {servers.map((s, i) => {
         const failed = Object.values(s.components || {}).some((x) => x !== 'healthy')
         const diskFail = (s.components || {}).disk === 'failed' || (s.components || {}).disk === 'degraded'
@@ -812,6 +937,7 @@ function rackPosition(index) {
 
 function RackInner({
   rack, servers, selectedId, expanded, onSelectRack, onSelectServer, onOpenBmc, tip, animBoost,
+  arMode = 'off', arThermalLevel = 0,
 }) {
   const anyFail = servers.some((s) => Object.values(s.components || {}).some((c) => c !== 'healthy'))
   const group = useRef()
@@ -822,6 +948,17 @@ function RackInner({
     group.current.rotation.z = Math.sin(clock.elapsedTime * 1.8) * 0.035
   })
 
+  // AR Thermal overlay: tint healthy racks warmer as CRAC/ticket stress rises —
+  // failed racks already read red, so leave that signal untouched.
+  const thermalOn = arMode === 'thermal' && !anyFail && arThermalLevel > 0.04
+  const rackColor = anyFail ? '#3f1d1d' : (thermalOn ? lerpHex('#0f141f', '#7c2d12', arThermalLevel) : '#0f141f')
+  const rackEmissive = anyFail
+    ? '#7f1d1d'
+    : (thermalOn ? lerpHex('#0ea5e9', '#f97316', Math.min(1, arThermalLevel + 0.3)) : '#0ea5e9')
+  const rackEmissiveIntensity = anyFail
+    ? 0.28
+    : (open ? 0.08 : 0.02) + (thermalOn ? arThermalLevel * 0.35 : 0)
+
   return (
     <group
       ref={group}
@@ -829,11 +966,11 @@ function RackInner({
     >
       <RoundedBox args={[RACK_W, RACK_H, RACK_D]} radius={0.02} castShadow receiveShadow>
         <meshStandardMaterial
-          color={anyFail ? '#3f1d1d' : '#0f141f'}
+          color={rackColor}
           metalness={0.55}
           roughness={0.35}
-          emissive={anyFail ? '#7f1d1d' : '#0ea5e9'}
-          emissiveIntensity={anyFail ? 0.28 : open ? 0.08 : 0.02}
+          emissive={rackEmissive}
+          emissiveIntensity={rackEmissiveIntensity}
         />
       </RoundedBox>
       <mesh position={[-RACK_W / 2 + 0.02, 0, 0]}>
@@ -861,6 +998,7 @@ function RackInner({
 
 function RackMesh({
   rack, servers, index, selectedId, expandedRack, onSelectRack, onSelectServer, onOpenBmc, physicsEnabled, animBoost,
+  arMode = 'off', arThermalLevel = 0,
 }) {
   const tip = rack.physics?.tip_risk === 'high'
   const { x, z } = rackPosition(index)
@@ -886,6 +1024,8 @@ function RackMesh({
       onOpenBmc={onOpenBmc}
       tip={tip}
       animBoost={animBoost}
+      arMode={arMode}
+      arThermalLevel={arThermalLevel}
     />
   )
 
@@ -1099,10 +1239,92 @@ function RoomPortal({ position, label, roomId, onEnterRoom, color = '#38bdf8' })
   )
 }
 
+/** Glowing badge desk near the mantrap — the in-world alternative to the toolbar
+ *  Badge-in button. Walk up and press E (or click) to badge in. */
+function BadgeDesk({ badgedIn, onBadgeIn }) {
+  const matRef = useRef()
+  useFrame(({ clock }) => {
+    if (!matRef.current) return
+    matRef.current.emissiveIntensity = 0.45 + Math.sin(clock.elapsedTime * 2.4) * 0.2
+  })
+  if (badgedIn) return null
+  return (
+    <group position={[-4.55, 0, 4.75]}>
+      <mesh castShadow receiveShadow position={[0, 0.5, 0]}>
+        <boxGeometry args={[0.55, 1.0, 0.4]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.4} roughness={0.55} />
+      </mesh>
+      <mesh
+        position={[0, 1.05, 0.16]}
+        onClick={(e) => { e.stopPropagation(); onBadgeIn?.() }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }}
+        onPointerOut={() => { document.body.style.cursor = 'default' }}
+      >
+        <boxGeometry args={[0.16, 0.22, 0.06]} />
+        <meshStandardMaterial ref={matRef} color="#0f172a" emissive="#fbbf24" emissiveIntensity={0.45} metalness={0.3} roughness={0.4} />
+      </mesh>
+      <Html position={[0, 1.42, 0.16]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
+        <div className="dc-3d-label dc-3d-label-hot">Badge reader · tap E</div>
+      </Html>
+    </group>
+  )
+}
+
+/** NOC wall stub — three small in-world monitor panels near the NOC portal,
+ *  fed from live monitoring/ticket counts when available, else static numbers.
+ *  Purely decorative — never forces a room switch. */
+function NocWall({ metrics = {} }) {
+  const panelRefs = useRef([])
+  const panels = useMemo(() => ([
+    { key: 'gpu', label: 'GPU util', value: `${Math.round(metrics.gpuUtil ?? 58)}%`, color: '#38bdf8' },
+    { key: 'pue', label: 'PUE', value: Number(metrics.pue ?? 1.34).toFixed(2), color: '#34d399' },
+    {
+      key: 'tix',
+      label: 'Tickets open',
+      value: `${metrics.ticketsOpen ?? 3}`,
+      color: (metrics.ticketsOpen ?? 3) > 5 ? '#f87171' : '#fbbf24',
+    },
+  ]), [metrics.gpuUtil, metrics.pue, metrics.ticketsOpen])
+
+  useFrame(({ clock }) => {
+    panelRefs.current.forEach((m, i) => {
+      if (m?.material) m.material.emissiveIntensity = 0.35 + Math.sin(clock.elapsedTime * 1.6 + i) * 0.08
+    })
+  })
+
+  return (
+    <group position={[2.15, 1.55, 2.85]}>
+      <mesh position={[0, 0, -0.03]} castShadow>
+        <boxGeometry args={[1.5, 0.8, 0.04]} />
+        <meshStandardMaterial color="#0b1220" metalness={0.5} roughness={0.4} />
+      </mesh>
+      {panels.map((p, i) => (
+        <group key={p.key} position={[-0.48 + i * 0.48, 0, 0.01]}>
+          <mesh ref={(el) => { if (el) panelRefs.current[i] = el }}>
+            <planeGeometry args={[0.4, 0.62]} />
+            <meshStandardMaterial color="#020617" emissive={p.color} emissiveIntensity={0.35} />
+          </mesh>
+          <Html center distanceFactor={8} position={[0, 0, 0.01]} style={{ pointerEvents: 'none' }}>
+            <div className="dc-noc-wall-panel" style={{ '--noc-color': p.color }}>
+              <span className="dc-noc-wall-label">{p.label}</span>
+              <span className="dc-noc-wall-value">{p.value}</span>
+            </div>
+          </Html>
+        </group>
+      ))}
+      <Html position={[0, 0.55, 0.01]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
+        <div className="dc-3d-label">NOC wall</div>
+      </Html>
+    </group>
+  )
+}
+
 function SceneContent({
   racks, serversByRack, network, cooling, pdus, selectedId, expandedRack,
   onSelectServer, onSelectRack, onOpenBmc, onUnplugCable, onPlugCable, physicsEnabled, onFps, animBoost, intro,
   walkMode = false, tickets = [], doorOpen = false, onEnterRoom, walkPaused = false, posRef,
+  arMode = 'off', badgedIn = false, onBadgeIn, nocMetrics = {},
+  dustCount = 90,
 }) {
   const thermalStress = useMemo(() => {
     const units = cooling || []
@@ -1125,6 +1347,13 @@ function SceneContent({
     })
     return Math.min(1, score)
   }, [tickets])
+
+  // Shared with the AR Thermal overlay so racks tint warmer under the same
+  // CRAC/ticket stress signal that drives the hot-aisle haze.
+  const arThermalLevel = useMemo(
+    () => Math.min(1, thermalStress + ticketHeat * 0.6),
+    [thermalStress, ticketHeat],
+  )
 
   const dockBusy = useMemo(() => {
     return (tickets || []).some((t) => {
@@ -1218,19 +1447,23 @@ function SceneContent({
       {!walkMode && <CameraIntro enabled={intro} cinematic />}
       <WalkController enabled={walkMode} paused={walkPaused} posRef={posRef} />
       <CrosshairInteract enabled={walkMode && !walkPaused} />
-      <color attach="background" args={['#0b0e14']} />
-      <fog attach="fog" args={['#0b0e14', 12, 32]} />
-      <ambientLight intensity={0.28} />
-      <directionalLight castShadow position={[6, 10, 4]} intensity={0.95} shadow-mapSize={[1024, 1024]} />
-      <directionalLight position={[-4, 6, -6]} intensity={0.35} color="#94a3b8" />
+      <color attach="background" args={['#070a10']} />
+      {/* Tight fog sells depth in first-person — hall falls off like a game level */}
+      <fog attach="fog" args={['#070a10', walkMode ? 5.5 : 10, walkMode ? 18 : 28]} />
+      <ambientLight intensity={0.22} />
+      <directionalLight castShadow position={[6, 10, 4]} intensity={1.05} shadow-mapSize={[1024, 1024]} />
+      <directionalLight position={[-4, 6, -6]} intensity={0.4} color="#94a3b8" />
       <PulsingLight />
       <Environment preset="warehouse" />
       <Floor />
       <CorridorShell dockBusy={dockBusy} doorOpen={doorOpen} />
+      <HallDust count={dustCount || (walkMode ? 140 : 90)} />
       <RoomPortal position={[-6.2, 1.05, 0.2]} label="Staging / dock" roomId="loading-dock" onEnterRoom={onEnterRoom} color="#f59e0b" />
       <RoomPortal position={[-5.2, 1.05, 3.2]} label="Reception" roomId="reception" onEnterRoom={onEnterRoom} color="#94a3b8" />
       <RoomPortal position={[5.8, 1.05, 0.4]} label="MDF" roomId="mdf" onEnterRoom={onEnterRoom} color="#38bdf8" />
       <RoomPortal position={[3.2, 1.05, 3.4]} label="NOC" roomId="noc" onEnterRoom={onEnterRoom} color="#a78bfa" />
+      <NocWall metrics={nocMetrics} />
+      <BadgeDesk badgedIn={badgedIn} onBadgeIn={onBadgeIn} />
       {(tickets || [])
         .filter((t) => t?.asset_id && !['closed', 'resolved'].includes((t.status || '').toLowerCase()))
         .slice(0, 8)
@@ -1261,7 +1494,7 @@ function SceneContent({
         />
       )}
       <CracUnits cooling={cooling} />
-      <PduStrips racks={racks} pdus={pdus} />
+      <PduStrips racks={racks} pdus={pdus} arMode={arMode} />
 
       <TorSwitch position={[5.5, 0.95, -1.2]} label="MDF / Spine" ports={48} />
       <TorSwitch position={[5.5, 1.25, -1.2]} label="Leaf / ToR agg" ports={36} />
@@ -1280,6 +1513,8 @@ function SceneContent({
             onOpenBmc={onOpenBmc}
             physicsEnabled={physicsEnabled}
             animBoost={animBoost}
+            arMode={arMode}
+            arThermalLevel={arThermalLevel}
           />
         ))}
       </Bvh>
@@ -1297,6 +1532,7 @@ function SceneContent({
           label={c.label}
           onUnplug={c.interactive ? (payload) => onUnplugCable?.(payload) : undefined}
           onPlug={c.interactive ? (payload) => onPlugCable?.(payload) : undefined}
+          arNetwork={arMode === 'network'}
         />
       ))}
 
@@ -1323,7 +1559,57 @@ function CoachMark({ show }) {
   if (!show) return null
   return (
     <div className="dc-3d-coachmark" key="coach">
-      Walk the cold aisle · <kbd>E</kbd> interact · <kbd>Esc</kbd> menu
+      Day-one tour complete · <kbd>WASD</kbd> walk · mouse look · <kbd>E</kbd> interact · <kbd>V</kbd> AR · <kbd>Esc</kbd> menu
+    </div>
+  )
+}
+
+/** Always-visible control strip — Steam Data Center players always see how to move. */
+function ControlsHud({ walkMode, quality, onQuality }) {
+  return (
+    <div className="dc-3d-controls-hud" aria-label="3D controls">
+      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span>
+      <span>Mouse look{walkMode ? ' (click canvas)' : ''}</span>
+      <span><kbd>Shift</kbd> sprint</span>
+      <span><kbd>E</kbd> interact</span>
+      <span><kbd>V</kbd> AR</span>
+      <span><kbd>1</kbd>–<kbd>4</kbd> rooms</span>
+      <span><kbd>Esc</kbd> menu</span>
+      <label className="dc-3d-quality">
+        Quality
+        <select value={quality} onChange={(e) => onQuality?.(e.target.value)} aria-label="3D quality preset">
+          <option value="low">Low</option>
+          <option value="med">Med</option>
+          <option value="high">High</option>
+        </select>
+      </label>
+    </div>
+  )
+}
+
+/** Diegetic DCIM peek card — mirrors field-tablet overview until drawer opens. */
+function InspectPeek({ server, onOpenBmc, onClose }) {
+  if (!server) return null
+  const failed = Object.entries(server.components || {}).filter(([, v]) => v !== 'healthy')
+  return (
+    <div className="dc-3d-inspect-peek">
+      <div className="dc-3d-inspect-peek-head">
+        <strong>{server.hostname || server.id}</strong>
+        <button type="button" className="dc-3d-inspect-close" onClick={onClose} aria-label="Close peek">×</button>
+      </div>
+      <div className="dc-3d-inspect-peek-body">
+        <div>{server.vendor} {server.model} · {server.rack} U{server.u_slot}</div>
+        <div>ST {server.service_tag || '—'} · {server.power_state} · {server.os || 'linux'}</div>
+        {failed.length > 0 ? (
+          <div className="dc-3d-np-bad">Faults: {failed.map(([k]) => k).join(', ')}</div>
+        ) : (
+          <div className="dc-3d-np-ok">All components healthy</div>
+        )}
+      </div>
+      <div className="dc-3d-inspect-peek-actions">
+        <span className="dc-muted">Field tablet open →</span>
+        <button type="button" className="dc-btn-outline dc-btn-xs" onClick={() => onOpenBmc?.(server.id)}>BMC</button>
+      </div>
     </div>
   )
 }
@@ -1335,8 +1621,9 @@ const RADAR_PORTALS = [
   { id: 'noc', x: 3.2, z: 3.4, color: '#a78bfa', hotkey: '4' },
 ]
 
-/** Lightweight top-down radar tip — player dot + the four room-portal beacons. */
-function Minimap({ posRef }) {
+/** Lightweight top-down radar tip — player dot + the four room-portal beacons,
+ *  plus a "you are here" room label above the ring. */
+function Minimap({ posRef, currentRoomLabel = 'Data Hall A' }) {
   const dotRef = useRef()
   useEffect(() => {
     let raf
@@ -1354,6 +1641,7 @@ function Minimap({ posRef }) {
   }, [posRef])
   return (
     <div className="dc-3d-minimap" aria-hidden>
+      <div className="dc-3d-minimap-label">{currentRoomLabel}</div>
       <div className="dc-3d-minimap-ring" />
       {RADAR_PORTALS.map((p) => (
         <span
@@ -1369,6 +1657,55 @@ function Minimap({ posRef }) {
         />
       ))}
       <span ref={dotRef} className="dc-3d-minimap-player" />
+    </div>
+  )
+}
+
+/** Current AR overlay mode chip — cycled with `V` (Off / Thermal / Power / Network). */
+function ArModeChip({ mode }) {
+  return (
+    <div className={`dc-3d-ar-chip dc-3d-ar-chip-${mode}`}>
+      <span>AR</span> {AR_MODE_LABELS[mode] || 'Off'}
+    </div>
+  )
+}
+
+/** Bottom "field kit" HUD — Badge · ESD · Cart · BMC quick actions. */
+function FieldKitHud({
+  badgedIn, onBadgeIn, esdOn, onToggleEsd, cartOpen, onToggleCart, onOpenBmc, esdToast,
+}) {
+  return (
+    <div className="dc-3d-fieldkit">
+      <div className="dc-3d-fieldkit-row">
+        <button
+          type="button"
+          className={`dc-3d-kit-btn ${badgedIn ? 'dc-3d-kit-btn-done' : ''}`}
+          onClick={() => onBadgeIn?.()}
+          title="Badge in at the mantrap"
+        >
+          Badge{badgedIn ? ' ✓' : ''}
+        </button>
+        <button
+          type="button"
+          className={`dc-3d-kit-btn ${esdOn ? 'dc-3d-kit-btn-on' : 'dc-3d-kit-btn-off'}`}
+          onClick={onToggleEsd}
+          title="ESD wrist strap"
+        >
+          ESD {esdOn ? 'On' : 'Off'}
+        </button>
+        <button
+          type="button"
+          className={`dc-3d-kit-btn ${cartOpen ? 'dc-3d-kit-btn-on' : ''}`}
+          onClick={onToggleCart}
+          title="Parts cart"
+        >
+          Cart
+        </button>
+        <button type="button" className="dc-3d-kit-btn" onClick={() => onOpenBmc?.()} title="Open BMC console">
+          BMC
+        </button>
+      </div>
+      {esdToast && <div className="dc-3d-kit-toast">Wrist strap recommended</div>}
     </div>
   )
 }
@@ -1390,7 +1727,7 @@ function ImmersiveMenu({ open, onResume, onExitImmersive, onExitTo2D, badgedIn }
           Switch to 2D floor
         </button>
         <div className="dc-3d-menu-hint">
-          {badgedIn ? 'Badged in' : 'Not badged in'} · 1 Dock · 2 Reception · 3 MDF · 4 NOC
+          {badgedIn ? 'Badged in' : 'Not badged in'} · 1 Dock · 2 Reception · 3 MDF · 4 NOC · V AR
         </div>
       </div>
     </div>
@@ -1434,8 +1771,11 @@ export default function DatacenterTwin3D({
   onOpenBmc,
   onUnplugCable,
   onPlugCable,
+  nocMetrics = {},
+  currentRoomLabel = 'Data Hall A',
 }) {
   const [physicsEnabled, setPhysicsEnabled] = useState(true)
+  const [physicsNote, setPhysicsNote] = useState(null)
   const [animBoost, setAnimBoost] = useState(1)
   const [intro, setIntro] = useState(true)
   const [walkMode, setWalkMode] = useState(false)
@@ -1444,32 +1784,82 @@ export default function DatacenterTwin3D({
   const [immersive, setImmersive] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [showCoach, setShowCoach] = useState(false)
+  const [quality, setQuality] = useState(() => {
+    try {
+      const q = window.localStorage?.getItem('fixitlab.dc.quality')
+      if (q === 'low' || q === 'med' || q === 'high') return q
+    } catch { /* ignore */ }
+    return 'med'
+  })
+  // AR HUD overlay cycle (Off / Thermal / Power / Network) — key `V`.
+  const [arModeIdx, setArModeIdx] = useState(0)
+  // Field kit HUD state — ESD wrist-strap toggle + cosmetic parts-cart marker.
+  const [esdOn, setEsdOn] = useState(true)
+  const [cartOpen, setCartOpen] = useState(false)
+  const [esdToast, setEsdToast] = useState(false)
   const autoWalkStarted = useRef(false)
   const coachShown = useRef(false)
   const posRef = useRef({ x: 5.2, z: 4.5, yaw: 0 })
+  const prevSelectedRef = useRef(null)
+
+  const arMode = AR_MODES[arModeIdx] || 'off'
 
   const badgedIn = useMemo(() => {
     const ev = access?.events || []
     return ev.some((e) => (e.type || '') === 'allow' || /ALLOW|badge/i.test(e.message || ''))
   }, [access])
 
+  // Brief, non-blocking amber toast when a server tablet is opened without ESD protection.
+  useEffect(() => {
+    if (selectedServerId && selectedServerId !== prevSelectedRef.current && !esdOn) {
+      setEsdToast(true)
+      prevSelectedRef.current = selectedServerId
+      const id = setTimeout(() => setEsdToast(false), 3200)
+      return () => clearTimeout(id)
+    }
+    prevSelectedRef.current = selectedServerId
+    return undefined
+  }, [selectedServerId, esdOn])
+
   useEffect(() => {
     if (!intro || walkMode) return undefined
-    const id = setTimeout(() => setIntro(false), 4400)
+    // Shorter cinematic — get into WASD walk faster (game, not flyover).
+    const id = setTimeout(() => setIntro(false), 2800)
     return () => clearTimeout(id)
   }, [intro, walkMode])
 
-  // After cinematic enter, offer Walk only once badge-in is done (Steam mantrap ritual).
+  // After cinematic enter, drop straight into first-person Walk (Steam FPS feel).
+  // Badge-in still opens the mantrap door — it no longer blocks movement.
   useEffect(() => {
-    if (intro || walkMode || !immersive || !badgedIn || autoWalkStarted.current) return undefined
+    if (intro || walkMode || !immersive || autoWalkStarted.current) return undefined
     const id = setTimeout(() => {
       autoWalkStarted.current = true
       setWalkMode(true)
-    }, 600)
+    }, 180)
     return () => clearTimeout(id)
-  }, [intro, walkMode, immersive, badgedIn])
+  }, [intro, walkMode, immersive])
 
-  const inGame = immersive && walkMode && badgedIn
+  const inGame = immersive && walkMode
+
+  const qualityCfg = useMemo(() => {
+    if (quality === 'low') return { dpr: [1, 1], dust: 40, shadows: false, anim: 0.65 }
+    if (quality === 'high') return { dpr: [1, 2], dust: 160, shadows: true, anim: 1 }
+    return { dpr: [1, 1.5], dust: 90, shadows: true, anim: 1 }
+  }, [quality])
+
+  const selectedServer = useMemo(() => {
+    if (!selectedServerId) return null
+    for (const list of Object.values(serversByRack || {})) {
+      const hit = (list || []).find((s) => s.id === selectedServerId)
+      if (hit) return hit
+    }
+    return null
+  }, [selectedServerId, serversByRack])
+
+  const setQualityPersist = (q) => {
+    setQuality(q)
+    try { window.localStorage?.setItem('fixitlab.dc.quality', q) } catch { /* ignore */ }
+  }
 
   useEffect(() => { onImmersiveChange?.(immersive) }, [immersive, onImmersiveChange])
 
@@ -1496,7 +1886,7 @@ export default function DatacenterTwin3D({
     onExitTo2D?.()
   }
 
-  // In-world room hotkeys (1-4) + Esc pause menu — no tab bar needed while immersive.
+  // In-world room hotkeys (1-4) + AR overlay cycle (V) + Esc pause menu — no tab bar needed while immersive.
   useEffect(() => {
     if (!immersive || intro) return undefined
     const handler = (e) => {
@@ -1505,6 +1895,10 @@ export default function DatacenterTwin3D({
         return
       }
       if (menuOpen) return
+      if (e.code === 'KeyV') {
+        setArModeIdx((i) => (i + 1) % AR_MODES.length)
+        return
+      }
       const room = ROOM_HOTKEYS[e.code]
       if (room) onEnterRoom?.(room)
     }
@@ -1520,7 +1914,7 @@ export default function DatacenterTwin3D({
       transition={{ duration: 0.55, ease: 'easeOut' }}
     >
       <div className="dc-3d-toolbar">
-        <span className="dc-twin-title">3D Lab Twin · Steam immersion</span>
+        <span className="dc-twin-title">3D Lab Twin · Walk mode</span>
         <label className="dc-3d-toggle">
           <input
             type="checkbox"
@@ -1551,9 +1945,6 @@ export default function DatacenterTwin3D({
             checked={walkMode}
             onChange={(e) => {
               const on = e.target.checked
-              if (on && !badgedIn) {
-                onBadgeIn?.()
-              }
               setWalkMode(on)
               if (on) setIntro(false)
             }}
@@ -1565,37 +1956,63 @@ export default function DatacenterTwin3D({
         </button>
         {!badgedIn && (
           <button type="button" className="dc-btn-outline dc-btn-xs" onClick={() => onBadgeIn?.()}>
-            Badge-in
+            Badge-in (open door)
           </button>
         )}
         <span className="dc-muted">
           ~{fps || '—'} FPS · {inGame
-            ? 'click to look · WASD · Shift sprint · Esc menu'
+            ? 'click canvas to look · WASD · Shift sprint · Esc menu'
             : walkMode
-              ? (badgedIn ? 'badged · WASD' : 'badge required')
+              ? 'WASD ready'
               : 'cinematic enter → auto Walk'}
         </span>
       </div>
       {!walkMode && !intro && !immersive && (
         <div className="dc-3d-immersion-hint">
-          Tip: <strong>Badge-in</strong> at the mantrap, then Walk — ticket beacons mark DCOps faults on racks
+          Tip: enable <strong>Immersive</strong> + <strong>Walk</strong> for first-person hall — ticket beacons mark DCOps faults on racks
         </div>
       )}
       <div className="dc-3d-canvas-wrap">
         {inGame && <div className="dc-3d-aisle-fog" aria-hidden />}
         {inGame && <div className="dc-3d-hud-crosshair" aria-hidden />}
+        <ControlsHud walkMode={walkMode} quality={quality} onQuality={setQualityPersist} />
+        {physicsNote && (
+          <div className="dc-3d-physics-note" role="status">
+            Physics off ({physicsNote}) — hall still walkable
+          </div>
+        )}
+        {selectedServer && (
+          <InspectPeek
+            server={selectedServer}
+            onOpenBmc={onOpenBmc}
+            onClose={() => onSelectServer?.(null)}
+          />
+        )}
         {inGame && (
           <div className="dc-3d-hud">
             {objective && <div className="dc-3d-hud-objective"><strong>Objective</strong> · {objective}</div>}
-            <div>WASD move · mouse look · Shift sprint · E interact</div>
-            <div>1 Dock · 2 Reception · 3 MDF · 4 NOC · Esc menu</div>
+            <div>WASD move · mouse look · Shift sprint · E interact · click server for DCIM tablet</div>
+            <div>1 Dock · 2 Reception · 3 MDF · 4 NOC · V AR overlay · Esc menu</div>
           </div>
         )}
-        {inGame && <Minimap posRef={posRef} />}
+        {inGame && <Minimap posRef={posRef} currentRoomLabel={currentRoomLabel} />}
         {inGame && <CoachMark show={showCoach} />}
+        {immersive && !intro && <ArModeChip mode={arMode} />}
+        {immersive && !intro && (
+          <FieldKitHud
+            badgedIn={badgedIn}
+            onBadgeIn={() => onBadgeIn?.()}
+            esdOn={esdOn}
+            onToggleEsd={() => setEsdOn((v) => !v)}
+            cartOpen={cartOpen}
+            onToggleCart={() => setCartOpen((v) => !v)}
+            onOpenBmc={() => onOpenBmc?.()}
+            esdToast={esdToast}
+          />
+        )}
         {immersive && (
           <div className="dc-3d-pinned-controls">
-            {audioControl}
+            {isValidElement(audioControl) ? cloneElement(audioControl, { posRef }) : audioControl}
             <button
               type="button"
               className="dc-3d-exit-btn"
@@ -1615,37 +2032,123 @@ export default function DatacenterTwin3D({
         />
         <Suspense fallback={<LoadingFallback />}>
           <Canvas
-            shadows
-            dpr={[1, Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio : 1.5)]}
-            camera={{ position: [12, 9, 14], fov: inGame ? 68 : 42, near: 0.1, far: 80 }}
-            gl={{ antialias: true, powerPreference: 'high-performance' }}
+            shadows={qualityCfg.shadows}
+            dpr={qualityCfg.dpr}
+            camera={{ position: [12, 9, 14], fov: inGame ? 70 : 42, near: 0.1, far: 80 }}
+            gl={{
+              antialias: quality !== 'low',
+              powerPreference: 'high-performance',
+              failIfMajorPerformanceCaveat: false,
+            }}
+            onCreated={({ gl }) => {
+              try {
+                gl.setClearColor('#070a10')
+              } catch { /* ignore */ }
+            }}
           >
-            <Physics gravity={[0, -9.81, 0]} colliders={false} paused={!physicsEnabled}>
-              <SceneContent
-                racks={racks}
-                serversByRack={serversByRack}
-                network={network}
-                cooling={cooling}
-                pdus={pdus}
-                selectedId={selectedServerId}
-                expandedRack={expandedRack}
-                onSelectServer={onSelectServer}
-                onSelectRack={onSelectRack}
-                onOpenBmc={onOpenBmc}
-                onUnplugCable={onUnplugCable}
-                onPlugCable={onPlugCable}
-                physicsEnabled={physicsEnabled}
-                onFps={setFps}
-                animBoost={animBoost}
-                intro={intro}
-                walkMode={walkMode && badgedIn}
-                walkPaused={menuOpen}
-                posRef={posRef}
-                tickets={tickets}
-                doorOpen={badgedIn}
-                onEnterRoom={onEnterRoom}
-              />
-            </Physics>
+            <PhysicsSafe
+              onFail={(err) => {
+                setPhysicsEnabled(false)
+                setPhysicsNote(err?.message || 'WASM init failed')
+              }}
+              fallback={(
+                <SceneContent
+                  racks={racks}
+                  serversByRack={serversByRack}
+                  network={network}
+                  cooling={cooling}
+                  pdus={pdus}
+                  selectedId={selectedServerId}
+                  expandedRack={expandedRack}
+                  onSelectServer={onSelectServer}
+                  onSelectRack={onSelectRack}
+                  onOpenBmc={onOpenBmc}
+                  onUnplugCable={onUnplugCable}
+                  onPlugCable={onPlugCable}
+                  physicsEnabled={false}
+                  onFps={setFps}
+                  animBoost={animBoost * qualityCfg.anim}
+                  intro={intro}
+                  walkMode={walkMode}
+                  walkPaused={menuOpen}
+                  posRef={posRef}
+                  tickets={tickets}
+                  doorOpen={badgedIn}
+                  onEnterRoom={onEnterRoom}
+                  arMode={arMode}
+                  badgedIn={badgedIn}
+                  onBadgeIn={onBadgeIn}
+                  nocMetrics={nocMetrics}
+                  dustCount={qualityCfg.dust}
+                />
+              )}
+            >
+              {physicsEnabled ? (
+                <Suspense fallback={null}>
+                  <Physics gravity={[0, -9.81, 0]} colliders={false} paused={!physicsEnabled}>
+                    <SceneContent
+                      racks={racks}
+                      serversByRack={serversByRack}
+                      network={network}
+                      cooling={cooling}
+                      pdus={pdus}
+                      selectedId={selectedServerId}
+                      expandedRack={expandedRack}
+                      onSelectServer={onSelectServer}
+                      onSelectRack={onSelectRack}
+                      onOpenBmc={onOpenBmc}
+                      onUnplugCable={onUnplugCable}
+                      onPlugCable={onPlugCable}
+                      physicsEnabled={physicsEnabled}
+                      onFps={setFps}
+                      animBoost={animBoost * qualityCfg.anim}
+                      intro={intro}
+                      walkMode={walkMode}
+                      walkPaused={menuOpen}
+                      posRef={posRef}
+                      tickets={tickets}
+                      doorOpen={badgedIn}
+                      onEnterRoom={onEnterRoom}
+                      arMode={arMode}
+                      badgedIn={badgedIn}
+                      onBadgeIn={onBadgeIn}
+                      nocMetrics={nocMetrics}
+                      dustCount={qualityCfg.dust}
+                    />
+                  </Physics>
+                </Suspense>
+              ) : (
+                <SceneContent
+                  racks={racks}
+                  serversByRack={serversByRack}
+                  network={network}
+                  cooling={cooling}
+                  pdus={pdus}
+                  selectedId={selectedServerId}
+                  expandedRack={expandedRack}
+                  onSelectServer={onSelectServer}
+                  onSelectRack={onSelectRack}
+                  onOpenBmc={onOpenBmc}
+                  onUnplugCable={onUnplugCable}
+                  onPlugCable={onPlugCable}
+                  physicsEnabled={false}
+                  onFps={setFps}
+                  animBoost={animBoost * qualityCfg.anim}
+                  intro={intro}
+                  walkMode={walkMode}
+                  walkPaused={menuOpen}
+                  posRef={posRef}
+                  tickets={tickets}
+                  doorOpen={badgedIn}
+                  onEnterRoom={onEnterRoom}
+                  arMode={arMode}
+                  badgedIn={badgedIn}
+                  onBadgeIn={onBadgeIn}
+                  nocMetrics={nocMetrics}
+                  dustCount={qualityCfg.dust}
+                />
+              )}
+            </PhysicsSafe>
           </Canvas>
         </Suspense>
       </div>

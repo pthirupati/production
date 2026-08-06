@@ -4,6 +4,7 @@ import {
   resolvePrimarySimFromConsoles,
   consolesInclude,
   normalizeConsoles,
+  companionChipsFromConsoles,
 } from './scenarioConsoles'
 
 describe('scenarioConsoles', () => {
@@ -25,5 +26,20 @@ describe('scenarioConsoles', () => {
     expect(consolesInclude(['commvault', 'vmware', 'terminal'], 'vmware')).toBe(true)
     expect(consolesInclude(['azure', 'terminal'], 'vmware')).toBe(false)
     expect(normalizeConsoles([' Azure ', 'TERMINAL'])).toEqual(['azure', 'terminal'])
+  })
+
+  it('does not promote baremetal/maas when vyos is listed', () => {
+    expect(resolvePrimarySimFromConsoles(['vyos', 'terminal', 'baremetal'])).toBeNull()
+    expect(resolvePrimarySimFromConsoles(['vyos', 'maas', 'terminal'])).toBeNull()
+    expect(resolvePrimarySimFromConsoles(['baremetal', 'terminal'])).toBe('baremetal')
+    expect(resolvePrimarySimFromConsoles(['maas', 'terminal'])).toBe('baremetal')
+  })
+
+  it('builds companion chips including ai-infra defaults', () => {
+    expect(companionChipsFromConsoles(['vyos', 'terminal', 'baremetal'])).toEqual(
+      expect.arrayContaining(['vyos', 'baremetal']),
+    )
+    const ai = companionChipsFromConsoles(['terminal'], { techSlug: 'ai-infra' })
+    expect(ai).toEqual(expect.arrayContaining(['baremetal', 'lxd', 'awx', 'datacenter']))
   })
 })

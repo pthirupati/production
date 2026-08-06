@@ -816,6 +816,29 @@ class SimulationProvisioner:
         )
         client_state.set_prompt_user("labuser")
         client_state.set_host_ip("10.0.0.5")
+        # Stamp session + platform so ping/ssh enforce inventory/power/cross-cloud
+        # gates from the jump box the same way as the primary Lab Server shell.
+        sid = str(entry.get("session_id") or "")
+        if not sid:
+            # register_sim_session keys the global map; recover from engine stamp.
+            eng = entry.get("state", {}).get("engine")
+            sid = str(getattr(getattr(getattr(eng, "shell", None), "state", None), "session_id", "") or "")
+        client_state.session_id = sid
+        slug = (entry["state"].get("scenario_slug") or "").lower()
+        if "aws" in slug:
+            client_state.host_platform = "aws"
+        elif "azure" in slug:
+            client_state.host_platform = "azure"
+        elif "gcp" in slug:
+            client_state.host_platform = "gcp"
+        elif any(k in slug for k in ("maas", "ai-infra", "baremetal", "vyos", "lxd", "datacenter")):
+            client_state.host_platform = "maas"
+        else:
+            client_state.host_platform = getattr(
+                getattr(getattr(entry.get("state", {}).get("engine"), "shell", None), "state", None),
+                "host_platform",
+                "linux",
+            ) or "linux"
         shell = RHELShell(
             state=client_state,
             scenario_slug=entry["state"].get("scenario_slug", ""),
@@ -824,6 +847,7 @@ class SimulationProvisioner:
         shell._host_ips = entry["state"].get("host_ips", {})
         shell._host_names = entry["state"].get("hosts", {})
         shell._engine = entry["state"]["engine"]
+        shell._scenario_slug = entry["state"].get("scenario_slug", "")
         register_modules(entry["state"]["engine"], shell)
         entry.setdefault("state", {})["ssh_client_shell"] = shell
         return shell

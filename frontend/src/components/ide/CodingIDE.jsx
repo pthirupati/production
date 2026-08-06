@@ -136,7 +136,8 @@ function TestRow({ name, passed, message, hidden }) {
  *   solved      boolean — externally controlled solved state (locks the editor)
  */
 export default function CodingIDE({ sessionId, scenario, onSolved, solved: solvedProp = false }) {
-  const [authenticated, setAuthenticated] = useState(isIdeAuthenticated)
+  // Lab session already authenticates the learner — skip the fake IDE login gate.
+  const [authenticated, setAuthenticated] = useState(() => Boolean(sessionId) || isIdeAuthenticated())
   const [loginUser, setLoginUser] = useState('')
   const [loginPass, setLoginPass] = useState('')
   const [loginError, setLoginError] = useState('')
@@ -193,6 +194,13 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   useEffect(() => () => { mountedRef.current = false }, [])
   useEffect(() => { if (solvedProp) setSolved(true) }, [solvedProp])
 
+  useEffect(() => {
+    if (sessionId && !authenticated) {
+      try { sessionStorage.setItem(IDE_AUTH_KEY, '1') } catch { /* ignore */ }
+      setAuthenticated(true)
+    }
+  }, [sessionId, authenticated])
+
   const language = spec?.language || 'python'
   const showHtmlPreview = hasHtmlPreview(files, language)
   const editorLanguage = editorLanguageForPath(activePath, language)
@@ -248,6 +256,16 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
 
     const dirs = new Set()
     Object.keys(fileMap).forEach((p) => parentDirs(p).forEach((d) => dirs.add(d)))
+
+    // Empty labs still need a workspace — seed a language-appropriate starter
+    // so Explorer is never a dead empty pane with nowhere to type.
+    if (Object.keys(fileMap).length === 0) {
+      const starter = newFileHint(s.language || 'python', [])
+      fileMap[starter] = stubContentForPath(starter, s.language || 'python')
+      parentDirs(starter).forEach((d) => dirs.add(d))
+      if (announce) appendTerminal(`created starter ${starter}`)
+    }
+
     setExpandedDirs(dirs)
     setFiles(fileMap)
     setReadonlyPaths(ro)
@@ -518,6 +536,9 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       setDirtyPaths(new Set())
       dirtyRef.current = false
       appendTerminal('saved to browser storage')
+      toast.success('Saved in this browser', { duration: 1400 })
+    } else {
+      toast.error('Could not save (storage unavailable)')
     }
   }, [files, readonlyPaths, sessionId, appendTerminal])
 
@@ -550,13 +571,23 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     })
   }, [])
 
-  const createFile = useCallback(() => {
-    const existing = Object.keys(files)
-    const suggestion = newFileHint(language, existing)
-    const input = window.prompt('New file path', suggestion)
-    if (!input) return
-    const path = input.trim().replace(/^\/+/, '')
+  const closeOtherTabs = useCallback(() => {
+    if (!activePath) return
+    setOpenTabs([activePath])
+  }, [activePath])
+
+  const closeAllTabs = useCallback(() => {
+    setOpenTabs([])
+    setActivePath('')
+  }, [])
+
+  const createFileAt = useCallback((rawPath) => {
+    const path = String(rawPath || '').trim().replace(/^\/+/, '')
     if (!path) return
+    if (path.endsWith('/')) {
+      toast.error('Enter a file name, not a folder path')
+      return
+    }
     if (files[path] !== undefined) { toast.error('A file already exists at that path'); return }
     setFiles((prev) => ({ ...prev, [path]: stubContentForPath(path, language) }))
     setExpandedDirs((prev) => {
@@ -569,16 +600,20 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     dirtyRef.current = true
     setDirtyPaths((prev) => new Set(prev).add(path))
     appendTerminal(`created ${path}`)
+    toast.success(`Created ${path}`, { duration: 1200 })
   }, [files, language, appendTerminal])
 
-  const createFolder = useCallback(() => {
-    const input = window.prompt('New folder path', 'new-folder')
-    if (!input) return
-    const dir = input.trim().replace(/^\/+|\/+$/g, '')
+  const createFolderAt = useCallback((rawDir) => {
+    const dir = String(rawDir || '').trim().replace(/^\/+|\/+$/g, '')
     if (!dir) return
     const keepPath = `${dir}/.keep`
-    if (files[keepPath] !== undefined) return
-    setFiles((prev) => ({ ...prev, [keepPath]: '' }))
+    const already = Object.keys(files).some((p) => p === keepPath || p.startsWith(`${dir}/`))
+    if (already && files[keepPath] !== undefined) {
+      toast('Folder already exists', { icon: '📁' })
+      setExpandedDirs((prev) => new Set(prev).add(dir))
+      return
+    }
+    setFiles((prev) => (prev[keepPath] !== undefined ? prev : { ...prev, [keepPath]: '' }))
     setExpandedDirs((prev) => {
       const next = new Set(prev)
       next.add(dir)
@@ -587,6 +622,41 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     })
     dirtyRef.current = true
     appendTerminal(`created folder ${dir}/`)
+    toast.success(`Created folder ${dir}/`, { duration: 1200 })
+  }, [files, appendTerminal])
+
+  const createFile = useCallback(() => {
+    const suggestion = newFileHint(language, Object.keys(files))
+    createFileAt(suggestion)
+  }, [language, files, createFileAt])
+
+  const createFolder = useCallback(() => {
+    createFolderAt('new-folder')
+  }, [createFolderAt])
+
+  const duplicateFile = useCallback((path) => {
+    if (!path || files[path] === undefined) return
+    const dot = path.lastIndexOf('.')
+    const slash = path.lastIndexOf('/')
+    let next
+    if (dot > slash) {
+      next = `${path.slice(0, dot)}.copy${path.slice(dot)}`
+    } else {
+      next = `${path}.copy`
+    }
+    let n = 2
+    while (files[next] !== undefined) {
+      next = dot > slash
+        ? `${path.slice(0, dot)}.copy${n}${path.slice(dot)}`
+        : `${path}.copy${n}`
+      n += 1
+    }
+    setFiles((prev) => ({ ...prev, [next]: prev[path] }))
+    setOpenTabs((prev) => (prev.includes(next) ? prev : [...prev, next]))
+    setActivePath(next)
+    dirtyRef.current = true
+    setDirtyPaths((prev) => new Set(prev).add(next))
+    appendTerminal(`duplicated ${path} → ${next}`)
   }, [files, appendTerminal])
 
   const deleteFile = useCallback((path) => {
@@ -771,17 +841,23 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
             {checking ? <Loader2 size={13} className="animate-spin" /> : solved ? <Trophy size={13} /> : <ListChecks size={13} />}
             {solved ? 'Solved' : 'Check Solution'}
           </button>
-          <button type="button" onClick={handleSave} disabled={solved} className="vsc-btn" title="Save (Ctrl/Cmd+S)">
+          <button type="button" onClick={handleSave} disabled={solved} className="vsc-btn" title="Save to this browser (Ctrl/Cmd+S) — Vim :w">
             <Save size={13} /> Save
           </button>
-          <button type="button" onClick={handleRefresh} disabled={solved || loading} className="vsc-btn" title="Reload lab starter files">
+          <button type="button" onClick={handleRefresh} disabled={solved || loading} className="vsc-btn" title="Reload lab starter files (discards local edits)">
             <RefreshCw size={13} /> Refresh
           </button>
+          <button type="button" onClick={() => createFileAt(newFileHint(language, Object.keys(files)))} disabled={solved} className="vsc-btn" title="New file">
+            <Plus size={13} /> New File
+          </button>
+          <button type="button" onClick={() => createFolderAt(`folder-${Date.now().toString(36).slice(-4)}`)} disabled={solved} className="vsc-btn" title="New folder">
+            <Folder size={13} /> New Folder
+          </button>
           <button type="button" onClick={() => editorRef.current?.openSearch()} className="vsc-btn" title="Find (Ctrl/Cmd+F)"><Search size={13} /></button>
-          <button type="button" onClick={() => setVimMode((v) => !v)} className={`vsc-btn ${vimMode ? 'vsc-btn-primary' : ''}`} title="Toggle Vim keybindings">
+          <button type="button" onClick={() => setVimMode((v) => !v)} className={`vsc-btn ${vimMode ? 'vsc-btn-primary' : ''}`} title="Toggle Vim keybindings (jj = Esc, :w = Save)">
             Vim
           </button>
-          <button type="button" onClick={() => editorRef.current?.formatDocument?.()} className="vsc-btn" title="Format document">Format</button>
+          <button type="button" onClick={() => editorRef.current?.formatDocument?.()} className="vsc-btn" title="Format document (Ctrl/Cmd+Shift+F)">Format</button>
           <button
             type="button"
             onClick={() => setFormatOnSave((v) => !v)}
@@ -793,6 +869,8 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           <button type="button" onClick={() => setFontSize((f) => Math.max(10, f - 1))} className="vsc-btn" title="Zoom out"><ZoomOut size={13} /></button>
           <button type="button" onClick={() => setFontSize((f) => Math.min(22, f + 1))} className="vsc-btn" title="Zoom in"><ZoomIn size={13} /></button>
           <button type="button" onClick={toggleTheme} className="vsc-btn" title="Toggle theme">{isDark ? <Sun size={13} /> : <Moon size={13} />}</button>
+          <button type="button" onClick={closeOtherTabs} disabled={!activePath || openTabs.length < 2} className="vsc-btn" title="Close other tabs">Close Others</button>
+          <button type="button" onClick={closeAllTabs} disabled={!openTabs.length} className="vsc-btn" title="Close all tabs">Close All</button>
           <button type="button" onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }} className="vsc-btn"><Sparkles size={13} /> Mentor</button>
           {showHtmlPreview && (
             <button
@@ -805,8 +883,8 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
             </button>
           )}
           {(savedAt && !solved) && (
-            <span className="text-[10px] text-emerald-400 flex items-center gap-1">
-              <Save size={11} /> {dirtyPaths.size ? 'Edited' : 'Saved'}
+            <span className="text-[10px] text-emerald-400 flex items-center gap-1" title="Drafts are stored in this browser only">
+              <Save size={11} /> {dirtyPaths.size ? 'Unsaved' : 'Saved'}
             </span>
           )}
           <span className="text-[10px] text-[var(--vsc-muted)] hidden lg:inline flex items-center gap-1"><EyeOff size={10} /> {hiddenCount} hidden</span>
@@ -844,12 +922,16 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           readonlyPaths={readonlyPaths}
           protectedPaths={protectedPaths}
           expandedDirs={expandedDirs}
+          language={language}
+          disabled={solved}
           onToggleDir={toggleDir}
           onOpenFile={openFile}
           onDeleteFile={solved ? undefined : deleteFile}
           onRenameFile={solved ? undefined : renameFile}
-          onCreateFile={solved ? undefined : createFile}
-          emptyHint="No files in this lab yet. Create a file or folder, or ask support if the lab should have starters."
+          onDuplicateFile={solved ? undefined : duplicateFile}
+          onCreateFileAt={solved ? undefined : createFileAt}
+          onCreateFolderAt={solved ? undefined : createFolderAt}
+          emptyHint="No files yet. Use New File / New Folder (or right-click) to build your project."
         />
       )}
       editorTabs={tabPaths.length ? tabPaths.map((p) => (
@@ -877,7 +959,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       editor={activePath && files[activePath] !== undefined ? (
         <CodeEditor
           ref={editorRef}
-          key={`${activePath}:${vimMode ? 'vim' : 'norm'}`}
+          key={activePath}
           value={files[activePath] ?? ''}
           onChange={handleEditorChange}
           onSave={handleSave}
@@ -893,9 +975,14 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           <FileCode size={36} className="opacity-40" />
           <p>{Object.keys(files).length ? 'Select a file from the Explorer' : 'No file open'}</p>
           {!solved && (
-            <button type="button" onClick={createFile} className="vsc-btn vsc-btn-primary">
-              <Plus size={13} /> New File
-            </button>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <button type="button" onClick={() => createFileAt(newFileHint(language, Object.keys(files)))} className="vsc-btn vsc-btn-primary">
+                <Plus size={13} /> New File
+              </button>
+              <button type="button" onClick={() => createFolderAt('src')} className="vsc-btn">
+                <Folder size={13} /> New Folder
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -1022,7 +1109,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       }}
       statusBar={{
         left: activePath || 'No file',
-        center: `${langLabel} · UTF-8 · Spaces: 4${vimMode ? ' · --VIM--' : ''}${formatOnSave ? ' · FoS' : ''}`,
+        center: `${langLabel} · UTF-8 · Spaces: 4${vimMode ? ' · -- VIM --' : ''}${formatOnSave ? ' · FoS' : ''} · ${Object.keys(files).filter((p) => !p.endsWith('/.keep')).length} files`,
         right: (
           <>
             <span>{Object.keys(files).length} files</span>

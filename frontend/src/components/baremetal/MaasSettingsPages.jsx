@@ -30,7 +30,7 @@ const LEAVES = [
 
 /**
  * Field descriptors for the simple key/value leaves — rendered generically.
- * Keys are chosen to match the simulator's seeded `maas.settings` (see
+ * Keys are chosen to match the region's seeded `maas.settings` (see
  * `_maas_infra_seed` in baremetal_engine.py) so a leaf's initial values are
  * populated from real state, and saving clears the matching `broken` flags
  * (e.g. ntp_servers / commissioning_distro_series) server-side.

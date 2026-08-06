@@ -23,6 +23,11 @@ class K8sNode:
     # Cross-tech: the node's VMware VM is hung. A hung node cannot be made Ready or
     # scheduled onto from kubectl — only a VMware reset (via the bridge) clears it.
     vm_hung: bool = False
+    # NVIDIA / AMD device-plugin advertised GPUs (nvidia.com/gpu or amd.com/gpu).
+    gpu_capacity: int = 0
+    gpu_allocatable: int = 0
+    gpu_resource: str = "nvidia.com/gpu"
+    labels: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -150,6 +155,7 @@ class K8sCluster:
         self.ingresses: list[K8sIngress] = []
         self.hpas: list[K8sHPA] = []
         self.daemonsets: list[K8sDaemonSet] = []
+        self._gpu_plugin_broken: bool = False
         self._apply_scenario(scenario_slug)
         # After seeding, fold in any cross-tech VMware node action so the very
         # first `kubectl get nodes` already reflects a node added/reset in VMware.
@@ -166,6 +172,58 @@ class K8sCluster:
         # (pods Pending / a node NotReady) and only recover once the matching
         # VMware VM action is performed; sync_from_vmware_bridge() folds that in.
         if self._apply_cross_tech_k8s(s):
+            return
+        # AI Infra Engineering — GPU Operator / device plugin on MAAS-deployed nodes.
+        # Starts fail-closed: GPUs present in hardware labels but not allocatable
+        # until the learner applies a healthy device-plugin / GPU Operator manifest.
+        if (
+            "gpu-operator" in s
+            or "device-plugin" in s
+            or ("k8s" in s and "gpu" in s)
+            or "nvidia.com/gpu" in s
+        ):
+            self.namespaces = ["default", "kube-system", "gpu-operator"]
+            self.nodes = [
+                K8sNode("master-1", roles=["control-plane"]),
+                K8sNode(
+                    "gpu-worker-1",
+                    roles=["worker"],
+                    gpu_capacity=8,
+                    gpu_allocatable=0,
+                    gpu_resource="nvidia.com/gpu",
+                    labels={
+                        "nvidia.com/gpu.present": "true",
+                        "feature.node.kubernetes.io/pci-10de.present": "true",
+                        "nvidia.com/gpu.product": "NVIDIA-H100-80GB-HBM3",
+                    },
+                ),
+            ]
+            self.daemonsets = [
+                K8sDaemonSet(
+                    "nvidia-device-plugin-daemonset",
+                    namespace="gpu-operator",
+                    image="nvcr.io/nvidia/k8s-device-plugin:v0.14.1-broken",
+                    selector={"name": "nvidia-device-plugin-ds"},
+                )
+            ]
+            self.pods = [
+                K8sPod(
+                    "nvidia-device-plugin-ds-xk2m1",
+                    namespace="gpu-operator",
+                    status="CrashLoopBackOff",
+                    ready="0/1",
+                    restarts=3,
+                    node="gpu-worker-1",
+                    image="nvcr.io/nvidia/k8s-device-plugin:v0.14.1-broken",
+                    labels={"name": "nvidia-device-plugin-ds"},
+                    owner="nvidia-device-plugin-daemonset",
+                    events=[
+                        "Warning Failed: Error: ErrImagePull (broken tag)",
+                        "Warning BackOff: back-off restarting failed container",
+                    ],
+                )
+            ]
+            self._gpu_plugin_broken = True
             return
         if "crashloop" in s:
             self.deployments = [K8sDeployment("nginx", image="nginx:broken")]
@@ -556,12 +614,51 @@ class K8sCluster:
         return "\n".join(lines)
 
     def get_nodes(self, wide: bool = False) -> str:
-        lines = ["NAME       STATUS                     ROLES           AGE   VERSION"]
+        lines = ["NAME           STATUS                     ROLES           AGE   VERSION"]
         for n in self.nodes:
             roles = ",".join(n.roles) if n.roles else "<none>"
             status = n.status + (",SchedulingDisabled" if not n.schedulable else "")
-            lines.append(f"{n.name:<10} {status:<26} {roles:<15} 30d   {n.version}")
+            lines.append(f"{n.name:<14} {status:<26} {roles:<15} 30d   {n.version}")
         return "\n".join(lines)
+
+    def get_nodes_gpu_columns(self) -> str:
+        """kubectl get nodes -o custom-columns=NAME:...,GPU:.status.allocatable.nvidia\\.com/gpu"""
+        lines = ["NAME           GPU"]
+        for n in self.nodes:
+            if n.gpu_capacity <= 0 and "control-plane" in (n.roles or []):
+                gpu = "<none>"
+            else:
+                gpu = str(n.gpu_allocatable) if n.gpu_allocatable else "<none>"
+            lines.append(f"{n.name:<14} {gpu}")
+        return "\n".join(lines)
+
+    def enable_gpu_device_plugin(self, gpu_count: int | None = None) -> str:
+        """Repair GPU Operator / device plugin — advertise nvidia.com/gpu as allocatable."""
+        fixed = 0
+        for n in self.nodes:
+            if n.gpu_capacity > 0 or "gpu" in n.name or n.labels.get("nvidia.com/gpu.present"):
+                if n.gpu_capacity <= 0:
+                    n.gpu_capacity = int(gpu_count or 8)
+                n.gpu_allocatable = n.gpu_capacity
+                n.gpu_resource = n.gpu_resource or "nvidia.com/gpu"
+                n.labels.setdefault("nvidia.com/gpu.present", "true")
+                fixed += 1
+        for p in self.pods:
+            if "nvidia-device-plugin" in p.name or "gpu-operator" in (p.namespace or ""):
+                p.status = "Running"
+                p.ready = "1/1"
+                p.restarts = 0
+                if p.image and "broken" in p.image:
+                    p.image = p.image.replace("-broken", "").replace(":broken", ":v0.14.1")
+        for ds in self.daemonsets:
+            if "nvidia" in ds.name or "gpu" in ds.name:
+                if ds.image and "broken" in ds.image:
+                    ds.image = ds.image.replace("-broken", "").replace(":broken", ":v0.14.1")
+        self._gpu_plugin_broken = False
+        return (
+            f"NVIDIA device plugin healthy on {fixed} GPU node(s); "
+            f"nvidia.com/gpu allocatable restored"
+        )
 
     def get_services(self, namespace: str = "default", all_ns: bool = False) -> str:
         lines = ["NAME         TYPE           CLUSTER-IP      EXTERNAL-IP    PORT(S)       AGE"]
@@ -833,11 +930,27 @@ class K8sCluster:
         roles = ",".join(node.roles) if node.roles else "<none>"
         taints = "<none>" if node.schedulable else "node.kubernetes.io/unschedulable:NoSchedule"
         pods_here = [p.name for p in self.pods if p.node == node.name]
+        labels = node.labels or {}
+        label_lines = "\n".join(f"                    {k}={v}" for k, v in sorted(labels.items())) or "                    <none>"
+        res = node.gpu_resource or "nvidia.com/gpu"
+        cap_gpu = node.gpu_capacity
+        alloc_gpu = node.gpu_allocatable
         return (
             f"Name:               {node.name}\n"
             f"Roles:              {roles}\n"
+            f"Labels:\n{label_lines}\n"
             f"Taints:             {taints}\n"
             f"Unschedulable:      {not node.schedulable}\n"
+            f"Capacity:\n"
+            f"  cpu:                64\n"
+            f"  memory:             1024000Mi\n"
+            f"  pods:               110\n"
+            f"  {res}:         {cap_gpu}\n"
+            f"Allocatable:\n"
+            f"  cpu:                63\n"
+            f"  memory:             1022976Mi\n"
+            f"  pods:               110\n"
+            f"  {res}:         {alloc_gpu}\n"
             f"Conditions:\n"
             f"  Ready   {'True' if node.status == 'Ready' else 'False'}\n"
             f"Non-terminated Pods: ({len(pods_here)} in total)\n"
@@ -1468,11 +1581,40 @@ class K8sCluster:
             self.gateway_broken = False
             return f"httproute.gateway.networking.k8s.io/{name} configured"
 
+        # NVIDIA GPU Operator / device plugin DaemonSet — restores nvidia.com/gpu.
+        if kind == "daemonset" or (
+            kind in ("deployment",) and (
+                "nvidia-device-plugin" in name
+                or "gpu-operator" in name
+                or "k8s-device-plugin" in (m.get("image") or "")
+            )
+        ):
+            if "nvidia" in name or "gpu" in name or "device-plugin" in name or "nvidia" in (m.get("image") or ""):
+                msg = self.enable_gpu_device_plugin()
+                image = m.get("image") or "nvcr.io/nvidia/k8s-device-plugin:v0.14.1"
+                existing_ds = next((d for d in self.daemonsets if d.name == name), None)
+                if existing_ds:
+                    existing_ds.image = image.replace("-broken", "")
+                    return f"daemonset.apps/{name} configured\n{msg}"
+                self.daemonsets.append(K8sDaemonSet(
+                    name, namespace=ns or "gpu-operator", image=image.replace("-broken", ""),
+                    selector={"name": name},
+                ))
+                return f"daemonset.apps/{name} created\n{msg}"
+
         return f"{kind}/{name} created"
 
     def _apply_legacy(self, content: str) -> str:
         """Heuristic fixes for sparse manifests used by older scenarios."""
         low = content.lower()
+        if (
+            "nvidia-device-plugin" in low
+            or "gpu-operator" in low
+            or "k8s-device-plugin" in low
+            or "nvidia.com/gpu" in low
+        ):
+            msg = self.enable_gpu_device_plugin()
+            return f"daemonset.apps/nvidia-device-plugin-daemonset configured\n{msg}"
         if "selector:" in content and "app: api" in content:
             for s in self.services:
                 if s.name == "api":
@@ -1529,6 +1671,11 @@ class K8sCluster:
         if getattr(self, "netpol_blocks", False):
             return False
         if getattr(self, "hpa_broken", False):
+            return False
+        if getattr(self, "_gpu_plugin_broken", False):
+            return False
+        # GPU capacity present but not allocatable → device plugin still broken.
+        if any(n.gpu_capacity > 0 and n.gpu_allocatable <= 0 for n in self.nodes):
             return False
         if any(n.status != "Ready" for n in self.nodes):
             return False

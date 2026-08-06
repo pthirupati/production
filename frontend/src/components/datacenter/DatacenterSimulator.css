@@ -517,6 +517,78 @@
 .dc-ops-panel { background: #12151e; border: 1px solid #232838; border-radius: 8px; padding: 0.75rem 0.9rem; }
 .dc-alert-row { font-size: 0.68rem; color: #fbbf24; margin: 0.2rem 0; display: flex; gap: 0.35rem; align-items: flex-start; }
 .dc-alert-crit { color: #f87171; }
+.dc-3d-fail-banner {
+  flex: 1; min-height: 220px; display: flex; flex-direction: column;
+  align-items: flex-start; justify-content: center; gap: 0.65rem;
+  padding: 1.25rem 1.5rem; margin: 0.5rem 0.75rem;
+  background: linear-gradient(135deg, #1a1208 0%, #0f141f 60%);
+  border: 1px solid #7c2d12; border-radius: 8px;
+  color: #fde68a; font-size: 0.85rem; line-height: 1.45;
+}
+.dc-3d-fail-title { font-weight: 700; font-size: 1rem; color: #fdba74; }
+.dc-3d-fail-msg { margin: 0; color: #e2e8f0; max-width: 52rem; }
+.dc-3d-fail-msg code {
+  display: inline-block; margin-top: 0.25rem; padding: 0.15rem 0.4rem;
+  background: #0b0e14; border: 1px solid #334155; border-radius: 4px;
+  color: #fda4af; font-size: 0.75rem; word-break: break-word;
+}
+.dc-3d-fail-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.dc-3d-safe-slot { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.dc-3d-nameplate {
+  min-width: 160px; padding: 0.4rem 0.55rem; border-radius: 6px;
+  background: rgba(8, 12, 20, 0.92); border: 1px solid #f97316;
+  color: #e2e8f0; font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.68rem; line-height: 1.35; box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+.dc-3d-nameplate-host { font-weight: 700; color: #fdba74; font-size: 0.75rem; }
+.dc-3d-nameplate-meta { color: #94a3b8; margin-top: 0.15rem; }
+.dc-3d-nameplate-hint { color: #64748b; margin-top: 0.25rem; font-size: 0.6rem; }
+.dc-3d-np-ok { color: #34d399; }
+.dc-3d-np-bad { color: #f87171; font-weight: 600; }
+
+.dc-3d-controls-hud {
+  position: absolute; z-index: 5; left: 50%; bottom: 0.55rem; transform: translateX(-50%);
+  display: flex; flex-wrap: wrap; gap: 0.45rem 0.75rem; align-items: center; justify-content: center;
+  max-width: min(920px, 96vw); padding: 0.4rem 0.75rem; border-radius: 999px;
+  background: rgba(8, 12, 20, 0.72); border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #cbd5e1; font-size: 0.65rem; backdrop-filter: blur(8px);
+  font-family: 'JetBrains Mono', ui-monospace, monospace; pointer-events: auto;
+}
+.dc-3d-controls-hud kbd {
+  display: inline-block; min-width: 1.1rem; padding: 0.05rem 0.28rem; margin: 0 0.08rem;
+  border-radius: 3px; border: 1px solid #475569; background: #1e293b; color: #f8fafc;
+  font-size: 0.6rem; text-align: center;
+}
+.dc-3d-quality { display: inline-flex; align-items: center; gap: 0.3rem; color: #94a3b8; }
+.dc-3d-quality select {
+  background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px;
+  font-size: 0.62rem; padding: 0.1rem 0.25rem;
+}
+.dc-3d-physics-note {
+  position: absolute; z-index: 5; top: 2.4rem; left: 50%; transform: translateX(-50%);
+  padding: 0.3rem 0.65rem; border-radius: 4px; font-size: 0.68rem;
+  background: rgba(120, 53, 15, 0.85); border: 1px solid #b45309; color: #ffedd5;
+}
+.dc-3d-inspect-peek {
+  position: absolute; z-index: 6; top: 3.2rem; right: 0.85rem;
+  width: min(300px, 86vw); padding: 0.65rem 0.75rem; border-radius: 8px;
+  background: rgba(12, 16, 24, 0.94); border: 1px solid #334155; color: #e2e8f0;
+  font-size: 0.72rem; line-height: 1.4; box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+.dc-3d-inspect-peek-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  color: #fdba74; margin-bottom: 0.35rem;
+}
+.dc-3d-inspect-close {
+  background: transparent; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer; line-height: 1;
+}
+.dc-3d-inspect-peek-body { color: #cbd5e1; display: flex; flex-direction: column; gap: 0.2rem; }
+.dc-3d-inspect-peek-actions {
+  margin-top: 0.5rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+}
+
 /* Phase 7 — 3D twin */
 .dc-view-toggle { display: inline-flex; gap: 0.25rem; margin-right: 0.65rem; }
 .dc-view-active { border-color: #f97316 !important; color: #f97316 !important; }
@@ -573,7 +645,20 @@
   display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; color: #cbd3e3;
 }
 .dc-3d-canvas-wrap { flex: 1; min-height: 360px; position: relative; }
-.dc-3d-root.dc-3d-immersive .dc-3d-canvas-wrap { min-height: 520px; }
+/* Full-viewport game surface — not a 520px dashboard panel */
+.dc-shell-game {
+  position: fixed !important; inset: 0; z-index: 70;
+  width: 100vw; height: 100dvh; max-height: 100dvh;
+  border-radius: 0 !important; margin: 0 !important;
+}
+.dc-shell-game .dc-3d-root,
+.dc-shell-game .dc-3d-canvas-wrap {
+  flex: 1; min-height: 0; height: 100%;
+}
+.dc-3d-root.dc-3d-immersive .dc-3d-canvas-wrap {
+  min-height: min(100dvh, 100%);
+  height: 100%;
+}
 .dc-3d-canvas-wrap canvas { display: block; width: 100% !important; height: 100% !important; }
 .dc-3d-loading {
   flex: 1; min-height: 360px; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -663,6 +748,67 @@
   position: absolute; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%;
   background: #fdba74; box-shadow: 0 0 8px rgba(253, 186, 116, 0.9); left: 50%; top: 50%;
 }
+/* Minimap "you are here" room label — sits just above the radar ring. */
+.dc-3d-minimap-label {
+  position: absolute; left: 0; right: 0; top: -1.2rem; text-align: center;
+  font-size: 0.58rem; font-weight: 700; color: #cbd3e3; letter-spacing: 0.01em;
+  font-family: 'JetBrains Mono', ui-monospace, monospace; white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+}
+
+/* ── AR overlay mode chip (V cycles Off / Thermal / Power / Network) ── */
+.dc-3d-ar-chip {
+  position: absolute; z-index: 4; left: 50%; top: 0.85rem; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.3rem 0.65rem; border-radius: 999px;
+  background: rgba(8, 12, 20, 0.6); border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #e2e8f0; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
+  backdrop-filter: blur(6px); pointer-events: none;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.dc-3d-ar-chip span { color: #94a3b8; font-weight: 700; }
+.dc-3d-ar-chip-thermal { border-color: rgba(249, 115, 22, 0.55); color: #fdba74; }
+.dc-3d-ar-chip-power { border-color: rgba(52, 211, 153, 0.55); color: #6ee7b7; }
+.dc-3d-ar-chip-network { border-color: rgba(56, 189, 248, 0.55); color: #7dd3fc; }
+
+/* ── Field kit HUD — bottom immersive toolbelt: Badge · ESD · Cart · BMC ── */
+.dc-3d-fieldkit {
+  position: absolute; z-index: 4; left: 50%; bottom: 0.85rem; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 0.35rem;
+}
+.dc-3d-fieldkit-row { display: flex; align-items: center; gap: 0.4rem; }
+.dc-3d-kit-btn {
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.01em; color: #cbd3e3;
+  padding: 0.35rem 0.65rem; border-radius: 999px;
+  background: rgba(8, 12, 20, 0.6); border: 1px solid rgba(148, 163, 184, 0.3);
+  backdrop-filter: blur(6px); pointer-events: auto;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.dc-3d-kit-btn:hover { border-color: #f97316; color: #fdba74; }
+.dc-3d-kit-btn-on { border-color: rgba(52, 211, 153, 0.55); color: #6ee7b7; }
+.dc-3d-kit-btn-off { border-color: rgba(251, 191, 36, 0.55); color: #fbbf24; }
+.dc-3d-kit-btn-done { border-color: rgba(52, 211, 153, 0.55); color: #6ee7b7; opacity: 0.85; }
+.dc-3d-kit-toast {
+  font-size: 0.65rem; font-weight: 700; color: #1c1305; background: #fbbf24;
+  padding: 0.3rem 0.6rem; border-radius: 999px; box-shadow: 0 6px 18px rgba(251, 191, 36, 0.35);
+  animation: dc-kit-toast-life 3.2s ease forwards;
+}
+@keyframes dc-kit-toast-life {
+  0% { opacity: 0; transform: translateY(6px); }
+  10% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
+/* ── NOC wall stub — small in-world monitor panels near the NOC portal ── */
+.dc-noc-wall-panel {
+  display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  color: var(--noc-color, #38bdf8);
+}
+.dc-noc-wall-label { font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; }
+.dc-noc-wall-value { font-size: 0.82rem; font-weight: 800; }
 
 /* Portal glow — pulsing beacon label on in-world room portals. */
 @keyframes dc-portal-glow {
@@ -772,10 +918,13 @@
 @media (max-width: 640px) {
   .dc-tablet { width: 100vw; height: 100dvh; margin: 0; border-radius: 0; }
   .dc-3d-minimap { display: none; }
+  .dc-3d-ar-chip { top: 0.5rem; font-size: 0.6rem; padding: 0.25rem 0.55rem; }
+  .dc-3d-fieldkit { bottom: 0.5rem; }
+  .dc-3d-kit-btn { padding: 0.3rem 0.5rem; font-size: 0.6rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dc-3d-coachmark, .dc-3d-aisle-fog, .dc-3d-portal-label, .dc-tablet, .dc-3d-hud, .dc-3d-menu {
+  .dc-3d-coachmark, .dc-3d-aisle-fog, .dc-3d-portal-label, .dc-tablet, .dc-3d-hud, .dc-3d-menu, .dc-3d-kit-toast {
     animation: none !important;
   }
 }

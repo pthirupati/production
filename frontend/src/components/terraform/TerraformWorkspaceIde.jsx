@@ -3,15 +3,16 @@ import { terraformApi } from '../../api/terraform'
 import toast from 'react-hot-toast'
 import { useConfirm } from '../../hooks/useConfirm'
 import CodeEditor from '../ide/CodeEditor'
+import IdeExplorer from '../ide/IdeExplorer'
 import LabTerminal, { scheduleReadySend } from '../LabTerminal'
 import TerraformAwsTerminal from './TerraformAwsTerminal'
-import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab, VscActivityButton } from '../ide/VsCodeWorkbench'
+import VsCodeWorkbench, { VscEditorTab, VscPanelTab, VscActivityButton } from '../ide/VsCodeWorkbench'
 import { getIacProfile } from '../../utils/iacFlavor'
 import { LabChromeControls } from '../lab/LabChromeBar'
 import { syncTerraformApplyToAwsConsole, syncTerraformDestroyToClouds, detectCloudProvidersFromHcl } from '../../utils/terraformAwsBridge'
 import { useAwsStore } from '../aws/store/awsStore'
 import {
-  FileCode, FolderOpen, Folder, Play, Plus, Trash2, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History, ExternalLink, ChevronRight, ChevronDown, Palette,
+  FileCode, FolderOpen, Folder, Play, Plus, Trash2, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History, ExternalLink, ChevronRight, Palette,
 } from 'lucide-react'
 import '../../styles/vscode-workbench.css'
 
@@ -21,24 +22,6 @@ const IDE_THEMES = [
   { id: 'light', label: 'Light+' },
   { id: 'hc', label: 'High Contrast' },
 ]
-
-/** Build a nested folder tree from flat path→content map. */
-function buildFileTree(fileMap) {
-  const root = { name: '', children: {}, files: [] }
-  Object.keys(fileMap || {}).sort().forEach((path) => {
-    const parts = path.split('/').filter(Boolean)
-    let node = root
-    parts.forEach((part, i) => {
-      if (i === parts.length - 1) {
-        node.files.push(path)
-      } else {
-        if (!node.children[part]) node.children[part] = { name: part, children: {}, files: [] }
-        node = node.children[part]
-      }
-    })
-  })
-  return root
-}
 
 /** VS Code–style Terraform workspace — files, init/plan/apply, scenario-driven output. */
 export default function TerraformWorkspaceIde({
@@ -139,7 +122,6 @@ export default function TerraformWorkspaceIde({
   }, [sessionId, activeFile, setState])
 
   const fileList = Object.keys(files).length ? Object.keys(files).sort() : DEFAULT_FILES
-  const fileTree = buildFileTree(Object.keys(files).length ? files : Object.fromEntries(DEFAULT_FILES.map((f) => [f, ''])))
   const breadcrumbParts = (activeFile || 'main.tf').split('/')
 
   const handleFileChange = (content) => {
@@ -274,23 +256,16 @@ export default function TerraformWorkspaceIde({
     })
   }
 
-  const createPath = (kind) => {
-    const hint = kind === 'folder' ? 'modules/network' : 'modules/vpc/main.tf'
-    const name = window.prompt(kind === 'folder' ? 'New folder path:' : 'New file path (.tf):', hint)
-    if (!name?.trim()) return
-    const path = name.trim().replace(/^\/+/, '')
-    if (kind === 'folder') {
-      const keep = `${path.replace(/\/$/, '')}/.keep`
-      const next = { ...filesRef.current, [keep]: '' }
-      filesRef.current = next
-      setFiles(next)
-      setExpandedDirs((prev) => new Set([...prev, path]))
-      setDirty(true)
-      persistFiles(next, activeFile)
-      return
-    }
+  const createFileAt = (rawPath) => {
+    let path = String(rawPath || '').trim().replace(/^\/+/, '')
+    if (!path) return
+    if (!path.includes('.')) path = `${path}.tf`
     if (!path.endsWith('.tf') && !path.endsWith('.tfvars') && !path.endsWith('.hcl')) {
       toast.error('Use a .tf / .tfvars / .hcl path')
+      return
+    }
+    if (filesRef.current[path] !== undefined) {
+      toast.error('File already exists')
       return
     }
     const next = {
@@ -304,51 +279,52 @@ export default function TerraformWorkspaceIde({
     const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
     if (parent) setExpandedDirs((prev) => new Set([...prev, ...parent.split('/').map((_, i, a) => a.slice(0, i + 1).join('/'))]))
     persistFiles(next, path)
+    toast.success(`Created ${path}`)
   }
 
-  const renderTree = (node, prefix = '') => {
-    const dirNames = Object.keys(node.children || {}).sort()
-    const items = []
-    dirNames.forEach((dir) => {
-      const path = prefix ? `${prefix}/${dir}` : dir
-      const open = expandedDirs.has(path)
-      items.push(
-        <div key={`d-${path}`}>
-          <button
-            type="button"
-            className="vsc-tree-row"
-            onClick={() => toggleDir(path)}
-          >
-            {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            {open ? <FolderOpen size={13} className="text-amber-400/90" /> : <Folder size={13} className="text-amber-400/70" />}
-            <span className="truncate">{dir}</span>
-          </button>
-          {open && (
-            <div className="vsc-tree-children">
-              {renderTree(node.children[dir], path)}
-            </div>
-          )}
-        </div>,
-      )
-    })
-    ;(node.files || []).forEach((f) => {
-      const base = f.split('/').pop()
-      items.push(
-        <div key={f} className="flex items-center gap-0.5 w-full group">
-          <VscFileItem active={activeFile === f} onClick={() => setActiveFile(f)} className="flex-1 min-w-0 vsc-tree-file">
-            <FileCode size={13} className="shrink-0 opacity-70" />
-            <span className="truncate">{base}</span>
-            {dirty && activeFile === f && <span className="ml-auto text-[10px] text-amber-400">●</span>}
-          </VscFileItem>
-          {!DEFAULT_FILES.includes(f) && (
-            <button type="button" onClick={() => deleteFile(f)} className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-300" title="Delete">
-              <Trash2 size={11} />
-            </button>
-          )}
-        </div>,
-      )
-    })
-    return items
+  const createFolderAt = (rawDir) => {
+    const path = String(rawDir || '').trim().replace(/^\/+|\/+$/g, '')
+    if (!path) return
+    const keep = `${path}/.keep`
+    if (filesRef.current[keep] !== undefined) {
+      setExpandedDirs((prev) => new Set([...prev, path]))
+      return
+    }
+    const next = { ...filesRef.current, [keep]: '' }
+    filesRef.current = next
+    setFiles(next)
+    setExpandedDirs((prev) => new Set([...prev, path]))
+    setDirty(true)
+    persistFiles(next, activeFile)
+    toast.success(`Created folder ${path}/`)
+  }
+
+  const createPath = (kind) => {
+    if (kind === 'folder') createFolderAt('modules/network')
+    else createFileAt('modules/vpc/main.tf')
+  }
+
+  const renameTfFile = (path) => {
+    if (DEFAULT_FILES.includes(path)) {
+      toast.error('Cannot rename starter files')
+      return
+    }
+    const input = window.prompt('Rename file', path)
+    if (!input) return
+    const nextName = input.trim().replace(/^\/+/, '')
+    if (!nextName || nextName === path) return
+    if (filesRef.current[nextName] !== undefined) {
+      toast.error('File already exists')
+      return
+    }
+    const next = { ...filesRef.current }
+    next[nextName] = next[path]
+    delete next[path]
+    filesRef.current = next
+    setFiles(next)
+    setActiveFile(nextName)
+    setDirty(true)
+    persistFiles(next, nextName)
   }
 
   const bottomContent = () => {
@@ -476,9 +452,21 @@ export default function TerraformWorkspaceIde({
         </>
       )}
       sidebar={(
-        <div className="vsc-file-tree">
-          {renderTree(fileTree)}
-        </div>
+        <IdeExplorer
+          files={Object.keys(files).length ? files : Object.fromEntries(DEFAULT_FILES.map((f) => [f, '']))}
+          activePath={activeFile}
+          dirtyPaths={dirty ? new Set([activeFile]) : new Set()}
+          expandedDirs={expandedDirs}
+          language="hcl"
+          onToggleDir={toggleDir}
+          onOpenFile={setActiveFile}
+          onDeleteFile={deleteFile}
+          onRenameFile={renameTfFile}
+          onCreateFileAt={createFileAt}
+          onCreateFolderAt={createFolderAt}
+          protectedPaths={new Set(DEFAULT_FILES)}
+          emptyHint="No Terraform files — create a .tf module to begin."
+        />
       )}
       editorTabs={fileList.map((f) => (
         <VscEditorTab key={f} active={activeFile === f} onClick={() => setActiveFile(f)}>

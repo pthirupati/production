@@ -105,12 +105,19 @@ hints:
     WHY: workloads need the driver to see the device.'
 consoles:
 - awx
+- baremetal
+- lxd
 - terminal
+- datacenter
 lab_servers:
 - id: gpu-node-01
   role: primary
   hostname: gpu-node-01
   persona: baremetal
-  appears_in:
+appears_in:
   - awx
+  - baremetal
+  - lxd
   - terminal
+  - datacenter
+datacenter_link: true

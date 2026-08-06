@@ -581,39 +581,100 @@ export default function LxdConsole({
     )
   } else if (nav === 'profiles') main = renderProfiles()
   else if (nav === 'storage') {
-    main = renderTablePage(
-      'Storage',
-      'Storage pools available to instances',
-      ['Name', 'Driver', 'Source', 'Used by'],
-      storage.map((p) => (
-        <tr key={p.name}>
-          <td>{p.name}</td>
-          <td>{p.driver}</td>
-          <td className="mono">{p.source}</td>
-          <td>{p.used_by ?? '—'}</td>
-        </tr>
-      )),
+    main = (
+      <div>
+        <h1 className="lxd-page-title">Storage</h1>
+        <p className="lxd-page-sub">Storage pools and volumes available to instances</p>
+        <div className="lxd-toolbar">
+          <button type="button" className="lxd-btn lxd-btn-primary" disabled={busy}
+            onClick={() => run(
+              () => baremetalApi.lxdStorageCreate(sessionId, `pool-${storage.length + 1}`, { driver: 'zfs' }),
+              'Storage pool created',
+            )}>
+            <Plus size={14} /> Create pool
+          </button>
+          <button type="button" className="lxd-btn" disabled={busy || !storage.length}
+            onClick={() => run(
+              () => baremetalApi.lxdVolumeCreate(sessionId, storage[0]?.name || 'default', `vol-${Date.now().toString(36).slice(-4)}`, { size: '20GiB' }),
+              'Volume created',
+            )}>
+            <Plus size={14} /> Create volume
+          </button>
+        </div>
+        <div className="lxd-table-wrap">
+          <table className="lxd-table">
+            <thead><tr><th>Name</th><th>Driver</th><th>Source</th><th>Used by</th></tr></thead>
+            <tbody>
+              {storage.map((p) => (
+                <tr key={p.name}>
+                  <td>{p.name}</td>
+                  <td>{p.driver}</td>
+                  <td className="mono">{p.source}</td>
+                  <td>{p.used_by ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {(lxd.volumes || []).length > 0 && (
+          <div className="lxd-table-wrap" style={{ marginTop: '1rem' }}>
+            <table className="lxd-table">
+              <thead><tr><th>Pool</th><th>Volume</th><th>Type</th><th>Size</th></tr></thead>
+              <tbody>
+                {(lxd.volumes || []).map((v) => (
+                  <tr key={`${v.pool}-${v.name}`}>
+                    <td>{v.pool}</td>
+                    <td>{v.name}</td>
+                    <td>{v.type}</td>
+                    <td>{v.size}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     )
   } else if (nav === 'networks') {
-    main = renderTablePage(
-      'Networks',
-      'Managed and unmanaged networks',
-      ['Name', 'Type', 'Managed', 'IPv4', 'IPv6'],
-      networks.map((n) => (
-        <tr key={n.name}>
-          <td>{n.name}</td>
-          <td>{n.type}</td>
-          <td>{n.managed ? 'yes' : 'no'}</td>
-          <td className="mono">{n.ipv4 || '—'}</td>
-          <td className="mono">{n.ipv6 || '—'}</td>
-        </tr>
-      )),
+    main = (
+      <div>
+        <h1 className="lxd-page-title">Networks</h1>
+        <p className="lxd-page-sub">Managed and unmanaged networks</p>
+        <div className="lxd-toolbar">
+          <button type="button" className="lxd-btn lxd-btn-primary" disabled={busy}
+            onClick={() => run(
+              () => baremetalApi.lxdNetworkCreate(sessionId, `br-${networks.length + 1}`),
+              'Network created',
+            )}>
+            <Plus size={14} /> Create network
+          </button>
+        </div>
+        <div className="lxd-table-wrap">
+          <table className="lxd-table">
+            <thead><tr><th>Name</th><th>Type</th><th>Managed</th><th>IPv4</th><th>IPv6</th></tr></thead>
+            <tbody>
+              {networks.map((n) => (
+                <tr key={n.name}>
+                  <td>{n.name}</td>
+                  <td>{n.type}</td>
+                  <td>{n.managed ? 'yes' : 'no'}</td>
+                  <td className="mono">{n.ipv4 || '—'}</td>
+                  <td className="mono">{n.ipv6 || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     )
   } else if (nav === 'projects') {
     main = (
       <div>
         <h1 className="lxd-page-title">Projects</h1>
-        <p className="lxd-page-sub">Isolated LXD projects</p>
+        <p className="lxd-page-sub">
+          Isolated LXD projects
+          {lxd.current_project ? ` · current: ${lxd.current_project}` : ''}
+        </p>
         <div className="lxd-toolbar">
           <button type="button" className="lxd-btn lxd-btn-primary" disabled={busy}
             onClick={() => run(
@@ -625,13 +686,26 @@ export default function LxdConsole({
         </div>
         <div className="lxd-table-wrap">
           <table className="lxd-table">
-            <thead><tr><th>Name</th><th>Description</th><th>Used by</th></tr></thead>
+            <thead><tr><th>Name</th><th>Description</th><th>Used by</th><th /></tr></thead>
             <tbody>
               {projects.map((p) => (
                 <tr key={p.name}>
-                  <td>{p.name}</td>
+                  <td>{p.name}{lxd.current_project === p.name ? ' ★' : ''}</td>
                   <td>{p.description || '—'}</td>
                   <td>{p.used_by ?? 0}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="lxd-btn"
+                      disabled={busy || lxd.current_project === p.name}
+                      onClick={() => run(
+                        () => baremetalApi.lxdProjectSwitch(sessionId, p.name),
+                        `Using project ${p.name}`,
+                      )}
+                    >
+                      Switch
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

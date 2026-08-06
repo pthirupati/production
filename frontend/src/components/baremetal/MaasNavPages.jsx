@@ -11,13 +11,16 @@ function healthClass(h) {
   return 'maas-health-down'
 }
 
-export function DevicesPage({ state, busy, run }) {
+export function DevicesPage({ state, busy, sessionId, run }) {
   const devices = state?.maas?.devices || state?.devices || []
+  const [hostname, setHostname] = useState('')
+  const [mac, setMac] = useState('')
+  const [ip, setIp] = useState('')
   return (
     <div>
       <h1 className="maas-page-title">Devices</h1>
       <p className="maas-page-sub">Non-deployable network devices with IP reservations</p>
-      <div className="maas-table-wrap">
+      <div className="maas-table-wrap" style={{ marginBottom: '1rem' }}>
         <table className="maas-table">
           <thead>
             <tr>
@@ -27,35 +30,81 @@ export function DevicesPage({ state, busy, run }) {
               <th className="no-sort">Zone</th>
               <th className="no-sort">Owner</th>
               <th className="no-sort">Parent</th>
+              <th className="no-sort" />
             </tr>
           </thead>
           <tbody>
             {devices.map((d) => (
               <tr key={d.id || d.hostname || d.mac}>
                 <td>{d.hostname || d.name}</td>
-                <td className="mono">{d.ip || d.ip_address || '—'}</td>
+                <td className="mono">{d.ip || d.ip_address || d.ip_reservation || '—'}</td>
                 <td className="mono">{d.mac || '—'}</td>
                 <td>{d.zone || 'default'}</td>
                 <td>{d.owner || '—'}</td>
                 <td>{d.parent || '—'}</td>
+                <td>
+                  {sessionId && run && (
+                    <button
+                      type="button"
+                      className="maas-btn maas-btn-sm maas-btn-negative"
+                      disabled={busy}
+                      onClick={() => run(
+                        () => baremetalApi.deleteDevice(sessionId, {
+                          hostname: d.hostname || d.name,
+                          mac: d.mac,
+                        }),
+                        'Device deleted',
+                      )}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
             {!devices.length && (
-              <tr><td colSpan={6}><div className="maas-empty">No devices registered.</div></td></tr>
+              <tr><td colSpan={7}><div className="maas-empty">No devices registered.</div></td></tr>
             )}
           </tbody>
         </table>
       </div>
-      {!busy && devices.length === 0 && run && (
-        <p className="maas-page-sub" style={{ marginTop: 12 }}>
-          Devices appear when the region controller has IP reservations for printers, switches, and other fixed hardware.
-        </p>
+      {sessionId && run && (
+        <div className="maas-card">
+          <div className="maas-card-head">Add device</div>
+          <div className="maas-card-body maas-form-grid">
+            <label className="maas-label">
+              Hostname
+              <input className="maas-input" value={hostname} onChange={(e) => setHostname(e.target.value)} placeholder="pdu-rack-b" />
+            </label>
+            <label className="maas-label">
+              MAC address
+              <input className="maas-input" value={mac} onChange={(e) => setMac(e.target.value)} placeholder="52:54:00:11:22:33" />
+            </label>
+            <label className="maas-label">
+              IP reservation
+              <input className="maas-input" value={ip} onChange={(e) => setIp(e.target.value)} placeholder="10.10.1.52" />
+            </label>
+          </div>
+          <div className="maas-dialog-foot">
+            <button
+              type="button"
+              className="maas-btn maas-btn-positive"
+              disabled={busy || !hostname || !mac}
+              onClick={() => run(
+                () => baremetalApi.addDevice(sessionId, { hostname, mac, ip }),
+                'Device registered',
+              ).then(() => { setHostname(''); setMac(''); setIp('') })}
+            >
+              <Plus size={14} /> Save device
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
 }
 
-export function ControllersPage({ state }) {
+export function ControllersPage({ state, busy, sessionId, run }) {
   const controllers = state?.controllers || state?.maas?.controllers || []
   return (
     <div>
@@ -64,7 +113,10 @@ export function ControllersPage({ state }) {
       {controllers.map((c) => (
         <div key={c.name || c.hostname} className="maas-card">
           <div className="maas-card-head" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>{c.name || c.hostname} · {c.type || 'rack'}</span>
+            <span>
+              {c.name || c.hostname} · {c.type || 'rack'}
+              {c.version ? ` · ${c.version}` : ''}
+            </span>
             <span className={healthClass(c.health || c.status)}>{c.health || c.status || 'ok'}</span>
           </div>
           <div className="maas-card-body">
@@ -74,19 +126,40 @@ export function ControllersPage({ state }) {
                   <tr>
                     <th className="no-sort">Service</th>
                     <th className="no-sort">Status</th>
+                    <th className="no-sort" />
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(c.services || {}).map(([name, status]) => (
-                    <tr key={name}>
-                      <td className="mono">{name}</td>
-                      <td className={healthClass(typeof status === 'string' ? status : status?.status)}>
-                        {typeof status === 'string' ? status : status?.status || 'ok'}
-                      </td>
-                    </tr>
-                  ))}
+                  {Object.entries(c.services || {}).map(([name, status]) => {
+                    const st = typeof status === 'string' ? status : status?.status || 'ok'
+                    return (
+                      <tr key={name}>
+                        <td className="mono">{name}</td>
+                        <td className={healthClass(st)}>{st}</td>
+                        <td>
+                          {sessionId && run && (st === 'degraded' || st === 'down' || st === 'dead') && (
+                            <button
+                              type="button"
+                              className="maas-btn maas-btn-sm"
+                              disabled={busy}
+                              onClick={() => run(
+                                () => baremetalApi.restartControllerService(
+                                  sessionId,
+                                  c.name || c.hostname,
+                                  name,
+                                ),
+                                `Restarted ${name}`,
+                              )}
+                            >
+                              <RefreshCw size={12} /> Restart
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                   {!Object.keys(c.services || {}).length && (
-                    <tr><td colSpan={2}><div className="maas-empty">No service inventory.</div></td></tr>
+                    <tr><td colSpan={3}><div className="maas-empty">No service inventory.</div></td></tr>
                   )}
                 </tbody>
               </table>
@@ -102,13 +175,16 @@ export function ControllersPage({ state }) {
 export function KvmPage({ state, busy, sessionId, run }) {
   const vms = state?.kvm?.vms || []
   const containers = state?.lxd?.containers || []
+  const [vmName, setVmName] = useState('')
+  const [vcpu, setVcpu] = useState('2')
+  const [ram, setRam] = useState('4')
   return (
     <div>
       <h1 className="maas-page-title">KVM</h1>
       <p className="maas-page-sub">KVM hosts and LXD instances managed alongside MAAS</p>
 
       <h2 style={{ fontSize: '1.1rem', fontWeight: 400, margin: '1rem 0 0.5rem' }}>Virtual machines</h2>
-      <div className="maas-table-wrap" style={{ marginBottom: '1.5rem' }}>
+      <div className="maas-table-wrap" style={{ marginBottom: '1rem' }}>
         <table className="maas-table">
           <thead>
             <tr>
@@ -154,6 +230,41 @@ export function KvmPage({ state, busy, sessionId, run }) {
             {!vms.length && <tr><td colSpan={6}><div className="maas-empty">No KVM VMs.</div></td></tr>}
           </tbody>
         </table>
+      </div>
+
+      <div className="maas-card" style={{ marginBottom: '1.5rem' }}>
+        <div className="maas-card-head">Compose</div>
+        <div className="maas-card-body maas-form-grid">
+          <label className="maas-label">
+            Name
+            <input className="maas-input" value={vmName} onChange={(e) => setVmName(e.target.value)} placeholder="vm-gpu-01" />
+          </label>
+          <label className="maas-label">
+            Cores
+            <input className="maas-input" value={vcpu} onChange={(e) => setVcpu(e.target.value)} />
+          </label>
+          <label className="maas-label">
+            RAM (GiB)
+            <input className="maas-input" value={ram} onChange={(e) => setRam(e.target.value)} />
+          </label>
+        </div>
+        <div className="maas-dialog-foot">
+          <button
+            type="button"
+            className="maas-btn maas-btn-positive"
+            disabled={busy || !vmName}
+            onClick={() => run(
+              () => baremetalApi.composeKvm(sessionId, {
+                name: vmName,
+                vcpu: Number(vcpu) || 2,
+                ram_gb: Number(ram) || 4,
+              }),
+              'VM composed',
+            ).then(() => setVmName(''))}
+          >
+            <Plus size={14} /> Compose
+          </button>
+        </div>
       </div>
 
       <h2 style={{ fontSize: '1.1rem', fontWeight: 400, margin: '1rem 0 0.5rem' }}>LXD containers</h2>
@@ -208,14 +319,29 @@ export function KvmPage({ state, busy, sessionId, run }) {
 
 export function ImagesPage({ state, busy, sessionId, run }) {
   const resources = state?.maas?.boot_resources || []
+  const stream = state?.maas?.image_stream || {}
+  const [uploadName, setUploadName] = useState('custom/h100-jammy')
+  const [uploadTitle, setUploadTitle] = useState('H100 Ubuntu 22.04')
+  const [uploadArch, setUploadArch] = useState('amd64/generic')
   return (
     <div>
       <div className="maas-toolbar">
         <div>
           <h1 className="maas-page-title">Images</h1>
-          <p className="maas-page-sub">Boot resources synced from images.maas.io and custom uploads</p>
+          <p className="maas-page-sub">
+            Boot resources from {stream.url || 'https://images.maas.io/ephemeral-v3/stable/'}
+            {stream.last_sync ? ` · last sync ${stream.last_sync}` : ''}
+          </p>
         </div>
         <div className="maas-toolbar-spacer" />
+        <button
+          type="button"
+          className="maas-btn"
+          disabled={busy}
+          onClick={() => run(() => baremetalApi.syncImages(sessionId), 'Images synced')}
+        >
+          <RefreshCw size={14} /> Sync now
+        </button>
         <button
           type="button"
           className="maas-btn maas-btn-positive"
@@ -228,11 +354,12 @@ export function ImagesPage({ state, busy, sessionId, run }) {
           <Plus size={14} /> Import custom/h100-jammy
         </button>
       </div>
-      <div className="maas-table-wrap">
+      <div className="maas-table-wrap" style={{ marginBottom: '1rem' }}>
         <table className="maas-table">
           <thead>
             <tr>
               <th className="no-sort">Name</th>
+              <th className="no-sort">Title</th>
               <th className="no-sort">Architecture</th>
               <th className="no-sort">Type</th>
               <th className="no-sort">Size</th>
@@ -244,6 +371,7 @@ export function ImagesPage({ state, busy, sessionId, run }) {
             {resources.map((r) => (
               <tr key={r.name}>
                 <td className="mono">{r.name}</td>
+                <td>{r.title || '—'}</td>
                 <td>{r.architecture || 'amd64/generic'}</td>
                 <td>{r.type || 'Synced'}</td>
                 <td>{r.size_gb != null ? `${r.size_gb} GB` : '—'}</td>
@@ -252,10 +380,45 @@ export function ImagesPage({ state, busy, sessionId, run }) {
               </tr>
             ))}
             {!resources.length && (
-              <tr><td colSpan={6}><div className="maas-empty">No boot resources — import or sync images.</div></td></tr>
+              <tr><td colSpan={7}><div className="maas-empty">No boot resources — import or sync images.</div></td></tr>
             )}
           </tbody>
         </table>
+      </div>
+      <div className="maas-card">
+        <div className="maas-card-head">Upload custom image</div>
+        <div className="maas-card-body maas-form-grid">
+          <label className="maas-label">
+            Name
+            <input className="maas-input" value={uploadName} onChange={(e) => setUploadName(e.target.value)} placeholder="custom/h100-jammy" />
+          </label>
+          <label className="maas-label">
+            Title
+            <input className="maas-input" value={uploadTitle} onChange={(e) => setUploadTitle(e.target.value)} />
+          </label>
+          <label className="maas-label">
+            Architecture
+            <input className="maas-input" value={uploadArch} onChange={(e) => setUploadArch(e.target.value)} />
+          </label>
+        </div>
+        <div className="maas-dialog-foot">
+          <button
+            type="button"
+            className="maas-btn maas-btn-positive"
+            disabled={busy || !uploadName}
+            onClick={() => run(
+              () => baremetalApi.uploadBootResource(sessionId, {
+                name: uploadName,
+                title: uploadTitle,
+                architecture: uploadArch,
+                source: 'upload',
+              }),
+              'Custom image uploaded',
+            )}
+          >
+            <Plus size={14} /> Upload
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -479,6 +642,9 @@ export function TagsPage({ state, busy, sessionId, run }) {
   const machines = state?.maas?.machines || []
   const [tagName, setTagName] = useState('')
   const [hostname, setHostname] = useState(machines[0]?.hostname || '')
+  const [newTag, setNewTag] = useState('')
+  const [definition, setDefinition] = useState('')
+  const [kernelOpts, setKernelOpts] = useState('')
   return (
     <div>
       <h1 className="maas-page-title">Tags</h1>
@@ -489,6 +655,7 @@ export function TagsPage({ state, busy, sessionId, run }) {
             <tr>
               <th className="no-sort">Name</th>
               <th className="no-sort">Definition</th>
+              <th className="no-sort">Kernel options</th>
               <th className="no-sort">Machines</th>
             </tr>
           </thead>
@@ -497,12 +664,47 @@ export function TagsPage({ state, busy, sessionId, run }) {
               <tr key={t.name}>
                 <td><span className="maas-tag">{t.name}</span></td>
                 <td className="mono" style={{ fontSize: '0.75rem' }}>{t.definition || '—'}</td>
+                <td className="mono" style={{ fontSize: '0.75rem' }}>{t.kernel_options || '—'}</td>
                 <td>{(t.machines || []).join(', ') || '—'}</td>
               </tr>
             ))}
-            {!tags.length && <tr><td colSpan={3}><div className="maas-empty">No tags.</div></td></tr>}
+            {!tags.length && <tr><td colSpan={4}><div className="maas-empty">No tags.</div></td></tr>}
           </tbody>
         </table>
+      </div>
+      <div className="maas-card" style={{ marginBottom: '1rem' }}>
+        <div className="maas-card-head">Create tag</div>
+        <div className="maas-card-body maas-form-grid">
+          <label className="maas-label">
+            Name
+            <input className="maas-input" value={newTag} onChange={(e) => setNewTag(e.target.value)} placeholder="needs-firmware" />
+          </label>
+          <label className="maas-label">
+            Definition (XPath)
+            <input className="maas-input" value={definition} onChange={(e) => setDefinition(e.target.value)} placeholder="//node" />
+          </label>
+          <label className="maas-label">
+            Kernel options
+            <input className="maas-input" value={kernelOpts} onChange={(e) => setKernelOpts(e.target.value)} placeholder="intel_iommu=on" />
+          </label>
+        </div>
+        <div className="maas-dialog-foot">
+          <button
+            type="button"
+            className="maas-btn maas-btn-positive"
+            disabled={busy || !newTag}
+            onClick={() => run(
+              () => baremetalApi.createTag(sessionId, {
+                name: newTag,
+                definition,
+                kernel_options: kernelOpts,
+              }),
+              'Tag created',
+            ).then(() => setNewTag(''))}
+          >
+            Create tag
+          </button>
+        </div>
       </div>
       <div className="maas-card">
         <div className="maas-card-head">Tag a machine</div>
@@ -644,6 +846,13 @@ export function SubnetsPage({ state, busy, sessionId, run }) {
 export function DhcpPage({ state, busy, sessionId, run }) {
   const dhcp = state?.dhcp || state?.maas?.dhcp || {}
   const enabled = dhcp.enabled !== false
+  const [snipName, setSnipName] = useState('')
+  const [snipValue, setSnipValue] = useState('option domain-name "maas";\n')
+  const [snipScope, setSnipScope] = useState('global')
+  const ranges = dhcp.dynamic_ranges || ['10.10.1.100-10.10.1.200']
+  const rangeText = Array.isArray(ranges)
+    ? ranges.map((r) => (typeof r === 'string' ? r : `${r.start}-${r.end}`)).join(', ')
+    : String(ranges)
   return (
     <div>
       <h1 className="maas-page-title">DHCP</h1>
@@ -656,11 +865,10 @@ export function DhcpPage({ state, busy, sessionId, run }) {
               {enabled ? 'Enabled' : 'Disabled'}
             </dd>
             <dt>VLAN</dt><dd>{dhcp.vlan || 'untagged'}</dd>
-            <dt>Primary rack</dt><dd>{dhcp.primary_rack || 'rack-01'}</dd>
+            <dt>Primary rack</dt><dd>{dhcp.primary_rack || 'rack-1'}</dd>
+            <dt>Secondary rack</dt><dd>{dhcp.secondary_rack || '—'}</dd>
             <dt>Dynamic ranges</dt>
-            <dd className="mono">
-              {(dhcp.dynamic_ranges || ['10.10.1.100-10.10.1.200']).join(', ')}
-            </dd>
+            <dd className="mono">{rangeText}</dd>
           </dl>
           <div className="maas-toolbar" style={{ marginTop: 16 }}>
             <button
@@ -692,13 +900,72 @@ export function DhcpPage({ state, busy, sessionId, run }) {
         <div className="maas-card-head">DHCP snippets</div>
         <div className="maas-card-body">
           {(dhcp.snippets || []).length === 0 && (
-            <div className="maas-empty" style={{ padding: 0 }}>No custom snippets.</div>
+            <div className="maas-empty" style={{ padding: 0, marginBottom: 12 }}>No custom snippets.</div>
           )}
           {(dhcp.snippets || []).map((s, i) => (
-            <pre key={i} className="mono" style={{ fontSize: '0.75rem', background: '#f5f5f5', padding: 8 }}>
-              {typeof s === 'string' ? s : s.value || JSON.stringify(s)}
-            </pre>
+            <div key={s.name || i} style={{ marginBottom: 12 }}>
+              <div className="maas-toolbar" style={{ marginBottom: 4 }}>
+                <strong>{s.name || `snippet-${i}`}</strong>
+                <span style={{ fontSize: '0.75rem', color: '#666' }}>{s.scope || 'global'}</span>
+                <div className="maas-toolbar-spacer" />
+                <button
+                  type="button"
+                  className="maas-btn maas-btn-sm maas-btn-negative"
+                  disabled={busy}
+                  onClick={() => run(
+                    () => baremetalApi.dhcpSnippetDelete(sessionId, s.name),
+                    'Snippet deleted',
+                  )}
+                >
+                  Delete
+                </button>
+              </div>
+              <pre className="mono" style={{ fontSize: '0.75rem', background: '#f5f5f5', padding: 8, margin: 0 }}>
+                {typeof s === 'string' ? s : s.value || JSON.stringify(s)}
+              </pre>
+            </div>
           ))}
+          <div className="maas-form-grid" style={{ marginTop: 16 }}>
+            <label className="maas-label">
+              Name
+              <input className="maas-input" value={snipName} onChange={(e) => setSnipName(e.target.value)} placeholder="opt66-tftp" />
+            </label>
+            <label className="maas-label">
+              Scope
+              <select className="maas-select" value={snipScope} onChange={(e) => setSnipScope(e.target.value)}>
+                <option value="global">global</option>
+                <option value="subnet">subnet</option>
+                <option value="node">node</option>
+              </select>
+            </label>
+            <label className="maas-label" style={{ gridColumn: '1 / -1' }}>
+              Value
+              <textarea
+                className="maas-input"
+                rows={4}
+                value={snipValue}
+                onChange={(e) => setSnipValue(e.target.value)}
+                style={{ fontFamily: 'Ubuntu Mono, monospace', fontSize: '0.8rem' }}
+              />
+            </label>
+          </div>
+          <div className="maas-dialog-foot">
+            <button
+              type="button"
+              className="maas-btn maas-btn-positive"
+              disabled={busy || !snipName}
+              onClick={() => run(
+                () => baremetalApi.dhcpSnippetAdd(sessionId, {
+                  name: snipName,
+                  value: snipValue,
+                  scope: snipScope,
+                }),
+                'Snippet saved',
+              ).then(() => setSnipName(''))}
+            >
+              <Plus size={14} /> Save snippet
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -852,9 +1119,9 @@ export function IpmiPage({ state, busy, sessionId, run, machines = [] }) {
 export default function MaasNavPages({ page, state, busy, sessionId, run, machines }) {
   switch (page) {
     case 'devices':
-      return <DevicesPage state={state} busy={busy} run={run} />
+      return <DevicesPage state={state} busy={busy} sessionId={sessionId} run={run} />
     case 'controllers':
-      return <ControllersPage state={state} />
+      return <ControllersPage state={state} busy={busy} sessionId={sessionId} run={run} />
     case 'kvm':
       return <KvmPage state={state} busy={busy} sessionId={sessionId} run={run} />
     case 'images':

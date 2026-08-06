@@ -1,0 +1,59 @@
+title: 'MAAS Commission RTX A4000 Workstation Node'
+slug: ai-infra-maas-commission-a4000
+technology: AI Infrastructure Engineering
+category: Build
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: baremetal
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: AI Infra / ImageDev — a Dell Precision workstation with NVIDIA RTX A4000 must be
+  enlisted and commissioned in MAAS for a graphics / light-inference fleet row (1× Ada/Ampere SKU, not SXM).
+
+
+  ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin.
+
+
+  SYMPTOM: Node is New; not commissioned; nvidia-smi must report RTX A4000 after deploy.
+
+
+  OBJECTIVE: Commission and deploy via MAAS; confirm nvidia-smi -L shows RTX A4000; leave the node Ready
+  for AWX follow-on.'
+objectives:
+- Commission the A4000 node in MAAS
+- Deploy an ImageDev-compatible OS image
+- Confirm nvidia-smi -L shows RTX A4000
+initial_state: Node New in MAAS; A4000 not yet visible to the fleet.
+hints:
+- order: 1
+  cost: 0
+  content: In Bare Metal, locate the New node and start Commission (commissioning scripts must pass).
+- order: 2
+  cost: 20
+  content: Deploy once Ready; wait for Deployed, then nvidia-smi -L on the node.
+- order: 3
+  cost: 40
+  content: Confirm the product string includes RTX A4000 (1× workstation SKU).
+consoles:
+- baremetal
+- terminal
+- lxd
+- awx
+- datacenter
+datacenter_link: true
+hosted_as: baremetal
+lab_servers:
+- id: gpu-ws-a4000-01
+  role: primary
+  hostname: gpu-ws-a4000-01
+  persona: baremetal
+appears_in:
+  - baremetal
+  - terminal
+  - lxd
+  - awx
+  - datacenter

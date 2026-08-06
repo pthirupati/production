@@ -49,12 +49,15 @@ hints:
 consoles:
 - datacenter
 - terminal
+- baremetal
+datacenter_link: true
 hosted_as: datacenter
 lab_servers:
 - id: gpu-node-01
   role: primary
   hostname: gpu-node-01
   persona: datacenter
-  appears_in:
+appears_in:
   - datacenter
   - terminal
+  - baremetal

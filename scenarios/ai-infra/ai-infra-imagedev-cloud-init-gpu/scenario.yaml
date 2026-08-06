@@ -40,16 +40,20 @@ hints:
   cost: 45
   content: After cloud-init final, run nvidia-smi -L and leave FIXED-OK when GPUs enumerate.
 consoles:
-- terminal
 - packer
 - baremetal
+- terminal
+- awx
+- lxd
 hosted_as: baremetal
 lab_servers:
 - id: gpu-node-01
   role: primary
   hostname: gpu-node-01
   persona: baremetal
-  appears_in:
-  - terminal
+appears_in:
   - packer
   - baremetal
+  - terminal
+  - awx
+  - lxd

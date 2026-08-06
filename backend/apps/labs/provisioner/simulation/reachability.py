@@ -37,9 +37,20 @@ def _platform_of(server: dict[str, Any] | None) -> str:
 
 
 def _same_l3_family(src: str, dst: str) -> bool:
-    """True when ICMP/SSH between platforms is allowed without VPN/peering."""
-    if not src or not dst:
-        return True  # unknown → allow inventory peer on same session
+    """True when ICMP/SSH between platforms is allowed without VPN/peering.
+
+    Unknown (empty) platforms do NOT auto-allow into a named public cloud.
+    Empty↔empty is allowed for local underlay peers that already passed
+    inventory/power checks (caller responsibility).
+    """
+    if not src and not dst:
+        return True
+    # One side unknown: allow only baremetal-family destinations (lab underlay),
+    # never cross into a named public cloud.
+    if not src:
+        return dst in _BAREMETAL_PLATFORMS or not dst
+    if not dst:
+        return src in _BAREMETAL_PLATFORMS or not src
     if src == dst:
         return True
     if src in _BAREMETAL_PLATFORMS and dst in _BAREMETAL_PLATFORMS:
@@ -72,6 +83,50 @@ def _ip_on_local_subnets(target_ip: str, iface_addrs: list[str]) -> bool:
     return False
 
 
+def _find_inventory_match(host: str, inventory: list[dict]) -> dict | None:
+    if not inventory:
+        return None
+    if _IPV4.match(host):
+        for s in inventory:
+            if (s.get("primary_ip") or "") == host:
+                return s
+        return None
+    for s in inventory:
+        if host in (s.get("hostname"), s.get("fqdn"), s.get("id")):
+            return s
+    return None
+
+
+def _gate_inventory_peer(
+    match: dict,
+    *,
+    host: str,
+    local_platform: str,
+) -> tuple[str | None, str | None]:
+    """Apply power / MAAS install / platform gates. Returns (ip, err)."""
+    if match.get("power") == "off":
+        tip = match.get("primary_ip") or host
+        return None, f"From {tip} icmp_seq=1 Destination Host Unreachable"
+
+    inst = (match.get("install_state") or "").lower()
+    plat = _platform_of(match)
+    if plat in ("maas", "baremetal", "ai-infra") and inst and inst not in (
+        "deployed", "allocated", "ready",
+    ):
+        if inst in ("new", "failed", "commissioning", ""):
+            if not match.get("primary_ip"):
+                return None, f"ping: {host}: Name or service not known"
+
+    src_plat = (local_platform or "").lower()
+    if not _same_l3_family(src_plat, plat):
+        return None, "connect: Network is unreachable"
+
+    ip = match.get("primary_ip") or (host if _IPV4.match(host) else "")
+    if not ip:
+        return None, f"ping: {host}: Name or service not known"
+    return str(ip), None
+
+
 def resolve_icmp_target(
     *,
     host: str,
@@ -89,20 +144,10 @@ def resolve_icmp_target(
     if host in ("localhost", "127.0.0.1", "::1"):
         return "127.0.0.1", None
 
-    # Known lab peer by hostname
-    if host in host_ips:
-        return str(host_ips[host]), None
-    if host in host_names:
-        meta = host_names.get(host) or {}
-        ip = meta.get("ip") if isinstance(meta, dict) else None
-        if ip:
-            return str(ip), None
-
     # Own interface address
     if host in iface_addrs or any(host == a.split("/")[0] for a in iface_addrs):
         return host.split("/")[0], None
 
-    # Inventory lookup
     inventory: list[dict] = []
     if session_id:
         try:
@@ -111,55 +156,53 @@ def resolve_icmp_target(
         except Exception:
             inventory = []
 
-    match = None
+    # Resolve hostname → IP via maps, then ALWAYS gate through inventory/power/
+    # platform (maps alone must not short-circuit to success).
+    resolved_ip: str | None = None
+    resolved_name: str | None = None
+    if host in host_ips:
+        # host_ips is {ip → hostname}
+        resolved_ip = str(host)
+        resolved_name = str(host_ips[host])
+    elif host in host_names:
+        meta = host_names.get(host) or {}
+        ip = meta.get("ip") if isinstance(meta, dict) else None
+        if ip:
+            resolved_ip = str(ip)
+            resolved_name = str(host)
+    elif _IPV4.match(host):
+        for ip, hn in (host_ips or {}).items():
+            if str(ip) == host:
+                resolved_ip = str(ip)
+                resolved_name = str(hn)
+                break
+
+    if resolved_ip or resolved_name:
+        match = _find_inventory_match(resolved_name or "", inventory) if inventory else None
+        if match is None and resolved_ip and inventory:
+            match = _find_inventory_match(resolved_ip, inventory)
+        if match is not None:
+            return _gate_inventory_peer(match, host=host, local_platform=local_platform)
+        # Mapped peer with no ServerIdentity row — refuse when local is a named
+        # public cloud (cannot prove same-cloud). Baremetal underlay maps OK.
+        src = (local_platform or "").lower()
+        if src in _CLOUD_PLATFORMS:
+            return None, "connect: Network is unreachable"
+        return str(resolved_ip or host), None
+
+    match = _find_inventory_match(host, inventory)
+    if match is not None:
+        return _gate_inventory_peer(match, host=host, local_platform=local_platform)
+
     if _IPV4.match(host):
-        for s in inventory:
-            if (s.get("primary_ip") or "") == host:
-                match = s
-                break
-        if match is None:
-            # Same L2/L3 underlay as a local iface + known gateway (.1) only —
-            # never open-reply to random dotted-quads.
-            if _ip_on_local_subnets(host, iface_addrs):
-                # Gateway .1 on lab underlay is reachable for routing labs.
-                if host.endswith(".1") or host.endswith(".254"):
-                    return host, None
-                return None, f"From {host} icmp_seq=1 Destination Host Unreachable"
+        # Same L2/L3 underlay as a local iface + known gateway (.1/.254) only.
+        if _ip_on_local_subnets(host, iface_addrs):
+            if host.endswith(".1") or host.endswith(".254"):
+                return host, None
             return None, f"From {host} icmp_seq=1 Destination Host Unreachable"
-    else:
-        for s in inventory:
-            if host in (s.get("hostname"), s.get("fqdn")):
-                match = s
-                break
-        if match is None:
-            return None, f"ping: {host}: Name or service not known"
+        return None, f"From {host} icmp_seq=1 Destination Host Unreachable"
 
-    if match.get("power") == "off":
-        return None, f"From {match.get('primary_ip') or host} icmp_seq=1 Destination Host Unreachable"
-
-    # MAAS New/Ready without Deployed: link-local commission path only — no guest stack.
-    inst = (match.get("install_state") or "").lower()
-    plat = _platform_of(match)
-    if plat in ("maas", "baremetal", "ai-infra") and inst and inst not in (
-        "deployed", "allocated", "ready",
-    ):
-        # Ready is PXE-commissioned but OS may still answer ICMP on BMC path —
-        # allow Ready; block New/Failed/Commissioning without IP stack.
-        if inst in ("new", "failed", "commissioning", ""):
-            if not match.get("primary_ip"):
-                return None, f"ping: {host}: Name or service not known"
-
-    src_plat = local_platform or ""
-    if not src_plat and inventory:
-        # Infer local platform from primary hostname match in inventory
-        pass
-    if not _same_l3_family(src_plat, plat):
-        return None, f"connect: Network is unreachable"
-
-    ip = match.get("primary_ip") or host
-    if not ip:
-        return None, f"ping: {host}: Name or service not known"
-    return str(ip), None
+    return None, f"ping: {host}: Name or service not known"
 
 
 def ssh_peer_allowed(
@@ -177,11 +220,7 @@ def ssh_peer_allowed(
     except Exception:
         return None, None
 
-    match = None
-    for s in servers:
-        if host in (s.get("hostname"), s.get("fqdn"), s.get("primary_ip"), s.get("id")):
-            match = s
-            break
+    match = _find_inventory_match(host, servers)
     if not match:
         return None, None
 

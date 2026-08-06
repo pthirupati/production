@@ -103,11 +103,16 @@ hints:
     WHY: workloads need the driver to see the device.'
 consoles:
 - terminal
+- baremetal
+- datacenter
+datacenter_link: true
 hosted_as: baremetal
 lab_servers:
 - id: gpu-node-01
   role: primary
   hostname: gpu-node-01
   persona: linux
-  appears_in:
+appears_in:
   - terminal
+  - baremetal
+  - datacenter

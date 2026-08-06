@@ -7,6 +7,7 @@ const TABS = [
   'Network',
   'Storage',
   'PCI',
+  'USB',
   'Commissioning',
   'Tests',
   'Events',
@@ -202,7 +203,21 @@ export default function MachineDetail({
 
       {tab === 'Network' && (
         <div className="maas-card">
-          <div className="maas-card-head">Network interfaces</div>
+          <div className="maas-card-head" style={{ display: 'flex', alignItems: 'center' }}>
+            <span>Network interfaces</span>
+            <div className="maas-toolbar-spacer" />
+            <button
+              type="button"
+              className="maas-btn maas-btn-sm"
+              disabled={busy || ifaces.filter((i) => (i.name || '').startsWith('eth')).length < 2}
+              onClick={() => run('createBond', {
+                interfaces: ifaces.filter((i) => (i.name || '').startsWith('eth')).slice(0, 2).map((i) => i.name),
+                name: 'bond0',
+              })}
+            >
+              Create bond
+            </button>
+          </div>
           <div className="maas-table-wrap" style={{ maxHeight: 'none', border: 'none' }}>
             <table className="maas-table">
               <thead>
@@ -221,7 +236,17 @@ export default function MachineDetail({
               <tbody>
                 {ifaces.map((iface) => (
                   <tr key={iface.name || iface.mac}>
-                    <td className="mono">{iface.name}</td>
+                    <td className="mono">
+                      {iface.name}
+                      {(iface.bond_members || []).length > 0 && (
+                        <span style={{ color: '#666', fontSize: '0.75rem' }}>
+                          {' '}({(iface.bond_members || []).join('+')})
+                        </span>
+                      )}
+                      {iface.bond && !iface.bond_members && (
+                        <span style={{ color: '#666', fontSize: '0.75rem' }}> → {iface.bond}</span>
+                      )}
+                    </td>
                     <td className="mono">{iface.mac}</td>
                     <td>{iface.link || '—'}</td>
                     <td>{iface.fabric || m.fabric || 'fabric-0'} / {iface.vlan || '—'}</td>
@@ -325,6 +350,45 @@ export default function MachineDetail({
                     <td colSpan={4}>
                       <div className="maas-empty">
                         No PCI inventory yet — commission the machine to discover GPUs and NICs.
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {tab === 'USB' && (
+        <div className="maas-card">
+          <div className="maas-card-head">USB devices</div>
+          <div className="maas-table-wrap" style={{ maxHeight: 'none', border: 'none' }}>
+            <table className="maas-table">
+              <thead>
+                <tr>
+                  <th className="no-sort">Bus</th>
+                  <th className="no-sort">Device</th>
+                  <th className="no-sort">Vendor</th>
+                  <th className="no-sort">Product</th>
+                  <th className="no-sort">IDs</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(m.usb_devices || []).map((d, i) => (
+                  <tr key={`${d.bus}-${d.device}-${i}`}>
+                    <td className="mono">{d.bus}</td>
+                    <td className="mono">{d.device}</td>
+                    <td>{d.vendor}</td>
+                    <td>{d.product}</td>
+                    <td className="mono">{d.vendor_id}:{d.product_id}</td>
+                  </tr>
+                ))}
+                {!(m.usb_devices || []).length && (
+                  <tr>
+                    <td colSpan={5}>
+                      <div className="maas-empty">
+                        No USB inventory yet — commission the machine to discover attached devices.
                       </div>
                     </td>
                   </tr>

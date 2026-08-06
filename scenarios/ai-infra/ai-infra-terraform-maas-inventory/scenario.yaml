@@ -43,13 +43,15 @@ consoles:
 - terraform
 - baremetal
 - terminal
+- awx
 hosted_as: baremetal
 lab_servers:
 - id: gpu-node-01
   role: primary
   hostname: gpu-node-01
   persona: baremetal
-  appears_in:
+appears_in:
   - terraform
   - baremetal
   - terminal
+  - awx

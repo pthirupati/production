@@ -24,7 +24,7 @@ description: 'CONTEXT: AI Infra Engineering — after MAAS deploy of an ImageDev
 
 
   OBJECTIVE: Confirm GPUs via nvidia-smi; fix/apply GPU Operator or device-plugin DaemonSet;
-  verify allocatable nvidia.com/gpu; FIXED-OK.'
+  verify allocatable nvidia.com/gpu.'
 objectives:
 - Confirm H100 GPUs on the Deployed node
 - Install or repair NVIDIA GPU Operator / device plugin
@@ -39,7 +39,7 @@ hints:
   content: Apply or repair the NVIDIA device-plugin DaemonSet / GPU Operator so the plugin mounts correctly.
 - order: 3
   cost: 45
-  content: Confirm allocatable nvidia.com/gpu is non-zero and a smoke pod can schedule, then FIXED-OK.
+  content: Confirm allocatable nvidia.com/gpu is non-zero and a smoke pod can schedule.
 consoles:
 - terminal
 - baremetal
