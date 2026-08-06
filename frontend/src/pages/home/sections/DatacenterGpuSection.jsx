@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, Cpu, Boxes, Thermometer, Cable, Gauge } from 'lucide-react'
-import DatacenterGpuShowcase from '../components/DatacenterGpuShowcase'
+import DatacenterWalkAnimation from '../components/DatacenterWalkAnimation'
 import { fadeLeft, fadeRight, viewportOnce } from '../../../ui/motion'
 
 const bulletIcons = [Boxes, Thermometer, Cable, Gauge]
@@ -88,7 +88,7 @@ export default function DatacenterGpuSection({ isAuthenticated }) {
         </motion.div>
 
         <motion.div initial="hidden" whileInView="visible" viewport={viewportOnce} variants={fadeRight}>
-          <DatacenterGpuShowcase demoHref={isAuthenticated ? '/technologies/datacenter' : '/register'} />
+          <DatacenterWalkAnimation demoHref={isAuthenticated ? '/technologies/datacenter' : '/register'} />
         </motion.div>
       </div>
     </section>
