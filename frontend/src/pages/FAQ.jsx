@@ -43,8 +43,13 @@ const FAQ_ITEMS = [
         a: 'Subscriptions are per-technology. You only pay for the technologies you want to learn. Free users can access sample labs to try the platform.',
       },
       {
+        // The refund path is manual by design (an admin issues it through the
+        // gateway), so the copy says so rather than implying self-serve. It also
+        // now states that access ends on a full refund, which is what the backend
+        // actually does since RazorpayRefundView started revoking entitlement —
+        // previously a refunded user silently kept a year of paid access.
         q: 'Can I get a refund?',
-        a: 'Yes, we offer refunds within 7 days of purchase. Contact us at fixitlab.payment@gmail.com with your subscription ID.',
+        a: 'Yes — within 7 days of purchase. Email fixitlab.payment@gmail.com with your subscription ID and we will process it manually, usually within two business days. Refunds are returned to the original payment method by the payment gateway. Note that a full refund ends access to that technology; a partial refund does not.',
       },
       {
         q: 'Do you offer student discounts?',

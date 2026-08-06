@@ -1543,6 +1543,67 @@ class InvoiceDownloadView(APIView):
         return response
 
 
+def _revoke_entitlement_for_transaction(tx) -> str:
+    """Deactivate whatever a fully-refunded transaction granted.
+
+    Returns a short description of what was revoked, for the audit log. Never
+    raises: a refund that succeeded at the gateway must not be reported as failed
+    because bookkeeping afterwards had a problem — but it IS logged loudly so a
+    mismatch can be reconciled by hand.
+    """
+    from apps.billing.razorpay_fulfillment import technology_id_from_transaction
+
+    revoked = []
+    try:
+        # 1. Per-technology subscription (the common case).
+        if tx.tech_subscription_id:
+            TechnologySubscription.objects.filter(
+                id=tx.tech_subscription_id, is_active=True
+            ).update(is_active=False)
+            revoked.append(f"tech_subscription={tx.tech_subscription_id}")
+        else:
+            tech_id = technology_id_from_transaction(tx)
+            if tech_id:
+                n = TechnologySubscription.objects.filter(
+                    user=tx.user, technology_id=tech_id, is_active=True
+                ).update(is_active=False)
+                if n:
+                    revoked.append(f"technology={tech_id}")
+
+        resp = tx.gateway_response or {}
+        product = resp.get("product_type") or ""
+
+        # 2. Certification track subscription.
+        if product == "certification_track":
+            track_id = resp.get("track_id")
+            if track_id:
+                from apps.certifications.models import CertificationTrackSubscription
+
+                n = CertificationTrackSubscription.objects.filter(
+                    user=tx.user, track_id=track_id, is_active=True
+                ).update(is_active=False)
+                if n:
+                    revoked.append(f"cert_track={track_id}")
+
+        # 3. Interview plan entitlement.
+        if product in ("interview_plan", "interview"):
+            from apps.interviews.models import InterviewEntitlement
+
+            n = InterviewEntitlement.objects.filter(user=tx.user).update(
+                interviews_remaining=0
+            )
+            if n:
+                revoked.append("interview_entitlement")
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.error(
+            "Entitlement revocation FAILED after refund for tx=%s user=%s: %s — "
+            "access must be revoked manually",
+            tx.id, tx.user_id, exc, exc_info=True,
+        )
+        return "REVOCATION FAILED — see logs"
+    return ", ".join(revoked)
+
+
 class RazorpayRefundView(APIView):
     """
     Admin-only: issue a partial or full refund for a Razorpay payment.
@@ -1687,6 +1748,23 @@ class RazorpayRefundView(APIView):
                 if tx.refunded_amount >= tx.amount:
                     tx.status = "refunded"
                 tx.save(update_fields=["gateway_response", "refunded_amount", "status"])
+
+                # Revoke the entitlement the refund paid for.
+                #
+                # This used to touch only the transaction row, so a refunded
+                # customer kept a full year of paid access — the money went back
+                # and the product did not. FAQ.jsx publicly promises "refunds
+                # within 7 days", which made this a standing revenue leak rather
+                # than an edge case.
+                #
+                # Only on FULL refund: a partial refund (goodwill credit, price
+                # adjustment) should not strip access that was partly paid for.
+                if tx.status == "refunded":
+                    revoked = _revoke_entitlement_for_transaction(tx)
+                    logger.info(
+                        "Refund revoked entitlement for tx=%s user=%s: %s",
+                        tx.id, tx.user_id, revoked or "nothing matched",
+                    )
 
             logger.info(
                 "Refund issued by admin %s: payment_id=%s amount=₹%s refund_id=%s",
