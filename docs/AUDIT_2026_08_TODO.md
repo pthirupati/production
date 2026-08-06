@@ -3744,6 +3744,39 @@ false positives on day one** — the classic way a secret scanner gets muted and
 being trusted. **§S2 must exclude lines within 6 lines of a `SIMULATED-CREDENTIAL`
 marker**, or match on real-secret shapes rather than the word "PASS".
 
+### 8. §S2/§S3 — secret scanner: catches real leaks, gated on PR, and fast
+- [x] Generic `NAME=value` pass added. **10 of 10** known-leaked lines in
+      `SETUP_COMPLETE.md` flagged; **zero false positives** across all 16,372
+      tracked files. Wired into `ci.yml` so it gates every PR (it previously ran
+      only in deploy/manual workflows, which is how those credentials merged green).
+- [x] **Performance regression I introduced and then fixed: 8m10s → 1.6s (~300×).**
+      The first version was a per-file bash loop spawning grep once per file per
+      pattern — 16,372 files × 8 patterns ≈ 131,000 process spawns. Replaced with
+      two `git grep` invocations that apply pathspec exclusions in-process.
+      **Caught only because a background run had `time` around it.** An 8-minute PR
+      gate would have been deleted by someone, which is worse than no scanner.
+      *Do not reintroduce a per-file loop in that script.*
+
+**Four false positives found and eliminated, each from a live run — this is the
+list to consult before widening the patterns again:**
+| Hit | Why it is not a secret |
+|---|---|
+| `.github/workflows/*` `SECRET_KEY` | throwaway key for the ephemeral CI test DB; real CI secrets come from GitHub Environments |
+| `tutorials_extra.json` k8s Secret manifest | the manifest **is** the lesson content |
+| `test_billing_webhooks.py`, `test/smoketest_e2e.py` | test fixtures (note `test/` singular + `smoketest_*` matched neither `**/tests/**` nor `**/test_*.py`) |
+| `setup-gmail-oauth.py` f-string | `print(f"...={creds.refresh_token}")` **emits** a secret at runtime, does not contain one; the filter knew `${VAR}` but not f-string fields |
+
+**Two false negatives, which matter more:** the value class started as
+`[A-Za-z0-9+/_@%.-]` and caught only **4 of 10** real leaks, because a Django
+`SECRET_KEY` contains `!#$%^&*()=+` and the 16-char run broke at the first special
+character. And a bare `/your/` placeholder filter silently suppressed a real
+`AWS_SECRET_ACCESS_KEY` whose value contained that substring. Both tightened.
+- [x] Self-test: a planted `AKIA` key confirms the rewritten prefix pass still
+      fires, rather than being silently broken by the rewrite.
+- [ ] **The leaked credentials themselves still need rotating out-of-band** (§S1).
+      The scanner only stops new ones landing. It will keep failing CI until
+      `SETUP_COMPLETE.md` is scrubbed — that is intentional.
+
 ## Still open from this turn's asks
 - [ ] **§X1c — 3D exists in only 1 of 10 rooms.** `currentRoom.type === 'data_hall'`
       gates it, so walking a portal out of the data hall leaves 3D entirely. This is
