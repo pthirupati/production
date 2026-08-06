@@ -3792,3 +3792,84 @@ character. And a bare `/your/` placeholder filter silently suppressed a real
 - [ ] Technology cards show `scenario_count` when the API supplies it; with the API
       down they fall back to the static tag. Worth confirming the live
       `/api/technologies/` payload actually includes `scenario_count`.
+
+---
+
+# IMPLEMENTATION LOG — 2026-08-06 (session 3)
+
+## ✅ Landed
+
+### 9. Signup page — live stats, and two untrue claims removed
+- [x] Stats were fully static: **"9+ Live Labs" against 7,280 scenarios and
+      "5 Technologies" against 46** — understating the catalogue by three orders of
+      magnitude and reading as placeholder copy. Now live from `/api/stats/`
+      (`PlatformStatsView`, 2-min cached, returns zeros rather than 500ing):
+      Hands-on labs / Technologies / Labs solved / Engineers training, `k+`
+      formatted, em-dash while in flight, never blocks signup.
+- [x] **Removed a fabricated endorsement.** `Register.jsx` carried a five-star
+      quote from *"Sarah K., SRE at Cloudflare"*. No such person, and Cloudflare
+      has not endorsed the product — a fake testimonial using a real company's name
+      to imply one. That is a misleading advertisement under the Consumer
+      Protection Act 2019 / CCPA endorsement rules. Replaced with three claims
+      checkable from the product. **Do not reintroduce invented testimonials.**
+      *Checked the rest of the codebase:* the home page uses generic role personas
+      ("DevOps Engineer · Enterprise") with no named individual or employer — a
+      defensible middle ground, left alone.
+- [x] **Removed "99.9% Uptime"** from `AuthShell` (shown on `/login`). The platform
+      does not measure or publish availability — monitoring is a 30-minute health
+      check with no SLO (§Z5-17), so it was an unsubstantiated SLA claim. Now
+      "Isolated labs", which is true and covered by `test_multiuser_isolation.py`.
+- **Verification gotcha worth remembering:** the signup illustration panel is
+      desktop-only. An initial check at a narrow viewport reported every string
+      absent — a **false pass**, because `innerText` excludes hidden subtrees while
+      `querySelectorAll` still finds them. Always confirm this panel at ≥1024px.
+      A second false negative: `includes('Included from day one')` failed because
+      CSS `uppercase` makes `innerText` return `INCLUDED FROM DAY ONE`.
+
+### 10. Payment correctness — four money bugs fixed (§Z1)
+143 billing / payment / certification / interview tests pass after these.
+- [x] **§Z1-1 live revenue loss.** Cart showed the full total beside
+      "Subscribe All (N)" while charging `cart[0]` only — a 5-item cart displayed
+      ~₹2,495 and charged ₹499 for one technology. No multi-line order endpoint
+      exists server-side, so the CTA now names the technology and amount actually
+      being charged and states how many remain.
+- [x] **§Z1-2 cert purchase broke on the second sale ever.** `idempotency_key` is
+      `unique=True` with no default and was omitted, so the first purchase inserted
+      `""` and every later one raised `IntegrityError` **after capture was verified
+      and the subscription row created**. Now a deterministic sha256 of
+      (user, track, order) via `get_or_create`.
+- [x] **§Z1-3 free paid plans on one settings regression.** The interview signature
+      check returned `DEMO_PAYMENT_ENABLED` without the `DEBUG` gate every sibling
+      verifier has. Now requires both.
+- [x] **§Z1-4 Stripe replay re-granted a year.** Deduped by a 1-hour Redis key while
+      Stripe retries for up to three days; a restart inside that window let a replay
+      re-run `activate_interview_plan`. Now uses the durable `ProcessedWebhookEvent`
+      row the Razorpay path already had.
+- [x] **§Z1-5 the enabler.** `generate_idempotency_key` mixed in `timezone.now()`,
+      so every call was unique and the duplicate check it feeds could never match.
+      Now takes an explicit `scope`: the Stripe session id where one exists (it was
+      already in scope and ignored), and product identity + a 10-minute bucket in
+      `payment_service` — collapses double-submits without blocking a legitimate
+      renewal months later.
+
+### 11. §S1 — the 10 tracked credentials redacted
+- [x] Values replaced with `<REDACTED-ROTATE-ME>`; scanner now clean across all
+      16,372 files, which unblocks the PR gate added in §S3.
+- [ ] **STILL OPEN AND OWNER-ONLY: the credentials are in git history and must be
+      treated as public. Rotate out-of-band on the servers** — Django `SECRET_KEY`,
+      Postgres, Redis, RabbitMQ, Razorpay key secret, AWS secret access key.
+      **Not** via the deploy workflow's `rotate_secrets` flag (known to break
+      login). Redacting the file does not reduce the exposure.
+
+## ⚠️ Why production deploy is NOT triggered in this session
+Everything above is committed and locally green, but four things gate a 4D deploy
+and three of them are owner-only:
+1. **The leaked credentials are unrotated** (§S1 above). Deploying does not fix it.
+2. **Real payment flow cannot be validated end-to-end without live Razorpay keys.**
+   Entering payment credentials is not something to automate — the code paths are
+   fixed and unit-tested, but "securely transacting" needs a real test charge by
+   the owner in the Razorpay dashboard.
+3. **Deploy flag invariants** (`rotate_secrets=false`, `build_scenarios=false`) and
+   the **metadata-push race** (push and verify-sync *before* triggering) — see the
+   deploy memories. These are easy to get wrong under time pressure.
+4. GitHub Actions CI has not run yet; only the equivalent checks locally.
