@@ -38,7 +38,11 @@ function DefaultIllustration() {
           <Shield size={13} /> Secure
         </div>
         <div className="absolute top-[42%] -left-10 flex items-center gap-1.5 px-3 py-2 rounded-[11px] bg-[rgba(16,20,38,.92)] border border-accent-blue/35 text-xs font-semibold text-accent-blue shadow-lg animate-[fxBob_4s_ease-in-out_.8s_infinite]">
-          <Cpu size={13} /> 99.9% Uptime
+          {/* Was "99.9% Uptime" — an availability figure the platform does not
+              measure or publish (monitoring is a 30-minute health check with no
+              SLO), i.e. an unsubstantiated SLA claim. "Isolated labs" is true and
+              is covered by backend/tests/test_multiuser_isolation.py. */}
+          <Cpu size={13} /> Isolated labs
         </div>
         <div className="absolute bottom-[14%] -right-[30px] flex items-center gap-1.5 px-3 py-2 rounded-[11px] bg-[rgba(16,20,38,.92)] border border-accent-amber/35 text-xs font-semibold text-accent-amber shadow-lg animate-[fxBob_3.4s_ease-in-out_.4s_infinite]">
           <Zap size={13} /> Live Labs
