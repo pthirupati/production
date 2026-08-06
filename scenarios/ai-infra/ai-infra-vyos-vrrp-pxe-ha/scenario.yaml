@@ -48,19 +48,23 @@ hints:
   content: Power-cycle or disable the MASTER, confirm BACKUP takes the VIP, and MAAS can still Enlist, then FIXED-OK.
 consoles:
 - vyos
-- terminal
 - baremetal
+- terminal
+- datacenter
+- lxd
+datacenter_link: true
 hosted_as: baremetal
 lab_servers:
 - id: pxe-router-01
   role: primary
   hostname: pxe-router-01
   persona: baremetal
-  appears_in:
+appears_in:
   - vyos
-  - terminal
   - baremetal
-- id: pxe-router-02
+  - terminal
+  - datacenter
+  - lxd
   role: secondary
   hostname: pxe-router-02
   persona: baremetal

@@ -25,10 +25,12 @@ import { LabBackendTerminalStatusBar } from '../components/linux/LinuxTerminalCh
 import PrimaryLabSim from '../components/lab/PrimaryLabSim'
 import LazySimPanel from '../components/lab/LazySimPanel'
 import { LabChromeControls } from '../components/lab/LabChromeBar'
+import CompanionToolStrip from '../components/lab/CompanionToolStrip'
 import SimErrorBoundary from '../components/SimErrorBoundary'
 import {
   resolvePrimarySimFromConsoles,
   consolesInclude,
+  companionChipsFromConsoles,
 } from '../utils/scenarioConsoles'
 import {
   LazyAwsLabOverlay,
@@ -515,11 +517,23 @@ export default function LabRunner() {
     setGuidedDone({})
   }, [sessionId])
 
-  // Terraform IDE "Open Bare Metal" / cloud consoles → companion overlay in this lab.
+  // Terraform IDE / Packer / companions → open overlay in this lab (mutual exclusion).
   useEffect(() => {
     const onOpen = (ev) => {
       const kind = ev?.detail?.kind
-      if (kind === 'baremetal') setShowBaremetalSim(true)
+      if (!kind) return
+      // Close every companion first so AWX/VyOS/MAAS never stack or hide each other.
+      setShowBaremetalSim(false)
+      setShowLxdSim(false)
+      setShowAwsSim(false)
+      setShowAzureSim(false)
+      setShowGcpSim(false)
+      setShowDatacenterSim(false)
+      setShowAwxSim(false)
+      setShowPackerSim(false)
+      setShowVyosSim(false)
+      setShowTerraformSim(false)
+      if (kind === 'baremetal' || kind === 'maas') setShowBaremetalSim(true)
       else if (kind === 'lxd') setShowLxdSim(true)
       else if (kind === 'aws') setShowAwsSim(true)
       else if (kind === 'azure') setShowAzureSim(true)
@@ -527,6 +541,8 @@ export default function LabRunner() {
       else if (kind === 'datacenter') setShowDatacenterSim(true)
       else if (kind === 'awx') setShowAwxSim(true)
       else if (kind === 'packer') setShowPackerSim(true)
+      else if (kind === 'vyos') setShowVyosSim(true)
+      else if (kind === 'terraform') setShowTerraformSim(true)
     }
     window.addEventListener('fixitlab:open-companion', onOpen)
     return () => window.removeEventListener('fixitlab:open-companion', onOpen)
@@ -1312,18 +1328,29 @@ export default function LabRunner() {
   }, [sendToHostTerminal])
 
   // ImageDev / Packer labs: auto-open Packer IDE (must run before any early return).
+  // Skip when VyOS is the primary companion intent — PXE underlay labs must not
+  // land on Packer/MAAS by mistake.
   useEffect(() => {
     if (!sessionId || loading || provisioning || !scenario) return undefined
     const tech = (scenario?.technology?.slug || '').toLowerCase()
     const hay = `${scenario?.slug || ''} ${scenario?.title || ''} ${scenario?.topic || ''}`.toLowerCase()
+    const vyos = consolesInclude(scenario?.consoles, 'vyos')
+      || /(?:^|[-_/])vyos(?:[-_/]|$)/.test(hay)
+    if (vyos) return undefined
     const packer = consolesInclude(scenario?.consoles, 'packer')
       || (tech === 'ai-infra' && /packer|image[-_]?factory|imagedev|libguestfs|cloud-init|e2e-image|gpu-image/.test(hay))
       || /packer|image[-_]?factory|imagedev/.test(hay)
-    if (packer) setShowPackerSim(true)
+    if (packer) {
+      setShowBaremetalSim(false)
+      setShowAwxSim(false)
+      setShowVyosSim(false)
+      setShowPackerSim(true)
+    }
     return undefined
   }, [sessionId, loading, provisioning, scenario])
 
-  // VyOS underlay labs: auto-open the VyOS console (same hook discipline as Packer).
+  // VyOS underlay labs: auto-open VyOS and close MAAS/AWX/Packer so the router
+  // console is what the learner sees — not Bare Metal.
   useEffect(() => {
     if (!sessionId || loading || provisioning || !scenario) return undefined
     const tech = (scenario?.technology?.slug || '').toLowerCase()
@@ -1331,7 +1358,34 @@ export default function LabRunner() {
     const vyos = consolesInclude(scenario?.consoles, 'vyos')
       || (tech === 'ai-infra' && /(?:^|[-_/])vyos(?:[-_/]|$)/.test(hay))
       || /(?:^|[-_/])vyos(?:[-_/]|$)/.test(hay)
-    if (vyos) setShowVyosSim(true)
+    if (vyos) {
+      setShowBaremetalSim(false)
+      setShowPackerSim(false)
+      setShowAwxSim(false)
+      setShowDatacenterSim(false)
+      setShowVyosSim(true)
+    }
+    return undefined
+  }, [sessionId, loading, provisioning, scenario])
+
+  // AWX companion labs (incl. AI Infra fleet): auto-open AWX when listed in
+  // consoles, unless Packer/VyOS already owns the first screen.
+  useEffect(() => {
+    if (!sessionId || loading || provisioning || !scenario) return undefined
+    const hay = `${scenario?.slug || ''} ${scenario?.title || ''} ${scenario?.topic || ''}`.toLowerCase()
+    const vyos = consolesInclude(scenario?.consoles, 'vyos') || /(?:^|[-_/])vyos(?:[-_/]|$)/.test(hay)
+    const packer = consolesInclude(scenario?.consoles, 'packer')
+      || /packer|image[-_]?factory|imagedev/.test(hay)
+    if (vyos || packer) return undefined
+    const awx = consolesInclude(scenario?.consoles, 'awx')
+      || consolesInclude(scenario?.consoles, 'ansible')
+      || /(?:^|[-_/])awx(?:[-_/]|$)/.test(hay)
+    if (awx) {
+      setShowBaremetalSim(false)
+      setShowPackerSim(false)
+      setShowVyosSim(false)
+      setShowAwxSim(true)
+    }
     return undefined
   }, [sessionId, loading, provisioning, scenario])
 
@@ -1917,6 +1971,51 @@ export default function LabRunner() {
         )
       )
     )
+  // YAML-driven companion set (entitlements still gate the chips below).
+  const yamlCompanionChips = companionChipsFromConsoles(scenario?.consoles, { techSlug: techSlugLc })
+  const showVyosLink = isVyosLab || yamlCompanionChips.includes('vyos')
+  const showPackerLink = isPackerLab || yamlCompanionChips.includes('packer')
+  const openCompanion = useCallback((kind) => {
+    try {
+      window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind } }))
+    } catch { /* ignore */ }
+  }, [])
+  // Floating strip chips — always visible above fullscreen companions.
+  const floatingCompanionChips = useMemo(() => {
+    const ordered = []
+    const add = (kind, ok) => { if (ok && !ordered.includes(kind)) ordered.push(kind) }
+    add('vyos', showVyosLink)
+    add('baremetal', showHostedBaremetalLink || isBaremetalGuiLab)
+    add('lxd', showLxdLink)
+    add('awx', showAwxLink || isAwxLab)
+    add('packer', showPackerLink)
+    add('datacenter', showDatacenterLink)
+    add('terraform', isTerraformSimLab || yamlCompanionChips.includes('terraform'))
+    add('aws', showHostedAwsLink || isAwsLab)
+    add('azure', showHostedAzureLink || isAzureLab)
+    add('gcp', showHostedGcpLink || isGcpLab)
+    return ordered
+  }, [
+    showVyosLink, showHostedBaremetalLink, isBaremetalGuiLab, showLxdLink,
+    showAwxLink, isAwxLab, showPackerLink, showDatacenterLink, isTerraformSimLab,
+    yamlCompanionChips, showHostedAwsLink, isAwsLab, showHostedAzureLink, isAzureLab,
+    showHostedGcpLink, isGcpLab,
+  ])
+  const activeCompanionKind = showVyosSim ? 'vyos'
+    : showPackerSim ? 'packer'
+    : showAwxSim ? 'awx'
+    : showLxdSim ? 'lxd'
+    : showBaremetalSim ? 'baremetal'
+    : showDatacenterSim ? 'datacenter'
+    : showTerraformSim ? 'terraform'
+    : showAwsSim ? 'aws'
+    : showAzureSim ? 'azure'
+    : showGcpSim ? 'gcp'
+    : (isSimPrimaryLab ? primarySimKind : null)
+  const showFloatingCompanionStrip = floatingCompanionChips.length > 0 && (
+    simOverlayOpen || isSimPrimaryLab || showPackerSim || showVyosSim || showAwxSim
+    || showBaremetalSim || showLxdSim || showDatacenterSim || showTerraformSim
+  )
   const vmwareWorkflowHint = showVmwareCompanionLink
     ? 'Use vCenter for hypervisor steps, then return here and rescan/reboot.'
     : showVmwareSubscribeHint
@@ -2827,7 +2926,7 @@ export default function LabRunner() {
               {showDatacenterLink && (
                 <button
                   type="button"
-                  onClick={() => setShowDatacenterSim(true)}
+                  onClick={() => openCompanion('datacenter')}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
                   style={{ borderColor: 'rgba(249,115,22,.5)', color: '#fb923c', background: 'rgba(249,115,22,.12)' }}
                   title="Same server in the data center — reseat NIC/disk, power, firmware"
@@ -2847,7 +2946,7 @@ export default function LabRunner() {
               {showAwxLink && (
                 <button
                   type="button"
-                  onClick={() => setShowAwxSim(true)}
+                  onClick={() => openCompanion('awx')}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
                   style={{ borderColor: 'rgba(238,0,0,.45)', color: '#ff6b6b', background: 'rgba(238,0,0,.12)' }}
                 >
@@ -2857,18 +2956,18 @@ export default function LabRunner() {
               {showHostedBaremetalLink && (
                 <button
                   type="button"
-                  onClick={() => setShowBaremetalSim(true)}
+                  onClick={() => openCompanion('baremetal')}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
                   style={{ borderColor: 'rgba(13,148,136,.45)', color: '#2dd4bf', background: 'rgba(13,148,136,.14)' }}
-                  title="Open MAAS / LXD / KVM bare metal console"
+                  title="Open MAAS — works with VyOS PXE, LXD, AWX, Datacenter"
                 >
-                  <ExternalLink size={12} /> Open Bare Metal
+                  <ExternalLink size={12} /> Open MAAS
                 </button>
               )}
               {showLxdLink && (
                 <button
                   type="button"
-                  onClick={() => setShowLxdSim(true)}
+                  onClick={() => openCompanion('lxd')}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
                   style={{ borderColor: 'rgba(233,84,32,.45)', color: '#E95420', background: 'rgba(233,84,32,.12)' }}
                   title="Open LXD console — instances, profiles, storage, cluster"
@@ -2876,28 +2975,21 @@ export default function LabRunner() {
                   <ExternalLink size={12} /> Open LXD
                 </button>
               )}
-              {isVyosLab && (
+              {showVyosLink && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowBaremetalSim(false)
-                    setShowAwxSim(false)
-                    setShowDatacenterSim(false)
-                    setShowVyosSim(true)
-                    setSimTerminalOpen(true)
-                    setSidebarOpen(false)
-                  }}
+                  onClick={() => openCompanion('vyos')}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
                   style={{ borderColor: 'rgba(234,179,8,.45)', color: '#facc15', background: 'rgba(234,179,8,.12)' }}
-                  title="VyOS — Lab Terminal CLI + ops dashboard"
+                  title="VyOS router console — configure/commit underlay for MAAS PXE"
                 >
                   <Terminal size={12} /> Open VyOS
                 </button>
               )}
-              {isPackerLab && (
+              {showPackerLink && (
                 <button
                   type="button"
-                  onClick={() => setShowPackerSim(true)}
+                  onClick={() => openCompanion('packer')}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
                   style={{ borderColor: 'rgba(2,168,239,.45)', color: '#02A8EF', background: 'rgba(2,168,239,.12)' }}
                   title="Open Packer workspace — edit .pkr.hcl, validate, build, publish to MAAS"
@@ -3059,7 +3151,7 @@ export default function LabRunner() {
           {showDatacenterLink && (
             <button
               type="button"
-              onClick={() => setShowDatacenterSim(true)}
+              onClick={() => openCompanion('datacenter')}
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(249,115,22,.5)', color: '#fb923c', background: 'rgba(249,115,22,.12)' }}
               title="Same server in the data center — reseat NIC/disk, power, firmware"
@@ -3173,7 +3265,7 @@ export default function LabRunner() {
           {showAwxLink && (
             <button
               type="button"
-              onClick={() => setShowAwxSim(true)}
+              onClick={() => openCompanion('awx')}
               title="Open Ansible AWX / Tower — run this playbook as a job template from the controller (login: lab_awx / lab_awx@123)"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(238,0,0,.45)', color: '#ff6b6b', background: 'rgba(238,0,0,.12)' }}
@@ -3230,7 +3322,7 @@ export default function LabRunner() {
           {isPackerLab && (
             <button
               type="button"
-              onClick={() => setShowPackerSim(true)}
+              onClick={() => openCompanion('packer')}
               title="Open Packer workspace — edit .pkr.hcl, validate, and build (CVE gate → MAAS)"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(2,168,239,.45)', color: '#02A8EF', background: 'rgba(2,168,239,.12)' }}
@@ -3252,29 +3344,29 @@ export default function LabRunner() {
           {isBaremetalGuiLab && (
             <button
               type="button"
-              onClick={() => setShowBaremetalSim(true)}
+              onClick={() => openCompanion('baremetal')}
               title="Open MAAS / LXD / KVM bare metal console"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(13,148,136,.45)', color: '#2dd4bf', background: 'rgba(13,148,136,.14)' }}
             >
-              <ExternalLink size={12} /> Open Bare Metal
+              <ExternalLink size={12} /> Open MAAS
             </button>
           )}
           {showHostedBaremetalLink && (
             <button
               type="button"
-              onClick={() => setShowBaremetalSim(true)}
-              title="Open MAAS / LXD console — Terraform apply mirrors enlist/create here"
+              onClick={() => openCompanion('baremetal')}
+              title="Open MAAS — enlist, commission, deploy (works with VyOS PXE underlay, LXD, AWX, Datacenter)"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(13,148,136,.45)', color: '#2dd4bf', background: 'rgba(13,148,136,.14)' }}
             >
-              <ExternalLink size={12} /> Open Bare Metal
+              <ExternalLink size={12} /> Open MAAS
             </button>
           )}
           {showLxdLink && (
             <button
               type="button"
-              onClick={() => setShowLxdSim(true)}
+              onClick={() => openCompanion('lxd')}
               title="Open LXD console — instances, profiles, storage, cluster"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(233,84,32,.45)', color: '#E95420', background: 'rgba(233,84,32,.12)' }}
@@ -3282,18 +3374,11 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open LXD
             </button>
           )}
-          {isVyosLab && (
+          {showVyosLink && (
             <button
               type="button"
-              onClick={() => {
-                setShowBaremetalSim(false)
-                setShowAwxSim(false)
-                setShowDatacenterSim(false)
-                setShowVyosSim(true)
-                setSimTerminalOpen(true)
-                setSidebarOpen(false)
-              }}
-              title="VyOS — Lab Terminal CLI + ops dashboard"
+              onClick={() => openCompanion('vyos')}
+              title="VyOS router console — configure/commit underlay for MAAS PXE"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(234,179,8,.45)', color: '#facc15', background: 'rgba(234,179,8,.12)' }}
             >
@@ -3724,7 +3809,7 @@ export default function LabRunner() {
             onToggleTerminal={() => setShowLxdSim(false)} {...simChromeProps} />
         </div>
       )}
-      {isVyosLab && showVyosSim && (
+      {showVyosLink && showVyosSim && (
         <div className={companionOverlayClass}>
           <LazySimPanel
             Sim={LazyVyosConsole}
@@ -3779,7 +3864,7 @@ export default function LabRunner() {
         </div>
       )}
 
-      {isPackerLab && showPackerSim && (
+      {showPackerLink && showPackerSim && (
         <Suspense fallback={<div className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center text-sm text-sky-200">Loading Packer workspace…</div>}>
           <LazyPackerWorkspaceIde
             sessionId={sessionId}
@@ -3860,6 +3945,14 @@ export default function LabRunner() {
             {...simChromeProps}
           />
         </div>
+      )}
+
+      {showFloatingCompanionStrip && (
+        <CompanionToolStrip
+          chips={floatingCompanionChips}
+          activeKind={activeCompanionKind}
+          onOpen={openCompanion}
+        />
       )}
 
       {showShortcuts && (

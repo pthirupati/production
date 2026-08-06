@@ -113,12 +113,19 @@ hints:
     is actually healthy.'
 consoles:
 - awx
+- baremetal
+- lxd
 - terminal
+- datacenter
 lab_servers:
 - id: gpu-node-01
   role: primary
   hostname: gpu-node-01
   persona: baremetal
-  appears_in:
+appears_in:
   - awx
+  - baremetal
+  - lxd
   - terminal
+  - datacenter
+datacenter_link: true

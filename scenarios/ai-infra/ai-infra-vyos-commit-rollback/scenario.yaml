@@ -41,14 +41,20 @@ hints:
   content: Re-apply the intended safe set … lines, compare, commit, verify BGP/PXE, then FIXED-OK.
 consoles:
 - vyos
-- terminal
 - baremetal
+- terminal
+- datacenter
+- lxd
+datacenter_link: true
 hosted_as: baremetal
 lab_servers:
 - id: gpu-node-01
   role: primary
   hostname: gpu-node-01
   persona: baremetal
-  appears_in:
-  - terminal
+appears_in:
+  - vyos
   - baremetal
+  - terminal
+  - datacenter
+  - lxd

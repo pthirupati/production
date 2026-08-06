@@ -189,6 +189,27 @@ def set_power(
     if source and source not in server.get("sources", []):
         server.setdefault("sources", []).append(source)
     saved = _save(session_id, server)
+    # Power-off must drop terminal SSH/ICMP maps so stopped cloud VMs stop
+    # answering ping/ssh — matching Fortune-100 guest lifecycle.
+    if power == "off":
+        try:
+            unregister_terminal_ssh_host(
+                session_id,
+                hostname=server.get("hostname") or "",
+                ip=server.get("primary_ip") or "",
+            )
+        except Exception:
+            pass
+    elif power == "on" and (server.get("primary_ip") or "") and (server.get("hostname") or ""):
+        try:
+            register_terminal_ssh_host(
+                session_id,
+                hostname=server["hostname"],
+                ip=server["primary_ip"],
+                source=source or "power-on",
+            )
+        except Exception:
+            pass
     publish_event(
         session_id, "server.power", {"server_id": server_id, "power": power, "source": source},
         trace_id=trace_id,
@@ -529,6 +550,61 @@ def upsert_from_maas_machine(
     return row
 
 
+def upsert_from_lxd_instance(
+    session_id: str,
+    instance: dict,
+    *,
+    source: str = "lxd",
+    owner: str = "ai-infra",
+) -> dict | None:
+    """Register an LXD instance host into the unified asset registry."""
+    if not session_id or not isinstance(instance, dict):
+        return None
+    name = (instance.get("name") or "").strip()
+    if not name:
+        return None
+    status = (instance.get("status") or "Stopped").strip()
+    ip = instance.get("ipv4") or instance.get("ip") or ""
+    power = "on" if status.lower() == "running" else "off"
+    has_gpu = bool(instance.get("nvidia_smi_ok")) or any(
+        isinstance(d, dict) and d.get("type") == "gpu"
+        for d in (instance.get("devices") or {}).values()
+    )
+    patch: dict[str, Any] = {
+        "id": f"lxd-{name}",
+        "hostname": name,
+        "primary_ip": ip,
+        "power": power,
+        "os": "ubuntu-22.04",
+        "install_state": status,
+        "serial": f"LXD-{name.upper()[:12]}",
+        "asset_tag": f"LXD-{name.upper()}",
+        "owner": owner,
+        "cpu": int((instance.get("config") or {}).get("limits.cpu") or 4),
+        "mem_mb": 8192,
+        "physical_location": {
+            "room": "Hall-A",
+            "rack": "R14",
+            "u_position": 8,
+        },
+        "tags": {
+            "role": "lxd-instance",
+            "type": instance.get("type") or "container",
+            "project": instance.get("project") or "default",
+            "location": instance.get("location") or "none",
+            "appears_in": ["lxd", "maas", "datacenter", "terminal"],
+        },
+    }
+    if has_gpu:
+        patch["gpu"] = {
+            "present": True,
+            "model": "NVIDIA H100 80GB HBM3",
+            "driver_loaded": bool(instance.get("nvidia_smi_ok")),
+            "health": "healthy" if instance.get("nvidia_smi_ok") else "unknown",
+        }
+    return upsert_server(session_id, patch, source=source)
+
+
 def list_assets(session_id: str) -> list[dict[str, Any]]:
     """CMDB-shaped projection of the unified asset registry (S1 #210)."""
     rows: list[dict[str, Any]] = []
@@ -687,6 +763,50 @@ def register_terminal_ssh_host(
             targets.append({"name": hostname, "ip": ip, "user": ssh_user})
             client_meta["ssh_targets"] = targets
             hosts["ssh_client"] = client_meta
+
+
+def unregister_terminal_ssh_host(
+    session_id: str,
+    *,
+    hostname: str = "",
+    ip: str = "",
+) -> None:
+    """Remove a peer from terminal host maps after power-off / terminate."""
+    hostname = (hostname or "").strip()
+    ip = (ip or "").strip()
+    if not hostname and not ip:
+        return
+    try:
+        from .shell import get_sim_session
+    except Exception:
+        return
+    entry = get_sim_session(str(session_id))
+    if not entry:
+        return
+    state = entry.setdefault("state", {})
+    hosts = state.setdefault("hosts", {})
+    host_ips = state.setdefault("host_ips", {})
+    # Drop by hostname and/or IP.
+    if hostname and hostname in hosts:
+        meta = hosts.pop(hostname) or {}
+        if not ip and isinstance(meta, dict):
+            ip = str(meta.get("ip") or "")
+    drop_ips = [k for k, v in list(host_ips.items()) if (ip and k == ip) or (hostname and v == hostname)]
+    for k in drop_ips:
+        host_ips.pop(k, None)
+    if ip:
+        host_ips.pop(ip, None)
+
+    def _unwire(shell) -> None:
+        if shell is None:
+            return
+        shell._host_names = dict(hosts)
+        shell._host_ips = dict(host_ips)
+
+    engine = state.get("engine")
+    if engine is not None:
+        _unwire(getattr(engine, "shell", None))
+    _unwire(state.get("ssh_client_shell"))
 
 
 def sync_awx_inventory(session_id: str, hosts: list[dict] | None) -> None:

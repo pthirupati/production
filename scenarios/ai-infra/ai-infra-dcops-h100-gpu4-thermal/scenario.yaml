@@ -108,6 +108,7 @@ hints:
 consoles:
 - datacenter
 - terminal
+- baremetal
 datacenter_link: true
 hosted_as: datacenter
 lab_servers:
@@ -115,6 +116,7 @@ lab_servers:
   role: primary
   hostname: gpu-node-01
   persona: baremetal
-  appears_in:
+appears_in:
   - datacenter
   - terminal
+  - baremetal

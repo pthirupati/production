@@ -50,6 +50,12 @@ def apply_cli_line(net: NetworkingState, line: str, shell_state=None) -> str:
     if shell_state is not None:
         net.bind_shell(shell_state)
 
+    # Tab-completion / context help (engineers type `?` or press Tab).
+    if line.endswith("?") or low.endswith(" ?"):
+        return net.vyos_help(line)
+    if line.endswith("\t") or low.endswith("<tab>"):
+        return net.vyos_complete(line.replace("<tab>", "").rstrip("\t"))
+
     if low == "configure" or low.startswith("configure "):
         return net.vyos_enter_configure()
     if low == "exit" and net.vyos_configure_mode:
@@ -99,6 +105,8 @@ def apply_cli_line(net: NetworkingState, line: str, shell_state=None) -> str:
         return net.vyos_show_config(candidate=cand)
     if "show ip bgp" in low or "bgp summary" in low or "show protocols bgp" in low:
         return net.show_ip_bgp_summary()
+    if "show ip ospf" in low or "show ip ospfv" in low:
+        return net.show_ip_ospf_neighbor()
     if "show ip route" in low:
         return net.show_ip_route()
     if "show interfaces" in low:
@@ -111,6 +119,8 @@ def apply_cli_line(net: NetworkingState, line: str, shell_state=None) -> str:
         return net.show_firewall()
     if "show dhcp" in low:
         return net.show_dhcp_leases()
+    if "show log" in low:
+        return net.show_log()
     if "show version" in low:
         return net.show_version()
     return f"Invalid command: {line}"

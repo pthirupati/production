@@ -39,16 +39,18 @@ hints:
   cost: 45
   content: lxc launch with -p gpu-passthrough; confirm RUNNING; leave FIXED-OK.
 consoles:
-- terminal
+- lxd
 - baremetal
-- datacenter
+- terminal
+- awx
 hosted_as: baremetal
 lab_servers:
 - id: gpu-node-01
   role: primary
   hostname: gpu-node-01
   persona: baremetal
-  appears_in:
-  - terminal
+appears_in:
+  - lxd
   - baremetal
-  - datacenter
+  - terminal
+  - awx

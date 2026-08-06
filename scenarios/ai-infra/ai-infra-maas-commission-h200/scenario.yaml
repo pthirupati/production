@@ -44,12 +44,19 @@ hints:
 consoles:
 - baremetal
 - terminal
+- lxd
+- awx
+- datacenter
+datacenter_link: true
 hosted_as: baremetal
 lab_servers:
 - id: gpu-node-h200
   role: primary
   hostname: gpu-node-h200
   persona: baremetal
-  appears_in:
+appears_in:
   - baremetal
   - terminal
+  - lxd
+  - awx
+  - datacenter

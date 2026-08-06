@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import CodeEditor from '../ide/CodeEditor'
+import IdeExplorer from '../ide/IdeExplorer'
 import LabTerminal, { scheduleReadySend } from '../LabTerminal'
-import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab, VscActivityButton } from '../ide/VsCodeWorkbench'
+import VsCodeWorkbench, { VscEditorTab, VscPanelTab, VscActivityButton } from '../ide/VsCodeWorkbench'
 import { LabChromeControls } from '../lab/LabChromeBar'
 import { baremetalApi } from '../../api/baremetal'
 import { packerApi } from '../../api/packer'
@@ -11,6 +12,7 @@ import {
   FileCode, FolderOpen, Play, Plus, Trash2, RefreshCw, Terminal, Files, ExternalLink, Upload,
   GitBranch, Workflow,
 } from 'lucide-react'
+import { parentDirs } from '../../utils/ide/fileTree'
 import '../../styles/vscode-workbench.css'
 
 const DEFAULT_MAIN = `# FixitLab GPU image factory — Packer HCL
@@ -120,6 +122,7 @@ export default function PackerWorkspaceIde({
     return { ...DEFAULT_FILES }
   })
   const [activeFile, setActiveFile] = useState('gpu-h100.pkr.hcl')
+  const [expandedDirs, setExpandedDirs] = useState(() => new Set())
   const [bottomTab, setBottomTab] = useState('output')
   const [output, setOutput] = useState('')
   const [dirty, setDirty] = useState(false)
@@ -246,6 +249,85 @@ export default function PackerWorkspaceIde({
 
   const canTerminal = terminalSession?.status === 'RUNNING'
   const fileList = Object.keys(files)
+  const dirtyPaths = dirty ? new Set([activeFile]) : new Set()
+
+  const toggleDir = useCallback((path) => {
+    setExpandedDirs((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }, [])
+
+  const createFileAt = useCallback((rawPath) => {
+    let name = String(rawPath || '').trim().replace(/^\/+/, '')
+    if (!name) return
+    if (!name.includes('.')) name = `${name}.pkr.hcl`
+    if (filesRef.current[name] !== undefined) {
+      toast.error('File already exists')
+      return
+    }
+    const next = { ...filesRef.current, [name]: '# New Packer configuration\n\n' }
+    filesRef.current = next
+    setFiles(next)
+    setActiveFile(name)
+    setDirty(true)
+    setExpandedDirs((prev) => {
+      const n = new Set(prev)
+      parentDirs(name).forEach((d) => n.add(d))
+      return n
+    })
+    toast.success(`Created ${name}`)
+  }, [])
+
+  const createFolderAt = useCallback((rawDir) => {
+    const dir = String(rawDir || '').trim().replace(/^\/+|\/+$/g, '')
+    if (!dir) return
+    const keep = `${dir}/.keep`
+    if (filesRef.current[keep] !== undefined) return
+    const next = { ...filesRef.current, [keep]: '' }
+    filesRef.current = next
+    setFiles(next)
+    setDirty(true)
+    setExpandedDirs((prev) => new Set([...prev, dir, ...parentDirs(keep)]))
+    toast.success(`Created folder ${dir}/`)
+  }, [])
+
+  const deletePackerFile = useCallback((f) => {
+    if (Object.keys(DEFAULT_FILES).includes(f)) {
+      toast.error('Cannot delete starter templates')
+      return
+    }
+    const next = { ...filesRef.current }
+    delete next[f]
+    filesRef.current = next
+    setFiles(next)
+    setDirty(true)
+    if (activeFile === f) setActiveFile(Object.keys(next).find((p) => !p.endsWith('/.keep')) || 'gpu-h100.pkr.hcl')
+  }, [activeFile])
+
+  const renamePackerFile = useCallback((path) => {
+    if (Object.keys(DEFAULT_FILES).includes(path)) {
+      toast.error('Cannot rename starter templates')
+      return
+    }
+    const input = window.prompt('Rename file', path)
+    if (!input) return
+    const nextName = input.trim().replace(/^\/+/, '')
+    if (!nextName || nextName === path) return
+    if (filesRef.current[nextName] !== undefined) {
+      toast.error('File already exists')
+      return
+    }
+    const next = { ...filesRef.current }
+    next[nextName] = next[path]
+    delete next[path]
+    filesRef.current = next
+    setFiles(next)
+    setActiveFile(nextName)
+    setDirty(true)
+  }, [])
 
   const syncFilesToShell = useCallback(() => {
     const entries = Object.entries(filesRef.current || {})
@@ -258,14 +340,18 @@ export default function PackerWorkspaceIde({
     setOutput((prev) => `${prev ? `${prev}\n` : ''}Synced ${entries.length} file(s) to lab workspace.`)
   }, [sendToTerminal])
 
-  const openMaasImages = useCallback(() => {
+  const openCompanion = useCallback((kind, label) => {
     try {
-      window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind: 'baremetal' } }))
-      toast.success('Opening MAAS Images', { duration: 1500 })
+      window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind } }))
+      toast.success(`Opening ${label}`, { duration: 1500 })
     } catch {
-      toast.error('Could not open MAAS companion')
+      toast.error(`Could not open ${label}`)
     }
   }, [])
+
+  const openMaasImages = useCallback(() => {
+    openCompanion('baremetal', 'MAAS Images')
+  }, [openCompanion])
 
   const publishToMaas = useCallback(async () => {
     const currentSku = detectSku()
@@ -455,12 +541,27 @@ export default function PackerWorkspaceIde({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-[var(--vsc-bg,#1e1e1e)]">
+    <div className="fixed inset-0 z-[80] flex flex-col bg-[var(--vsc-bg,#1e1e1e)]">
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--vsc-border,#333)] shrink-0">
         <span className="text-xs font-semibold text-[#02A8EF]">Packer Image Factory</span>
         <span className="text-[10px] text-[var(--vsc-muted)] truncate">{scenario?.title || scenario?.slug || 'GPU image build'}</span>
         <span className="text-[10px] font-mono text-[#02A8EF]/opacity-80 hidden sm:inline">{bootResourceName}</span>
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex items-center gap-1.5 flex-wrap justify-end">
+          <button type="button" onClick={openMaasImages} className="vsc-btn text-[10px] inline-flex items-center gap-1" title="Open MAAS">
+            <ExternalLink size={11} /> MAAS
+          </button>
+          <button type="button" onClick={() => openCompanion('awx', 'AWX')} className="vsc-btn text-[10px] inline-flex items-center gap-1" title="Open AWX">
+            <ExternalLink size={11} /> AWX
+          </button>
+          <button type="button" onClick={() => openCompanion('lxd', 'LXD')} className="vsc-btn text-[10px] inline-flex items-center gap-1" title="Open LXD">
+            <ExternalLink size={11} /> LXD
+          </button>
+          <button type="button" onClick={() => openCompanion('vyos', 'VyOS')} className="vsc-btn text-[10px] inline-flex items-center gap-1" title="Open VyOS">
+            <ExternalLink size={11} /> VyOS
+          </button>
+          <button type="button" onClick={() => openCompanion('datacenter', 'Datacenter')} className="vsc-btn text-[10px] inline-flex items-center gap-1" title="Open Datacenter">
+            <ExternalLink size={11} /> Datacenter
+          </button>
           {showLabControls && (onHints || onCheck || onExtend || onStop) && (
             <LabChromeControls
               onHints={onHints}
@@ -509,53 +610,25 @@ export default function PackerWorkspaceIde({
         sidebarHeader={(
           <>
             <span className="flex items-center gap-1"><FolderOpen size={11} /> packer</span>
-            <button
-              type="button"
-              onClick={() => {
-                const name = window.prompt('New .pkr.hcl file:', 'custom.pkr.hcl')
-                if (!name?.endsWith('.pkr.hcl') && !name?.endsWith('.pkrvars.hcl')) return
-                const next = { ...filesRef.current, [name]: '# New Packer configuration\n' }
-                filesRef.current = next
-                setFiles(next)
-                setActiveFile(name)
-                setDirty(true)
-              }}
-              className="text-[var(--vsc-accent)]"
-              title="New file"
-            >
-              <Plus size={12} />
-            </button>
           </>
         )}
-        sidebar={fileList.map((f) => (
-          <div key={f} className="flex items-center gap-0.5 w-full group">
-            <VscFileItem
-              active={activeFile === f}
-              onClick={() => setActiveFile(f)}
-              className="flex-1 min-w-0"
-            >
-              <FileCode size={13} className="shrink-0 opacity-70" />
-              <span className="truncate">{f}</span>
-              {dirty && activeFile === f && <span className="ml-auto text-[10px] text-amber-400">●</span>}
-            </VscFileItem>
-            {!Object.keys(DEFAULT_FILES).includes(f) && (
-              <button
-                type="button"
-                onClick={() => {
-                  const next = { ...filesRef.current }
-                  delete next[f]
-                  filesRef.current = next
-                  setFiles(next)
-                  if (activeFile === f) setActiveFile(Object.keys(next)[0] || 'gpu-h100.pkr.hcl')
-                }}
-                className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-300"
-                title="Delete"
-              >
-                <Trash2 size={11} />
-              </button>
-            )}
-          </div>
-        ))}
+        sidebar={(
+          <IdeExplorer
+            files={files}
+            activePath={activeFile}
+            dirtyPaths={dirtyPaths}
+            expandedDirs={expandedDirs}
+            language="hcl"
+            onToggleDir={toggleDir}
+            onOpenFile={setActiveFile}
+            onDeleteFile={deletePackerFile}
+            onRenameFile={renamePackerFile}
+            onCreateFileAt={createFileAt}
+            onCreateFolderAt={createFolderAt}
+            protectedPaths={new Set(Object.keys(DEFAULT_FILES))}
+            emptyHint="No Packer files — create a .pkr.hcl template to begin."
+          />
+        )}
         editorTabs={fileList.map((f) => (
           <VscEditorTab key={f} active={activeFile === f} onClick={() => setActiveFile(f)}>
             <FileCode size={12} /> {f}{dirty && activeFile === f ? ' ●' : ''}

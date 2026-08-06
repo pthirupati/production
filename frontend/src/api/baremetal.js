@@ -177,6 +177,24 @@ export const baremetalApi = {
   lxdExec(sessionId, name, command) {
     return baremetalApi.action(sessionId, 'lxd_exec_echo', { name, command })
   },
+  lxdStorageCreate(sessionId, name, opts = {}) {
+    return baremetalApi.action(sessionId, 'lxd_storage_create', { name, ...opts })
+  },
+  lxdVolumeCreate(sessionId, pool, name, opts = {}) {
+    return baremetalApi.action(sessionId, 'lxd_storage_volume_create', { pool, name, ...opts })
+  },
+  lxdNetworkCreate(sessionId, name, opts = {}) {
+    return baremetalApi.action(sessionId, 'lxd_network_create', { name, ...opts })
+  },
+  lxdMove(sessionId, name, target) {
+    return baremetalApi.action(sessionId, 'lxd_move', { name, target })
+  },
+  lxdProjectSwitch(sessionId, name) {
+    return baremetalApi.action(sessionId, 'lxd_project_switch', { name })
+  },
+  lxdDeviceRemove(sessionId, name, device) {
+    return baremetalApi.action(sessionId, 'lxd_config_device_remove', { name, device })
+  },
   startKvm(sessionId, name) {
     return baremetalApi.action(sessionId, 'kvm_start', { name })
   },
@@ -210,6 +228,43 @@ export const baremetalApi = {
       boot_resource: name || `custom/${sku}-jammy`,
       architecture,
       source: source || `packer output-gpu-${sku}/`,
+    })
+  },
+  syncImages(sessionId, releases) {
+    return baremetalApi.action(sessionId, 'maas_sync_images', releases ? { releases } : {})
+  },
+  uploadBootResource(sessionId, fields = {}) {
+    return baremetalApi.action(sessionId, 'maas_upload_boot_resource', fields)
+  },
+  addDevice(sessionId, fields = {}) {
+    return baremetalApi.action(sessionId, 'maas_add_device', fields)
+  },
+  deleteDevice(sessionId, { hostname, mac } = {}) {
+    return baremetalApi.action(sessionId, 'maas_delete_device', { hostname, mac })
+  },
+  createTag(sessionId, fields = {}) {
+    return baremetalApi.action(sessionId, 'maas_create_tag', fields)
+  },
+  dhcpSnippetAdd(sessionId, fields = {}) {
+    return baremetalApi.action(sessionId, 'maas_dhcp_snippet_add', fields)
+  },
+  dhcpSnippetDelete(sessionId, name) {
+    return baremetalApi.action(sessionId, 'maas_dhcp_snippet_delete', { name })
+  },
+  composeKvm(sessionId, fields = {}) {
+    return baremetalApi.action(sessionId, 'maas_compose_kvm', fields)
+  },
+  restartControllerService(sessionId, controller, service) {
+    return baremetalApi.action(sessionId, 'maas_controller_restart_service', {
+      controller,
+      service,
+    })
+  },
+  createBond(sessionId, machineId, interfaces, name = 'bond0') {
+    return baremetalApi.action(sessionId, 'maas_create_bond', {
+      machine_id: machineId,
+      interfaces,
+      name,
     })
   },
   /** Packer Image Factory CI (see also api/packer.js). */

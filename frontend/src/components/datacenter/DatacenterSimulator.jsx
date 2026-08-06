@@ -128,16 +128,20 @@ export default function DatacenterSimulator({
   // tab bar / status strip / goal banner into the twin's thin in-world HUD.
   const [twinImmersive, setTwinImmersive] = useState(true)
   const [floorView, setFloorView] = useState(() => {
-    // Steam-class default: immersive 3D hall. Fall back to 2D on phones /
-    // reduced-motion so Twin3DSafe never bricks the lab chrome.
+    // Always prefer immersive 3D hall. Persist user choice; never force 2D
+    // just because the viewport is narrow — 3D walk works on tablets too.
     try {
       if (typeof window !== 'undefined') {
-        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return '2d'
-        if (window.matchMedia('(max-width: 900px)').matches) return '2d'
+        const saved = window.localStorage?.getItem('fixitlab.dc.floorView')
+        if (saved === '2d' || saved === '3d') return saved
       }
     } catch { /* ignore */ }
     return '3d'
   })
+  const setFloorViewPersist = useCallback((v) => {
+    setFloorView(v)
+    try { window.localStorage?.setItem('fixitlab.dc.floorView', v) } catch { /* ignore */ }
+  }, [])
   const dragRef = useRef(null)
   const movedRef = useRef(false)
   const liveTickInFlight = useRef(false)
@@ -443,7 +447,7 @@ export default function DatacenterSimulator({
                 <button
                   type="button"
                   className={`dc-btn-outline dc-btn-xs ${floorView === '2d' ? 'dc-view-active' : ''}`}
-                  onClick={() => setFloorView('2d')}
+                  onClick={() => setFloorViewPersist('2d')}
                   title="Isometric 2D floor plan"
                 >
                   <Move size={11} /> 2D floor
@@ -451,7 +455,7 @@ export default function DatacenterSimulator({
                 <button
                   type="button"
                   className={`dc-btn-outline dc-btn-xs ${floorView === '3d' ? 'dc-view-active' : ''}`}
-                  onClick={() => setFloorView('3d')}
+                  onClick={() => setFloorViewPersist('3d')}
                   title="Steam-class animated 3D hall — Walk (WASD) · falls back to 2D on GPU errors"
                 >
                   <Box size={11} /> 3D hall
@@ -466,7 +470,7 @@ export default function DatacenterSimulator({
       )}
 
       {currentRoom.type === 'data_hall' && floorView === '3d' && (
-        <Twin3DSafe onFallback={() => setFloorView('2d')}>
+        <Twin3DSafe onFallback={() => setFloorViewPersist('2d')}>
           <Suspense fallback={<div className="dc-3d-loading">Loading 3D twin…</div>}>
             <LazyDatacenterTwin3D
               racks={roomRacks}
@@ -478,7 +482,7 @@ export default function DatacenterSimulator({
               access={accessControl}
               objective={goal.objective ? `${goal.title ? `${goal.title}: ` : ''}${goal.objective}` : ''}
               onImmersiveChange={setTwinImmersive}
-              onExitTo2D={() => setFloorView('2d')}
+              onExitTo2D={() => setFloorViewPersist('2d')}
               audioControl={(
                 <DcAmbientAudio
                   alert={Boolean(

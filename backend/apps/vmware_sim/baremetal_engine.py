@@ -343,10 +343,51 @@ def _apply_storage_layout(m: dict, layout: str) -> None:
     m["storage_gb"] = storage_gb
 
 
+def _build_usb_inventory(hostname: str) -> list[dict]:
+    """Enumerate USB devices discovered during commissioning."""
+    devices = [
+        {
+            "bus": "001",
+            "device": "001",
+            "vendor": "Linux Foundation",
+            "product": "1.1 root hub",
+            "vendor_id": "1d6b",
+            "product_id": "0001",
+        },
+        {
+            "bus": "002",
+            "device": "001",
+            "vendor": "Linux Foundation",
+            "product": "2.0 root hub",
+            "vendor_id": "1d6b",
+            "product_id": "0002",
+        },
+        {
+            "bus": "001",
+            "device": "002",
+            "vendor": "American Megatrends Inc.",
+            "product": "Virtual Keyboard and Mouse",
+            "vendor_id": "046b",
+            "product_id": "ff10",
+        },
+    ]
+    if _is_gpu_host(hostname):
+        devices.append({
+            "bus": "001",
+            "device": "003",
+            "vendor": "NVIDIA",
+            "product": "GPU USB Type-C controller",
+            "vendor_id": "0955",
+            "product_id": "09ff",
+        })
+    return devices
+
+
 def _fill_commission_complete(m: dict) -> None:
     """Inventory + commissioning results when Commissioning → Ready."""
     hostname = m.get("hostname") or ""
     m["pci_devices"] = _build_pci_inventory(hostname)
+    m["usb_devices"] = _build_usb_inventory(hostname)
     m["commissioning_results"] = _default_commissioning_results(hostname)
     _machine_event(m, "Node changed status - Ready")
     if not m.get("storage") or len(m.get("storage") or []) < 1:
@@ -1028,14 +1069,28 @@ def _advance_machine(m: dict, now: float, *, session_id: str = "") -> None:
             m.pop("pending_os", None)
             _machine_event(m, "Node changed status - Deployed")
         elif status == "Testing":
-            m["status"] = m.pop("status_before_test", None) or "Ready"
-            m["test_results"] = [
+            fail = bool(m.pop("fail_testing", False))
+            hostname = m.get("hostname") or ""
+            results = [
                 {"name": "smartctl-short", "status": "passed"},
                 {"name": "internet-connectivity", "status": "passed"},
-                {"name": "cpu-stress", "status": "passed"},
+                {"name": "cpu-stress", "status": "failed" if fail else "passed"},
             ]
-            _machine_event(m, f"Node changed status - {m['status']}")
-            _log(m, "Hardware tests passed")
+            if _is_gpu_host(hostname):
+                results.append({
+                    "name": "60-gpu-sanity",
+                    "status": "failed" if fail else "passed",
+                })
+            m["test_results"] = results
+            if fail:
+                m.pop("status_before_test", None)
+                m["status"] = "Failed testing"
+                _machine_event(m, "Node changed status - Failed testing")
+                _log(m, "Hardware tests failed")
+            else:
+                m["status"] = m.pop("status_before_test", None) or "Ready"
+                _machine_event(m, f"Node changed status - {m['status']}")
+                _log(m, "Hardware tests passed")
         elif status == "Releasing":
             m["status"] = "Ready"
             m["os"] = ""
@@ -1369,7 +1424,9 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                   "lxd_profile_create", "lxd_profile_set", "lxd_config_device_add",
                   "lxd_project_create", "lxd_storage_list", "lxd_network_list",
                   "lxd_cluster_list", "lxd_exec_echo", "lxd_config_set", "lxd_profile_assign",
-                  "lxd_publish"):
+                  "lxd_publish", "lxd_storage_create", "lxd_storage_volume_create",
+                  "lxd_network_create", "lxd_move", "lxd_project_switch",
+                  "lxd_config_device_remove"):
         _ensure_lxd_infra(state)
 
     if action == "lxd_start":
@@ -1440,6 +1497,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["lxd"]["containers"].append(inst)
         verb = "Launched" if action == "lxd_launch" else "Created"
         _lxd_event(state, f"Instance {name} {verb.lower()}", "success")
+        try:
+            from apps.labs.provisioner.simulation.server_identity import upsert_from_lxd_instance
+            upsert_from_lxd_instance(session_id, inst, source="lxd")
+        except Exception:
+            pass
         _save(session_id, entry)
         return {"ok": True, "message": f"{verb} {name}", "instance": inst}
 
@@ -1650,6 +1712,29 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 output = "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
         elif "uname" in low_cmd:
             output = "Linux " + name + " 5.15.0-91-generic #101-Ubuntu SMP x86_64 GNU/Linux"
+        elif "lsblk" in low_cmd:
+            disks = []
+            for dname, d in (c.get("devices") if c else {}).items() if c else []:
+                if isinstance(d, dict) and d.get("type") == "disk":
+                    size = d.get("size") or "10GB"
+                    path = d.get("path") or f"/{dname}"
+                    disks.append(f"{dname:<8} 8:0    0 {size:>6}  0 disk {path}")
+            if not disks:
+                disks = ["sda      8:0    0  20G  0 disk /"]
+            output = "NAME     MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT\n" + "\n".join(disks)
+        elif "ip link" in low_cmd or low_cmd.strip() == "ip a" or "ip addr" in low_cmd:
+            nics = ["1: lo: <LOOPBACK,UP> mtu 65536\n    link/loopback 00:00:00:00:00:00"]
+            idx = 2
+            for dname, d in (c.get("devices") if c else {}).items() if c else []:
+                if isinstance(d, dict) and d.get("type") == "nic":
+                    nics.append(
+                        f"{idx}: {d.get('name') or dname}: <BROADCAST,MULTICAST,UP> mtu 1500\n"
+                        f"    link/ether 00:16:3e:{(idx * 11) % 256:02x}:{(idx * 7) % 256:02x}:{(idx * 3) % 256:02x}"
+                    )
+                    idx += 1
+            if idx == 2:
+                nics.append("2: eth0: <BROADCAST,MULTICAST,UP> mtu 1500\n    link/ether 00:16:3e:11:22:33")
+            output = "\n".join(nics)
         elif low_cmd.strip() in ("bash", "sh", "/bin/bash"):
             output = f"root@{name}:~#"
         else:
@@ -1685,6 +1770,112 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _lxd_event(state, f"Published {name} as image {alias}", "success")
         _save(session_id, entry)
         return {"ok": True, "message": f"Image {alias} published", "image": row}
+
+    if action == "lxd_storage_create":
+        pname = (payload.get("name") or payload.get("pool") or "").strip()
+        if not pname:
+            return {"ok": False, "error": "Storage pool name required"}
+        pools = state["lxd"].setdefault("storage_pools", [])
+        if any(p.get("name") == pname for p in pools):
+            return {"ok": False, "error": f"Storage pool {pname} already exists"}
+        row = {
+            "name": pname,
+            "driver": payload.get("driver") or "dir",
+            "source": payload.get("source") or f"/var/snap/lxd/common/lxd/storage-pools/{pname}",
+            "used_by": 0,
+        }
+        pools.append(row)
+        _lxd_event(state, f"Storage pool {pname} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Storage pool {pname} created", "pool": row}
+
+    if action == "lxd_storage_volume_create":
+        pool = (payload.get("pool") or "default").strip()
+        vname = (payload.get("name") or payload.get("volume") or "").strip()
+        if not vname:
+            return {"ok": False, "error": "Volume name required"}
+        pools = {p.get("name"): p for p in (state["lxd"].get("storage_pools") or [])}
+        if pool not in pools:
+            return {"ok": False, "error": f"Storage pool {pool} not found"}
+        volumes = state["lxd"].setdefault("volumes", [])
+        if any(v.get("name") == vname and v.get("pool") == pool for v in volumes):
+            return {"ok": False, "error": f"Volume {pool}/{vname} already exists"}
+        row = {
+            "name": vname,
+            "pool": pool,
+            "type": payload.get("type") or "custom",
+            "content_type": payload.get("content_type") or "filesystem",
+            "size": payload.get("size") or "10GiB",
+            "used_by": [],
+        }
+        volumes.append(row)
+        pools[pool]["used_by"] = int(pools[pool].get("used_by") or 0) + 1
+        _lxd_event(state, f"Volume {pool}/{vname} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Volume {pool}/{vname} created", "volume": row}
+
+    if action == "lxd_network_create":
+        nname = (payload.get("name") or "").strip()
+        if not nname:
+            return {"ok": False, "error": "Network name required"}
+        nets = state["lxd"].setdefault("networks", [])
+        if any(n.get("name") == nname for n in nets):
+            return {"ok": False, "error": f"Network {nname} already exists"}
+        row = {
+            "name": nname,
+            "type": payload.get("type") or "bridge",
+            "managed": True,
+            "ipv4": payload.get("ipv4") or "10.10.3.1/24",
+            "ipv6": payload.get("ipv6") or "",
+            "used_by": 0,
+        }
+        nets.append(row)
+        _lxd_event(state, f"Network {nname} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Network {nname} created", "network": row}
+
+    if action == "lxd_move":
+        name = payload.get("name") or payload.get("instance") or ""
+        target = (payload.get("target") or payload.get("destination") or "").strip()
+        c = _find_lxd_instance(state, name)
+        if not c:
+            return {"ok": False, "error": f"Instance {name} not found"}
+        if not target:
+            return {"ok": False, "error": "Target cluster member required"}
+        members = {m.get("name") for m in (state["lxd"].get("cluster") or [])}
+        if members and target not in members:
+            return {"ok": False, "error": f"Cluster member {target} not found"}
+        prev = c.get("location") or "none"
+        c["location"] = target
+        _lxd_event(state, f"Instance {name} moved {prev} → {target}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Instance {name} moved to {target}", "instance": c}
+
+    if action == "lxd_project_switch":
+        pname = (payload.get("name") or payload.get("project") or "default").strip()
+        projects = state["lxd"].get("projects") or []
+        if projects and not any(p.get("name") == pname for p in projects):
+            return {"ok": False, "error": f"Project {pname} not found"}
+        state["lxd"]["current_project"] = pname
+        _lxd_event(state, f"Switched to project {pname}")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Using project {pname}", "project": pname}
+
+    if action == "lxd_config_device_remove":
+        name = payload.get("name") or payload.get("instance") or ""
+        device = (payload.get("device") or "").strip()
+        c = _find_lxd_instance(state, name)
+        if not c:
+            return {"ok": False, "error": f"Instance {name} not found"}
+        devices = c.setdefault("devices", {})
+        if device not in devices:
+            return {"ok": False, "error": f"Device {device} not found on {name}"}
+        removed = devices.pop(device)
+        if removed.get("type") == "gpu":
+            c["nvidia_smi_ok"] = False
+        _lxd_event(state, f"Device {device} removed from {name}")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Device {device} removed", "devices": devices}
 
     if action == "kvm_start":
         name = payload.get("name") or broken.get("vm_stopped") or "train-vm-2"
@@ -1908,14 +2099,20 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         m = _find_machine(state, mid)
         if not m:
             return {"ok": False, "error": f"Machine {mid} not found"}
-        if m.get("status") not in ("Ready", "Deployed"):
+        if m.get("status") not in ("Ready", "Deployed", "Failed testing"):
             return {"ok": False, "error": f"Machine {mid} must be Ready or Deployed to test (is {m.get('status')})"}
-        m["status_before_test"] = m.get("status")
+        m["status_before_test"] = m.get("status") if m.get("status") != "Failed testing" else "Ready"
         m["status"] = "Testing"
         m["progress"] = 0
         m["phase_started_at"] = _now()
         m["phase_duration"] = TEST_SECONDS
         m["test_results"] = []
+        # Scenario / operator can force a failed testing outcome (parity with real MAAS).
+        m["fail_testing"] = bool(
+            payload.get("fail")
+            or payload.get("fail_testing")
+            or (state.get("broken") or {}).get("force_failed_testing")
+        )
         _log(m, "Hardware testing started")
         _machine_event(m, "Node changed status - Testing")
         state["events"].insert(0, {"time": _now_iso(), "message": f"Machine {mid} testing started", "severity": "info"})
@@ -1927,14 +2124,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         m = _find_machine(state, mid)
         if not m:
             return {"ok": False, "error": f"Machine {mid} not found"}
-        # Allow override from Failed / Failed commissioning after tests, or Testing.
-        if m.get("status") not in ("Failed", "Failed commissioning", "Testing", "Broken"):
-            # Also allow if test_results contain failed entries while Ready.
+        # Allow override from Failed testing / Failed / Broken / Testing, or failed results.
+        if m.get("status") not in (
+            "Failed", "Failed commissioning", "Failed testing", "Testing", "Broken",
+        ):
             results = m.get("test_results") or []
             if not any(r.get("status") == "failed" for r in results) and m.get("status") != "Ready":
                 return {"ok": False, "error": f"Machine {mid} has no failed testing to override"}
         _clear_phase(m)
         m.pop("status_before_test", None)
+        m.pop("fail_testing", None)
         m["status"] = "Ready"
         m["progress"] = 100
         m["test_results"] = [

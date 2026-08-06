@@ -301,7 +301,7 @@ function WalkController({ enabled, paused = false, posRef }) {
     if (!enabled) return
     if (paused) { keys.current = {}; return }
     const sprinting = !!keys.current.ShiftLeft
-    const speed = (sprinting ? 4.2 : 2.4) * dt
+    const speed = (sprinting ? 5.2 : 2.85) * dt
     const forward = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current))
     const right = new THREE.Vector3(Math.cos(yaw.current), 0, -Math.sin(yaw.current))
     let moving = false
@@ -313,19 +313,25 @@ function WalkController({ enabled, paused = false, posRef }) {
     pos.current.x = Math.max(-8.5, Math.min(7.5, pos.current.x))
     pos.current.z = Math.max(-5.5, Math.min(6.5, pos.current.z))
 
-    // Steam-style boot-fall head-bob while walking — settles instantly when idle.
-    const bobFreq = sprinting ? 11.5 : 7.5
-    const bobTarget = moving ? (sprinting ? 0.045 : 0.028) : 0
-    bobAmount.current += (bobTarget - bobAmount.current) * Math.min(1, dt * 8)
+    // Game-style boot-fall head-bob — stronger while sprinting.
+    const bobFreq = sprinting ? 13.5 : 8.5
+    const bobTarget = moving ? (sprinting ? 0.065 : 0.04) : 0
+    bobAmount.current += (bobTarget - bobAmount.current) * Math.min(1, dt * 10)
     if (moving) bobPhase.current += dt * bobFreq
     const bob = Math.sin(bobPhase.current) * bobAmount.current
-    const sway = Math.cos(bobPhase.current * 0.5) * bobAmount.current * 0.4
+    const sway = Math.cos(bobPhase.current * 0.5) * bobAmount.current * 0.55
 
     camera.position.set(pos.current.x + sway, pos.current.y + bob, pos.current.z)
     pos.current.y = 1.55
     camera.rotation.order = 'YXZ'
     camera.rotation.y = yaw.current
-    camera.rotation.x = pitch.current + bob * 0.15
+    camera.rotation.x = pitch.current + bob * 0.22
+    // Sprint FOV punch
+    const targetFov = sprinting && moving ? 78 : 68
+    if (camera.isPerspectiveCamera) {
+      camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 6)
+      camera.updateProjectionMatrix()
+    }
 
     if (posRef) {
       posRef.current.x = pos.current.x
@@ -334,6 +340,38 @@ function WalkController({ enabled, paused = false, posRef }) {
     }
   })
   return null
+}
+
+/** Floating dust motes in the cold aisle — cheap game-atmosphere particles. */
+function HallDust({ count = 80 }) {
+  const ref = useRef()
+  const positions = useMemo(() => {
+    const arr = new Float32Array(count * 3)
+    for (let i = 0; i < count; i += 1) {
+      arr[i * 3] = (Math.random() - 0.5) * 14
+      arr[i * 3 + 1] = 0.4 + Math.random() * 2.4
+      arr[i * 3 + 2] = (Math.random() - 0.5) * 10
+    }
+    return arr
+  }, [count])
+  useFrame(({ clock }) => {
+    if (!ref.current) return
+    const t = clock.elapsedTime
+    const pos = ref.current.geometry.attributes.position.array
+    for (let i = 0; i < count; i += 1) {
+      pos[i * 3 + 1] += Math.sin(t * 0.4 + i) * 0.0008
+      if (pos[i * 3 + 1] > 2.9) pos[i * 3 + 1] = 0.35
+    }
+    ref.current.geometry.attributes.position.needsUpdate = true
+  })
+  return (
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" count={count} array={positions} itemSize={3} />
+      </bufferGeometry>
+      <pointsMaterial size={0.025} color="#94a3b8" transparent opacity={0.45} depthWrite={false} sizeAttenuation />
+    </points>
+  )
 }
 
 /** "E" key fires a synthetic click at the crosshair (screen center) so mouse-locked
@@ -1350,6 +1388,7 @@ function SceneContent({
       <Environment preset="warehouse" />
       <Floor />
       <CorridorShell dockBusy={dockBusy} doorOpen={doorOpen} />
+      <HallDust count={90} />
       <RoomPortal position={[-6.2, 1.05, 0.2]} label="Staging / dock" roomId="loading-dock" onEnterRoom={onEnterRoom} color="#f59e0b" />
       <RoomPortal position={[-5.2, 1.05, 3.2]} label="Reception" roomId="reception" onEnterRoom={onEnterRoom} color="#94a3b8" />
       <RoomPortal position={[5.8, 1.05, 0.4]} label="MDF" roomId="mdf" onEnterRoom={onEnterRoom} color="#38bdf8" />
@@ -1661,17 +1700,18 @@ export default function DatacenterTwin3D({
     return () => clearTimeout(id)
   }, [intro, walkMode])
 
-  // After cinematic enter, offer Walk only once badge-in is done (Steam mantrap ritual).
+  // After cinematic enter, drop straight into first-person Walk (Steam FPS feel).
+  // Badge-in still opens the mantrap door — it no longer blocks movement.
   useEffect(() => {
-    if (intro || walkMode || !immersive || !badgedIn || autoWalkStarted.current) return undefined
+    if (intro || walkMode || !immersive || autoWalkStarted.current) return undefined
     const id = setTimeout(() => {
       autoWalkStarted.current = true
       setWalkMode(true)
-    }, 600)
+    }, 500)
     return () => clearTimeout(id)
-  }, [intro, walkMode, immersive, badgedIn])
+  }, [intro, walkMode, immersive])
 
-  const inGame = immersive && walkMode && badgedIn
+  const inGame = immersive && walkMode
 
   useEffect(() => { onImmersiveChange?.(immersive) }, [immersive, onImmersiveChange])
 
@@ -1726,7 +1766,7 @@ export default function DatacenterTwin3D({
       transition={{ duration: 0.55, ease: 'easeOut' }}
     >
       <div className="dc-3d-toolbar">
-        <span className="dc-twin-title">3D Lab Twin · Steam immersion</span>
+        <span className="dc-twin-title">3D Lab Twin · Walk mode</span>
         <label className="dc-3d-toggle">
           <input
             type="checkbox"
@@ -1757,9 +1797,6 @@ export default function DatacenterTwin3D({
             checked={walkMode}
             onChange={(e) => {
               const on = e.target.checked
-              if (on && !badgedIn) {
-                onBadgeIn?.()
-              }
               setWalkMode(on)
               if (on) setIntro(false)
             }}
@@ -1771,20 +1808,20 @@ export default function DatacenterTwin3D({
         </button>
         {!badgedIn && (
           <button type="button" className="dc-btn-outline dc-btn-xs" onClick={() => onBadgeIn?.()}>
-            Badge-in
+            Badge-in (open door)
           </button>
         )}
         <span className="dc-muted">
           ~{fps || '—'} FPS · {inGame
-            ? 'click to look · WASD · Shift sprint · Esc menu'
+            ? 'click canvas to look · WASD · Shift sprint · Esc menu'
             : walkMode
-              ? (badgedIn ? 'badged · WASD' : 'badge required')
+              ? 'WASD ready'
               : 'cinematic enter → auto Walk'}
         </span>
       </div>
       {!walkMode && !intro && !immersive && (
         <div className="dc-3d-immersion-hint">
-          Tip: <strong>Badge-in</strong> at the mantrap, then Walk — ticket beacons mark DCOps faults on racks
+          Tip: enable <strong>Immersive</strong> + <strong>Walk</strong> for first-person hall — ticket beacons mark DCOps faults on racks
         </div>
       )}
       <div className="dc-3d-canvas-wrap">
@@ -1857,7 +1894,7 @@ export default function DatacenterTwin3D({
                 onFps={setFps}
                 animBoost={animBoost}
                 intro={intro}
-                walkMode={walkMode && badgedIn}
+                walkMode={walkMode}
                 walkPaused={menuOpen}
                 posRef={posRef}
                 tickets={tickets}

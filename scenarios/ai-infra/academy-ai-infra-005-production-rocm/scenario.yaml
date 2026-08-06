@@ -112,11 +112,13 @@ hints:
     is actually healthy.'
 consoles:
 - terminal
+- baremetal
 hosted_as: baremetal
 lab_servers:
 - id: gpu-node-01
   role: primary
   hostname: gpu-node-01
   persona: linux
-  appears_in:
+appears_in:
   - terminal
+  - baremetal

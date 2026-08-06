@@ -2327,6 +2327,8 @@ def _vyos_dispatch(net: NetworkingState, line: str, engine: "UnifiedSimulationEn
         return net.vyos_show_config(candidate=cand)
     if "show ip bgp" in low or "show protocols bgp" in low or "bgp summary" in low:
         return net.show_ip_bgp_summary()
+    if "show ip ospf" in low:
+        return net.show_ip_ospf_neighbor()
     if "show ip route" in low:
         return net.show_ip_route()
     if "show interfaces" in low:
@@ -2339,8 +2341,12 @@ def _vyos_dispatch(net: NetworkingState, line: str, engine: "UnifiedSimulationEn
         return net.show_firewall()
     if "show dhcp" in low:
         return net.show_dhcp_leases()
+    if "show log" in low:
+        return net.show_log()
     if "show version" in low:
         return net.show_version()
+    if line.endswith("?") or low.endswith(" ?"):
+        return net.vyos_help(line)
     return f"Invalid command: {line}"
 
 
@@ -2757,6 +2763,61 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                             _sync_maas_from_gui()
                         return f"Released {m['name']} → Ready"
                 return "No Deployed machine to release."
+            if "machine" in low and "read" in low:
+                target = None
+                for tok in parts:
+                    if tok.startswith("gpu-node") or tok.startswith("node-") or tok.startswith("storage-"):
+                        target = tok
+                        break
+                for m in machines:
+                    if target and m["name"] != target:
+                        continue
+                    return (
+                        f"system_id: {m.get('id')}\n"
+                        f"hostname: {m['name']}\n"
+                        f"status_name: {m['status']}\n"
+                        f"power_state: {m['power']}\n"
+                        f"architecture: {m.get('arch', 'amd64/generic')}\n"
+                        f"zone: {m.get('zone', 'default')}\n"
+                        f"pool: {m.get('pool', 'default')}\n"
+                        f"ip_addresses: {m.get('ip', '-')}\n"
+                        f"tag_names: {','.join(m.get('tags') or []) or '-'}"
+                    )
+                return "Machine not found."
+            if "tags" in low and ("read" in low or "list" in low):
+                _sync_maas_from_gui()
+                tags = []
+                try:
+                    from apps.vmware_sim import baremetal_engine as _bm
+                    st = (_bm.get_state(str(_session_id())) or {}).get("state") or {}
+                    tags = (st.get("maas") or {}).get("tags") or []
+                except Exception:
+                    pass
+                if not tags:
+                    return "No tags."
+                rows = ["name            machines"]
+                for t in tags:
+                    rows.append(f"{t.get('name', ''):<15} {','.join(t.get('machines') or []) or '-'}")
+                return "\n".join(rows)
+            if "devices" in low and ("read" in low or "list" in low):
+                _sync_maas_from_gui()
+                devices = []
+                try:
+                    from apps.vmware_sim import baremetal_engine as _bm
+                    st = (_bm.get_state(str(_session_id())) or {}).get("state") or {}
+                    devices = (st.get("maas") or {}).get("devices") or st.get("devices") or []
+                except Exception:
+                    pass
+                if not devices:
+                    return "No devices."
+                rows = ["hostname           ip              mac"]
+                for d in devices:
+                    rows.append(
+                        f"{(d.get('hostname') or d.get('name') or '-'):<18} "
+                        f"{(d.get('ip') or d.get('ip_reservation') or '-'):<15} "
+                        f"{d.get('mac') or '-'}"
+                    )
+                return "\n".join(rows)
             if "power" in low:
                 action = "on" if "on" in low else "off" if "off" in low else "status"
                 for m in machines:
@@ -2778,7 +2839,10 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                 return "\n".join(rows)
             return (
                 "usage: maas <profile> machines read|commission|deploy|release\n"
+                "       maas <profile> machine read <hostname>\n"
                 "       maas <profile> boot-resources read\n"
+                "       maas <profile> tags read\n"
+                "       maas <profile> devices read\n"
                 "       maas login <profile> <url> <api-key>"
             )
         if low.startswith("lxc") or low.startswith("lxd"):

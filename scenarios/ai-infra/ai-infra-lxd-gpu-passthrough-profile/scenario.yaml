@@ -41,14 +41,18 @@ hints:
   cost: 45
   content: lxc launch with -p gpu-passthrough, confirm RUNNING, then leave FIXED-OK for the lab grader.
 consoles:
-- terminal
+- lxd
 - baremetal
+- terminal
+- awx
 hosted_as: baremetal
 lab_servers:
 - id: gpu-node-01
   role: primary
   hostname: gpu-node-01
   persona: baremetal
-  appears_in:
-  - terminal
+appears_in:
+  - lxd
   - baremetal
+  - terminal
+  - awx

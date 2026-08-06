@@ -19,81 +19,87 @@ from __future__ import annotations
 AI_INFRA_TOPIC_SURFACES: dict[str, dict] = {
     "maas": {
         "simulation_type": "baremetal",
-        "consoles": ["baremetal", "terminal"],
+        "consoles": ["baremetal", "terminal", "lxd", "awx", "datacenter"],
         "hosted_as": "baremetal",
+        "datacenter_link": True,
     },
     "lxd": {
         "simulation_type": "baremetal",
-        "consoles": ["baremetal", "terminal"],
+        "consoles": ["lxd", "baremetal", "terminal", "awx"],
         "hosted_as": "baremetal",
     },
     "pxe": {
+        # PXE underlay is VyOS + MAAS — never open Datacenter as the VyOS stand-in.
         "simulation_type": "baremetal",
-        "consoles": ["baremetal", "terminal"],
+        "consoles": ["vyos", "baremetal", "terminal", "datacenter"],
         "hosted_as": "baremetal",
+        "datacenter_link": True,
     },
     "bmc": {
         "simulation_type": "baremetal",
-        "consoles": ["baremetal", "terminal", "bmc"],
+        "consoles": ["baremetal", "terminal", "bmc", "datacenter"],
         "hosted_as": "baremetal",
+        "datacenter_link": True,
     },
     "awx": {
         "simulation_type": "ansible-awx",
-        "consoles": ["awx", "terminal"],
+        "consoles": ["awx", "baremetal", "lxd", "terminal", "datacenter"],
+        "datacenter_link": True,
     },
     "thermal": {
         "simulation_type": "datacenter",
-        "consoles": ["datacenter", "terminal"],
+        "consoles": ["datacenter", "terminal", "baremetal"],
         "datacenter_link": True,
         "hosted_as": "datacenter",
     },
     "chassis": {
         "simulation_type": "datacenter",
-        "consoles": ["datacenter", "terminal"],
+        "consoles": ["datacenter", "terminal", "baremetal"],
         "datacenter_link": True,
         "hosted_as": "datacenter",
     },
     "dcgm": {
         "simulation_type": "gpu",
-        "consoles": ["terminal"],
+        "consoles": ["terminal", "baremetal", "datacenter"],
         "hosted_as": "baremetal",
+        "datacenter_link": True,
     },
     "nvidia-smi": {
         "simulation_type": "gpu",
-        "consoles": ["terminal"],
+        "consoles": ["terminal", "baremetal"],
         "hosted_as": "baremetal",
     },
     "rocm": {
         "simulation_type": "gpu",
-        "consoles": ["terminal"],
+        "consoles": ["terminal", "baremetal"],
         "hosted_as": "baremetal",
     },
     "packer": {
         "simulation_type": "gpu",
-        "consoles": ["terminal"],
+        "consoles": ["packer", "baremetal", "terminal", "awx", "lxd"],
         "hosted_as": "baremetal",
     },
     "nccl": {
         "simulation_type": "gpu",
-        "consoles": ["terminal"],
+        "consoles": ["terminal", "baremetal"],
         "hosted_as": "baremetal",
     },
     "nvlink": {
         "simulation_type": "gpu",
-        "consoles": ["terminal"],
+        "consoles": ["terminal", "baremetal"],
         "hosted_as": "baremetal",
     },
     "missing-gpu": {
         "simulation_type": "gpu",
-        "consoles": ["terminal"],
+        "consoles": ["terminal", "baremetal", "datacenter"],
         "hosted_as": "baremetal",
+        "datacenter_link": True,
     },
     "vyos": {
-        # VyOS UI not shipped yet — Lab Terminal + DC twin for uplink context.
-        "simulation_type": "datacenter",
-        "consoles": ["datacenter", "terminal"],
+        "simulation_type": "baremetal",
+        "consoles": ["vyos", "baremetal", "terminal", "datacenter", "lxd"],
         "datacenter_link": True,
-        "hosted_as": "datacenter",
+        "hosted_as": "baremetal",
     },
 }
 

@@ -2105,18 +2105,46 @@ export function createLinuxShell(vm, opts = {}) {
       }
     }
     else if (lc === 'ping' || lc === 'ping6') {
-      const host = positional[0] || '8.8.8.8'
-      const resolved = host === 'localhost' ? '127.0.0.1' : /^\d/.test(host) ? host : gw
-      emit([
-        `PING ${host} (${resolved}) 56(84) bytes of data.`,
-        `64 bytes from ${resolved}: icmp_seq=1 ttl=64 time=0.412 ms`,
-        `64 bytes from ${resolved}: icmp_seq=2 ttl=64 time=0.388 ms`,
-        `64 bytes from ${resolved}: icmp_seq=3 ttl=64 time=0.401 ms`,
-        ``,
-        `--- ${host} ping statistics ---`,
-        `3 packets transmitted, 3 received, 0% packet loss, time 2003ms`,
-        `rtt min/avg/max/mdev = 0.388/0.400/0.412/0.012 ms`,
-      ])
+      // iputils-style: ping [-c N] host — -c value lands in positionals after parseArgs.
+      let count = 4
+      let host = ''
+      const pos = [...positional]
+      if (has('-c') && pos.length && /^\d+$/.test(pos[0])) {
+        count = Math.max(1, Math.min(10, Number(pos.shift())))
+      }
+      host = pos[0] || ''
+      if (!host) {
+        emit('Usage: ping [-c count] destination')
+      } else {
+        const linkUp = primaryNicUp(vmRef.current)
+        const { ip: nIp, gw: nGw } = primaryNicL3(vmRef.current, ip, gw)
+        const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1'
+        const isSelf = host === nIp
+        const isGw = host === nGw || host === gw || /\.(1|254)$/.test(host)
+        // Only localhost / self / gateway reply — random IPs and off-link hosts do not.
+        const reachable = isLocal || (linkUp && (isSelf || isGw))
+        const resolved = isLocal ? '127.0.0.1' : (/^\d/.test(host) ? host : (reachable ? nGw : host))
+        if (!reachable) {
+          emit([
+            `PING ${host} (${resolved}) 56(84) bytes of data.`,
+            `From ${nIp || '10.0.0.10'} icmp_seq=1 Destination Host Unreachable`,
+            ``,
+            `--- ${host} ping statistics ---`,
+            `1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms`,
+          ])
+        } else {
+          const lines = [`PING ${host} (${resolved}) 56(84) bytes of data.`]
+          for (let i = 1; i <= count; i += 1) {
+            const ms = (0.35 + (i % 3) * 0.03).toFixed(3)
+            lines.push(`64 bytes from ${resolved}: icmp_seq=${i} ttl=64 time=${ms} ms`)
+          }
+          lines.push('')
+          lines.push(`--- ${host} ping statistics ---`)
+          lines.push(`${count} packets transmitted, ${count} received, 0% packet loss, time ${count * 1000}ms`)
+          lines.push(`rtt min/avg/max/mdev = 0.350/0.380/0.410/0.025 ms`)
+          emit(lines)
+        }
+      }
     }
     else if (lc === 'ss' || lc === 'netstat') {
       const netVm = vmRef.current

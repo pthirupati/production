@@ -4644,16 +4644,24 @@ class RHELShell:
 
         # Platform isolation + power / Deployed gates from ServerIdentity.
         sid = getattr(self.state, "session_id", None)
-        local_plat = ""
-        slug = (getattr(self, "_scenario_slug", None) or getattr(self, "scenario_slug", "") or "").lower()
-        if "aws" in slug:
-            local_plat = "aws"
-        elif "azure" in slug:
-            local_plat = "azure"
-        elif "gcp" in slug:
-            local_plat = "gcp"
-        elif any(k in slug for k in ("maas", "ai-infra", "baremetal", "vyos", "lxd")):
-            local_plat = "maas"
+        local_plat = (getattr(self.state, "host_platform", None) or "").lower()
+        if local_plat in ("linux", "rhel", "ubuntu", ""):
+            local_plat = ""
+        slug = (
+            getattr(self, "_scenario_slug", None)
+            or getattr(self, "scenario_slug", "")
+            or getattr(self.state, "scenario_slug", "")
+            or ""
+        ).lower()
+        if not local_plat:
+            if "aws" in slug:
+                local_plat = "aws"
+            elif "azure" in slug:
+                local_plat = "azure"
+            elif "gcp" in slug:
+                local_plat = "gcp"
+            elif any(k in slug for k in ("maas", "ai-infra", "baremetal", "vyos", "lxd", "datacenter")):
+                local_plat = "maas"
         try:
             from .reachability import ssh_peer_allowed
             _row, ssh_err = ssh_peer_allowed(host=host, session_id=sid, local_platform=local_plat)
@@ -4780,26 +4788,33 @@ class RHELShell:
                 iface_addrs.append(a)
 
         from .reachability import resolve_icmp_target, _platform_of
-        local_plat = ""
+        local_plat = (getattr(self.state, "host_platform", None) or "").lower()
+        if local_plat in ("linux", "rhel", "ubuntu", ""):
+            local_plat = ""
         sid = getattr(self.state, "session_id", None)
         try:
             from .server_identity import list_servers
             hn = getattr(self.state, "hostname", "") or ""
             for s in list_servers(sid) or []:
                 if hn and hn in (s.get("hostname"), s.get("fqdn")):
-                    local_plat = _platform_of(s)
+                    local_plat = _platform_of(s) or local_plat
                     break
         except Exception:
             pass
         if not local_plat:
-            slug = (getattr(self, "_scenario_slug", None) or getattr(self, "scenario_slug", "") or "").lower()
+            slug = (
+                getattr(self, "_scenario_slug", None)
+                or getattr(self, "scenario_slug", "")
+                or getattr(self.state, "scenario_slug", "")
+                or ""
+            ).lower()
             if "aws" in slug:
                 local_plat = "aws"
             elif "azure" in slug:
                 local_plat = "azure"
             elif "gcp" in slug:
                 local_plat = "gcp"
-            elif any(k in slug for k in ("maas", "ai-infra", "baremetal", "vyos", "lxd")):
+            elif any(k in slug for k in ("maas", "ai-infra", "baremetal", "vyos", "lxd", "datacenter")):
                 local_plat = "maas"
 
         target_ip, err = resolve_icmp_target(

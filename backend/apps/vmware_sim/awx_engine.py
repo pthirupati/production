@@ -652,24 +652,32 @@ def _merge_maas_identity_hosts(state: dict, session_id: str) -> None:
         status = (s.get("install_state") or "").strip()
         if not (sources & {"maas", "baremetal", "gpu"}):
             continue
-        if status not in ("Ready", "Deployed", "deployed"):
+        if status not in ("Ready", "Deployed", "deployed", "Failed testing", "Broken"):
             continue
         name = s.get("hostname") or ""
-        if not name or name.lower() in existing:
+        if not name:
             continue
-        hosts.append(
-            {
-                "id": f"id-{s.get('id') or name}",
-                "name": name,
-                "inventory": inventory_name,
-                "enabled": (s.get("power") or "on") == "on",
-                "status": "ok" if status in ("Deployed", "deployed", "Ready") else "failed",
-                "source": "MAAS",
-                "ip": s.get("primary_ip") or "",
-                "serial": s.get("serial") or "",
-                "asset_tag": s.get("asset_tag") or "",
-            }
-        )
+        row = {
+            "id": f"id-{s.get('id') or name}",
+            "name": name,
+            "inventory": inventory_name,
+            "enabled": (s.get("power") or "on") == "on",
+            "status": "ok" if status in ("Deployed", "deployed", "Ready") else "failed",
+            "source": "MAAS",
+            "ip": s.get("primary_ip") or "",
+            "serial": s.get("serial") or "",
+            "asset_tag": s.get("asset_tag") or "",
+        }
+        if name.lower() in existing:
+            for h in hosts:
+                if str(h.get("name") or "").lower() == name.lower() and h.get("source") == "MAAS":
+                    h["enabled"] = row["enabled"]
+                    h["status"] = row["status"]
+                    if row["ip"]:
+                        h["ip"] = row["ip"]
+                    break
+            continue
+        hosts.append(row)
         existing.add(name.lower())
         added += 1
 

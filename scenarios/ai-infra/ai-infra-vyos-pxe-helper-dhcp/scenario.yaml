@@ -48,14 +48,20 @@ hints:
   content: In Bare Metal, Enlist (PXE) and confirm a New machine appears, then FIXED-OK.
 consoles:
 - vyos
-- terminal
 - baremetal
+- terminal
+- datacenter
+- lxd
+datacenter_link: true
 hosted_as: baremetal
 lab_servers:
 - id: gpu-node-01
   role: primary
   hostname: gpu-node-01
   persona: baremetal
-  appears_in:
-  - terminal
+appears_in:
+  - vyos
   - baremetal
+  - terminal
+  - datacenter
+  - lxd

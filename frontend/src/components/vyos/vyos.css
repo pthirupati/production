@@ -126,3 +126,78 @@
   padding: 0.15rem 0.45rem;
   border-radius: 2px;
 }
+
+.vyos-layout {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.vyos-cli-panel {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--vyos-border);
+  background: #070b0a;
+  max-height: 42%;
+  min-height: 160px;
+}
+
+.vyos-cli-log {
+  flex: 1;
+  overflow: auto;
+  padding: 0.55rem 0.85rem;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.vyos-cli-hint {
+  color: var(--vyos-muted);
+  font-size: 11px;
+}
+
+.vyos-cli-line {
+  margin: 0 0 0.2rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+}
+
+.vyos-cli-in { color: var(--vyos-accent); }
+.vyos-cli-out { color: #b9cfc2; }
+.vyos-cli-err { color: var(--vyos-err); }
+
+.vyos-cli-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.75rem 0.55rem;
+  border-top: 1px solid var(--vyos-border);
+  background: #0a100e;
+}
+
+.vyos-cli-prompt {
+  color: var(--vyos-accent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.vyos-cli-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--vyos-text);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.vyos-cli-input::placeholder {
+  color: #4a6358;
+}
+
+.vyos-banner code {
+  color: var(--vyos-accent);
+  font-size: 11px;
+}

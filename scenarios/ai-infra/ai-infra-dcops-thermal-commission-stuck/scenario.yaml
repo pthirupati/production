@@ -50,13 +50,14 @@ consoles:
 - baremetal
 - terminal
 - datacenter
+datacenter_link: true
 hosted_as: baremetal
 lab_servers:
 - id: gpu-node-02
   role: primary
   hostname: gpu-node-02
   persona: baremetal
-  appears_in:
+appears_in:
   - baremetal
   - terminal
   - datacenter
