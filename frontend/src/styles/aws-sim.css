@@ -274,3 +274,27 @@
 .aws-leftnav { box-shadow: inset -1px 0 0 var(--aws-sidebar-border); }
 .aws-table tbody tr:last-child td { border-bottom: none; }
 .aws-table.aws-compact tbody td { height: 36px; padding: 6px 16px; font-size: 13px; }
+
+/* ─────────────────────────────────────────────────────────────
+   Mobile (≤640px) — relax fixed widths that made the console
+   unusable on a phone. Scoped to a media query rather than
+   changing the base rules so desktop layout is untouched.
+   ───────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* .aws-modal set BOTH min-width:400px and width:100%, so it could never
+     shrink below 400px — it overflowed a 375px viewport and clipped fields. */
+  .aws-modal { min-width: 0; max-width: 100%; }
+  .aws-modal-overlay { padding: 4vh 10px 0; }
+  .aws-modal-header { padding: 12px 14px; font-size: 16px; }
+  .aws-modal-body { padding: 14px; }
+  .aws-modal-footer { padding: 12px 14px; flex-wrap: wrap; }
+
+  /* 220px of a 375px viewport is 59% for navigation alone. */
+  .aws-leftnav { width: 148px; min-width: 148px; }
+  .aws-leftnav-item { padding: 7px 10px; font-size: 13px; }
+  .aws-leftnav-group,
+  .aws-leftnav-title { padding-left: 10px; padding-right: 10px; }
+
+  /* Wide tables must scroll rather than force the page wider. */
+  .aws-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}

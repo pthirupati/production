@@ -83,9 +83,20 @@ class Twin3DSafe extends Component {
   }
 }
 
+/* SIMULATED-CREDENTIAL: lab-console flavour, not a real secret. Shown to the
+   learner on screen (with an autofill button) so the fake console feels real, and
+   the gate is bypassed entirely once a provisioned lab session exists. Grants no
+   access to anything. Secret scanners should allowlist this marker rather than
+   flagging these lines. See docs/AUDIT_2026_08_TODO.md §Y2e. */
 const DC_LAB_USER = 'lab_datacenter'
 const DC_LAB_PASS = 'lab_datacenter@123'
 const ACCENT = '#f97316'
+
+/**
+ * Versioned so bumping it releases browsers that a previous build pinned to 2D.
+ * Written ONLY by an explicit "2D floor" click — never by an error path.
+ */
+const PREFER_2D_KEY = 'fixitlab.dc.prefer2d.v2'
 
 const COMPONENT_META = {
   power: { label: 'Power Supply', icon: Power },
@@ -163,9 +174,19 @@ export default function DatacenterSimulator({
     // Game-style default is always 3D walk. Only honor an explicit prefer2d
     // flag (set when the learner clicks "2D floor") — legacy `floorView=2d`
     // alone used to trap people in the isometric plan forever.
+    //
+    // The key is VERSIONED (`.v2`) on purpose. An earlier build wired the R3F
+    // error boundary's fallback straight into setFloorViewPersist('2d'), so a
+    // single transient 3D failure — most often the CDN HDRI fetch, now removed
+    // in favour of procedural Lightformers — wrote the unversioned flag and
+    // pinned that browser to the isometric plan permanently, across every
+    // scenario and every future session, with no UI to clear it. Bumping the
+    // key releases every already-poisoned browser back into 3D exactly once.
+    // Only an explicit click on "2D floor" writes the flag now.
     try {
       if (typeof window !== 'undefined') {
-        if (window.localStorage?.getItem('fixitlab.dc.prefer2d') === '1') return '2d'
+        window.localStorage?.removeItem('fixitlab.dc.prefer2d') // retire the poisoned v1 key
+        if (window.localStorage?.getItem(PREFER_2D_KEY) === '1') return '2d'
         const saved = window.localStorage?.getItem('fixitlab.dc.floorView')
         if (saved === '3d') return '3d'
       }
@@ -176,8 +197,8 @@ export default function DatacenterSimulator({
     setFloorView(v)
     try {
       window.localStorage?.setItem('fixitlab.dc.floorView', v)
-      if (v === '2d') window.localStorage?.setItem('fixitlab.dc.prefer2d', '1')
-      else window.localStorage?.removeItem('fixitlab.dc.prefer2d')
+      if (v === '2d') window.localStorage?.setItem(PREFER_2D_KEY, '1')
+      else window.localStorage?.removeItem(PREFER_2D_KEY)
     } catch { /* ignore */ }
   }, [])
   const retryWebgl3d = useCallback(() => {
@@ -363,7 +384,7 @@ export default function DatacenterSimulator({
       <div className={simPanelRoot(embedded, 'bg-[#0b0e14]')}>
         <LabChromeBar title="Data Center Console" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-[400px] overflow-hidden">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold flex items-center gap-2" style={{ background: '#1a1d2b' }}>
               <Server size={18} /> DCIM Field Console
             </div>
@@ -532,8 +553,13 @@ export default function DatacenterSimulator({
       )}
 
       {currentRoom.type === 'data_hall' && floorView === '3d' && webglGate.ok && (
-        <Twin3DSafe onFallback={() => setFloorViewPersist('2d')}>
-          <Suspense fallback={<div className="dc-3d-loading"><div className="dc-3d-loading-spin" /> Loading 3D twin…</div>}>
+        // Suspense sits OUTSIDE the error boundary on purpose. The twin chunk is
+        // ~1MB gzip; when Suspense was nested inside, a slow or dropped chunk
+        // fetch surfaced as a thrown error and got treated as a permanent WebGL
+        // failure. Outside, a chunk problem stays a retryable loading state and
+        // only genuine R3F/WebGL crashes reach Twin3DSafe.
+        <Suspense fallback={<div className="dc-3d-loading"><div className="dc-3d-loading-spin" /> Loading 3D twin…</div>}>
+          <Twin3DSafe onFallback={() => setFloorViewPersist('2d')}>
             <LazyDatacenterTwin3D
               racks={roomRacks}
               serversByRack={serversByRack}
@@ -606,8 +632,8 @@ export default function DatacenterSimulator({
                 )
               }}
             />
-          </Suspense>
-        </Twin3DSafe>
+          </Twin3DSafe>
+        </Suspense>
       )}
 
       {currentRoom.type === 'data_hall' && floorView === '2d' && (

@@ -2762,9 +2762,11 @@ body::after {
 @media (max-width: 1024px) {
   .fx-tech-grid { grid-template-columns: repeat(2, 1fr); }
 }
-@media (max-width: 540px) {
-  .fx-tech-grid { grid-template-columns: 1fr; }
-}
+/* Compact-mobile grid + card overrides live AFTER the base .fx-tech-* rules
+   below — see the block following .fx-tech-soon-dot. They must, because these
+   selectors have identical specificity to the base rules, so source order is
+   what decides. (An earlier attempt placed them here and only the grid
+   columns took effect.) */
 .fx-tech-card {
   position: relative;
   display: block;
@@ -2823,6 +2825,30 @@ body::after {
   border-radius: 50%;
   background: #feb155;
   animation: fxPulseDot 2s infinite;
+}
+
+/* ── Mobile tech grid: two compact columns ────────────────────────────────
+   Placed here, AFTER the base .fx-tech-* rules, because these selectors have
+   the same specificity — source order decides the winner.
+   Previously the grid collapsed to a single column while each card kept 24px
+   padding, a 54px icon and an 18px icon margin: 175px per card × 22+ cards ≈
+   4,200px of vertical scroll before you got past the grid. That was the worst
+   part of the phone experience. Two compact columns roughly halve it, and the
+   card shrinks to ~95px. */
+@media (max-width: 540px) {
+  .fx-tech-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .fx-tech-card { padding: 14px; border-radius: 14px; }
+  .fx-tech-icon { width: 38px; height: 38px; border-radius: 10px; margin-bottom: 10px; }
+  .fx-tech-icon svg { width: 18px; height: 18px; }
+  .fx-tech-name { font-size: 14px; margin: 0 0 3px; line-height: 1.25; }
+  .fx-tech-tag { font-size: 11px; line-height: 1.35; }
+  .fx-tech-soon { font-size: 10px; gap: 4px; }
+  /* A hover-reveal arrow is meaningless without a pointer — reclaim the space. */
+  .fx-tech-arrow { display: none; }
+}
+/* Very narrow phones: single column, still compact. */
+@media (max-width: 360px) {
+  .fx-tech-grid { grid-template-columns: 1fr; }
 }
 
 .fx-cta-strip {
@@ -4575,3 +4601,407 @@ body::after {
   }
 }
 
+
+/* ─────────────────────────────────────────────────────────────
+   3D Datacenter + GPU marketing showcase (DatacenterGpuShowcase)
+   CSS/SVG only — no video, no WebGL, no network asset, so the
+   marketing critical path can never hit the CDN-HDRI class of
+   failure that took the real twin down.
+   ───────────────────────────────────────────────────────────── */
+.fx-dc-hall {
+  position: relative;
+  height: 190px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #070a10 0%, #0a1018 60%, #0d1420 100%);
+  perspective: 620px;
+  perspective-origin: 50% 42%;
+}
+.fx-dc-floor {
+  position: absolute;
+  inset: 42% -30% -18% -30%;
+  background:
+    repeating-linear-gradient(90deg, rgba(124, 192, 240, 0.07) 0 1px, transparent 1px 42px),
+    repeating-linear-gradient(0deg, rgba(124, 192, 240, 0.07) 0 1px, transparent 1px 42px),
+    #0b1119;
+  transform: rotateX(74deg);
+  transform-origin: 50% 0;
+}
+.fx-dc-aisle-glow {
+  position: absolute;
+  left: 50%;
+  top: 4%;
+  width: 34%;
+  height: 62%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at 50% 0%, rgba(219, 234, 254, 0.16), transparent 70%);
+  pointer-events: none;
+}
+.fx-dc-rack {
+  position: absolute;
+  bottom: 34%;
+  width: 44px;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, #1b2536, #101722);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.6);
+}
+.fx-dc-rack::after {
+  /* server sleds */
+  content: '';
+  position: absolute;
+  inset: 5px 4px 4px;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.1) 0 2px, transparent 2px 7px);
+  border-radius: 2px;
+}
+.fx-dc-rack-led {
+  position: absolute;
+  top: 6px;
+  right: 5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  animation: fxDcBlink 2.4s ease-in-out infinite;
+}
+/* Left row — larger/closer to camera as index rises */
+.fx-dc-rack-l0 { left: 16%; height: 74px; opacity: 0.55; }
+.fx-dc-rack-l1 { left: 11%; height: 88px; opacity: 0.72; }
+.fx-dc-rack-l2 { left: 5%;  height: 104px; opacity: 0.9; }
+.fx-dc-rack-l3 { left: -2%; height: 122px; opacity: 1; }
+/* Right row mirrors it */
+.fx-dc-rack-r0 { right: 16%; height: 74px; opacity: 0.55; }
+.fx-dc-rack-r1 { right: 11%; height: 88px; opacity: 0.72; }
+.fx-dc-rack-r2 { right: 5%;  height: 104px; opacity: 0.9; }
+.fx-dc-rack-r3 { right: -2%; height: 122px; opacity: 1; }
+
+.fx-dc-airflow {
+  position: absolute;
+  bottom: 30%;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: rgba(124, 192, 240, 0.75);
+  animation: fxDcAirflow 4.2s linear infinite;
+}
+.fx-dc-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+.fx-dc-crosshair::before {
+  content: '';
+  display: block;
+  width: 7px;
+  height: 7px;
+  margin: 0 auto 9px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+}
+.fx-dc-prompt {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.62);
+  border: 1px solid rgba(154, 230, 0, 0.4);
+  color: #d9f99d;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  animation: fxDcPrompt 3.4s ease-in-out infinite;
+}
+
+.fx-dc-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.025);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.fx-dc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+  white-space: nowrap;
+}
+.fx-dc-chip em { opacity: 0.4; font-style: normal; }
+
+.fx-dc-elevation { padding: 11px 14px 4px; display: flex; flex-direction: column; gap: 4px; }
+.fx-dc-u {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.fx-dc-u-num {
+  font-size: 9px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.45);
+  width: 24px;
+  flex-shrink: 0;
+}
+.fx-dc-u-bar { width: 3px; height: 13px; border-radius: 2px; flex-shrink: 0; }
+.fx-dc-u-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.86);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fx-dc-u-led {
+  margin-left: auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: fxDcBlink 1.9s ease-in-out infinite;
+}
+
+.fx-dc-gpu-panel {
+  margin: 8px 14px 14px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: rgba(118, 185, 0, 0.055);
+  border: 1px solid rgba(118, 185, 0, 0.2);
+  font-variant-numeric: tabular-nums;
+}
+.fx-dc-gpu-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.68);
+  margin-bottom: 7px;
+}
+.fx-dc-gpu-driver { font-size: 9px; opacity: 0.6; white-space: nowrap; }
+.fx-dc-gpu-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.fx-dc-gpu-id {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.6);
+  width: 30px;
+  flex-shrink: 0;
+}
+.fx-dc-gpu-track {
+  flex: 1;
+  min-width: 30px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.fx-dc-gpu-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  animation: fxDcGpuPulse 3.1s ease-in-out infinite;
+}
+.fx-dc-gpu-num {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.72);
+  width: 34px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.fx-dc-gpu-flag {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+@keyframes fxDcBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+@keyframes fxDcAirflow {
+  0% { transform: translateY(0); opacity: 0; }
+  15% { opacity: 0.85; }
+  100% { transform: translateY(-120px); opacity: 0; }
+}
+@keyframes fxDcPrompt {
+  0%, 100% { opacity: 0.45; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
+}
+@keyframes fxDcGpuPulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.28); }
+}
+
+/* Mobile: keep the hall readable and drop the deepest racks */
+@media (max-width: 640px) {
+  .fx-dc-hall { height: 150px; }
+  .fx-dc-rack-l0, .fx-dc-rack-r0 { display: none; }
+  .fx-dc-gpu-driver { display: none; }
+  .fx-dc-gpu-flag { display: none; }
+  .fx-dc-u-label { font-size: 9.5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-dc-rack-led,
+  .fx-dc-airflow,
+  .fx-dc-prompt,
+  .fx-dc-u-led,
+  .fx-dc-gpu-fill {
+    animation: none !important;
+  }
+  .fx-dc-airflow { opacity: 0.5; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Datacenter first-person walk animation (DatacenterWalkAnimation)
+   CSS/SVG only — no video, no WebGL, no network asset. The real 3D twin is a
+   ~1MB gzip chunk behind auth; WebGL on the landing page would wreck LCP, and a
+   CDN asset dependency is exactly what broke the twin (audit §X1b).
+   ═══════════════════════════════════════════════════════════════════════════ */
+.fx-dcw-wrap { position: relative; }
+.fx-dcw-glow {
+  position: absolute; inset: -24px; border-radius: 30px;
+  background: linear-gradient(135deg, rgba(118,185,0,.22), rgba(56,189,248,.16));
+  filter: blur(36px); pointer-events: none;
+}
+.fx-dcw-frame {
+  position: relative; border-radius: 18px; overflow: hidden; background: #060910;
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: 0 40px 90px -25px rgba(0,0,0,.75);
+}
+.fx-dcw-titlebar {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  background: linear-gradient(90deg, #16220f, #101a22);
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.fx-dcw-title { font-size: 12.5px; font-weight: 800; color: #fff; white-space: nowrap; }
+.fx-dcw-title em { font-style: normal; font-weight: 600; color: #9ae600; }
+.fx-dcw-bay { font-size: 10.5px; color: rgba(255,255,255,.55); margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fx-dcw-live { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: #9ae600; flex-shrink: 0; }
+
+.fx-dcw-hall {
+  position: relative; height: 266px; overflow: hidden;
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 42%, rgba(219,234,254,.11), transparent 70%),
+    linear-gradient(180deg, #05070c 0%, #080d16 55%, #0b1220 100%);
+}
+.fx-dcw-ceiling {
+  position: absolute; inset: 0 -20% 62% -20%;
+  background: repeating-linear-gradient(90deg, rgba(148,163,184,.07) 0 1px, transparent 1px 54px), linear-gradient(180deg, #0a0f18, #070b12);
+  transform: rotateX(-70deg); transform-origin: 50% 100%;
+}
+.fx-dcw-floor {
+  position: absolute; inset: 52% -24% -14% -24%;
+  background:
+    repeating-linear-gradient(90deg, rgba(56,189,248,.09) 0 1px, transparent 1px 48px),
+    repeating-linear-gradient(0deg, rgba(56,189,248,.09) 0 1px, transparent 1px 48px), #080e18;
+  transform: rotateX(72deg); transform-origin: 50% 0;
+}
+.fx-dcw-fog { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 44% 34% at 50% 46%, transparent 30%, rgba(6,9,16,.82) 78%); }
+.fx-dcw-lamp {
+  position: absolute; top: 13%; left: 50%; width: 108px; height: 5px; margin-left: -54px;
+  border-radius: 3px; background: linear-gradient(90deg, transparent, #dbeafe, transparent);
+  opacity: 0; animation: fxDcwLamp 4.2s linear infinite;
+}
+.fx-dcw-row { position: absolute; bottom: 16%; display: flex; align-items: flex-end; }
+.fx-dcw-row-left { left: 2%; }
+.fx-dcw-row-right { right: 2%; flex-direction: row-reverse; }
+.fx-dcw-rack { position: relative; flex-shrink: 0; animation: fxDcwApproach 4.2s ease-out both; }
+.fx-dcw-depth-0 { width: 74px; height: 168px; opacity: 1; z-index: 4; }
+.fx-dcw-depth-1 { width: 60px; height: 138px; opacity: .82; z-index: 3; }
+.fx-dcw-depth-2 { width: 48px; height: 112px; opacity: .55; z-index: 2; }
+.fx-dcw-depth-3 { width: 38px; height: 90px;  opacity: .3;  z-index: 1; }
+.fx-dcw-rack-frame {
+  position: absolute; inset: 0; border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, #1e293b 0%, #131c29 40%, #0d141e 100%);
+  border: 1px solid rgba(255,255,255,.11);
+  box-shadow: inset 0 0 18px rgba(0,0,0,.72);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.fx-dcw-rack.is-active .fx-dcw-rack-frame {
+  border-color: rgba(154,230,0,.42);
+  box-shadow: inset 0 0 18px rgba(0,0,0,.72), 0 0 22px rgba(154,230,0,.16);
+}
+.fx-dcw-rack-top {
+  font-size: 7px; font-weight: 800; letter-spacing: .4px; text-align: center; padding: 2px 0;
+  color: rgba(255,255,255,.5); background: rgba(0,0,0,.4); border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.fx-dcw-sleds { flex: 1; display: flex; flex-direction: column; gap: 1px; padding: 2px; }
+.fx-dcw-sled {
+  position: relative; flex: 1; display: flex; align-items: center; border-radius: 1px;
+  background: linear-gradient(90deg, #223046, #1a2536);
+  border: 1px solid rgba(255,255,255,.05); padding-left: 3px;
+}
+.fx-dcw-sled-vents { flex: 1; height: 55%; background: repeating-linear-gradient(90deg, rgba(0,0,0,.45) 0 1px, transparent 1px 3px); border-radius: 1px; }
+.fx-dcw-sled-led { width: 3.5px; height: 3.5px; border-radius: 50%; margin-right: 3px; flex-shrink: 0; animation: fxDcwLed 2.1s ease-in-out infinite; }
+.fx-dcw-sled-gpu { position: absolute; right: 9px; font-size: 4.5px; font-weight: 900; letter-spacing: .3px; color: #9ae600; opacity: .9; }
+.fx-dcw-gpu-strip { display: flex; flex-direction: column; gap: 2px; padding: 3px 4px 4px; background: rgba(118,185,0,.07); border-top: 1px solid rgba(118,185,0,.22); }
+.fx-dcw-gpu-bar { height: 2.5px; border-radius: 2px; background: rgba(255,255,255,.09); overflow: hidden; }
+.fx-dcw-gpu-fill { display: block; height: 100%; border-radius: 2px; animation: fxDcwGpu 2.7s ease-in-out infinite; }
+.fx-dcw-cables { position: absolute; top: -34px; right: -52px; width: 60px; height: 40px; overflow: visible; }
+.fx-dcw-cable-path { fill: none; stroke-width: 1.1; stroke-linecap: round; opacity: .5; stroke-dasharray: 4 9; animation: fxDcwCable 2.6s linear infinite; }
+.fx-dcw-air { position: absolute; bottom: 16%; width: 2px; height: 2px; border-radius: 50%; background: rgba(125,211,252,.8); animation: fxDcwAir 3.9s linear infinite; }
+.fx-dcw-hud { position: absolute; left: 50%; top: 45%; transform: translate(-50%,-50%); text-align: center; z-index: 6; }
+.fx-dcw-crosshair { display: block; width: 7px; height: 7px; margin: 0 auto 10px; border-radius: 50%; border: 1px solid rgba(255,255,255,.8); box-shadow: 0 0 5px rgba(0,0,0,.85); }
+.fx-dcw-prompt {
+  display: inline-block; padding: 3px 10px; border-radius: 6px; background: rgba(0,0,0,.68);
+  border: 1px solid rgba(154,230,0,.45); color: #d9f99d; font-size: 10px; font-weight: 700;
+  white-space: nowrap; animation: fxDcwPrompt 4.2s ease-in-out;
+}
+.fx-dcw-keys { position: absolute; left: 12px; bottom: 10px; display: flex; align-items: center; gap: 3px; font-size: 8.5px; color: rgba(255,255,255,.42); z-index: 6; }
+.fx-dcw-keys kbd { font-family: inherit; font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 3px; background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.16); color: rgba(255,255,255,.72); }
+.fx-dcw-keys span { margin: 0 5px 0 2px; }
+.fx-dcw-badge {
+  position: absolute; top: 10px; right: 10px; z-index: 7; display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 999px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.16);
+  font-size: 9.5px; font-weight: 700; color: rgba(255,255,255,.9); transition: background .2s;
+}
+.group:hover .fx-dcw-badge { background: rgba(118,185,0,.9); }
+.fx-dcw-telemetry { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 13px; background: rgba(255,255,255,.022); border-top: 1px solid rgba(255,255,255,.07); }
+.fx-dcw-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09);
+  font-size: 9.5px; font-weight: 600; color: rgba(255,255,255,.7); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.fx-dcw-chip b { color: #fff; font-weight: 800; }
+.fx-dcw-chip em { opacity: .35; font-style: normal; margin: 0 1px; }
+.fx-dcw-chip-ctx { color: rgba(167,139,250,.9); }
+
+@keyframes fxDcwApproach { 0% { transform: scale(.9); opacity: 0; } 18% { opacity: 1; } 100% { transform: scale(1); } }
+@keyframes fxDcwLamp { 0% { transform: translateY(0) scaleX(.35); opacity: 0; } 25% { opacity: .75; } 100% { transform: translateY(190px) scaleX(2.4); opacity: 0; } }
+@keyframes fxDcwLed { 0%, 100% { opacity: 1; } 46% { opacity: .2; } }
+@keyframes fxDcwGpu { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.35); } }
+@keyframes fxDcwCable { to { stroke-dashoffset: -26; } }
+@keyframes fxDcwAir { 0% { transform: translateY(0); opacity: 0; } 14% { opacity: .9; } 100% { transform: translateY(-138px); opacity: 0; } }
+@keyframes fxDcwPrompt { 0%, 8% { opacity: 0; transform: translateY(4px); } 16%, 88% { opacity: 1; transform: translateY(0); } 100% { opacity: .35; } }
+
+@media (max-width: 640px) {
+  .fx-dcw-hall { height: 200px; }
+  .fx-dcw-depth-3 { display: none; }
+  .fx-dcw-depth-0 { width: 58px; height: 128px; }
+  .fx-dcw-depth-1 { width: 48px; height: 106px; }
+  .fx-dcw-depth-2 { width: 38px; height: 86px; }
+  .fx-dcw-keys, .fx-dcw-bay, .fx-dcw-chip-ctx { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-dcw-rack, .fx-dcw-lamp, .fx-dcw-sled-led, .fx-dcw-gpu-fill,
+  .fx-dcw-cable-path, .fx-dcw-air, .fx-dcw-prompt { animation: none !important; }
+  .fx-dcw-lamp { opacity: .4; }
+  .fx-dcw-air { opacity: .5; }
+  .fx-dcw-prompt { opacity: 1; }
+}

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from datetime import timedelta
 
 from django.conf import settings
@@ -9,12 +11,46 @@ from django.utils import timezone
 
 from apps.interviews.models import InterviewCampaign, InterviewCertificate
 
+logger = logging.getLogger(__name__)
+
 
 def issue_certificate(campaign: InterviewCampaign) -> InterviewCertificate | None:
     if hasattr(campaign, "certificate"):
         return campaign.certificate
 
     user = campaign.user
+
+    # Gate on the paid-tier flag.
+    #
+    # InterviewPlanTier.certificate_enabled is seeded False on Free and True on
+    # Pro/Premium, is exposed in the entitlement payload, and is shown in the
+    # pricing UI — but nothing ever checked it. _finalize_campaign called this
+    # unconditionally, so a Free-tier user received the certificate that Premium
+    # (Rs 2,499) is partly sold on. This was the clearest UI-only paywall in the
+    # codebase: grep for certificate_enabled and every hit was a serializer,
+    # admin, seed or payload — no enforcement site at all.
+    #
+    # Fails CLOSED on lookup error: better to withhold a certificate (recoverable
+    # by re-running once the tier resolves) than to hand out the paid artefact.
+    try:
+        from apps.interviews.services.entitlements import get_entitlement_payload
+
+        plan = (get_entitlement_payload(user) or {}).get("plan") or {}
+        if not plan.get("certificate_enabled"):
+            logger.info(
+                "Certificate withheld for user=%s campaign=%s — plan %r does not "
+                "include certificates",
+                user.id, campaign.id, plan.get("code") or "unknown",
+            )
+            return None
+    except Exception as exc:
+        logger.warning(
+            "Certificate entitlement check failed for user=%s campaign=%s (%s) — "
+            "withholding rather than issuing",
+            user.id, campaign.id, exc,
+        )
+        return None
+
     tech_name = campaign.primary_technology.name if campaign.primary_technology else "Multi-stack"
     date_str = timezone.now().strftime("%Y%m%d")
     cert_id = f"FIXIT-INT-{tech_name.upper().replace(' ', '-')[:12]}-{user.id}-{date_str}"

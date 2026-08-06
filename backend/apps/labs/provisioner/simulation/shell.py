@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import queue
+import logging
 import threading
 import time
+
 import uuid
 from dataclasses import dataclass, field
 from typing import Callable
-
 from .terminal_input import TerminalLineEditor
+
+logger = logging.getLogger(__name__)
 
 
 def _to_crlf(text: str) -> str:
@@ -244,15 +247,83 @@ class SimulationStreamHolder:
 _SIM_SESSIONS: dict[str, dict] = {}
 _SIM_LOCK = threading.Lock()
 
+# Idle eviction bound for _SIM_SESSIONS.
+#
+# This dict holds live UnifiedSimulationEngine objects (full VFS, users, services,
+# processes, LVM, git state) and live stream handles. It had NO ttl, NO maxsize and
+# NO eviction, and there are FIVE independent copies of it: one per uvicorn worker
+# (4) plus celery_provisioning.
+#
+# The leak is structural, not a missing cleanup call. Provisioning runs on the
+# Celery worker and populates THAT process's dict. The terminal then connects to an
+# arbitrary uvicorn worker whose dict is empty, so ensure_sim_session() rebuilds a
+# second engine there. Teardown calls drop_sim_session() in ONE process. Celery
+# children recycle at CELERY_WORKER_MAX_TASKS_PER_CHILD and self-heal; uvicorn
+# workers never recycle, so their copies accumulate monotonically until the 5 GB
+# cgroup OOM-kills all four and every in-flight lab dies.
+#
+# Eviction is keyed on IDLE TIME, not on count pressure, and deliberately so:
+# evicting an ACTIVE session would force a rebuild from LabSession
+# .simulation_snapshot, which (since snapshots are debounced to 15s) could lose up
+# to 15 seconds of a learner's work. An entry idle for longer than a lab can
+# possibly live is certainly dead, and rebuilding it is free because
+# ensure_sim_session() already restores from the snapshot.
+#
+# The real fix is still to move engine state out of process memory — the pattern
+# the 22 apps/vmware_sim/*_engine.py modules already use with SESSION_TTL=7200.
+# That is a larger change because this dict also holds live stream objects, which
+# genuinely must stay process-local. This bounds the damage in the meantime.
+_SIM_IDLE_TTL_SECONDS = 2 * 60 * 60  # 2x LAB_MAX_DURATION_MINUTES default (60m)
+
+
+def _touch(entry: dict) -> dict:
+    entry["last_access"] = time.time()
+    return entry
+
+
+def _evict_idle_locked() -> int:
+    """Drop entries idle beyond the TTL. Caller must hold _SIM_LOCK."""
+    cutoff = time.time() - _SIM_IDLE_TTL_SECONDS
+    stale = [
+        sid for sid, e in _SIM_SESSIONS.items()
+        if e.get("last_access", 0) < cutoff
+    ]
+    for sid in stale:
+        entry = _SIM_SESSIONS.pop(sid, None)
+        if not entry:
+            continue
+        for stream in (entry.get("streams") or {}).values():
+            try:
+                stream.close()
+            except Exception:
+                pass
+    if stale:
+        logger.info(
+            "Evicted %d idle simulation session(s) from this worker; %d remain",
+            len(stale), len(_SIM_SESSIONS),
+        )
+    return len(stale)
+
+
+def sim_session_count() -> int:
+    """Live entries in THIS process's registry.
+
+    Exported for monitoring: without it an OOM caused by this leak is
+    indistinguishable from a random worker restart (audit Z5-17).
+    """
+    with _SIM_LOCK:
+        return len(_SIM_SESSIONS)
+
 
 def register_sim_session(session_id: str, resource_id: str, sim_type: str, state: dict) -> None:
     with _SIM_LOCK:
-        _SIM_SESSIONS[str(session_id)] = {
+        _evict_idle_locked()
+        _SIM_SESSIONS[str(session_id)] = _touch({
             "resource_id": resource_id,
             "sim_type": sim_type,
             "state": state,
             "streams": {},
-        }
+        })
     # Stamp the lab session id onto the OS state so the cross-technology VMware
     # bridge (keyed by session id in the shared cache) can be consulted from the
     # terminal engine — even though the two simulators run in different workers.
@@ -264,14 +335,15 @@ def register_sim_session(session_id: str, resource_id: str, sim_type: str, state
 
 def get_sim_session(session_id: str) -> dict | None:
     with _SIM_LOCK:
-        return _SIM_SESSIONS.get(str(session_id))
+        entry = _SIM_SESSIONS.get(str(session_id))
+        return _touch(entry) if entry is not None else None
 
 
 def get_sim_session_by_resource(resource_id: str) -> dict | None:
     with _SIM_LOCK:
         for entry in _SIM_SESSIONS.values():
             if entry.get("resource_id") == resource_id:
-                return entry
+                return _touch(entry)
         return None
 
 

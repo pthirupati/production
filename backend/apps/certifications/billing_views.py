@@ -59,30 +59,48 @@ def fulfill_cert_track_subscription(*, user, track, amount_inr: int, razorpay_pa
         is_active=True,
         expires_at=now + timedelta(days=365),
     )
+    import hashlib
+
     from apps.billing.models import PaymentTransaction
     from apps.billing.gst import compute_gst
 
     breakup = compute_gst(amount_inr)
-    PaymentTransaction.objects.create(
-        user=user,
-        amount=breakup.total_amount,
-        taxable_amount=breakup.taxable_amount,
-        gst_rate=breakup.gst_rate,
-        gst_amount=breakup.gst_amount,
-        cgst_amount=breakup.cgst_amount,
-        sgst_amount=breakup.sgst_amount,
-        igst_amount=breakup.igst_amount,
-        place_of_supply=breakup.place_of_supply,
-        currency="INR",
-        payment_method="razorpay",
-        status="success",
-        gateway_order_id=order_id,
-        gateway_payment_id=razorpay_payment_id,
-        gateway_response={
-            "product_type": "certification_track",
-            "track_slug": track.slug,
-            "track_id": track.id,
-        },
+    # PaymentTransaction.idempotency_key is unique=True with no default. This
+    # create() omitted it, so the FIRST certification purchase platform-wide
+    # inserted "" and EVERY subsequent one raised IntegrityError — after Razorpay
+    # capture had already been verified and after the subscription row above was
+    # created. Depending on ATOMIC_REQUESTS that either charged the customer and
+    # rolled back the grant, or granted access and lost the ledger row. Either
+    # way it broke on the second cert sale ever.
+    #
+    # Deterministic key derived from (user, track, order): a replayed verify for
+    # the same Razorpay order is idempotent rather than a duplicate charge record.
+    idem = hashlib.sha256(
+        f"cert-v1-{user.id}-{track.id}-{order_id or razorpay_payment_id}".encode()
+    ).hexdigest()
+    PaymentTransaction.objects.get_or_create(
+        idempotency_key=idem,
+        defaults=dict(
+            user=user,
+            amount=breakup.total_amount,
+            taxable_amount=breakup.taxable_amount,
+            gst_rate=breakup.gst_rate,
+            gst_amount=breakup.gst_amount,
+            cgst_amount=breakup.cgst_amount,
+            sgst_amount=breakup.sgst_amount,
+            igst_amount=breakup.igst_amount,
+            place_of_supply=breakup.place_of_supply,
+            currency="INR",
+            payment_method="razorpay",
+            status="success",
+            gateway_order_id=order_id,
+            gateway_payment_id=razorpay_payment_id,
+            gateway_response={
+                "product_type": "certification_track",
+                "track_slug": track.slug,
+                "track_id": track.id,
+            },
+        ),
     )
     return sub, True
 

@@ -17,6 +17,7 @@ import TechnologiesSection from './sections/TechnologiesSection'
 import CertificationsSection from './sections/CertificationsSection'
 import InterviewSection from './sections/InterviewSection'
 import VMwareSection from './sections/VMwareSection'
+import DatacenterGpuSection from './sections/DatacenterGpuSection'
 import FeaturesSection from './sections/FeaturesSection'
 import HowItWorksSection from './sections/HowItWorksSection'
 import TestimonialsSection from './sections/TestimonialsSection'
@@ -32,8 +33,8 @@ export default function HomePage() {
   const { progressRef, toTopRef, navRef, spotRef, initMagnetic } = useFxPage()
 
   usePageTitle(
-    'Hands-on DevOps & Cloud Labs',
-    'Fix broken production systems in real environments — Linux, AWS, VMware, Kubernetes, and more.',
+    'Hands-on DevOps, Cloud, GPU & AI Infrastructure Labs',
+    'Fix broken production systems in real environments — Linux, AWS, Azure, GCP, Kubernetes, VMware, Terraform, security, plus GPU/NVIDIA and AI-infrastructure labs, a walkable 3D datacenter, portfolio projects and voice AI interviews.',
     { canonical: `${typeof window !== 'undefined' ? window.location.origin : ''}/` },
   )
 
@@ -68,6 +69,7 @@ export default function HomePage() {
       <CertificationsSection isAuthenticated={isAuthenticated} />
       <InterviewSection isAuthenticated={isAuthenticated} />
       <VMwareSection isAuthenticated={isAuthenticated} />
+      <DatacenterGpuSection isAuthenticated={isAuthenticated} />
       <FeaturesSection />
       <HowItWorksSection />
       <TestimonialsSection />

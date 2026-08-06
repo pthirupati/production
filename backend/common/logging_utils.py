@@ -23,6 +23,7 @@ Example structured log output:
 """
 
 import json
+import re
 import logging
 import time
 from datetime import datetime
@@ -33,6 +34,76 @@ def _mask_pii(value):
     """Lazy import avoids AppRegistryNotReady during logging setup."""
     from .security import mask_pii
     return mask_pii(value)
+
+
+# ── Message-body redaction ────────────────────────────────────────────────────
+#
+# The masking below used to apply ONLY to record.fields / record.structured, i.e.
+# only to extra={} passed through the StructuredLogger wrapper. That wrapper is
+# used in 4 files; plain logging.getLogger() is used in 84. So every f-string
+# email went to stdout in cleartext -- OTP and password-reset addresses, billing
+# and webhook recipients, and worst of all accounts/views.py and
+# account_lifecycle.py logging `email=` AT THE MOMENT OF DELETION, which defeats
+# the erasure the user just requested.
+#
+# These patterns run over the interpolated message. They are deliberately narrow:
+# over-redacting a log line destroys the debuggability the log exists for, so they
+# target shapes that are unambiguously identifiers.
+_EMAIL_RE = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
+# Long opaque tokens: JWT-ish, hex digests, base64-ish secrets. Bounded to 24+ so
+# ordinary words, slugs, UUIDs-with-dashes and stack frames survive.
+_TOKEN_RE = re.compile(r"\b[A-Za-z0-9_\-]{24,}\b")
+# NAME=secret / "password": "secret" style assignments in free text.
+_ASSIGN_RE = re.compile(
+    r"(?i)\b(password|passwd|secret|token|api[_-]?key|access[_-]?key|refresh)"
+    r"([\"'\s]*[:=][\s\"']*)([^\s,;\"'}\)]{4,})"
+)
+
+
+def _redact_message(msg: str) -> str:
+    """Redact identifiers from an already-interpolated log message."""
+    if not msg:
+        return msg
+    try:
+        msg = _ASSIGN_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}<redacted>", msg)
+        msg = _EMAIL_RE.sub(lambda m: _mask_pii(m.group(0)), msg)
+        msg = _TOKEN_RE.sub(
+            lambda m: m.group(0) if _looks_safe(m.group(0)) else "<redacted-token>",
+            msg,
+        )
+    except Exception:
+        # Never let redaction break logging -- a dropped log line is worse than an
+        # unredacted one, because it hides the incident entirely.
+        return msg
+    return msg
+
+
+# A lowercase slug: at least two hyphen/underscore-separated lowercase groups.
+# Scenario slugs (academy-linux-001-learn-users-groups), setting names and app
+# labels all match; real secrets essentially never do, because they are mixed-case
+# or high-entropy. Anchored with fullmatch so a slug-prefixed secret is not
+# whitelisted by its prefix.
+_SLUG_RE = re.compile(r"[a-z0-9]+(?:[-_][a-z0-9]+)+")
+
+
+def _looks_safe(token: str) -> bool:
+    """True for long-but-harmless tokens we must NOT destroy in logs.
+
+    Over-redaction is its own failure: a log line you cannot read is a log line
+    that hides the incident. Scenario slugs, dotted module paths and file paths all
+    routinely exceed the 24-char threshold and are precisely what you need when
+    reading a traceback or tracing a lab.
+
+    An earlier version omitted the slug case and turned
+    `scenario=academy-linux-001-learn-users-groups` into `<redacted-token>`, which
+    would have gutted lab logging across the platform.
+    """
+    return (
+        "." in token
+        or "/" in token
+        or bool(_SLUG_RE.fullmatch(token))
+        or token.isalpha()
+    )
 
 
 class JSONFormatter(logging.Formatter):
@@ -47,7 +118,7 @@ class JSONFormatter(logging.Formatter):
             "timestamp": datetime.utcfromtimestamp(record.created).isoformat() + "Z",
             "level": record.levelname,
             "logger": record.name,
-            "message": record.getMessage(),
+            "message": _redact_message(record.getMessage()),
         }
         
         # Add exception info if present

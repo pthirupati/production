@@ -78,6 +78,20 @@ def readiness_check(request):
             "(Vault is a rotation source, not required to serve traffic)"
         )
 
+    # Informational gauge, never a readiness failure.
+    #
+    # _SIM_SESSIONS is a process-local registry of live simulation engines, and it
+    # leaks across workers (audit Z5-1). Without this number an OOM caused by that
+    # leak is indistinguishable from a random worker restart, which is exactly what
+    # made it hard to spot. Each uvicorn worker reports its OWN count, so polling
+    # this endpoint repeatedly will show different values — that is the point.
+    try:
+        from apps.labs.provisioner.simulation.shell import sim_session_count
+
+        checks["sim_sessions"] = {"status": "ok", "count": sim_session_count()}
+    except Exception as exc:  # pragma: no cover - never fail readiness on a gauge
+        checks["sim_sessions"] = {"status": "unknown", "error": str(exc)}
+
     code = 200 if overall in ("ok", "degraded") else 503
     return JsonResponse({"status": overall, "checks": checks}, status=code)
 

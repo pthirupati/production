@@ -181,8 +181,13 @@ def default_linked_lab_slug(topic: str) -> str:
         "ai-infra-engineering": "ai-infra",
         "argocd": "devops",
         "argocd-gitops": "devops",
-        "aws": "terraform",
-        "azure": "terraform",
+        # NOTE: aws / azure / gcp deliberately have NO alias here.
+        # They used to map to "terraform", which meant every AWS tutorial linked
+        # to a Terraform lab even though scenarios/aws/ holds 420 scenarios of
+        # its own (and azure/gcp 150 each). The glob fallback below resolves
+        # them correctly on their own — academy-aws-001-learn-ec2,
+        # academy-azure-001-learn-virtual-machines,
+        # academy-gcp-001-learn-compute-engine. Do not re-add these aliases.
         "backend": "nodejs",
         "backend-api": "nodejs",
         "bash": "shell-script",
@@ -196,7 +201,7 @@ def default_linked_lab_slug(topic: str) -> str:
         "express-js": "nodejs",
         "fastapi": "python",
         "frontend": "react",
-        "gcp": "terraform",
+
         "git": "devops",
         "github": "devops",
         "gitlab": "devops",

@@ -15,7 +15,7 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db import connection, transaction
-from django.db.models import Q, Count, Avg, Sum, F, Exists, OuterRef, Value, BooleanField
+from django.db.models import Q, Count, Avg, Sum, Max, F, Exists, OuterRef, Value, BooleanField
 
 from common.throttles import LabStartThrottle, StrictAnonRateThrottle
 from common.api_security import require_authentication
@@ -2170,14 +2170,39 @@ class LeaderboardView(APIView):
             validation_passed=True, ended_at__gte=since, scenario__isnull=False
         )
         qs = qs.filter(**LeaderboardView._coerce_tech_id(tech_id))
-        rows = (
-            qs.values("user__id", "user__username")
-            .annotate(
-                total_score=Sum("score"),
-                scenarios_completed=Count("scenario", distinct=True),
-            )
-            .order_by("-total_score")[:100]
+        # ANTI-GRIND: sum each scenario's BEST score once per user, not every
+        # session. This was Sum("score") over all sessions in the window, so
+        # re-solving one 30-second lab 200 times added 200 scores and topped the
+        # weekly board. The all-time board already uses per-scenario bests
+        # (UserScenarioProgress.best_score); this brings weekly in line.
+        #
+        # The tell that it was wrong was visible in the output: scenarios_completed
+        # used distinct=True, so a grinder showed "1 scenario" beside an enormous
+        # total. Nothing rejected it.
+        # Two-level aggregation. Django cannot Sum() over an aggregate annotation
+        # in one chain (Sum("best") where best=Max(...) raises), so the per-user
+        # roll-up happens in Python. The input is bounded: one row per
+        # (user, scenario) pair that had a validated session in a 7-day window.
+        per_scenario = (
+            qs.values("user__id", "user__username", "scenario")
+            .annotate(best=Max("score"))
         )
+        totals = {}
+        for row in per_scenario.iterator(chunk_size=2000):
+            key = row["user__id"]
+            entry = totals.get(key)
+            if entry is None:
+                entry = totals[key] = {
+                    "user__id": key,
+                    "user__username": row["user__username"],
+                    "total_score": 0,
+                    "scenarios_completed": 0,
+                }
+            entry["total_score"] += row["best"] or 0
+            entry["scenarios_completed"] += 1
+        rows = sorted(
+            totals.values(), key=lambda r: r["total_score"], reverse=True
+        )[:100]
         return [
             {
                 "rank": i,

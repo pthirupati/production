@@ -588,24 +588,41 @@ class StripeWebhookView(APIView):
             logger.warning("Invalid Stripe webhook signature")
             return Response({"error": "Invalid signature"}, status=http_status.HTTP_401_UNAUTHORIZED)
 
-        # Idempotency: use event id
         event_id = event.get('id')
-        cache_key = f"stripe_webhook:{event_id}"
-        # cache.add returns True only if key was added (not present)
-        added = cache.add(cache_key, True, timeout=60 * 60)
-        if not added:
-            logger.info(f"Duplicate Stripe webhook ignored: {event_id}")
-            return Response({"status": "duplicate"})
-
         event_type = event.get('type')
         logger.info(f"Stripe webhook received: {event_type} (id={event_id})")
 
-        try:
+        def _dispatch():
             if event_type == 'checkout.session.completed':
                 self._handle_checkout_session_completed(event)
             elif event_type == 'invoice.payment_succeeded':
                 self._handle_invoice_payment_succeeded(event)
             # Add more event types as needed
+
+        try:
+            if event_id:
+                # Durable idempotency, matching the Razorpay handler above.
+                #
+                # This used to be `cache.add(f"stripe_webhook:{id}", ttl=1h)`.
+                # Redis-only, and only one hour — while Stripe retries failed
+                # webhooks for up to three days. A Redis restart or eviction
+                # inside that window reopened a double-fulfillment hole: a replay
+                # re-ran activate_interview_plan, resetting interviews_remaining
+                # and extending period_end by another 365 days on a single
+                # payment. The Razorpay path was hardened for exactly this reason
+                # and Stripe never got the same treatment.
+                with transaction.atomic():
+                    _, created = ProcessedWebhookEvent.objects.get_or_create(
+                        event_id=event_id,
+                        defaults={"provider": "stripe"},
+                    )
+                    if not created:
+                        logger.info("Duplicate Stripe webhook ignored (db): %s", event_id)
+                        return Response({"status": "duplicate"})
+                    _dispatch()
+            else:
+                # No event id — fall back rather than crash, same as Razorpay.
+                _dispatch()
 
             return Response({"status": "ok"})
         except Exception as e:

@@ -28,7 +28,16 @@ INTERVIEW_SUBSCRIPTION_DAYS = 365
 def verify_razorpay_signature(order_id: str, payment_id: str, signature: str) -> bool:
     secret = settings.RAZORPAY_KEY_SECRET
     if not secret:
-        return getattr(settings, "DEMO_PAYMENT_ENABLED", False)
+        # Demo bypass requires BOTH DEBUG and the flag. Every sibling verifier in
+        # the codebase does this (billing/views.py:817,852,
+        # razorpay_fulfillment.py:325) — this one checked only the flag, so a
+        # single settings regression would have granted paid interview plans for
+        # free. settings.py force-clamps DEMO_PAYMENT_ENABLED off when DEBUG is
+        # False, but defence in depth should not depend on that one clamp.
+        return bool(
+            getattr(settings, "DEBUG", False)
+            and getattr(settings, "DEMO_PAYMENT_ENABLED", False)
+        )
     try:
         message = f"{order_id}|{payment_id}"
         expected = hmac.new(secret.encode(), message.encode(), hashlib.sha256).hexdigest()
@@ -305,7 +314,15 @@ def fulfill_stripe_interview_checkout(session: dict) -> None:
         return
     amount = int(metadata.get("amount_inr") or tier.price_inr)
     session_id = session.get("id", "")
-    idem = PaymentTransaction.generate_idempotency_key(user.id, amount, "INR")
+    # Scope on the Stripe session id — it is already in hand on the line above and
+    # is the stable identifier for THIS purchase. Without it the key was
+    # time-derived, so a replayed webhook produced a different key, get_or_create
+    # reported created=True again, and activate_interview_plan ran a second time:
+    # interviews_remaining reset and period_end extended another 365 days on one
+    # payment.
+    idem = PaymentTransaction.generate_idempotency_key(
+        user.id, amount, "INR", scope=f"stripe:{session_id}"
+    )
     tx, created = PaymentTransaction.objects.get_or_create(
         idempotency_key=idem,
         defaults={

@@ -1,5 +1,8 @@
 import api from './client'
 import { useAuthStore } from '../store/authStore'
+import { useNotificationStore } from '../store/notificationStore'
+import { useDataStore } from '../store/dataStore'
+import { useLabStore } from '../store/labStore'
 import { rehydrateAwsSimForUser, resetAwsSimOnLogout } from '../components/aws/store/awsStore'
 
 export const authApi = {
@@ -46,7 +49,19 @@ export const authApi = {
     } catch {
       // Ignore errors — still clear local state
     } finally {
+      // Clear EVERY per-user store, not just auth + the AWS sim.
+      //
+      // Logout is an SPA navigation (navigate('/login')), not a full reload, so
+      // the JS heap survives. Previously only authStore and the AWS sim were
+      // reset, which meant user A's notifications, unread badge, cached
+      // technologies (with A's entitlement overlay) and active lab session were
+      // still in memory when user B signed in on the same tab. Note the
+      // forced-401 path in api/client.js uses window.location.href and so was
+      // never affected — that asymmetry is why this went unnoticed.
       resetAwsSimOnLogout()
+      try { useNotificationStore.getState().reset() } catch { /* non-fatal */ }
+      try { useDataStore.getState().reset() } catch { /* non-fatal */ }
+      try { useLabStore.getState().clearSession() } catch { /* non-fatal */ }
       store.logout()
     }
   },

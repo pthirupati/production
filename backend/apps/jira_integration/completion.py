@@ -65,6 +65,14 @@ def finalize_lab_completion_if_ready(session) -> bool:
         if locked is None:
             return False
 
+        # Was this scenario ALREADY completed before this attempt? Must be read
+        # before record_attempt(), which sets completed_at on first success.
+        from apps.progress.models import UserScenarioProgress
+
+        already_completed = UserScenarioProgress.objects.filter(
+            user=session.user, scenario=session.scenario, completed=True,
+        ).exists()
+
         record_attempt(
             user=session.user,
             scenario=session.scenario,
@@ -74,12 +82,30 @@ def finalize_lab_completion_if_ready(session) -> bool:
             hints_used=session.hints_used,
         )
 
-        # Grant XP exactly once per scenario completion — guarded by the locked
-        # completion_finalized re-check above, so it cannot double-count.
-        award_xp_for_completion(
-            session.user, score=score,
-            difficulty=getattr(session.scenario, "difficulty", None),
-        )
+        # Grant XP only on the FIRST completion of a given scenario.
+        #
+        # The completion_finalized lock above makes this idempotent per SESSION —
+        # it correctly defeats duplicate Jira webhooks and double-clicked Check.
+        # But restarting a lab creates a NEW session with completion_finalized
+        # False, so re-solving the same scenario re-awarded the full 50 + score +
+        # difficulty bonus (150-250 XP) every time. compute_score even rewards
+        # speed, so the fastest replay paid the most: grinding one easy scenario
+        # was the cheapest route up the XP and level ladder.
+        #
+        # Replaying for practice is still fine and still updates best_score,
+        # best_time and achievements via record_attempt — it just does not mint
+        # new XP. This mirrors the weekly leaderboard, which now sums per-scenario
+        # bests rather than every session.
+        if already_completed:
+            logger.info(
+                "XP not re-awarded: user=%s already completed scenario=%s",
+                session.user_id, session.scenario.slug,
+            )
+        else:
+            award_xp_for_completion(
+                session.user, score=score,
+                difficulty=getattr(session.scenario, "difficulty", None),
+            )
 
         Scenario.objects.filter(pk=session.scenario.pk).update(
             completions_count=F("completions_count") + 1

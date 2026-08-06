@@ -3608,8 +3608,15 @@ export default function LabRunner() {
         </div>
       )}
 
-      {/* Mobile: floating action bar */}
-      <div className="sm:hidden fixed bottom-0 inset-x-0 bg-surface-900 border-t border-surface-700/50 px-2 py-2 flex items-center justify-around z-30 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      {/* Mobile: floating action bar.
+          z-[85] is deliberate and load-bearing: companion consoles render at
+          z-[80] (companionOverlayClass) and CompanionToolStrip sits at z-[90].
+          At the old z-30 this bar — which owns Instructions / Hints / Check /
+          Stop on a phone — was buried the moment any companion console opened,
+          leaving a fullscreen simulator with no way to check or stop the lab.
+          The sidebar already escalates to z-[70] in the same situation; this bar
+          was simply missed. Keep it between the overlay and the tool strip. */}
+      <div className="sm:hidden fixed bottom-0 inset-x-0 bg-surface-900 border-t border-surface-700/50 px-2 py-2 flex items-center justify-around z-[85] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <LabTimerBadge variant="mobile-float" />
         <button onClick={() => { setSidebarTab('instructions'); setSidebarOpen(p => !p) }}
           className="p-2 text-surface-400 hover:text-white" aria-label="Instructions">

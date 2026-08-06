@@ -40,6 +40,11 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - name: Install backend deps
         run: pip install -r backend/requirements.txt
+      # Runs on every PR. This check previously existed only in the
+      # deploy/manual workflows, so a PR that added a secret merged green — which
+      # is how SETUP_COMPLETE.md ended up tracked with 10 live credentials.
+      - name: Check for leaked secrets in tracked files
+        run: bash scripts/check-no-secrets-in-git.sh
       - name: Lint hero scenario YAML
         run: python scripts/lint_scenarios.py --strict-heroes
       - name: Lint full scenario catalog (no banned learner-facing words)

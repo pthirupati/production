@@ -10,6 +10,11 @@ import { renderOpenStackV2Page } from '../sim/V3PlatformPanels'
 import '../../styles/sim-products.css'
 import './openstack.css'
 
+/* SIMULATED-CREDENTIAL: lab-console flavour, not a real secret. Shown to the
+   learner on screen (with an autofill button) so the fake console feels real, and
+   the gate is bypassed entirely once a provisioned lab session exists. Grants no
+   access to anything. Secret scanners should allowlist this marker rather than
+   flagging these lines. See docs/AUDIT_2026_08_TODO.md §Y2e. */
 const OS_LAB_USER = 'admin'
 const OS_LAB_PASS = 'lab123'
 const ACCENT = '#cf2a27'
@@ -104,7 +109,7 @@ export default function OpenStackConsole({
       <div className={simPanelRoot(embedded, 'bg-[#1a1a1a]')}>
         <LabChromeBar title="OpenStack Horizon" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded shadow-2xl w-[400px] overflow-hidden">
+          <div className="bg-white rounded shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold flex items-center gap-2" style={{ background: ACCENT }}>
               <Cloud size={18} /> Sign in to Horizon
             </div>

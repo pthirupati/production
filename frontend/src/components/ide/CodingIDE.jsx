@@ -39,6 +39,11 @@ function tsLine(text) {
 // localStorage key for per-session autosaved drafts. Keyed by lab session so a
 // reload (or accidental navigation) restores the exact in-progress files.
 const draftKey = (sessionId) => `fixitlab:ide-draft:${sessionId}`
+/* SIMULATED-CREDENTIAL: lab-console flavour, not a real secret. Shown to the
+   learner on screen (with an autofill button) so the fake console feels real, and
+   the gate is bypassed entirely once a provisioned lab session exists. Grants no
+   access to anything. Secret scanners should allowlist this marker rather than
+   flagging these lines. See docs/AUDIT_2026_08_TODO.md §Y2e. */
 const IDE_LAB_USER = 'lab_ide'
 const IDE_LAB_PASS = 'lab_ide@123'
 const IDE_AUTH_KEY = 'fixitlab_ide_auth'

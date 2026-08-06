@@ -19,6 +19,11 @@ import '../../styles/sim-products.css'
 
 // Lab sign-in credentials, consistent with the other simulators
 // (lab_<product> / lab_<product>@123). The AWX default admin/admin is also accepted.
+/* SIMULATED-CREDENTIAL: lab-console flavour, not a real secret. Shown to the
+   learner on screen (with an autofill button) so the fake console feels real, and
+   the gate is bypassed entirely once a provisioned lab session exists. Grants no
+   access to anything. Secret scanners should allowlist this marker rather than
+   flagging these lines. See docs/AUDIT_2026_08_TODO.md §Y2e. */
 const AWX_LAB_USER = 'lab_awx'
 const AWX_LAB_PASS = 'lab_awx@123'
 
@@ -124,7 +129,7 @@ export default function AwxSimulator({
       <div className={simPanelRoot(embedded, 'bg-[#1a1a2e]')}>
         <LabChromeBar title="Ansible AWX" subtitle={scenario?.title || slug} accent="#EE0000" {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-[400px] overflow-hidden">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold bg-[#EE0000] flex items-center gap-2">
               <Layers size={18} /> Ansible AWX
             </div>

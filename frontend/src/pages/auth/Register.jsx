@@ -1,13 +1,65 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { authApi } from '../../api/auth'
+import { scenarioApi } from '../../api/scenarios'
 import { Mail, Lock, ArrowRight, AlertCircle, Phone, Eye, EyeOff, Check, X, ShieldCheck, ArrowLeft, Terminal, Server, Cloud, Activity, Shield } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { startOAuth } from '../../utils/oauth'
 import { AuthShell } from '../../components/design'
 
-/* ── Animated illustration for registration ── */
+/* ── Animated illustration for registration ──
+ *
+ * Stats are LIVE from /api/stats/ (PlatformStatsView, 2-min cache, never 500s —
+ * it returns zeros on DB error). They used to be hardcoded "9+ Live Labs" and
+ * "5 Technologies", which understated the catalogue by three orders of
+ * magnitude and read as placeholder copy to anyone evaluating the product.
+ * Falls back to conservative floors only while the request is in flight.
+ */
 function RegisterIllustration() {
+  const [stats, setStats] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    scenarioApi
+      .getPlatformStats()
+      .then((d) => { if (!cancelled) setStats(d) })
+      .catch(() => { /* keep the loading floors — never block signup on this */ })
+    return () => { cancelled = true }
+  }, [])
+
+  const fmt = (n) => {
+    if (!n || n <= 0) return null
+    if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k+`
+    return `${n}+`
+  }
+
+  const cards = [
+    {
+      icon: Terminal,
+      label: 'Hands-on labs',
+      value: fmt(stats?.total_scenarios) || '—',
+      color: 'accent-cyan',
+    },
+    {
+      icon: Server,
+      label: 'Technologies',
+      value: fmt(stats?.total_technologies) || '—',
+      color: 'accent-green',
+    },
+    {
+      icon: Cloud,
+      label: 'Labs solved',
+      value: fmt(stats?.total_completions) || '—',
+      color: 'accent-purple',
+    },
+    {
+      icon: Activity,
+      label: 'Engineers training',
+      value: fmt(stats?.total_users) || '—',
+      color: 'accent-amber',
+    },
+  ]
+
   return (
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
       {/* Grid background */}
@@ -22,12 +74,7 @@ function RegisterIllustration() {
       <div className="relative z-10 max-w-md mx-auto px-8">
         {/* Stats cards */}
         <div className="grid grid-cols-2 gap-4 mb-8">
-          {[
-            { icon: Terminal, label: 'Live Labs', value: '9+', color: 'accent-cyan' },
-            { icon: Server, label: 'Technologies', value: '5', color: 'accent-green' },
-            { icon: Cloud, label: 'Cloud Providers', value: '3', color: 'accent-purple' },
-            { icon: Activity, label: 'Uptime', value: '99.9%', color: 'accent-amber' },
-          ].map(({ icon: Icon, label, value, color }, i) => (
+          {cards.map(({ icon: Icon, label, value, color }, i) => (
             <div key={label} className="glass-card p-4 text-center animate-fade-in" style={{ animationDelay: `${i * 0.15}s` }}>
               <Icon size={24} className={`mx-auto mb-2 text-${color}`} />
               <p className="text-2xl font-bold text-white">{value}</p>
@@ -53,15 +100,35 @@ function RegisterIllustration() {
           ))}
         </div>
 
-        {/* Testimonial */}
+        {/* What you get — factual proof points.
+         *
+         * This slot previously held a five-star quote attributed to
+         * "Sarah K., SRE at Cloudflare". That person does not exist and
+         * Cloudflare has not endorsed this product, so it was a fabricated
+         * endorsement using a real company's name to imply one — deceptive
+         * advertising, and squarely a misleading-advertisement risk under the
+         * Consumer Protection Act 2019 / CCPA endorsement rules in India.
+         * Replaced with claims that are true and checkable from the product
+         * itself. Do NOT reintroduce invented testimonials here: if and when
+         * real users consent to be quoted, attribute them properly. The home
+         * page uses generic role personas ("DevOps Engineer · Enterprise"),
+         * which is a defensible middle ground. */}
         <div className="mt-8 glass-card p-5 animate-fade-in" style={{ animationDelay: '1s' }}>
-          <div className="flex mb-2 gap-0.5">
-            {[...Array(5)].map((_, i) => (
-              <svg key={i} className="w-3.5 h-3.5 text-accent-amber fill-accent-amber" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+          <p className="text-xs font-semibold text-surface-200 mb-3 tracking-wide uppercase">
+            Included from day one
+          </p>
+          <div className="space-y-2">
+            {[
+              'Free tier — start solving without a card',
+              'Guided tutorials, then break-fix labs on the same stack',
+              'Voice AI interviews with verifiable certificates',
+            ].map((t) => (
+              <div key={t} className="flex items-start gap-2.5">
+                <Check size={13} className="text-accent-green mt-0.5 shrink-0" />
+                <p className="text-xs text-surface-300 leading-relaxed">{t}</p>
+              </div>
             ))}
           </div>
-          <p className="text-sm text-surface-300 italic leading-relaxed">"FixitLab is the closest thing to real incident response practice. Way better than reading docs."</p>
-          <p className="text-xs text-surface-500 mt-2">— Sarah K., SRE at Cloudflare</p>
         </div>
       </div>
     </div>

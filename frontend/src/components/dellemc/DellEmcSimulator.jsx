@@ -11,6 +11,11 @@ import { renderDellEmcV2Page } from './DellEmcV2Panels'
 import '../../styles/sim-products.css'
 import './dellemc.css'
 
+/* SIMULATED-CREDENTIAL: lab-console flavour, not a real secret. Shown to the
+   learner on screen (with an autofill button) so the fake console feels real, and
+   the gate is bypassed entirely once a provisioned lab session exists. Grants no
+   access to anything. Secret scanners should allowlist this marker rather than
+   flagging these lines. See docs/AUDIT_2026_08_TODO.md §Y2e. */
 const DE_LAB_USER = 'lab_dellemc'
 const DE_LAB_PASS = 'lab_dellemc@123'
 const ACCENT = '#0072c6'
@@ -90,7 +95,7 @@ export default function DellEmcSimulator({
       <div className={simPanelRoot(embedded, 'bg-[#04213f]')}>
         <LabChromeBar title="Dell EMC Unisphere" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-[400px] overflow-hidden">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold flex items-center gap-2" style={{ background: ACCENT }}>
               <HardDrive size={18} /> Unisphere for PowerMax
             </div>

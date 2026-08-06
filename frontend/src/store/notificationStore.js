@@ -68,4 +68,19 @@ export const useNotificationStore = create((set, get) => ({
       })
     } catch { /* ignore */ }
   },
+
+  /**
+   * Wipe per-user state. Called on logout.
+   *
+   * Logout navigates via SPA `navigate('/login')`, not a full reload, so the JS
+   * heap survives. Without this, user A's notifications and unread badge kept
+   * rendering for user B after a sign-in on the same tab, until the 60s poll in
+   * NotificationBell replaced them.
+   */
+  reset: () => set({
+    notifications: [],
+    unreadCount: 0,
+    loading: false,
+    lastFetchError: null,
+  }),
 }))
