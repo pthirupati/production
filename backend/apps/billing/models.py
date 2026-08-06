@@ -238,8 +238,23 @@ class PaymentTransaction(models.Model):
         return f"{self.user.email} — {self.amount} {self.currency} ({self.status})"
 
     @classmethod
-    def generate_idempotency_key(cls, user_id, amount, currency):
-        key_str = f"{user_id}-{amount}-{currency}-{timezone.now().isoformat()}"
+    def generate_idempotency_key(cls, user_id, amount, currency, scope=""):
+        """Stable key for one logical payment attempt.
+
+        This used to mix in ``timezone.now().isoformat()``, which made every call
+        return a fresh value — so the duplicate check it feeds in
+        ``payment_service.create_transaction`` ("Check for existing transaction
+        (idempotency)") could never match, and two rapid checkouts produced two
+        pending transactions and two gateway orders. It also broke
+        ``get_or_create(idempotency_key=...)`` in the Stripe interview path: a
+        replayed webhook computed a *different* key, so ``created`` was True
+        again and the plan was activated twice on one payment.
+
+        ``scope`` is where a gateway order id belongs when the caller has one —
+        that keeps two genuinely separate purchases of the same product distinct
+        while still collapsing retries of the same one.
+        """
+        key_str = f"{user_id}-{amount}-{currency}-{scope}"
         return hashlib.sha256(key_str.encode()).hexdigest()
 
     def mark_success(self, gateway_payment_id=None, gateway_response=None):

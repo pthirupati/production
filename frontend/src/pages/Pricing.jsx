@@ -378,6 +378,12 @@ export default function Pricing() {
       return
     }
 
+    // Charges cart[0] only — see the MONEY-CORRECTNESS note in the cart drawer.
+    // The server has no multi-line order endpoint, so a cart is checked out one
+    // technology per Razorpay order. The drawer states the amount being charged
+    // and how many items remain, so the displayed figure always matches the
+    // charge. Remove the item we are about to pay for from the cart on success
+    // handled by PaymentPage's return flow.
     setBatchProcessing(true)
     try {
       const tech = cart[0]
@@ -986,9 +992,25 @@ export default function Pricing() {
                   </div>
                 )}
                 <div className="flex justify-between text-white font-bold text-lg pt-2 border-t border-surface-700/30">
-                  <span>Total</span>
+                  <span>Cart value</span>
                   <span>{getDisplayPrice(cartTotal).display}</span>
                 </div>
+                {/* MONEY-CORRECTNESS: this drawer used to show the full cart total
+                    next to a "Subscribe All (N)" button, while handleBatchSubscribe
+                    created a Razorpay order for cart[0] ONLY. A 5-item cart
+                    displayed ~₹2,495 and charged ₹499, delivering one technology.
+                    There is no multi-line order endpoint server-side, so the fix
+                    is to make the CTA state exactly what is about to be charged.
+                    Do not restore a single "Subscribe All" button unless a real
+                    multi-item order exists on the backend. */}
+                {cart.length > 1 && (
+                  <div className="flex justify-between text-sm pt-2 border-t border-surface-700/30">
+                    <span className="text-surface-400">Charging now</span>
+                    <span className="text-white font-semibold">
+                      {getDisplayPrice(cart[0]?.price || 499).display}
+                    </span>
+                  </div>
+                )}
               </div>
               <button
                 onClick={handleBatchSubscribe}
@@ -997,10 +1019,18 @@ export default function Pricing() {
               >
                 {batchProcessing ? (
                   <><Loader2 size={18} className="animate-spin" /> Processing...</>
+                ) : cart.length > 1 ? (
+                  <><Lock size={16} /> Checkout {cart[0]?.name}</>
                 ) : (
-                  <><Lock size={16} /> Subscribe All ({cart.length})</>
+                  <><Lock size={16} /> Subscribe to {cart[0]?.name}</>
                 )}
               </button>
+              {cart.length > 1 && (
+                <p className="text-[11px] text-surface-500 text-center leading-relaxed">
+                  Technologies are purchased one at a time. You&apos;ll be brought back
+                  here for the remaining {cart.length - 1} after this payment.
+                </p>
+              )}
               <div className="flex items-center justify-center gap-1.5 text-xs text-surface-500">
                 <ShieldCheck size={12} className="text-accent-green" />
                 <span>Secure payment via Razorpay</span>

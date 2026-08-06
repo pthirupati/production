@@ -43,9 +43,22 @@ class PaymentService:
         if not tech_subscription and not plan:
             raise PaymentServiceException("Must provide tech_subscription or plan")
 
-        # Generate idempotency key
+        # Scope the idempotency key to the product plus a coarse time bucket.
+        #
+        # No gateway order exists yet at this point (we create the transaction
+        # first, then the order), so there is no natural per-attempt id. A bare
+        # (user, amount, currency) key would be too strict: it would collapse a
+        # legitimate renewal months later into the original success row and refuse
+        # to create a new transaction. A 10-minute bucket collapses the actual bug
+        # — a double-clicked checkout producing two pending transactions and two
+        # gateway orders — without blocking repurchase.
+        product_scope = (
+            f"tech:{tech_subscription.id}" if tech_subscription
+            else f"plan:{getattr(plan, 'id', plan)}"
+        )
+        bucket = int(timezone.now().timestamp()) // 600
         idempotency_key = PaymentTransaction.generate_idempotency_key(
-            self.user.id, self.amount, self.currency
+            self.user.id, self.amount, self.currency, scope=f"{product_scope}:{bucket}"
         )
 
         # Check for existing transaction (idempotency)
