@@ -1264,6 +1264,15 @@ jobs:
     # cold/feature-branch deploys; keep headroom so GH does not cancel mid-pull.
     timeout-minutes: 120
     environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: cluster-edge-host, path: _cluster }
+      - name: Load edge host
+        run: |
+          echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+          [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
+      - name: Ordered deploy (data → edge → app → labs images)
         env:
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
           # EDGE/APP/DATA/LABS_PRIVATE_IP come from cluster_ips.env via $GITHUB_ENV.
