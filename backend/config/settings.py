@@ -275,6 +275,16 @@ REST_FRAMEWORK = {
         "otp": "10/minute",  # was 5 — legitimate resends behind a shared IP
         "password_reset": "8/minute",  # allow a few retries (mistyped email) without "too many requests"
         "payment": "30/hour",  # per user
+        # User-generated content writes. Community had NO throttling at all:
+        # ThreadListView, ThreadDetailView, ReplyView, VoteView,
+        # ThreadAttachmentUploadView, ReplyReactionView and ThreadReportView were
+        # all unbounded, so a script could post threads/replies and upload 5MB
+        # images in a loop. Generous enough for a real conversation, tight enough
+        # that automated flooding hits a wall. Per authenticated user.
+        "ugc_write": "60/hour",       # threads, replies, edits
+        "ugc_light": "300/hour",      # votes and reactions — cheap, high-frequency
+        "ugc_upload": "20/hour",      # 5MB image uploads
+        "ugc_report": "20/hour",      # abuse reports; enough to report a thread-storm
         "interview": "200/day",  # per user — long practice sessions
         "strict_anon": "240/minute",  # public browsing behind NAT needs real headroom (was 60)
         # Public, anonymous "Playgrounds" (try-instantly sandboxes). Each POST

@@ -1,6 +1,8 @@
 import hashlib
 import hmac
 import json
+
+from celery import shared_task
 import logging
 from datetime import datetime, timezone
 
@@ -13,7 +15,7 @@ def _sign_payload(secret: str, body: bytes) -> str:
     return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
 
-def fire_org_webhook(org, event: str, payload: dict) -> bool:
+def _post_org_webhook(org, event: str, payload: dict) -> bool:
     """POST JSON to org.webhook_url with HMAC signature. Returns True on 2xx."""
     if not org.webhook_url:
         return False
@@ -41,3 +43,65 @@ def fire_org_webhook(org, event: str, payload: dict) -> bool:
     except Exception as exc:
         logger.warning("Org webhook %s → %s failed: %s", org.slug, event, exc)
         return False
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=10,
+    acks_late=True,
+)
+def deliver_org_webhook(self, org_id: str, event: str, payload: dict) -> bool:
+    """Deliver an org webhook OFF the request path.
+
+    fire_org_webhook() was previously called synchronously from
+    labs/completion.py and accounts/views.py, so every lab completion blocked on
+    a 5-second timeout against a URL the org owner controls. That was both a
+    latency amplifier and half of an SSRF (the other half being the missing URL
+    validation, now in url_safety.py).
+
+    The URL is re-validated here as well as at write time: a hostname that was
+    public when it was saved can be repointed at a private address later, and
+    this is the last gate before the socket is opened.
+    """
+    from .models import Organization
+    from .url_safety import UnsafeURLError, validate_outbound_url
+
+    org = Organization.objects.filter(id=org_id).first()
+    if not org or not org.webhook_url:
+        return False
+    try:
+        validate_outbound_url(org.webhook_url)
+    except UnsafeURLError as exc:
+        # Do not retry — a private target will still be private next time.
+        logger.warning(
+            "Refusing org webhook for org=%s event=%s: %s", org.slug, event, exc
+        )
+        return False
+    return _post_org_webhook(org, event, payload)
+
+
+def fire_org_webhook(org, event: str, payload: dict) -> bool:
+    """Queue an org webhook. Never blocks the caller, never raises.
+
+    Kept as the public entrypoint so the two call sites did not need to change
+    shape. Falls back to a synchronous send only if the broker is unreachable,
+    matching how the Jira team-reply path degrades.
+    """
+    if not org or not getattr(org, "webhook_url", ""):
+        return False
+    try:
+        deliver_org_webhook.delay(str(org.id), event, payload)
+        return True
+    except Exception as exc:
+        logger.warning(
+            "Broker unavailable for org webhook %s → %s, sending inline: %s",
+            getattr(org, "slug", "?"), event, exc,
+        )
+        try:
+            from .url_safety import UnsafeURLError, validate_outbound_url
+
+            validate_outbound_url(org.webhook_url)
+        except Exception:
+            return False
+        return _post_org_webhook(org, event, payload)

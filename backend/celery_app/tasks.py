@@ -725,3 +725,9 @@ def reset_jira_ticket_after_lab_close(session_id: str) -> dict:
 # task body lives in tasks_monitoring.py to keep this module focused.
 from celery_app.tasks_monitoring import check_business_signals  # noqa: E402,F401
 
+# Same reason as above: deliver_org_webhook lives in apps/accounts/webhooks.py
+# (next to the signing/POST helpers it uses) rather than in that app's tasks.py,
+# so autodiscovery would not see it. Import it here so the @shared_task registers.
+# Without this, fire_org_webhook().delay() raises and silently degrades to a
+# synchronous send — which is the latency problem it exists to remove.
+from apps.accounts.webhooks import deliver_org_webhook  # noqa: E402,F401

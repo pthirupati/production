@@ -356,7 +356,14 @@ class LoginView(APIView):
             if is_ip_blocked(client_ip):
                 return Response({"error": "Access denied from this network."}, status=403)
         except Exception:
-            pass
+            # FAILS OPEN by design — an outage in the blocklist backend must not
+            # lock every user out of login. But it must be LOUD: silently
+            # swallowing this meant the IP blocklist could be down indefinitely
+            # with no signal, so a blocked network would sail straight through.
+            logger.warning(
+                "IP blocklist check failed for %s — allowing login attempt "
+                "(control is failing OPEN)", client_ip, exc_info=True,
+            )
 
         def _record_login_failure():
             # Count this as a brute-force attempt against (IP + email). Only
@@ -367,7 +374,14 @@ class LoginView(APIView):
                 throttle.allow_request(request, self)  # primes throttle.key/now
                 throttle.record_failure(request, self)
             except Exception:
-                pass
+                # Losing this silently is worse than it looks: the login throttle
+                # counts FAILURES only, so a swallowed exception here means the
+                # brute-force counter stops incrementing and the rate limit
+                # effectively stops enforcing — while still appearing configured.
+                logger.warning(
+                    "Failed to record login failure for throttling (brute-force "
+                    "counter did NOT increment)", exc_info=True,
+                )
 
         # Look up user by email, then authenticate by username
         user_obj = User.objects.filter(email=email).first()

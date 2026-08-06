@@ -154,3 +154,50 @@ class LabStartThrottle(UserRateThrottle):
         if not request.user or not request.user.is_authenticated:
             return None
         return super().get_cache_key(request, view)
+
+
+# ── User-generated content ────────────────────────────────────────────────────
+# The community app shipped with NO throttling on any write path. Every one of
+# ThreadListView / ThreadDetailView / ReplyView / VoteView /
+# ThreadAttachmentUploadView / ReplyReactionView / ThreadReportView was
+# unbounded, so an authenticated script could post threads and replies and
+# upload 5 MB images in a loop. Per-user (not per-IP) so a shared office network
+# is not collectively limited by one abuser.
+class _WriteOnlyUserThrottle(UserRateThrottle):
+    """Throttle that ignores safe methods.
+
+    This matters: ThreadListView and ThreadDetailView allow anonymous READS
+    (IsAuthenticatedOrReadOnly), and DRF's UserRateThrottle falls back to
+    per-IP keying when there is no authenticated user. Applying it naively would
+    have capped PUBLIC FORUM BROWSING at the write rate — 60 GETs/hour/IP, which
+    would break the community pages for logged-out visitors and every NAT'd
+    office. Only POST/PUT/PATCH/DELETE consume quota; reads are governed by the
+    existing anon/user defaults.
+    """
+
+    SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+    def allow_request(self, request, view):
+        if request.method in self.SAFE_METHODS:
+            return True
+        return super().allow_request(request, view)
+
+
+class UgcWriteThrottle(_WriteOnlyUserThrottle):
+    """Threads, replies and edits."""
+    scope = "ugc_write"
+
+
+class UgcLightThrottle(_WriteOnlyUserThrottle):
+    """Votes and reactions — cheap and high-frequency, so a looser ceiling."""
+    scope = "ugc_light"
+
+
+class UgcUploadThrottle(_WriteOnlyUserThrottle):
+    """Attachment uploads. Tightest of the four: each one can be 5 MB."""
+    scope = "ugc_upload"
+
+
+class UgcReportThrottle(_WriteOnlyUserThrottle):
+    """Abuse reports. Enough to report a thread-storm without enabling one."""
+    scope = "ugc_report"

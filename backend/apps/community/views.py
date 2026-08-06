@@ -6,6 +6,13 @@ from rest_framework import status as http_status
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from common.throttles import (
+    UgcLightThrottle,
+    UgcReportThrottle,
+    UgcUploadThrottle,
+    UgcWriteThrottle,
+)
 from rest_framework.pagination import PageNumberPagination
 
 from .models import Thread, Reply, ThreadVote
@@ -27,6 +34,7 @@ class ThreadPagination(PageNumberPagination):
 class ThreadListView(APIView):
     """List threads or create a new thread."""
     permission_classes = [IsAuthenticatedOrReadOnly]
+    throttle_classes = [UgcWriteThrottle]
 
     def get(self, request):
         threads = Thread.objects.filter(is_deleted=False).select_related("author", "technology")
@@ -63,6 +71,7 @@ class ThreadListView(APIView):
 class ThreadDetailView(APIView):
     """Get, update, or delete a thread."""
     permission_classes = [IsAuthenticatedOrReadOnly]
+    throttle_classes = [UgcWriteThrottle]
 
     def get(self, request, thread_id):
         try:
@@ -123,6 +132,7 @@ class ThreadDetailView(APIView):
 class ReplyView(APIView):
     """Create a reply to a thread."""
     permission_classes = [IsAuthenticated]
+    throttle_classes = [UgcWriteThrottle]
 
     def post(self, request, thread_id):
         try:
@@ -170,6 +180,7 @@ class ReplyView(APIView):
 class ReplyDetailView(APIView):
     """Update or delete a reply."""
     permission_classes = [IsAuthenticated]
+    throttle_classes = [UgcWriteThrottle]
 
     def patch(self, request, reply_id):
         try:
@@ -208,6 +219,7 @@ class ReplyDetailView(APIView):
 class VoteView(APIView):
     """Vote on a thread or reply."""
     permission_classes = [IsAuthenticated]
+    throttle_classes = [UgcLightThrottle]
 
     def post(self, request, thread_id=None, reply_id=None):
         vote_type = request.data.get("vote_type", "up")
@@ -304,6 +316,7 @@ class VoteView(APIView):
 class ThreadAttachmentUploadView(APIView):
     """Upload screenshot/image to a thread or reply."""
     permission_classes = [IsAuthenticated]
+    throttle_classes = [UgcUploadThrottle]
     MAX_BYTES = 5 * 1024 * 1024
 
     def post(self, request, thread_id):
@@ -354,6 +367,7 @@ class ThreadAttachmentUploadView(APIView):
 class ReplyReactionView(APIView):
     """Toggle emoji reaction on a reply."""
     permission_classes = [IsAuthenticated]
+    throttle_classes = [UgcLightThrottle]
     ALLOWED = ("👍", "👎", "❤️", "🎉", "😂", "🚀", "👀", "✅", "🔥", "💡")
 
     def post(self, request, reply_id):
@@ -381,6 +395,7 @@ class ReplyReactionView(APIView):
 class ThreadReportView(APIView):
     """Report a community thread for moderation."""
     permission_classes = [IsAuthenticated]
+    throttle_classes = [UgcReportThrottle]
 
     def post(self, request, thread_id):
         from .models import ThreadReport

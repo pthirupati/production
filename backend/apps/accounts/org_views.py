@@ -16,6 +16,8 @@ from rest_framework.views import APIView
 
 from apps.notifications.tasks import send_notification_email
 
+from .url_safety import UnsafeURLError, validate_outbound_url
+
 from .models import (
     Organization,
     OrganizationMember,
@@ -450,9 +452,28 @@ class OrganizationSettingsView(APIView):
 
         update_fields = []
         for field in self.ALLOWED:
-            if field in request.data:
-                setattr(org, field, request.data[field] or "")
-                update_fields.append(field)
+            if field not in request.data:
+                continue
+            value = request.data[field] or ""
+            # SSRF guard. save(update_fields=...) skips full_clean(), so URLField
+            # validation never ran here — and the server POSTs to webhook_url
+            # synchronously from the lab-completion path. An org owner could aim
+            # it at cloud instance metadata, Vault, or Postgres and trigger it by
+            # finishing a lab. Resolve and reject non-public targets before store.
+            if field == "webhook_url":
+                try:
+                    value = validate_outbound_url(value)
+                except UnsafeURLError as exc:
+                    logger.warning(
+                        "Rejected unsafe org webhook_url for org=%s user=%s: %s",
+                        org.slug, request.user.id, exc,
+                    )
+                    return Response(
+                        {"error": f"Invalid webhook URL: {exc}"},
+                        status=400,
+                    )
+            setattr(org, field, value)
+            update_fields.append(field)
 
         if update_fields:
             org.save(update_fields=update_fields)

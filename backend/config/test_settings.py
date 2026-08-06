@@ -93,6 +93,15 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {  # noqa: F405
     "lab_start": "10000/minute",
     "token_refresh": "10000/minute",
     "playground": "10000/minute",
+    # NOTE: this dict REPLACES the production one, so every scope used by a
+    # view-level throttle_classes must be listed here or SimpleRateThrottle
+    # .get_rate() raises ImproperlyConfigured and the endpoint 500s in tests.
+    # Adding the ugc_* scopes to settings.py alone broke every existing
+    # community test until they were mirrored here.
+    "ugc_write": "10000/minute",
+    "ugc_light": "10000/minute",
+    "ugc_upload": "10000/minute",
+    "ugc_report": "10000/minute",
 }
 
 # Monkey-patch allow_request so throttle classes always pass in tests
