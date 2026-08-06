@@ -472,10 +472,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     if cmd and len(cmd) < 2000 and self.lab_session:
                         await self._save_command(cmd)
                         if self.provider_type == "simulation":
-                            from apps.labs.provisioner.simulation.sim_persistence import persist_session_snapshot
-                            await asyncio.to_thread(
-                                persist_session_snapshot, str(self.lab_session.id)
-                            )
+                            await self._maybe_snapshot_simulation()
 
                 await asyncio.to_thread(self.raw_socket.send, input_bytes)
 
@@ -772,12 +769,57 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     "output": "\r\n\x1b[1;31mConnection lost\x1b[0m\r\n"
                 }))
 
+    # Snapshot the simulation engine at most once every SNAPSHOT_MIN_INTERVAL
+    # seconds, plus an unconditional flush on disconnect.
+    #
+    # This used to run on EVERY command line. Measured: ~15 KB of JSONB per
+    # snapshot, and Postgres has no partial JSONB update, so each one is a full
+    # row rewrite that produces a dead tuple. At 60 concurrent labs x ~20
+    # commands/min that is ~20 writes/sec and roughly 1 GB/hour of write
+    # amplification on labs_labsession — the dominant write load in the system,
+    # and enough to keep autovacuum permanently behind.
+    #
+    # The snapshot is a durability BACKSTOP, not the live store: the authoritative
+    # engine lives in memory, and the snapshot exists so a Celery worker (a
+    # different process) can apply team-bot actions and so a restart can restore.
+    # A slightly stale backstop is fine; losing the session is not — hence the
+    # guaranteed flush in disconnect().
+    SNAPSHOT_MIN_INTERVAL = 15.0
+
+    async def _maybe_snapshot_simulation(self, force: bool = False) -> None:
+        if not self.lab_session or self.provider_type != "simulation":
+            return
+        now = time.time()
+        last = getattr(self, "_last_snapshot_at", 0.0)
+        if not force and (now - last) < self.SNAPSHOT_MIN_INTERVAL:
+            self._snapshot_pending = True
+            return
+        self._last_snapshot_at = now
+        self._snapshot_pending = False
+        try:
+            from apps.labs.provisioner.simulation.sim_persistence import (
+                persist_session_snapshot,
+            )
+
+            await asyncio.to_thread(persist_session_snapshot, str(self.lab_session.id))
+        except Exception as exc:  # pragma: no cover - best effort by design
+            logger.warning(
+                "Simulation snapshot failed for session %s: %s",
+                self.lab_session.id, exc,
+            )
+
     async def disconnect(self, close_code):
         """Cleanup on disconnect and save recording."""
         self._ws_connected = False
         self._release_connection_slot()
         if self.lab_session and self._recording_events:
             await self._save_recording()
+
+        # Always flush the engine snapshot on the way out, so debouncing above can
+        # never lose a learner's work — even if the last command landed inside the
+        # interval window.
+        if self.provider_type == "simulation":
+            await self._maybe_snapshot_simulation(force=True)
 
         if self.reader_task:
             self.reader_task.cancel()
