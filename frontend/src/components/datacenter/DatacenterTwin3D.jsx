@@ -7,7 +7,7 @@ import {
 } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import {
-  OrbitControls, Html, Environment, ContactShadows, RoundedBox, Float, Bvh,
+  OrbitControls, Html, Environment, Lightformer, ContactShadows, RoundedBox, Float, Bvh,
 } from '@react-three/drei'
 import { Physics, RigidBody } from '@react-three/rapier'
 import { motion } from 'framer-motion'
@@ -1070,6 +1070,38 @@ function PulsingLight() {
   return <pointLight ref={ref} position={[-4, 3, -2]} color="#38bdf8" />
 }
 
+/**
+ * Procedural image-based lighting for the hall — NO network fetch.
+ *
+ * Replaces `<Environment preset="warehouse" />`, which pulled
+ * `empty_warehouse_01_1k.hdr` from a CDN at runtime. That fetch failing
+ * (offline, air-gapped lab, CDN blocked, flaky network) threw inside the R3F
+ * tree and knocked the whole twin into the failure banner — and because the
+ * error message contains the literal string "Failed to fetch", it also tripped
+ * the over-broad stale-chunk matcher in main.jsx and reloaded the page.
+ *
+ * drei's <Environment> renders its children into an offscreen cube target, so
+ * Lightformers give us a real env map generated on the GPU with zero requests.
+ * Tuned for a dark server hall: cool overhead strips down the cold aisle, a
+ * warm bounce at floor level, and dim side rims so metal reads as metal.
+ */
+function HallEnvironment() {
+  return (
+    <Environment resolution={256} frames={1}>
+      {/* Overhead cold-aisle strips — the dominant source, mirrors CeilingLights */}
+      <Lightformer form="rect" intensity={2.2} color="#dbeafe" position={[0, 6, -2]} rotation={[Math.PI / 2, 0, 0]} scale={[10, 3, 1]} />
+      <Lightformer form="rect" intensity={1.6} color="#e0f2fe" position={[0, 6, 3]} rotation={[Math.PI / 2, 0, 0]} scale={[10, 3, 1]} />
+      {/* Side rims so rack metal and cable jackets catch a highlight */}
+      <Lightformer form="rect" intensity={0.8} color="#93c5fd" position={[-7, 2.5, 0]} rotation={[0, Math.PI / 2, 0]} scale={[8, 3, 1]} />
+      <Lightformer form="rect" intensity={0.8} color="#93c5fd" position={[7, 2.5, 0]} rotation={[0, -Math.PI / 2, 0]} scale={[8, 3, 1]} />
+      {/* Warm floor bounce — keeps shadow sides from going pure black */}
+      <Lightformer form="rect" intensity={0.35} color="#fbbf24" position={[0, -1, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[12, 8, 1]} />
+      {/* Faint cyan ambient from equipment LEDs */}
+      <Lightformer form="circle" intensity={0.5} color="#38bdf8" position={[-3, 1.2, -5]} scale={[3, 3, 1]} />
+    </Environment>
+  )
+}
+
 function TorSwitch({ position = [5.5, 0.95, -1.2], label = 'MDF / Agg', ports = 48 }) {
   const leds = useRef([])
   useFrame(({ clock }) => {
@@ -1454,7 +1486,7 @@ function SceneContent({
       <directionalLight castShadow position={[6, 10, 4]} intensity={1.05} shadow-mapSize={[1024, 1024]} />
       <directionalLight position={[-4, 6, -6]} intensity={0.4} color="#94a3b8" />
       <PulsingLight />
-      <Environment preset="warehouse" />
+      <HallEnvironment />
       <Floor />
       <CorridorShell dockBusy={dockBusy} doorOpen={doorOpen} />
       <HallDust count={dustCount || (walkMode ? 140 : 90)} />

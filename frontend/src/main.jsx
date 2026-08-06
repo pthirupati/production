@@ -24,9 +24,18 @@ window.addEventListener('vite:preloadError', (e) => {
   e.preventDefault()
   recoverFromStaleChunk(e?.payload?.message || 'vite:preloadError')
 })
+// NOTE: every pattern here must be MODULE-specific. A bare /Failed to fetch/
+// used to live in this list and it matched any network error whose message
+// happens to contain that phrase — e.g. a texture/HDRI load
+// ("Could not load empty_warehouse_01_1k.hdr: Failed to fetch"), a failed
+// image, or an aborted API call. Those are not stale chunks, so reloading did
+// not fix them; it just bounced the user off the page they were on, repeatedly.
+// Keep this list narrow: if it does not name a module/chunk, it does not belong.
+const STALE_CHUNK_RE = /dynamically imported module|Importing a module script failed|ChunkLoadError|Loading chunk \d+ failed|Failed to fetch dynamically imported module/i
+
 window.addEventListener('error', (e) => {
   const msg = String(e?.message || '')
-  if (/dynamically imported module|Importing a module script failed|ChunkLoadError|Failed to fetch/i.test(msg)) {
+  if (STALE_CHUNK_RE.test(msg)) {
     recoverFromStaleChunk(msg)
   }
 })
@@ -35,7 +44,7 @@ window.addEventListener('error', (e) => {
 // "Failed to fetch dynamically imported module" the admin pages were hitting.
 window.addEventListener('unhandledrejection', (e) => {
   const msg = String(e?.reason?.message || e?.reason || '')
-  if (/dynamically imported module|Importing a module script failed|ChunkLoadError|Failed to fetch dynamically/i.test(msg)) {
+  if (STALE_CHUNK_RE.test(msg)) {
     recoverFromStaleChunk(msg)
   }
 })
