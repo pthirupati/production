@@ -54,7 +54,13 @@ class RedactsPiiTests(SimpleTestCase):
 
     def test_long_opaque_tokens_are_redacted(self):
         for tok in (
-            "rzp_live_AbCdEf1234567890",
+            # Deliberately NOT a realistic gateway prefix. An earlier version used
+            # a real-looking "rzp_live_..." string and scripts/check-no-secrets-in-git.sh
+            # correctly flagged this file in CI — the prefix pass has no test-path
+            # exclusion, and it should not have one, or a genuinely leaked key in a
+            # test fixture would sail through. Use a shape that exercises the
+            # token rule without impersonating a live credential.
+            "QxV7mLp2ZtRb9KcYwNfHgAeD",
             "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9abcdef",
             "a3f5b8c9d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f",
         ):
