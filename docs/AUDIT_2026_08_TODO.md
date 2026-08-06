@@ -3873,3 +3873,111 @@ and three of them are owner-only:
    the **metadata-push race** (push and verify-sync *before* triggering) — see the
    deploy memories. These are easy to get wrong under time pressure.
 4. GitHub Actions CI has not run yet; only the equivalent checks locally.
+
+---
+
+# IMPLEMENTATION LOG — 2026-08-06 (session 4)
+
+## ✅ Landed — security
+
+### §S5 — blind SSRF via org `webhook_url` (was the one genuinely exploitable bug)
+- [x] New `apps/accounts/url_safety.py`. **Resolves** the host and rejects if any
+      A/AAAA record is non-public — string matching is insufficient because a
+      public-looking name can resolve to `127.0.0.1`. Fails closed on resolution
+      failure. `https` + port 443 only, which also removes the
+      scan-the-private-network-by-port primitive. Blocks embedded credentials and
+      cloud metadata addresses explicitly.
+- [x] Wired into `org_views.py` — the write used `setattr` +
+      `save(update_fields=...)`, which skips `full_clean()`, so `URLField`
+      validation never ran.
+- [x] **Delivery moved to Celery** (`deliver_org_webhook`), so lab completion no
+      longer blocks on a 5s timeout against a user-controlled URL. **Gotcha:**
+      autodiscovery only imports each app's `tasks.py`, and this task lives in
+      `webhooks.py`, so it is explicitly imported in `celery_app/tasks.py`
+      following the `check_business_signals` precedent. Verified registered as
+      `apps.accounts.webhooks.deliver_org_webhook` — without that import `.delay()`
+      raises and silently degrades to the synchronous send it exists to remove.
+- [x] 16 tests, incl. DNS-rebinding and mixed A records. Verified end-to-end:
+      IMDS / Vault-on-private / Postgres / rebind-to-loopback / plain-http all
+      **BLOCKED**, a legitimate Slack-style webhook **ALLOWED**.
+- [ ] Documented residual risk: TOCTOU between check and connect. Closing it fully
+      needs address pinning in the request layer. Mitigated by https+443 only, the
+      move off the request path, and re-validation inside the task.
+
+### §S7 — two auth controls failing open in silence
+- [x] `accounts/views.py:358` IP-blocklist check and `:369` brute-force counter
+      were both `except: pass`. They still fail **open** (an outage must not lock
+      everyone out of login) but now log at WARNING. The brute-force one matters
+      more than it looks: the login throttle counts **failures only**, so a
+      swallowed exception meant the counter stopped incrementing and the rate limit
+      stopped enforcing while still appearing configured.
+
+### §Z3-2 — community writes were completely unthrottled
+- [x] All eight write views had no `throttle_classes`. Four per-user scopes added:
+      `ugc_write` 60/h, `ugc_light` 300/h, `ugc_upload` 20/h, `ugc_report` 20/h.
+- [x] **Two mistakes made and caught by writing the tests:**
+  1. A plain `UserRateThrottle` would have **broken public browsing**.
+     `ThreadListView`/`ThreadDetailView` allow anonymous GETs and DRF keys on IP
+     when unauthenticated, so reads would have been capped at the *write* rate for
+     every logged-out visitor and every NAT'd office. Hence
+     `_WriteOnlyUserThrottle`, which short-circuits safe methods.
+  2. **`config/test_settings.py` REPLACES `DEFAULT_THROTTLE_RATES` rather than
+     extending it.** Adding the scopes to `settings.py` alone made every existing
+     community test 500 with `ImproperlyConfigured`. Mirrored there with a comment;
+     `test_scopes_registered_in_both_settings` locks it in. **Remember this for any
+     future scope.**
+
+## ✅ Landed — the two grind faucets
+
+### §Z3-3 — weekly leaderboard rewarded replays
+- [x] `_build_weekly` used `Sum("score")` over every session in the window.
+      Measured: grinder solving one 100-point lab ×40 scored **4000 → rank 1**;
+      honest user with two labs (120+130) scored 250 → rank 2. Now per-scenario
+      bests: grinder **100 → rank 2**, honest **250 → rank 1**.
+- [x] The bug was visible in its own output and nobody looked —
+      `scenarios_completed` used `distinct=True`, so a grinder rendered as
+      *"1 scenario"* beside an enormous total.
+- [x] Implementation note: Django cannot `Sum()` over an aggregate annotation in
+      one chain (`Sum("best")` where `best=Max(...)` raises at
+      `resolve_expression`), so the per-user roll-up is Python over one row per
+      `(user, scenario)`, streamed with `.iterator()` and bounded by the 7-day window.
+
+### §Z3-4 — XP was awarded per session, not per scenario
+- [x] The `completion_finalized` lock is genuinely correct **per session** (it
+      defeats duplicate Jira webhooks and double-clicked Check) and its comment
+      claimed "exactly once per scenario completion" — but a lab **restart** makes a
+      new session, so re-solving minted the full 150–250 XP again. `compute_score`
+      rewards speed, so the fastest replay paid most.
+- [x] Now gated on `UserScenarioProgress.completed`, read *before*
+      `record_attempt()` sets `completed_at`. Practice still updates `best_score`,
+      `best_time`, `attempts` and achievements — it just mints no XP.
+- [x] 5 tests incl. "a DIFFERENT scenario still pays" so the fix is not over-broad.
+
+## ✅ Landed — signup / marketing honesty (session 3 items, verified)
+See session-3 log. Notable: removed a **fabricated testimonial** attributed to a
+named person at a real company, and a **"99.9% Uptime"** claim the platform does
+not measure.
+
+## ⚠️ Two pre-existing test-layout defects found
+- [ ] **`apps/jira_integration/` has no `__init__.py`** — it is a namespace
+      package, so `manage.py test apps.jira_integration` dies with
+      `TypeError: expected str, bytes or os.PathLike object, not NoneType` and its
+      tests are unreachable by app label. Not fixed blind here because adding it
+      changes package semantics for a working app.
+- [x] `apps/public_api/tests/` cannot be a package — `tests` collides with the
+      top-level `backend/tests` package (`ImportError: 'tests' module incorrectly
+      imported`). That is why it had no `__init__.py`. New tests for that app
+      belong in `backend/tests/` (102 modules there already).
+
+## Still open — highest value next
+- [ ] **§Z1-8** refunds: `RazorpayRefundView` is well-built and has **zero frontend
+      callers**, while `FAQ.jsx:46` promises 7-day refunds. A refund also never
+      revokes entitlement.
+- [ ] **§Z1-9** interview certificates are a paid feature enforced nowhere.
+- [ ] **§Z3-1** abuse reports write to a table with no admin queue.
+- [ ] **§Z3-5** certificates cannot be revoked (signed Open Badges, no revocation
+      list) — needed to unwind anything earned via the fail-open graders.
+- [ ] **§Z4-1** log PII: the masker only covers `extra={}`; ~30 f-string email
+      sites bypass it, including two that log the address **at deletion**.
+- [ ] **§Z5-1/Z5-2** the `_SIM_SESSIONS` cross-process leak and the full-VFS JSONB
+      write per command — the two things that will bite before growth does.
