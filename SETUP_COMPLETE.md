@@ -23,11 +23,11 @@
 ## 🔑 Critical Passwords Generated
 
 ```
-✅ DJANGO_SECRET_KEY=X4Q_47L^ZlV40g2kRY5r3n_ugWc9q=T$76zcUsxIC2$eNJW$x#
-✅ POSTGRES_PASSWORD=VVMb$K6zE5*5jQiavmYDvo6prSj$tBzu
-✅ REDIS_PASSWORD=zbH7yGX7RNHOe3%eZlXZ%f10@oShL*tY
-✅ RABBITMQ_PASS=MTKNGug!wwZqWs7AKbAllR22ftiv0CMe
-✅ RAZORPAY_KEY_SECRET=af4293ad792211c3eebad84ee20f5fe3a40238fee39fdf71d9a50bfbc19cbc3b
+✅ DJANGO_SECRET_KEY=<REDACTED-ROTATE-ME>
+✅ POSTGRES_PASSWORD=<REDACTED-ROTATE-ME>
+✅ REDIS_PASSWORD=<REDACTED-ROTATE-ME>
+✅ RABBITMQ_PASS=<REDACTED-ROTATE-ME>
+✅ RAZORPAY_KEY_SECRET=<REDACTED-ROTATE-ME>
 ```
 
 All already updated in [.env](.env) ✓
@@ -155,7 +155,7 @@ docker-compose run backend pytest backend/tests/test_multiuser_isolation.py -v
 ```bash
 POSTGRES_DB=fixitlab
 POSTGRES_USER=fixitlab
-POSTGRES_PASSWORD=VVMb$K6zE5*5jQiavmYDvo6prSj$tBzu  # ✅ Strong password
+POSTGRES_PASSWORD=<REDACTED-ROTATE-ME>
 POSTGRES_HOST=database
 POSTGRES_PORT=5432
 ```
@@ -164,14 +164,14 @@ POSTGRES_PORT=5432
 ```bash
 REDIS_HOST=redis
 REDIS_PORT=6379
-REDIS_PASSWORD=zbH7yGX7RNHOe3%eZlXZ%f10@oShL*tY  # ✅ Strong password
+REDIS_PASSWORD=<REDACTED-ROTATE-ME>
 ```
 
 ### Message Queue
 ```bash
 CELERY_BROKER_URL=amqp://fixitlab:MTKNGug!wwZqWs7AKbAllR22ftiv0CMe@rabbitmq:5672//
 RABBITMQ_USER=fixitlab
-RABBITMQ_PASS=MTKNGug!wwZqWs7AKbAllR22ftiv0CMe  # ✅ Strong password
+RABBITMQ_PASS=<REDACTED-ROTATE-ME>
 ```
 
 ### OAuth
@@ -185,13 +185,13 @@ GOOGLE_CLIENT_SECRET=2eb7f362cd146041dbb4c9dd61734485404472e7954e346522a92804f51
 ### Payment
 ```bash
 RAZORPAY_KEY_ID=rzp_live_your_key_id_here  # ⚠️  UPDATE with your Razorpay key
-RAZORPAY_KEY_SECRET=af4293ad792211c3eebad84ee20f5fe3a40238fee39fdf71d9a50bfbc19cbc3b  # ✅ Strong password
+RAZORPAY_KEY_SECRET=<REDACTED-ROTATE-ME>
 ```
 
 ### AWS EC2 (for Cloud Labs)
 ```bash
 AWS_ACCESS_KEY_ID=AKIA...your-key-here  # ⚠️  UPDATE with your AWS IAM key
-AWS_SECRET_ACCESS_KEY=ADzBQC6agRx79WSR4mzZeMNctylwIL8dctzCviH9  # ⚠️  UPDATE with your AWS secret
+AWS_SECRET_ACCESS_KEY=<REDACTED-ROTATE-ME>
 AWS_REGION=ap-south-1
 AWS_LAB_BASE_AMI=ami-03793655b06c6e29a  # ⚠️  UPDATE for your region
 AWS_LAB_KEY_PAIR=fixitlab-labs
