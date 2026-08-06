@@ -27,28 +27,59 @@ import {
 import '../../styles/sim-products.css'
 import './DatacenterSimulator.css'
 import DcAmbientAudio from './DcAmbientAudio'
+import { detectWebGL } from './webglSupport'
 
 const LazyDatacenterTwin3D = lazyWithRetry(() => import('./DatacenterTwin3D'))
 
-/** If WebGL/R3F throws, drop to 2D floor instead of the whole-lab error banner. */
+/**
+ * Catch R3F/WebGL crashes WITHOUT silently forcing 2D.
+ * Show a dismissible banner + Retry so learners (and CI/debug) see the reason.
+ */
 class Twin3DSafe extends Component {
   constructor(props) {
     super(props)
-    this.state = { failed: false }
+    this.state = { failed: false, error: null, retryKey: 0 }
   }
 
-  static getDerivedStateFromError() {
-    return { failed: true }
+  static getDerivedStateFromError(error) {
+    return { failed: true, error }
   }
 
   componentDidCatch(error, info) {
-    console.error('Datacenter 3D twin failed — falling back to 2D floor', error, info)
-    try { this.props.onFallback?.() } catch { /* ignore */ }
+    // eslint-disable-next-line no-console
+    console.error('Datacenter 3D twin failed', error, info)
+    try { this.props.onError?.(error, info) } catch { /* ignore */ }
+  }
+
+  handleRetry = () => {
+    this.setState((s) => ({ failed: false, error: null, retryKey: s.retryKey + 1 }))
   }
 
   render() {
-    if (this.state.failed) return null
-    return this.props.children
+    if (this.state.failed) {
+      const msg = this.state.error?.message || String(this.state.error || 'Unknown WebGL/R3F error')
+      return (
+        <div className="dc-3d-fail-banner" role="alert">
+          <div className="dc-3d-fail-title">3D hall failed to load</div>
+          <p className="dc-3d-fail-msg">
+            Using a recoverable path — the isometric floor is optional. Reason: <code>{msg}</code>
+          </p>
+          <div className="dc-3d-fail-actions">
+            <button type="button" className="dc-btn-primary dc-btn-xs" onClick={this.handleRetry}>
+              Retry 3D
+            </button>
+            <button
+              type="button"
+              className="dc-btn-outline dc-btn-xs"
+              onClick={() => this.props.onFallback?.()}
+            >
+              Use 2D floor
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return <div key={this.state.retryKey} className="dc-3d-safe-slot">{this.props.children}</div>
   }
 }
 
@@ -127,6 +158,7 @@ export default function DatacenterSimulator({
   // Mirrors the 3D twin's own immersive flag so this shell can collapse its
   // tab bar / status strip / goal banner into the twin's thin in-world HUD.
   const [twinImmersive, setTwinImmersive] = useState(true)
+  const [webglGate, setWebglGate] = useState(() => detectWebGL())
   const [floorView, setFloorView] = useState(() => {
     // Game-style default is always 3D walk. Only honor an explicit prefer2d
     // flag (set when the learner clicks "2D floor") — legacy `floorView=2d`
@@ -148,6 +180,11 @@ export default function DatacenterSimulator({
       else window.localStorage?.removeItem('fixitlab.dc.prefer2d')
     } catch { /* ignore */ }
   }, [])
+  const retryWebgl3d = useCallback(() => {
+    const gate = detectWebGL()
+    setWebglGate(gate)
+    if (gate.ok) setFloorViewPersist('3d')
+  }, [setFloorViewPersist])
   const dragRef = useRef(null)
   const movedRef = useRef(false)
   const liveTickInFlight = useRef(false)
@@ -477,9 +514,26 @@ export default function DatacenterSimulator({
         </div>
       )}
 
-      {currentRoom.type === 'data_hall' && floorView === '3d' && (
+      {currentRoom.type === 'data_hall' && floorView === '3d' && !webglGate.ok && (
+        <div className="dc-3d-fail-banner" role="alert">
+          <div className="dc-3d-fail-title">3D hall unavailable</div>
+          <p className="dc-3d-fail-msg">
+            WebGL is required for the Steam-class walk. Reason: <code>{webglGate.reason || 'no WebGL'}</code>
+          </p>
+          <div className="dc-3d-fail-actions">
+            <button type="button" className="dc-btn-primary dc-btn-xs" onClick={retryWebgl3d}>
+              Retry 3D
+            </button>
+            <button type="button" className="dc-btn-outline dc-btn-xs" onClick={() => setFloorViewPersist('2d')}>
+              Use 2D floor
+            </button>
+          </div>
+        </div>
+      )}
+
+      {currentRoom.type === 'data_hall' && floorView === '3d' && webglGate.ok && (
         <Twin3DSafe onFallback={() => setFloorViewPersist('2d')}>
-          <Suspense fallback={<div className="dc-3d-loading">Loading 3D twin…</div>}>
+          <Suspense fallback={<div className="dc-3d-loading"><div className="dc-3d-loading-spin" /> Loading 3D twin…</div>}>
             <LazyDatacenterTwin3D
               racks={roomRacks}
               serversByRack={serversByRack}

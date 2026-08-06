@@ -517,6 +517,78 @@
 .dc-ops-panel { background: #12151e; border: 1px solid #232838; border-radius: 8px; padding: 0.75rem 0.9rem; }
 .dc-alert-row { font-size: 0.68rem; color: #fbbf24; margin: 0.2rem 0; display: flex; gap: 0.35rem; align-items: flex-start; }
 .dc-alert-crit { color: #f87171; }
+.dc-3d-fail-banner {
+  flex: 1; min-height: 220px; display: flex; flex-direction: column;
+  align-items: flex-start; justify-content: center; gap: 0.65rem;
+  padding: 1.25rem 1.5rem; margin: 0.5rem 0.75rem;
+  background: linear-gradient(135deg, #1a1208 0%, #0f141f 60%);
+  border: 1px solid #7c2d12; border-radius: 8px;
+  color: #fde68a; font-size: 0.85rem; line-height: 1.45;
+}
+.dc-3d-fail-title { font-weight: 700; font-size: 1rem; color: #fdba74; }
+.dc-3d-fail-msg { margin: 0; color: #e2e8f0; max-width: 52rem; }
+.dc-3d-fail-msg code {
+  display: inline-block; margin-top: 0.25rem; padding: 0.15rem 0.4rem;
+  background: #0b0e14; border: 1px solid #334155; border-radius: 4px;
+  color: #fda4af; font-size: 0.75rem; word-break: break-word;
+}
+.dc-3d-fail-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.dc-3d-safe-slot { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.dc-3d-nameplate {
+  min-width: 160px; padding: 0.4rem 0.55rem; border-radius: 6px;
+  background: rgba(8, 12, 20, 0.92); border: 1px solid #f97316;
+  color: #e2e8f0; font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.68rem; line-height: 1.35; box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+.dc-3d-nameplate-host { font-weight: 700; color: #fdba74; font-size: 0.75rem; }
+.dc-3d-nameplate-meta { color: #94a3b8; margin-top: 0.15rem; }
+.dc-3d-nameplate-hint { color: #64748b; margin-top: 0.25rem; font-size: 0.6rem; }
+.dc-3d-np-ok { color: #34d399; }
+.dc-3d-np-bad { color: #f87171; font-weight: 600; }
+
+.dc-3d-controls-hud {
+  position: absolute; z-index: 5; left: 50%; bottom: 0.55rem; transform: translateX(-50%);
+  display: flex; flex-wrap: wrap; gap: 0.45rem 0.75rem; align-items: center; justify-content: center;
+  max-width: min(920px, 96vw); padding: 0.4rem 0.75rem; border-radius: 999px;
+  background: rgba(8, 12, 20, 0.72); border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #cbd5e1; font-size: 0.65rem; backdrop-filter: blur(8px);
+  font-family: 'JetBrains Mono', ui-monospace, monospace; pointer-events: auto;
+}
+.dc-3d-controls-hud kbd {
+  display: inline-block; min-width: 1.1rem; padding: 0.05rem 0.28rem; margin: 0 0.08rem;
+  border-radius: 3px; border: 1px solid #475569; background: #1e293b; color: #f8fafc;
+  font-size: 0.6rem; text-align: center;
+}
+.dc-3d-quality { display: inline-flex; align-items: center; gap: 0.3rem; color: #94a3b8; }
+.dc-3d-quality select {
+  background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px;
+  font-size: 0.62rem; padding: 0.1rem 0.25rem;
+}
+.dc-3d-physics-note {
+  position: absolute; z-index: 5; top: 2.4rem; left: 50%; transform: translateX(-50%);
+  padding: 0.3rem 0.65rem; border-radius: 4px; font-size: 0.68rem;
+  background: rgba(120, 53, 15, 0.85); border: 1px solid #b45309; color: #ffedd5;
+}
+.dc-3d-inspect-peek {
+  position: absolute; z-index: 6; top: 3.2rem; right: 0.85rem;
+  width: min(300px, 86vw); padding: 0.65rem 0.75rem; border-radius: 8px;
+  background: rgba(12, 16, 24, 0.94); border: 1px solid #334155; color: #e2e8f0;
+  font-size: 0.72rem; line-height: 1.4; box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+.dc-3d-inspect-peek-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  color: #fdba74; margin-bottom: 0.35rem;
+}
+.dc-3d-inspect-close {
+  background: transparent; border: none; color: #94a3b8; font-size: 1.1rem; cursor: pointer; line-height: 1;
+}
+.dc-3d-inspect-peek-body { color: #cbd5e1; display: flex; flex-direction: column; gap: 0.2rem; }
+.dc-3d-inspect-peek-actions {
+  margin-top: 0.5rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+}
+
 /* Phase 7 — 3D twin */
 .dc-view-toggle { display: inline-flex; gap: 0.25rem; margin-right: 0.65rem; }
 .dc-view-active { border-color: #f97316 !important; color: #f97316 !important; }

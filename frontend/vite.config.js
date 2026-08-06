@@ -3,6 +3,12 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  // Rapier (@react-three/rapier) ships a WASM module — ensure Vite emits it
+  // in production builds so Physics does not 404 and kill the 3D hall.
+  assetsInclude: ['**/*.wasm'],
+  optimizeDeps: {
+    exclude: ['@dimforge/rapier3d-compat'],
+  },
   test: {
     environment: 'node',
     include: ['src/**/*.test.{js,jsx}'],
