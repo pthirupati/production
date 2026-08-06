@@ -15,7 +15,7 @@ import { PROVIDERS, PROVIDER_LABELS } from './pipelineModel'
 import {
   CICD_SEED_PIPELINES, CICD_SEED_PIPELINE_LIST, CICD_FAULTS_CATALOG,
   faultsForScenario, pipelineForScenario,
-} from '../../mockData/cicd'
+} from '../../simFixtures/cicd'
 import { cicdApi } from '../../api/cicd'
 import { renderCicdGitOpsPage } from '../sim/V3PlatformPanels'
 import '../../styles/lab-chrome.css'
@@ -107,6 +107,84 @@ function extractPipelineJobFields(source) {
       }
       if (/^\s{2,}\w[\w-]*:\s*/.test(line)) inScript = false
     }
+  }
+  return out
+}
+
+/**
+ * Registry images the runner can actually pull. Mirrors `_VALID_IMAGES` in
+ * backend/apps/vmware_sim/cicd_engine.py — that module is authoritative for
+ * grading, so the local run must agree with it or the learner sees a green
+ * pipeline and a failing Check (or vice-versa).
+ */
+const VALID_IMAGES = new Set([
+  'node:20', 'node:18', 'python:3.12', 'python:3.11', 'golang:1.22',
+  'docker:24', 'docker:25', 'alpine:3.19', 'ubuntu:22.04',
+  'maven:3.9-eclipse-temurin-21', 'registry.fixitlab.local/ci/base:1.4.0',
+  // Seed pipelines also ship these; they are pullable in the sim registry.
+  'node:18-alpine', 'alpine/k8s:1.28.0', 'golang:1.22-alpine',
+])
+
+/**
+ * Decide whether a catalog fault is STILL live against the pipeline the learner
+ * is actually looking at.
+ *
+ * The catalog entry says which fault was planted; this says whether the edit
+ * fixed it. Previously the catalog faults were fed to the engine verbatim, so
+ * correcting `image:` or adding `needs:` changed the parsed model but not the
+ * fault set and the job stayed red forever (audit L992). Faults we cannot yet
+ * express in terms of the YAML (flaky, approvalTimeout) are passed through
+ * unchanged so their labs keep behaving as before.
+ *
+ * Returns a faults object in the engine's shape: { [jobId]: fault }.
+ */
+export function deriveFaults(catalogFaults, { pipeline, jobFields }) {
+  const out = {}
+  const jobIds = new Set((pipeline?.jobs || []).map((j) => j.id))
+  for (const [jobId, fault] of Object.entries(catalogFaults || {})) {
+    // The catalog is keyed by conventional job names across several seed
+    // pipelines; entries for jobs this pipeline does not define never applied.
+    if (!jobIds.has(jobId)) continue
+    const job = pipeline.jobs.find((j) => j.id === jobId)
+    const fields = jobFields[jobId] || {}
+
+    // Bad image tag: cleared as soon as `image:` names a pullable tag.
+    if (/manifest|not found/i.test(fault.message || '') || fault.imageFault) {
+      if (fields.image && VALID_IMAGES.has(fields.image)) continue
+      out[jobId] = fault
+      continue
+    }
+
+    // Missing secret/variable: the job must reference the variable it needs.
+    // Declaring it in the script (export/`--set`/env) is the learner's fix.
+    if (/required variable/i.test(fault.message || '')) {
+      const want = (fault.message.match(/variable ([A-Z0-9_]+)/) || [])[1]
+      const script = (fields.script || []).join('\n')
+      if (want && script.includes(want)) continue
+      out[jobId] = fault
+      continue
+    }
+
+    // OOM in tests: cleared by reducing parallelism or raising the memory the
+    // job asks for — both show up as an edit to the job's script.
+    if (fault.exitCode === 137) {
+      const script = (fields.script || []).join('\n')
+      if (/--max-workers|--maxWorkers|-p 1|NODE_OPTIONS|max-old-space-size|--runInBand/i.test(script)) continue
+      out[jobId] = fault
+      continue
+    }
+
+    // kubeconfig/RBAC on deploy: the fix is to make the deploy job depend on a
+    // successful upstream (so credentials are provisioned) — i.e. add `needs:`.
+    if (/Unauthorized|forbidden|RBAC/i.test(fault.message || '')) {
+      if ((job?.needs || []).length) continue
+      out[jobId] = fault
+      continue
+    }
+
+    // Not yet derivable from the YAML (flaky, approvalTimeout): keep as-is
+    // rather than silently making those labs unfailable.
+    out[jobId] = fault
   }
   return out
 }
@@ -337,9 +415,12 @@ export default function CicdPipelineSim({
     resetRunState()
     setRunning(true)
 
+    // Per-job image/script as currently written. Drives both the lab-server
+    // sync below and the local fault derivation, so the two cannot disagree.
+    const fields = extractPipelineJobFields(source)
+
     // Mirror YAML image/script edits to the lab server before the grading run.
     if (sessionId) {
-      const fields = extractPipelineJobFields(source)
       await Promise.all(Object.entries(fields).map(async ([id, f]) => {
         if (f.image) await cicdApi.setImage(sessionId, id, f.image).catch(() => {})
         if (f.script?.length) await cicdApi.fixJob(sessionId, id, f.script).catch(() => {})
@@ -354,8 +435,10 @@ export default function CicdPipelineSim({
     }
     setArtifacts(runArtifacts)
 
+    // Re-evaluate the planted fault against the YAML as currently edited, so a
+    // correct fix actually turns the job green.
+    let faults = deriveFaults(activeFault?.faults, { pipeline, jobFields: fields })
     // Restrict faults to only the failed jobs when re-running failed only.
-    let faults = activeFault?.faults || {}
     if (onlyFailedFrom) {
       const allow = new Set(onlyFailedFrom)
       faults = Object.fromEntries(Object.entries(faults).filter(([jobId]) => allow.has(jobId)))

@@ -6,12 +6,107 @@ and NOC planning surfaces.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import time
 
 
+def _stable_jitter(key: str, modulus: int = 7) -> int:
+    """Process-stable small integer for sensor phase offsets (audit §I8)."""
+    digest = hashlib.blake2b(key.encode("utf-8", errors="replace"), digest_size=4).digest()
+    return int.from_bytes(digest, "big") % max(1, modulus)
+
+
 def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def thermal_baseline(state: dict) -> dict:
+    """Cold/hot aisle baselines derived from live IT load vs running cooling.
+
+    The sensor drift used to be pure decoration (`math.sin` around a constant),
+    so losing every CRAC changed nothing on the panel. Baselines now follow the
+    heat actually being produced and the capacity actually left to reject it,
+    which is what makes a cooling failure a real thermal emergency.
+    """
+    facility = state.get("facility") or {}
+    it_kw = float(facility.get("it_kw") or 0.0)
+    cooling = state.get("cooling") or []
+    capacity_kw = sum(
+        float(c.get("capacity_kw") or 0) for c in cooling if c.get("status") == "running"
+    )
+    # Heat that cooling cannot reject. Each unrejected kW pushes the hall up;
+    # 1.1 C/kW keeps a single-CRAC loss (~15 kW short) at a believable +16 C.
+    deficit_kw = max(0.0, it_kw - capacity_kw)
+    rise_c = min(30.0, deficit_kw * 1.1)
+    cold_c = 21.2 + rise_c
+    # Hot aisle delta-T scales with load: more kW through the same airflow.
+    delta_t = 8.0 + it_kw * 0.22
+    return {
+        "it_kw": round(it_kw, 2),
+        "cooling_capacity_kw": round(capacity_kw, 2),
+        "deficit_kw": round(deficit_kw, 2),
+        "cold_aisle_c": round(cold_c, 1),
+        "hot_aisle_c": round(cold_c + delta_t, 1),
+    }
+
+
+# A door held open past this many ticks is propped, not merely in use.
+PROPPED_DOOR_TICKS = 3
+# A visitor loose without an escort past this many ticks is a real breach.
+UNESCORTED_VISITOR_TICKS = 3
+
+
+def advance_physical_security(state: dict, ticks: int = 1) -> list[dict]:
+    """Escalate propped doors and unescorted visitors. Returns new violations.
+
+    Doors previously carried a plain open/closed boolean with no duration, so
+    propping one was free. Violations are recorded on access_control rather
+    than in state['broken'], which is a single-fault slot already owned by
+    hardware chaos injection.
+    """
+    violations: list[dict] = []
+    env = state.get("environmental") or {}
+    access = state.get("access_control") or {}
+
+    for s in env.get("sensors") or []:
+        if s.get("type") != "door" or not s.get("open"):
+            continue
+        s["open_ticks"] = int(s.get("open_ticks") or 0) + max(1, int(ticks))
+        if s["open_ticks"] >= PROPPED_DOOR_TICKS and not s.get("propped"):
+            s["propped"] = True
+            s["status"] = "alarm"
+            violations.append({
+                "type": "propped_door",
+                "severity": "critical",
+                "door": s.get("id"),
+                "message": f"Door {s.get('id')} propped open for {s['open_ticks']} ticks · {s.get('location')}",
+            })
+
+    for v in access.get("visitors") or []:
+        if v.get("status") != "on_site":
+            continue
+        if v.get("escort"):
+            v["unescorted_ticks"] = 0
+            continue
+        v["unescorted_ticks"] = int(v.get("unescorted_ticks") or 0) + max(1, int(ticks))
+        if v["unescorted_ticks"] >= UNESCORTED_VISITOR_TICKS and not v.get("flagged"):
+            v["flagged"] = True
+            violations.append({
+                "type": "unescorted_visitor",
+                "severity": "critical",
+                "visitor": v.get("name"),
+                "message": f"{v.get('name')} unescorted in {v.get('zone')} for {v['unescorted_ticks']} ticks",
+            })
+
+    if violations and access:
+        alarms = access.setdefault("active_alarms", [])
+        events = access.setdefault("events", [])
+        for viol in violations:
+            alarms.insert(0, {"time": _now(), "severity": viol["severity"], "message": viol["message"]})
+            events.insert(0, {"time": _now(), "type": "breach", "message": viol["message"]})
+        access["events"] = events[:40]
+    return violations
 
 
 def tick_live(state: dict) -> dict:
@@ -19,13 +114,22 @@ def tick_live(state: dict) -> dict:
     env = state.setdefault("environmental", build_environmental(state.get("servers") or []))
     t = time.time()
     phase = (t % 120) / 120.0 * 2 * math.pi
+    thermal = thermal_baseline(state)
+    env["thermal"] = thermal
     for s in env.get("sensors") or []:
         if s.get("type") == "temp_humidity":
-            base = 33.5 if "Hot" in (s.get("location") or "") else 21.2
-            if s.get("status") == "alarm":
-                continue
-            s["temp_c"] = round(base + 0.6 * math.sin(phase + hash(s.get("id") or "") % 7), 1)
-            s["humidity_pct"] = round(max(20, min(60, (s.get("humidity_pct") or 45) + 0.3 * math.cos(phase))), 1)
+            hot = "Hot" in (s.get("location") or "")
+            base = thermal["hot_aisle_c"] if hot else thermal["cold_aisle_c"]
+            # An alarmed sensor keeps tracking load: a hotspot must be able to
+            # escalate while in alarm, not freeze at the value that tripped it.
+            s["temp_c"] = round(base + 0.6 * math.sin(phase + _stable_jitter(s.get("id") or "")), 1)
+            if s.get("status") != "alarm":
+                s["humidity_pct"] = round(max(20, min(60, (s.get("humidity_pct") or 45) + 0.3 * math.cos(phase))), 1)
+            # ASHRAE A1 allowable inlet tops out at 32 C; trip once we exceed it.
+            if not hot and s["temp_c"] > 32.0:
+                s["status"] = "alarm"
+            elif s.get("status") == "alarm" and thermal["deficit_kw"] <= 0 and (hot or s["temp_c"] <= 27.0):
+                s["status"] = "ok"
         elif s.get("type") == "differential_pressure" and s.get("status") == "ok":
             s["pa"] = round(12.0 + 1.5 * math.sin(phase * 1.7), 1)
     env["last_scan"] = _now()
@@ -36,10 +140,15 @@ def tick_live(state: dict) -> dict:
             continue
         bmc = srv.setdefault("bmc", {})
         sensors = bmc.setdefault("sensors", {})
-        inlet = float(sensors.get("inlet_c") or 22.0)
-        sensors["inlet_c"] = round(inlet + 0.15 * math.sin(phase + hash(srv.get("id") or "") % 5), 1)
+        # Anchor to the hall's cold aisle rather than the sensor's own last
+        # value, so a cooling loss raises every inlet instead of each server
+        # drifting around whatever it happened to boot at.
+        inlet = thermal["cold_aisle_c"]
+        sensors["inlet_c"] = round(inlet + 0.15 * math.sin(phase + _stable_jitter(srv.get("id") or "", 5)), 1)
         sensors["exhaust_c"] = round(sensors["inlet_c"] + 11.5 + 0.4 * math.cos(phase), 1)
-        sensors["fans_rpm"] = int(7200 + 80 * math.sin(phase * 2))
+        # Fans ramp to fight a hot inlet — audible jeopardy before thermal trip.
+        fan_ramp = max(0.0, sensors["inlet_c"] - 24.0) * 380
+        sensors["fans_rpm"] = int(min(18000, 7200 + fan_ramp + 80 * math.sin(phase * 2)))
         if sensors.get("cpu1_c"):
             sensors["cpu1_c"] = round(sensors["inlet_c"] + 26 + 0.5 * math.sin(phase), 1)
         if sensors.get("cpu2_c"):
@@ -254,6 +363,10 @@ def environmental_op(env: dict, op: str, **kwargs) -> tuple[bool, str, dict]:
             return False, "Door sensor required", env
         sensor["open"] = True
         sensor["status"] = "warning"
+        # Start the held-open clock. A door is only a violation once it has
+        # been open too long, so the timer is what makes propping playable.
+        sensor["open_ticks"] = 0
+        sensor["escort"] = kwargs.get("escort")
         env.setdefault("alerts", []).insert(0, {"time": _now(), "severity": "warning", "message": f"Door open {sensor['id']}"})
         return True, f"Door open {sid}", env
 
@@ -262,6 +375,12 @@ def environmental_op(env: dict, op: str, **kwargs) -> tuple[bool, str, dict]:
             return False, "Door sensor required", env
         sensor["open"] = False
         sensor["status"] = "ok"
+        sensor["open_ticks"] = 0
+        sensor.pop("propped", None)
+        env["alerts"] = [
+            a for a in env.get("alerts") or []
+            if sensor["id"] not in (a.get("message") or "")
+        ]
         return True, f"Door closed {sid}", env
 
     if op == "hotspot":
@@ -584,6 +703,52 @@ def ensure_campus_plant(campus: dict, power_chain: dict | None = None) -> dict:
     return c
 
 
+# Transit is measured in sim ticks, not wall-clock, so a part cannot become
+# available just because a session sat idle — and a short session can still
+# finish by expediting. One tick ≈ one advance of the ops clock.
+TICKS_PER_TRANSIT_DAY = 4
+
+
+def advance_shipments(campus: dict, ticks: int = 1) -> list[dict]:
+    """Move inbound ASNs along their lead time. Returns the ones that arrived.
+
+    ASNs previously had a status but no clock, so an RMA part was effectively
+    available the instant it was ordered. `ticks_remaining` is what makes a
+    part genuinely absent at 03:00.
+    """
+    arrived: list[dict] = []
+    dock = (campus or {}).get("loading_dock") or {}
+    for item in dock.get("queue") or []:
+        if item.get("status") != "inbound":
+            continue
+        remaining = item.get("ticks_remaining")
+        if remaining is None:
+            continue  # legacy ASN with no lead time: leave it immediately available
+        remaining = max(0, int(remaining) - max(1, int(ticks)))
+        item["ticks_remaining"] = remaining
+        if remaining <= 0:
+            item["status"] = "at_bay"
+            item["arrived"] = _now()
+            dock["occupied_bays"] = min(
+                int(dock.get("bays") or 2), int(dock.get("occupied_bays") or 0) + 1
+            )
+            arrived.append(item)
+    return arrived
+
+
+def eta_summary(item: dict) -> str:
+    """Human ETA for a dock row: what the player sees at 03:00."""
+    if item.get("status") != "inbound":
+        return "at bay"
+    remaining = item.get("ticks_remaining")
+    if remaining is None:
+        return "unknown"
+    days = remaining / TICKS_PER_TRANSIT_DAY
+    if days >= 1:
+        return f"~{days:.1f}d out"
+    return "arriving next tick" if remaining <= 1 else f"{remaining} ticks out"
+
+
 def _restock_from_contents(spares: dict, contents: str) -> str | None:
     """Match dock ASN contents to a spare bin sku/label; bump qty by 1."""
     hay = (contents or "").lower()
@@ -621,6 +786,14 @@ def campus_plant_op(campus: dict, power_chain: dict | None, op: str, **kwargs) -
         )
         if not item:
             return False, "No inbound shipment to receive", c
+        # A truck that has not arrived cannot be unloaded. This is the point of
+        # lead time: at 03:00 the part is still on a road somewhere. Legacy
+        # ASNs carry no ticks_remaining and stay immediately receivable.
+        if item.get("status") == "inbound" and int(item.get("ticks_remaining") or 0) > 0:
+            return False, (
+                f"{item['id']} still in transit ({eta_summary(item)}) — "
+                "expedite it or pull a spare from the stockroom"
+            ), c
         item["status"] = "received"
         dock["received_today"] = int(dock.get("received_today") or 0) + 1
         dock["occupied_bays"] = max(0, int(dock.get("occupied_bays") or 1) - 1)
@@ -660,9 +833,40 @@ def campus_plant_op(campus: dict, power_chain: dict | None, op: str, **kwargs) -
             }
             queue.append(inbound)
         inbound["status"] = "at_bay"
+        # Forcing a truck to the bay also ends its transit, otherwise the ASN
+        # would sit at_bay yet still be refused by receive_dock.
+        inbound["ticks_remaining"] = 0
         dock["occupied_bays"] = min(int(dock.get("bays") or 2), int(dock.get("occupied_bays") or 0) + 1)
         _log(f"Truck at bay · {inbound['id']}")
         return True, f"{inbound['id']} at bay", c
+
+    if op == "expedite_asn":
+        # Paid escalation: halves the remaining lead time (min one tick left).
+        # Guarantees a lab can always make forward progress on a stuck part.
+        dock = c["loading_dock"]
+        asn = kwargs.get("asn_id") or kwargs.get("id")
+        queue = dock.get("queue") or []
+        item = next((q for q in queue if q.get("id") == asn), None) if asn else next(
+            (q for q in queue if q.get("status") == "inbound"), None
+        )
+        if not item:
+            return False, "No inbound shipment to expedite", c
+        remaining = int(item.get("ticks_remaining") or 0)
+        if remaining <= 0:
+            return False, f"{item['id']} is already at the bay", c
+        item["ticks_remaining"] = remaining // 2
+        item["expedited"] = True
+        if item["ticks_remaining"] <= 0:
+            item["status"] = "at_bay"
+            dock["occupied_bays"] = min(int(dock.get("bays") or 2), int(dock.get("occupied_bays") or 0) + 1)
+        _log(f"Expedited {item['id']} · {eta_summary(item)}")
+        return True, f"Expedited {item['id']} · {eta_summary(item)}", c
+
+    if op == "advance_shipments":
+        arrived = advance_shipments(c, int(kwargs.get("ticks") or 1))
+        for item in arrived:
+            _log(f"Truck at bay · {item['id']} ({item.get('contents')})")
+        return True, f"{len(arrived)} shipment(s) arrived", c
 
     if op == "issue_spare":
         spares = c["spares"]

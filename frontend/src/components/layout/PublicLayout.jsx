@@ -64,6 +64,14 @@ export default function PublicLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-surface-950">
+      {/* Same visually-hidden-until-focused treatment as MainLayout so the link
+          never shows on marketing pages. z-[60] clears the z-50 fixed nav. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[60] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:rounded-md focus:bg-accent-cyan focus:text-surface-950 focus:font-semibold"
+      >
+        Skip to main content
+      </a>
       <nav className="fixed top-0 w-full z-50 border-b border-white/[0.07] bg-surface-950/[0.88] backdrop-blur-[18px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[68px] flex items-center justify-between gap-4">
           <FixitLogo to="/" size="sm" />
@@ -129,7 +137,9 @@ export default function PublicLayout({ children }) {
 
       <PlatformBanners config={platformConfig} showMaintenance showPromo />
 
-      <main className="pt-[68px]">
+      {/* pt-[68px] clears the fixed nav; scroll-mt keeps the anchor target from
+          landing underneath that header when the skip link jumps here. */}
+      <main id="main-content" role="main" className="pt-[68px] scroll-mt-[68px]" tabIndex={-1}>
         {children}
       </main>
 

@@ -1,10 +1,20 @@
-"""Terminal shell_ready after respawn — regression guard for reconnect loops."""
+"""Terminal shell_ready after respawn — regression guard for reconnect loops.
+
+Uses Django's `SimpleTestCase` rather than `unittest.IsolatedAsyncioTestCase`, which
+supports `async def test_` just as well and, unlike it, can be pickled.
+`IsolatedAsyncioTestCase.__init__` stores a `contextvars.Context`, and Django's
+`--parallel` runner pickles test cases to hand them to worker processes — so one
+class using it crashed the whole run with `cannot pickle '_contextvars.Context'`
+before a single test executed. `e2e-labs.yml` runs the suite that way.
+"""
 
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from django.test import SimpleTestCase
 
-class RespawnShellReadyTest(unittest.IsolatedAsyncioTestCase):
+
+class RespawnShellReadyTest(SimpleTestCase):
     async def test_respawn_shell_sends_shell_ready(self):
         from apps.terminal.consumers import TerminalConsumer
         from apps.labs.provisioner.simulation.shell import SimulationStreamHolder

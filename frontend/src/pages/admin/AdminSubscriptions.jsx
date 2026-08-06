@@ -91,7 +91,13 @@ function TechDetailView({ tech, onBack }) {
         scheduled_end: m.maintenance_scheduled_end ? m.maintenance_scheduled_end.slice(0, 16) : '',
       })
       setMaintenanceLoaded(true)
-    } catch {}
+    } catch (err) {
+      // maintenanceLoaded stays false so the next tab switch retries. Tell the
+      // operator: a silent failure leaves the form at its empty defaults, which
+      // reads as "maintenance is off" for a tech that may be in maintenance.
+      console.error('[fixitlab] tech maintenance load failed:', err)
+      toast.error('Failed to load maintenance settings')
+    }
   }
 
   const handleSubTabChange = (tab) => {
@@ -435,7 +441,12 @@ export default function AdminSubscriptions() {
         scheduled_end: m.maintenance_scheduled_end ? m.maintenance_scheduled_end.slice(0, 16) : '',
       })
       setInterviewMaintenanceLoaded(true)
-    } catch {}
+    } catch (err) {
+      // Same reasoning as loadMaintenance above — an empty form must not be
+      // mistaken for "interview maintenance is off".
+      console.error('[fixitlab] interview maintenance load failed:', err)
+      toast.error('Failed to load interview maintenance settings')
+    }
   }
 
   const saveInterviewMaintenance = async () => {

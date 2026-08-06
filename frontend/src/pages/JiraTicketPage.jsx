@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useEffect, useState, useCallback } from 'react'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { jiraApi } from '../api/jira'
 import {
   ArrowLeft, MessageSquare, Loader2, ChevronRight, Clock, User,
@@ -9,6 +9,7 @@ import toast from 'react-hot-toast'
 import { JiraRichText } from '../components/JiraRichText'
 import { StatusLozenge, PriorityIcon, ActivityItem } from '../components/jira/JiraUi'
 import { FixitLogo } from '../components/design'
+import { useJiraTeamReplyPoll } from '../hooks/useJiraTeamReplyPoll'
 
 function FieldRow({ label, children }) {
   return (
@@ -19,29 +20,68 @@ function FieldRow({ label, children }) {
   )
 }
 
+/**
+ * Return control. Without a lab session this is the old "Back to FixitLab" →
+ * /dashboard link. With one (audit L479) it goes back to the lab the learner
+ * left — and because JiraTicketLink opens tickets in a NEW tab, the common case
+ * is that the lab is still sitting in the opener tab. Closing this tab returns
+ * to a live lab; navigating to /lab/:id in a second tab would instead open a
+ * duplicate view of a session that may since have expired. So: close if we were
+ * opened by the lab, otherwise navigate and let LabRunner handle a dead session
+ * the same way a direct visit to /lab/:id does.
+ */
+function BackToLabLink({ sessionId, className, children }) {
+  const openedByLab = typeof window !== 'undefined' && window.opener && !window.opener.closed
+  if (sessionId && openedByLab) {
+    return (
+      <button type="button" onClick={() => window.close()} className={className}>
+        {children}
+      </button>
+    )
+  }
+  return (
+    <Link to={sessionId ? `/lab/${sessionId}` : '/dashboard'} className={className}>
+      {children}
+    </Link>
+  )
+}
+
 export default function JiraTicketPage() {
   const { issueKey } = useParams()
+  const [searchParams] = useSearchParams()
+  // Set only when the ticket was opened from inside a running lab
+  // (JiraTicketLink sessionId prop). Absent for Dashboard / admin ticket lists,
+  // where /dashboard remains the right destination.
+  const labSessionId = searchParams.get('session') || ''
   const [ticket, setTicket] = useState(null)
   const [loading, setLoading] = useState(true)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState('comments')
+  const { pending, startPendingPoll } = useJiraTeamReplyPoll()
 
-  const loadTicket = async () => {
-    try {
-      const res = await jiraApi.getIssue(issueKey)
-      setTicket(res.data)
-    } catch {
-      toast.error('Ticket not found')
-      setTicket(null)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const loadTicket = useCallback(async () => {
+    const res = await jiraApi.getIssue(issueKey)
+    setTicket(res.data)
+    return (res.data?.comments || []).length
+  }, [issueKey])
 
   useEffect(() => {
-    loadTicket()
-  }, [issueKey])
+    let cancelled = false
+    ;(async () => {
+      try {
+        await loadTicket()
+      } catch {
+        if (!cancelled) {
+          toast.error('Ticket not found')
+          setTicket(null)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [issueKey, loadTicket])
 
   const handleTransition = async (status) => {
     setSubmitting(true)
@@ -61,10 +101,25 @@ export default function JiraTicketPage() {
     if (!comment.trim()) return
     setSubmitting(true)
     try {
+      const baseline = (ticket?.comments || []).length
       const res = await jiraApi.addComment(issueKey, comment.trim())
       setTicket(res.data)
       setComment('')
-      toast.success('Comment added')
+      const teamReply = res.data?.team_reply
+      if (teamReply?.scheduled) {
+        toast.success(
+          `${teamReply.pending_author || 'Team'} notified — reply in ~${teamReply.delay_seconds || 30}s`,
+          { duration: 5000 },
+        )
+        startPendingPoll(teamReply, {
+          commentCount: baseline + 1, // includes the comment just posted
+          reload: loadTicket,
+        })
+      } else if (teamReply?.coached || teamReply?.delivered) {
+        toast.success('Reply posted')
+      } else {
+        toast.success('Comment added')
+      }
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to add comment')
     } finally {
@@ -89,9 +144,9 @@ export default function JiraTicketPage() {
           <p className="text-sm text-surface-400 mb-6">
             Issue {issueKey} does not exist or you do not have permission to view it.
           </p>
-          <Link to="/dashboard" className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
-            <ArrowLeft size={14} /> Return to FixitLab
-          </Link>
+          <BackToLabLink sessionId={labSessionId} className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+            <ArrowLeft size={14} /> {labSessionId ? 'Return to lab' : 'Return to FixitLab'}
+          </BackToLabLink>
         </div>
       </div>
     )
@@ -137,12 +192,12 @@ export default function JiraTicketPage() {
           <ChevronRight size={14} />
           <span className="text-surface-200 font-medium font-mono">{ticket.issue_key}</span>
         </nav>
-        <Link
-          to="/dashboard"
+        <BackToLabLink
+          sessionId={labSessionId}
           className="text-xs text-surface-500 hover:text-accent-cyan flex items-center gap-1 transition-colors"
         >
-          <ArrowLeft size={12} /> Back to FixitLab
-        </Link>
+          <ArrowLeft size={12} /> {labSessionId ? 'Back to lab' : 'Back to FixitLab'}
+        </BackToLabLink>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 animate-fx-rise">
@@ -243,6 +298,12 @@ export default function JiraTicketPage() {
                         </button>
                       </div>
                     </form>
+
+                    {pending?.author && (
+                      <div className="mb-4 text-sm text-amber-300/90 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
+                        {pending.author} is responding… (~{pending.delaySeconds}s)
+                      </div>
+                    )}
 
                     <div className="space-y-5">
                       {(ticket.comments || []).map((c, i) => (

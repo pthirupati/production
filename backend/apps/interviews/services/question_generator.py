@@ -24,6 +24,7 @@ Public API:
 
 from __future__ import annotations
 
+import hashlib
 import random
 import re
 from dataclasses import dataclass, field
@@ -259,6 +260,29 @@ _OPEN_ENDED_FALLBACKS = [
 
 # Rotating "angle" suffixes appended to a base prompt so that, even once the whole
 # fallback pool is used in a round, each subsequent question is still unique.
+def _strip_question_decoration(text: str) -> str:
+    """Recover the bare prompt from a finalized question.
+
+    Undoes what ``personalize_question`` and the duplicate-breaking suffixes add,
+    so dedup can compare a candidate prompt against what was really asked. Kept
+    beside _FALLBACK_ANGLES deliberately: if an angle is added there, or a new
+    wrapper in resume_context.personalize_question, it must be handled here too.
+    """
+    t = (text or "").strip()
+    # Suffixes, innermost last: "(angle N)" then a rotating angle.
+    t = re.sub(r"\s*\(angle \d+\)\s*$", "", t)
+    for angle in _FALLBACK_ANGLES:
+        if t.endswith(angle):
+            t = t[: -len(angle)].rstrip()
+            break
+    # personalize_question wrappers.
+    t = re.sub(r"^in your .{1,40}? context:\s*", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"^for a .{1,40}? track\s+—\s*", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*\(thinking about your work at .+?\)\s*$", "", t)
+    t = re.sub(r"\s+—\s+at .+?\?$", "?", t)
+    return t.strip()
+
+
 _FALLBACK_ANGLES = [
     "— going one level deeper",
     "— focusing on what you'd do differently now",
@@ -875,9 +899,15 @@ def _tool_cross_question(
 
 def _seed_from(conversation_tail: list[dict], questions_asked: int) -> int:
     """Deterministic seed: stable for a given conversation state so output is
-    repeatable (tests) but varies turn-to-turn (not robotic)."""
+    repeatable (tests) but varies turn-to-turn (not robotic).
+
+    Uses blake2b — Python's built-in ``hash()`` is process-salted and breaks
+    cross-process determinism (audit §I8 / §Y1g).
+    """
     blob = "".join((m.get("content") or "")[:40] for m in (conversation_tail or []))
-    return (hash(blob) ^ (questions_asked * 2654435761)) & 0x7FFFFFFF
+    blob = f"{blob}|{questions_asked}"
+    digest = hashlib.blake2b(blob.encode("utf-8", errors="replace"), digest_size=8).digest()
+    return int.from_bytes(digest, "big") & 0x7FFFFFFF
 
 
 # ---------------------------------------------------------------------------
@@ -939,7 +969,17 @@ def generate_question(
     snap = profile_snapshot or {}
     asked_texts = asked_texts or []
     conversation_tail = conversation_tail or []
-    used = {_normalize(t) for t in asked_texts}
+    # Index every asked question under BOTH its finalized form and its bare
+    # prompt. The caller only keeps what we returned, which has been through
+    # personalize_question ("In your Linux context: ...") and possibly a
+    # de-duplication angle suffix — while every pool below matches on the bare
+    # prompt. Without stripping, a question that was already asked never looks
+    # used, so the pool re-picks it and only the suffix differs: one Linux round
+    # asked the same D-state question on 4 of its first 5 turns.
+    used = set()
+    for t in asked_texts:
+        used.add(_normalize(t))
+        used.add(_normalize(_strip_question_decoration(t)))
     mem = memory if isinstance(memory, dict) else {}
 
     rng = random.Random(_seed_from(conversation_tail, questions_asked))
@@ -962,7 +1002,32 @@ def generate_question(
         return personalize_question(text, snap, rng)
 
     def _finalize(text: str) -> str:
-        return _personalize(text)
+        """Personalize, then guarantee the result is not a verbatim repeat.
+
+        `used` holds prior FINALIZED questions, but every pool pick above tests the
+        RAW prompt — and `personalize_question` may prepend "In your <tech>
+        context: ". So a raw prompt that was already asked looks unused, gets picked
+        again, and the same prefix is re-applied: a verbatim duplicate. This guard
+        used to live at the single generic fallback return, leaving the other
+        seventeen return paths unprotected (a Linux round repeated its first
+        question on turns 2 AND 3). Centralizing it here covers all of them.
+
+        Deterministic — a rotating angle then a turn ordinal, no rng/date calls — so
+        the same conversation state still reproduces the same question.
+        """
+        final = _personalize(text)
+        if _normalize(final) in used:
+            final = f"{final} {_FALLBACK_ANGLES[len(used) % len(_FALLBACK_ANGLES)]}"
+            if _normalize(final) in used:
+                final = f"{final} (angle {len(used) + 1})"
+        # Record BOTH forms. Recording only the finalized text stops verbatim
+        # repeats but not substantive ones: the pools match on the raw prompt, so
+        # the same base question kept winning and only the angle suffix differed
+        # (a Linux round asked the same D-state question on 4 of its first 5
+        # turns). Seeding `used` with the raw prompt makes the pools skip it.
+        used.add(_normalize(final))
+        used.add(_normalize(text))
+        return final
 
     incident_round = round_type in ("devops_debug", "sre_oncall")
 
@@ -1376,17 +1441,8 @@ def generate_question(
         angle = _FALLBACK_ANGLES[len(used) % len(_FALLBACK_ANGLES)]
         gq = f"{base} {angle}"
     stitch = _maybe_stitch(last_answer_quality, rng)
+    # _finalize now owns the no-verbatim-repeat guarantee for every return path.
     final = _finalize(f"{stitch} {gq}".strip() if stitch else gq)
-    # Guarantee no verbatim repeat within the round. `used` holds prior FINALIZED
-    # (resume-context-prefixed) questions, but the pool pick above checks the RAW
-    # prompt — so a prefixed collision can slip through (the finalized text was
-    # already asked). If so, append a deterministic rotating angle, then a turn
-    # ordinal as a hard backstop — no rng/date, so it stays reproducible.
-    if _normalize(final) in used:
-        final = f"{final} {_FALLBACK_ANGLES[len(used) % len(_FALLBACK_ANGLES)]}"
-        if _normalize(final) in used:
-            final = f"{final} (angle {len(used) + 1})"
-    used.add(_normalize(final))
     return GeneratedQuestion(
         text=final,
         category="technical",

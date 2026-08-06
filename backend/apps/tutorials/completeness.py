@@ -8,6 +8,7 @@ fields and from the deterministic quiz generator.
 """
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -56,6 +57,8 @@ LEGACY_SECTION_HEADINGS = (
     "performance tuning", "real incidents", "root cause analysis",
     "interview questions", "use cases",
 )
+
+logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[3]
 SCENARIOS_ROOT = ROOT / "scenarios"
@@ -190,13 +193,17 @@ def default_linked_lab_slug(topic: str) -> str:
         # academy-gcp-001-learn-compute-engine. Do not re-add these aliases.
         "backend": "nodejs",
         "backend-api": "nodejs",
+        "bare-metal": "baremetal",
         "bash": "shell-script",
         "bitbucket": "devops",
+        "cisco": "networking",
         "cloudformation": "terraform",
         "containerd": "docker",
         "css": "html",
         "cybersecurity": "security",
         "devsecops": "security",
+        "django": "python",
+        "elk": "opentelemetry",
         "express": "nodejs",
         "express-js": "nodejs",
         "fastapi": "python",
@@ -207,18 +214,25 @@ def default_linked_lab_slug(topic: str) -> str:
         "gitlab": "devops",
         "helm": "kubernetes",
         "iam": "security",
+        "jaeger": "opentelemetry",
+        "jenkins": "devops",
         "loki": "grafana",
         "maas": "baremetal",
         "mikrotik": "networking",
+        "mongodb": "database",
         "monitoring": "prometheus",
         "next-js": "react",
         "nextjs": "react",
         "nginx": "linux",
+        "node-js": "nodejs",
         "openshift": "kubernetes",
         "packer": "terraform",
+        "pfsense": "networking",
         "podman": "docker",
         "pulumi": "terraform",
+        "redis": "database",
         "siem": "security",
+        "simulation": "datacenter",
         "soc": "security",
         "tempo": "grafana",
         "typescript": "javascript",
@@ -233,9 +247,19 @@ def default_linked_lab_slug(topic: str) -> str:
     matches = sorted((SCENARIOS_ROOT / tech).glob(f"academy-{tech}-001-*/scenario.yaml")) if (SCENARIOS_ROOT / tech).is_dir() else []
     if matches:
         return matches[0].parent.name
-    # Final fallback keeps completion possible for broad catalogue topics that
-    # do not yet have a same-name scenario folder (for example ArgoCD/Azure).
-    return "academy-linux-001-learn-users-groups"
+    # No same-name scenario folder and no alias to one. Returning the Linux
+    # users/groups lab here used to be silent, which is how MongoDB, Redis,
+    # Jaeger and 9 other topics ended up shipping a Linux lab as their
+    # "hands-on" link. Prefer no link over a misleading one: the seeder leaves
+    # scenario_slug empty and simply hides the CTA. Log it so a new topic that
+    # needs an alias shows up in seed output instead of being papered over.
+    logger.warning(
+        "default_linked_lab_slug: no scenario for topic %r (resolved tech %r); "
+        "leaving the tutorial unlinked. Add an alias in completeness.py or author "
+        "scenarios/%s/academy-%s-001-*.",
+        topic, tech, tech, tech,
+    )
+    return ""
 
 
 def _topic_first_concept(tech: str) -> str:

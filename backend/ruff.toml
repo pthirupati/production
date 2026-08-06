@@ -1,0 +1,60 @@
+# Python linting for FixitLab (audit Z6-11).
+#
+# ~225,000 lines had no formatter, linter or type checker — no pyproject.toml,
+# setup.cfg, .flake8 or ruff.toml anywhere, and nothing in CI checked Python at
+# all. This is the first pass, and it is deliberately narrow.
+#
+# WHY NOT THE DEFAULT RULE SET: turning on ruff's defaults produced 252 findings,
+# 199 of which are cosmetic (unused imports, f-strings with no placeholder, unused
+# locals). A gate that starts red is a gate people learn to ignore, and mass
+# auto-fixing 165 unused imports across a Django tree is genuinely risky — some
+# imports exist for side effects (signal registration, app loading), and ruff
+# cannot tell those apart.
+#
+# So the CI gate is the `select` below: rules where a finding is a *bug*, not a
+# style opinion. All of them are at zero, and four real defects were fixed getting
+# there:
+#   * a byte-identical duplicate `lab_start_block_http_status` in start_gates.py
+#   * `"shutdown"` mapped twice in one dict literal in rhel_shell.py
+#   * `pytest.main(...)` in two test files where pytest is not a dependency
+#   * a duplicate `"context"` key that made ten React labs describe LLM context
+#     windows (see scripts/topic_snippets_extended.py)
+#
+# The cosmetic rules are listed under [lint.extend-per-file-ignores] intent below
+# rather than enabled, so the next person can widen the gate one rule at a time
+# instead of facing 199 findings at once. Run locally with:
+#   ruff check --select F,E9 backend/ scripts/     # the full picture
+#   ruff check backend/ scripts/                   # what CI enforces
+
+line-length = 100
+target-version = "py312"
+
+exclude = [
+    ".venv",
+    "*/migrations/*",   # generated; churn here is noise, not signal
+    "node_modules",
+    "staticfiles",
+]
+
+[lint]
+# Bug classes only. Every one of these means "this code is wrong", not
+# "this code is untidy".
+select = [
+    "E9",    # syntax / IO errors — the file does not even parse
+    "F821",  # undefined name — the failure mode that hides inside `except:` blocks
+    "F811",  # redefinition of an unused name — a shadowed function or import
+    "F601",  # repeated dict key literal — one value silently discarded
+    "F632",  # `is` comparison against a literal — works by accident, or not at all
+    "F502",  # % format expects a mapping but got a sequence
+    "F702",  # `continue` outside a loop
+]
+
+# NOT yet enforced, in rough order of value once someone does the cleanup:
+#   F401 (165) unused imports      — needs care: Django side-effect imports
+#   F841  (37) unused locals       — often a dropped assertion or forgotten check
+#   F541  (34) f-string, no placeholder — harmless, purely cosmetic
+ignore = []
+
+[lint.per-file-ignores]
+# Test files legitimately re-import inside a method to keep a test self-contained.
+"tests/*" = ["F811"]

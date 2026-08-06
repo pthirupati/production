@@ -31,6 +31,85 @@ const SIDEBAR = [
   { key: 'registry', label: 'Registry', icon: Archive },
 ]
 
+/**
+ * Expanded container row: the two surfaces this console previously had no way to
+ * show or edit. Env vars are printed verbatim — `docker inspect` hands them to
+ * anyone who can reach the daemon, and seeing that is the point of the secrets
+ * lab. Mounted secrets show their target path only; the value is readable solely
+ * from inside the container (`exec` → `cat /run/secrets/<name>`).
+ */
+function ContainerDetails({ container, sessionId, busy, run }) {
+  const env = container.env || []
+  const mounts = container.secretMounts || []
+  return (
+    <div className="grid md:grid-cols-2 gap-4 p-1">
+      <div>
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+          Environment ({env.length})
+        </h4>
+        {env.length === 0 ? (
+          <p className="text-xs text-slate-500">No environment variables.</p>
+        ) : (
+          <ul className="space-y-1">
+            {env.map((entry) => {
+              const idx = entry.indexOf('=')
+              const key = idx === -1 ? entry : entry.slice(0, idx)
+              const value = idx === -1 ? '' : entry.slice(idx + 1)
+              return (
+                <li key={key} className="flex items-start gap-2 bg-white border border-slate-200 rounded px-2 py-1">
+                  <div className="min-w-0 flex-1 font-mono text-[11px] leading-relaxed">
+                    <span className="font-semibold text-slate-700">{key}</span>
+                    <span className="text-slate-400">=</span>
+                    <span className="text-slate-600 break-all">{value}</span>
+                  </div>
+                  <button type="button" title={`Remove ${key}`} className="docker-btn-ghost shrink-0 text-[11px]"
+                    disabled={busy}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      run(() => dockerApi.unsetContainerEnv(sessionId, container.shortName, key), `Removed ${key}`)
+                    }}>
+                    <Trash2 size={11} className="inline mr-0.5" />Remove
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+      <div>
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+          Mounted secrets ({mounts.length})
+        </h4>
+        {mounts.length === 0 ? (
+          <p className="text-xs text-slate-500">
+            None. Mount one from <span className="font-medium">Secrets &amp; Configs</span> to give this
+            container a credential without putting it in the environment.
+          </p>
+        ) : (
+          <ul className="space-y-1">
+            {mounts.map((m) => (
+              <li key={m.secret} className="flex items-center gap-2 bg-white border border-slate-200 rounded px-2 py-1">
+                <div className="min-w-0 flex-1 text-[11px] leading-relaxed">
+                  <div className="font-semibold text-slate-700">{m.secret}</div>
+                  <div className="font-mono text-slate-500 break-all">{m.target} · mode {m.mode || '0400'}</div>
+                </div>
+                <button type="button" title={`Unmount ${m.secret}`} className="docker-btn-ghost shrink-0 text-[11px]"
+                  disabled={busy}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    run(() => dockerApi.unmountSecret(sessionId, container.shortName, m.secret), 'Unmounted')
+                  }}>
+                  Unmount
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function containerTone(state) {
   if (state === 'running') return 'success'
   if (state === 'exited' || state === 'dead') return 'error'
@@ -188,6 +267,16 @@ export default function DockerConsole({
               { key: 'cpu', label: 'CPU %', render: (r) => r.cpuPercent ?? 0 },
               { key: 'mem', label: 'Mem', render: (r) => `${r.memUsageMb ?? 0} / ${r.memLimitMb ?? 0} MB` },
               {
+                key: 'config', label: 'Env / Secrets',
+                render: (r) => (
+                  <span className="text-xs text-slate-600 whitespace-nowrap">
+                    {(r.env || []).length} env
+                    <span className="text-slate-300 mx-1">·</span>
+                    {(r.secretMounts || []).length} mounted
+                  </span>
+                ),
+              },
+              {
                 key: 'actions', label: 'Actions',
                 render: (r) => (
                   <div className="flex gap-1 flex-wrap">
@@ -235,7 +324,13 @@ export default function DockerConsole({
               },
             ]}
             rows={containers}
+            expandRow={(r) => (
+              <ContainerDetails container={r} sessionId={sessionId} busy={busy} run={run} />
+            )}
           />
+          <p className="text-xs text-slate-500 mt-2">
+            Select a container to view its environment variables and mounted secrets.
+          </p>
         </div>
       )
     }

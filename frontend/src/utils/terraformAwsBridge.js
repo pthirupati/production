@@ -520,12 +520,9 @@ export function resetTerraformAwsLabState() {
   }
 }
 
-export function awsConsoleUrlForResource(type, id) {
-  if (type === 'instance' && id) {
-    return `/aws-sim/ec2/instances/${id}`
-  }
-  if (type === 'bucket') {
-    return `/aws-sim/s3/buckets/${encodeURIComponent(id)}`
-  }
-  return '/aws-sim/console/home'
-}
+// awsConsoleUrlForResource() lived here and built absolute /aws-sim/... hrefs.
+// Removed with the standalone route (audit §H5): it was exported but never
+// imported, and the URLs it produced only resolve inside AwsLabOverlay's
+// MemoryRouter, so navigating to one from the real router was a dead end.
+// Deep-linking to a resource inside the embedded console needs a different
+// mechanism than a top-level href.

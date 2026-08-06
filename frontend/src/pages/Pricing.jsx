@@ -130,6 +130,18 @@ function FAQAccordion({ items }) {
   )
 }
 
+// Audit Z1-14: `tech.price || 499` appeared in five places, inventing a price
+// whenever the catalog had none. The server rejects such a purchase outright
+// ("Price not configured for this technology"), so the number was never charged
+// — it was shown, which is worse: the customer saw ₹499 and got an error, or saw
+// ₹499 for something priced differently. A missing price now reads as missing.
+// Module scope so every helper in the component sees the same definition
+// regardless of declaration order.
+const priceOf = (tech) => {
+  const p = Number(tech?.price)
+  return Number.isFinite(p) && p > 0 ? p : null
+}
+
 export default function Pricing() {
   usePageTitle('Pricing', 'Technology subscriptions, interview plans, and team seats on FixitLab.')
   const { isAuthenticated, user } = useAuthStore()
@@ -241,16 +253,29 @@ export default function Pricing() {
     mySubscriptions.some(s => s.technology?.name === techName && s.is_active)
 
   const getDisplayPrice = useCallback((priceINR) => {
+    // A null/absent price means the catalog has none — the server refuses such a
+    // purchase, so the UI must say so rather than render "₹null" or "$NaN"
+    // (audit Z1-14). `available: false` lets call sites disable the buy button
+    // instead of sending the customer to a checkout that will 400.
+    if (priceINR === null || priceINR === undefined || !Number.isFinite(Number(priceINR))) {
+      return { amount: null, display: 'Not available', symbol: '', available: false }
+    }
     if (currency === 'USD' && exchangeRate && exchangeRate > 0) {
       const usd = (priceINR / exchangeRate).toFixed(2)
-      return { amount: parseFloat(usd), display: `$${usd}`, symbol: '$' }
+      return { amount: parseFloat(usd), display: `$${usd}`, symbol: '$', available: true }
     }
-    return { amount: priceINR, display: `₹${priceINR}`, symbol: '₹' }
+    return { amount: priceINR, display: `₹${priceINR}`, symbol: '₹', available: true }
   }, [currency, exchangeRate])
 
   const isInCart = (techId) => cart.some(item => item.id === techId)
 
   const addToCart = (tech) => {
+    if (!priceOf(tech)) {
+      // No catalog price — the order endpoint would reject this with
+      // "Price not configured for this technology" (audit Z1-14).
+      toast.error(`${tech.name} is not available for purchase yet.`)
+      return
+    }
     if (!isInCart(tech.id) && !isSubscribed(tech.name)) {
       setCart(prev => [...prev, tech])
       toast.success(`${tech.name} added to cart`)
@@ -261,7 +286,10 @@ export default function Pricing() {
     setCart(prev => prev.filter(item => item.id !== techId))
   }
 
-  const cartTotal = useMemo(() => cart.reduce((sum, tech) => sum + (tech.price || 499), 0), [cart])
+  const cartTotal = useMemo(
+    () => cart.reduce((sum, tech) => sum + (priceOf(tech) || 0), 0),
+    [cart],
+  )
 
   const handleInterviewSubscribe = async (plan) => {
     if (!isAuthenticated) {
@@ -340,7 +368,7 @@ export default function Pricing() {
       const params = new URLSearchParams({
         token: orderData.payment_token || orderData.order_id || '',
         tech: tech.name,
-        amount: String(orderData.amount || tech.price || 499),
+        amount: String(orderData.amount || priceOf(tech) || ''),
         tech_id: String(tech.id),
         currency: 'INR',
       })
@@ -352,7 +380,7 @@ export default function Pricing() {
         params.set('razorpay_key', orderData.razorpay_key_id || '')
       }
       if (currency === 'USD' && exchangeRate) {
-        const usdAmount = ((orderData.amount || tech.price || 499) / exchangeRate).toFixed(2)
+        const usdAmount = ((orderData.amount || priceOf(tech) || 0) / exchangeRate).toFixed(2)
         params.set('display_currency', 'USD')
         params.set('display_amount', usdAmount)
         params.set('exchange_rate', exchangeRate.toFixed(2))
@@ -395,7 +423,7 @@ export default function Pricing() {
       const params = new URLSearchParams({
         token: orderData.payment_token || orderData.order_id || '',
         tech: tech.name,
-        amount: String(orderData.amount || tech.price || 499),
+        amount: String(orderData.amount || priceOf(tech) || ''),
         tech_id: String(tech.id),
         currency: 'INR',
       })
@@ -691,7 +719,7 @@ export default function Pricing() {
           {technologies.map((tech) => {
             const Icon = techIcons[tech.name] || Server
             const colors = techColors[tech.name] || defaultColor
-            const priceINR = tech.price || 499
+            const priceINR = priceOf(tech)
             const priceDisplay = getDisplayPrice(priceINR)
             const subscribed = isSubscribed(tech.name)
             const inCart = isInCart(tech.id)
@@ -946,7 +974,7 @@ export default function Pricing() {
               {cart.map(tech => {
                 const colors = techColors[tech.name] || defaultColor
                 const Icon = techIcons[tech.name] || Server
-                const priceINR = tech.price || 499
+                const priceINR = priceOf(tech)
                 const priceDisplay = getDisplayPrice(priceINR)
                 return (
                   <FixitPanel key={tech.id} padding="p-4" className="flex items-center gap-3 animate-fade-in">
@@ -1007,7 +1035,7 @@ export default function Pricing() {
                   <div className="flex justify-between text-sm pt-2 border-t border-surface-700/30">
                     <span className="text-surface-400">Charging now</span>
                     <span className="text-white font-semibold">
-                      {getDisplayPrice(cart[0]?.price || 499).display}
+                      {priceOf(cart[0]) ? getDisplayPrice(priceOf(cart[0])).display : '\u2014'}
                     </span>
                   </div>
                 )}

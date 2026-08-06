@@ -7,10 +7,16 @@ from rest_framework.permissions import IsAdminUser
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.public_api.sitemaps import SITEMAPS
+from apps.accounts.client_errors import ClientErrorView
+from apps.accounts.mfa_views import (
+    MfaLoginVerifyView, MfaStatusView, MfaEnrollView, MfaConfirmView,
+    MfaDisableView, MfaRegenerateRecoveryCodesView, MfaDismissPromptView,
+)
 
 from apps.accounts.views import (
     RegisterView, LoginView, UserProfileView, ChangePasswordView,
     ForgotPasswordView, ResetPasswordView, LogoutView, DeleteAccountView,
+    ExportMyDataView, AcceptLegalTermsView,
     SendOTPView, VerifyOTPView,
     SocialAuthConfigView, SocialOAuthStartView, GitHubCallbackView, GoogleCallbackView,
     GitHubLinkView, GoogleLinkView,
@@ -49,6 +55,9 @@ urlpatterns = [
     path("api/auth/refresh/", CookieTokenRefreshView.as_view(), name="token_refresh"),
     path("api/auth/profile/", UserProfileView.as_view(), name="profile"),
     path("api/auth/account/delete/", DeleteAccountView.as_view(), name="delete_account"),
+    # Right of access (GDPR Art.15 / DPDP §11) — everything we hold, not just
+    # interview transcripts. ?download=1 returns it as a file attachment.
+    path("api/auth/account/export/", ExportMyDataView.as_view(), name="export_my_data"),
     path("api/auth/change-password/", ChangePasswordView.as_view(), name="change_password"),
     path("api/auth/forgot-password/", ForgotPasswordView.as_view(), name="forgot_password"),
     path("api/auth/reset-password/", ResetPasswordView.as_view(), name="reset_password"),
@@ -66,6 +75,19 @@ urlpatterns = [
 
     # Contact form
     path("api/contact/", ContactView.as_view(), name="contact"),
+    # Re-acceptance after a policy version bump (audit Z4-8).
+    path("api/auth/accept-terms/", AcceptLegalTermsView.as_view(), name="accept-terms"),
+    # Multi-factor authentication (audit Z2-3).
+    path("api/auth/mfa/verify/", MfaLoginVerifyView.as_view(), name="mfa-verify"),
+    path("api/auth/mfa/status/", MfaStatusView.as_view(), name="mfa-status"),
+    path("api/auth/mfa/enroll/", MfaEnrollView.as_view(), name="mfa-enroll"),
+    path("api/auth/mfa/confirm/", MfaConfirmView.as_view(), name="mfa-confirm"),
+    path("api/auth/mfa/disable/", MfaDisableView.as_view(), name="mfa-disable"),
+    path("api/auth/mfa/recovery-codes/", MfaRegenerateRecoveryCodesView.as_view(), name="mfa-recovery"),
+    path("api/auth/mfa/dismiss-prompt/", MfaDismissPromptView.as_view(), name="mfa-dismiss-prompt"),
+    # Browser-side crash intake (audit Z6-6) — routes React error boundaries into
+    # the same logging/Sentry pipeline the backend already uses.
+    path("api/client-errors/", ClientErrorView.as_view(), name="client-errors"),
 
     # Teams/Org "Contact Sales" inquiry (public, AllowAny)
     path("api/sales/inquiry/", SalesInquiryView.as_view(), name="sales_inquiry"),

@@ -28,12 +28,26 @@ from __future__ import annotations
 import logging
 import re
 
+from django.db import transaction
+
 from apps.interviews.models import InterviewMessage, InterviewRound
+from apps.labs.capacity import at_global_capacity
+from apps.labs.infra import lab_infra_type
 from apps.labs.models import LabSession
-from apps.labs.sessions import start_lab_session
+# Re-exported into this module's namespace on purpose: the provisioning half is
+# shared with apps.labs.sessions.start_lab_session (one implementation, not two
+# that can drift), and tests patch it at `practical_lab.provision_reserved_session`.
+from apps.labs.sessions import provision_reserved_session
 from apps.question_bank.models import Scenario
 
 logger = logging.getLogger(__name__)
+
+# Mirrors public_api.views.LAB_CAPACITY_FULL_RESPONSE so the interview UI can
+# show the same "retry soon" message instead of a generic provisioning error.
+LAB_CAPACITY_FULL = {
+    "error": "All lab capacity is in use right now — please try again in a few minutes.",
+    "code": "CAPACITY_FULL",
+}
 
 
 def _practical_config_from_message(msg: InterviewMessage | None) -> dict:
@@ -132,12 +146,48 @@ def start_practical_lab(user, round_obj: InterviewRound) -> dict:
     if block:
         return block
 
+    # ── Global capacity gate + row INSERT in ONE atomic block (audit L1506/L1511) ──
+    # This path previously called start_lab_session(), which back then created the
+    # LabSession without ever consulting at_global_capacity() — so interview
+    # practical labs bypassed the MAX_CONCURRENT_LABS ceiling entirely and could
+    # drive the engine past exhaustion no matter how many labs were already live.
+    # (start_lab_session now gates too, but this path stays inlined: it needs to
+    # return LAB_CAPACITY_FULL as a payload rather than raise, and it records the
+    # session on the round between the reserve and provision phases.)
+    #
+    # We follow the reference pattern in public_api/views.py (the StartLabView
+    # path): at_global_capacity() takes a transaction-scoped advisory lock and
+    # re-counts live sessions under it, and because we hold that lock through the
+    # INSERT below, "count < cap ⇒ create" is atomic and cannot overshoot.
+    #
+    # Provisioning is deliberately kept OUTSIDE the atomic block (see the comment
+    # at public_api/views.py:119): provisioner.provision() does network I/O
+    # (SSH/API round trips), and holding the platform-wide advisory lock across it
+    # would serialise every lab start on the platform behind the slowest provision.
+    infra_type = lab_infra_type(scenario)
     try:
-        session = start_lab_session(user, scenario)
+        with transaction.atomic():
+            if at_global_capacity(infra_type):
+                return dict(LAB_CAPACITY_FULL)
+
+            session = LabSession.objects.create(
+                user=user,
+                scenario=scenario,
+                status="PROVISIONING",
+                provider=infra_type,
+            )
+    except Exception:
+        logger.exception("Interview practical lab reserve failed round=%s", round_obj.id)
+        return {"error": "Could not start the practical lab environment.", "code": "PROVISION_FAILED"}
+
+    # The row now holds a capacity slot; provision it (or release the slot on
+    # failure so a dead PROVISIONING row doesn't permanently consume the cap).
+    try:
+        session = provision_reserved_session(session)
         round_obj.practical_lab_session_id = session.id
         round_obj.save(update_fields=["practical_lab_session_id"])
         return _session_payload(session)
-    except Exception as exc:
+    except Exception:
         logger.exception("Interview practical lab failed round=%s", round_obj.id)
         return {"error": "Could not start the practical lab environment.", "code": "PROVISION_FAILED"}
 
@@ -298,6 +348,42 @@ def _clean_validator_output(output: str) -> str:
     return out[:300]
 
 
+_SUBMISSION_FILENAME = "_submission.py"
+
+
+def _needs_submission_file(tests: list[dict]) -> bool:
+    """True if any test snippet reads the candidate's source off disk.
+
+    The live_coding.py problem bank grades by grepping ``_submission.py``, but
+    code_exec's python harness only ever writes ``_runner.py`` and exec()s the
+    submission from an in-memory string — the file never exists. Every one of
+    those tests therefore died with FileNotFoundError, so a perfect answer
+    always scored 0/N. Detected here rather than assumed for every submission:
+    materialising the file is only correct for tests that ask for it.
+    """
+    return any(_SUBMISSION_FILENAME in (t.get("code") or "") for t in tests)
+
+
+def _with_submission_file(answer: str) -> str:
+    """Append a shim that writes the candidate's source to ``_submission.py``.
+
+    Appended (not prepended) so a traceback from the candidate's own code still
+    reports the line numbers they wrote. The sandbox cwd is a per-submission
+    temp dir (in-process) or the writable ``/work`` tmpfs (container), so this
+    write is isolated and disposable in both backends. Failures are swallowed:
+    an unwritable cwd should leave the source-grep tests failing exactly as
+    before, never break an otherwise-runnable submission.
+    """
+    shim = (
+        "\ntry:\n"
+        "    with open(" + repr(_SUBMISSION_FILENAME) + ", 'w', encoding='utf-8') as _fh:\n"
+        "        _fh.write(" + repr(answer) + ")\n"
+        "except Exception:\n"
+        "    pass\n"
+    )
+    return answer + shim
+
+
 def _grade_code_answer(round_obj: InterviewRound, question, answer: str, code_spec: dict) -> dict:
     try:
         from apps.labs.code_exec import grade_submission
@@ -311,7 +397,10 @@ def _grade_code_answer(round_obj: InterviewRound, question, answer: str, code_sp
             }
             for i, t in enumerate(code_spec.get("tests") or [])
         ]
-        result = grade_submission(language, answer, tests, timeout=int(code_spec.get("timeout", 8)))
+        source = answer
+        if language == "python" and _needs_submission_file(tests):
+            source = _with_submission_file(answer)
+        result = grade_submission(language, source, tests, timeout=int(code_spec.get("timeout", 8)))
         if result.all_passed:
             return {
                 "validated": True,

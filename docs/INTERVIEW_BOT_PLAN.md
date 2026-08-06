@@ -113,6 +113,12 @@ Legend: ✅ exists · 🟡 partial · ⬜ missing. "File" = where the change lan
 Each increment is independently shippable and keeps CI green. Estimates are
 rough engineer-days. **No paid APIs in any phase.**
 
+> **Reading the "Key files" column:** paths prefixed with `new` **do not exist yet** — they are
+> deliverables this phase would create. Every other path in the column is an existing file the
+> phase would modify. Automated link-checkers have flagged the `new` paths as broken references
+> (see `docs/AUDIT_2026_08_TODO.md` O3); they are roadmap entries, not stale links, and must not
+> be "fixed" by committing empty stubs.
+
 | Phase | Goal | Key files | Est |
 |---|---|---|---|
 | **P2.1** | **Fix the browser voice loop** (highest ROI, no infra). Correct `voiceAnswer()` → `listen(mediaStream, {locale,onInterim})`, pass the live stream, show interim transcript, auto-submit on final. Add in-room **voice switcher** dropdown (cap. #6,#7). | `frontend/src/pages/interviews/InterviewRoom.jsx`, `frontend/src/hooks/useInterviewVoice.js` | 1.5 |

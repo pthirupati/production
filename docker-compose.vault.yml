@@ -21,12 +21,36 @@ services:
       VAULT_API_ADDR: http://vault:8200
     networks:
       - fixitlab_net
+    # File storage backend with a small secret set — Vault's footprint is the Go
+    # runtime plus the unsealed keyring, not the data. Safe to bound tightly here
+    # because infra/vault/config.hcl sets disable_mlock = true: nothing is locked
+    # into RAM, so the limit cannot collide with an mlock reservation.
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+    # Healthy means UNSEALED (exit 0). Sealed is exit 2 — measured: a Vault started
+    # against a file backend with no unseal reports "Sealed true" and `vault status`
+    # exits 2, while an unsealed one exits 0. This check previously accepted 2, which
+    # is the exact shape of the incident in the runbook: Vault sealed itself, every
+    # auth/interview call 500'd, and the container sat there reporting green.
+    #
+    # Sealed is still tolerated DURING start_period, and that tolerance is
+    # load-bearing, not laziness: Vault always boots sealed, prod's `backend` gates
+    # on `vault: condition: service_healthy`, and the unseal only happens later from
+    # platform-start.sh. A check that demanded unsealed from t=0 would deadlock —
+    # backend waits on Vault, and the script that unseals Vault runs after backend.
+    # So the window must exceed the unseal retry loop (12 × 5s = 60s in
+    # platform-start.sh); 150s leaves margin for a slow node without being so long
+    # that a genuinely stuck seal goes unnoticed.
     healthcheck:
-      test: ["CMD-SHELL", "code=$$(vault status -format=yaml >/dev/null 2>&1; echo $$?); test $$code -eq 0 -o $$code -eq 2"]
+      test: ["CMD-SHELL", "vault status -format=yaml >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 150s
     restart: unless-stopped
 
 networks:

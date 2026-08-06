@@ -1,3 +1,22 @@
+# FixitLab — manual rollback (audit Z6-15).
+#
+# Both paths do `git reset --hard HEAD~1` on the server and redeploy. Two things
+# that are NOT obvious and have bitten people elsewhere:
+#
+#  1. MIGRATIONS ARE NOT REVERSED. Neither scripts/ci-cluster-rollback.sh nor
+#     scripts/ci-single-droplet-rollback.sh runs `migrate` backwards -- verified
+#     by grep, they contain no migration handling at all. So this rolls the CODE
+#     back while the DATABASE stays migrated forward. That is fine for an
+#     additive migration and actively destructive for a forward-incompatible one
+#     (a dropped/renamed column leaves the old code querying a field that no
+#     longer exists). Check what the last deploy migrated before running this.
+#
+#  2. HEAD~1 is one COMMIT, not one RELEASE. The deploy pipeline pushes its own
+#     ci-metadata commits to main, so HEAD~1 is not necessarily the previously
+#     deployed application state.
+#
+# `dry_run` exists so this can be drilled without actually rolling production
+# back -- the audit's "an untested rollback is not a rollback".
 name: Rollback
 
 on:
@@ -15,16 +34,52 @@ on:
         description: Four-droplet cluster IP (required for four-droplet)
         required: false
         type: string
+      dry_run:
+        description: "Drill mode: report what would be rolled back, change nothing"
+        required: false
+        default: true
+        type: boolean
 
 jobs:
   rollback:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Drill — what would this roll back?
+        env:
+          TOPOLOGY: ${{ inputs.topology }}
+          TARGET_IP: ${{ inputs.cluster_ip }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          echo "Topology: $TOPOLOGY"
+          echo "Target:   ${TARGET_IP:-<none supplied>}"
+          echo
+          echo "Current HEAD:      $(git rev-parse --short HEAD) $(git log -1 --pretty=%s)"
+          echo "Would roll back to: $(git rev-parse --short HEAD~1) $(git log -1 --pretty=%s HEAD~1)"
+          echo
+          # Surface migrations added by the commit being rolled away. These are
+          # NOT reversed by the rollback scripts, so this is the operator's only
+          # warning before the code and schema disagree.
+          MIGRATIONS="$(git diff --name-only --diff-filter=A HEAD~1 HEAD -- '*/migrations/*.py' || true)"
+          if [ -n "$MIGRATIONS" ]; then
+            echo "::warning::The commit being rolled back ADDS migrations. They will NOT be reversed:"
+            echo "$MIGRATIONS" | sed 's/^/  /'
+            echo "Confirm each is backward-compatible (additive) before proceeding."
+          else
+            echo "No new migrations in the commit being rolled back."
+          fi
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo
+            echo "DRY RUN — nothing was changed. Re-run with dry_run=false to actually roll back."
+          fi
+
       - name: Rollback four-droplet cluster
-        if: inputs.topology == 'four-droplet'
+        if: inputs.topology == 'four-droplet' && inputs.dry_run != true
         env:
           CLUSTER_IP: ${{ inputs.cluster_ip }}
         run: |
@@ -34,7 +89,7 @@ jobs:
           fi
           bash scripts/ci-cluster-rollback.sh "$CLUSTER_IP"
       - name: Rollback single-droplet (git reset on server)
-        if: inputs.topology == 'single-droplet'
+        if: inputs.topology == 'single-droplet' && inputs.dry_run != true
         env:
           CLUSTER_IP: ${{ inputs.cluster_ip }}
         run: |

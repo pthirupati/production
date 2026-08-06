@@ -34,6 +34,12 @@ export const adminApi = {
     return data
   },
 
+  async getFunnel(days = 30, refresh = false) {
+    const q = refresh ? '&refresh=1' : ''
+    const { data } = await api.get(`/admin/funnel/?days=${days}${q}`)
+    return data
+  },
+
   async getAnalytics(days = 30, refresh = false) {
     const q = refresh ? '&refresh=1' : ''
     const { data } = await api.get(`/admin/analytics/?days=${days}${q}`)

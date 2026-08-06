@@ -253,9 +253,11 @@ class RegisterSerializerTest(TestCase):
 class RegisterAPITest(APITestCase, AuthMixin):
     def test_register_success(self):
         # Registration requires a verified OTP session_token
+        from django.contrib.auth.hashers import make_password
+
         otp = EmailVerificationOTP.objects.create(
             email="newuser@test.com",
-            code="123456",
+            code_hash=make_password("123456"),  # stored hashed (Z4-11)
             verified=True,
             session_token="test-session-token-abc",
             expires_at=timezone.now() + timedelta(minutes=30),
@@ -382,15 +384,29 @@ class ForgotPasswordAPITest(APITestCase, AuthMixin):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
     def test_forgot_password_nonexistent(self):
-        """Unknown emails return 404 with a clear error.
+        """Unknown emails are indistinguishable from known ones.
 
-        Product decision (owner-requested): give the user explicit feedback when
-        no account matches instead of the silent anti-enumeration 200. This is a
-        deliberate enumeration trade-off — see ForgotPasswordView.post.
+        REVERSES an owner-requested product decision (audit Z2-5), so it is worth
+        stating the reason rather than just flipping the assertion. The old
+        behaviour returned 404 "No active account found" to give the user explicit
+        feedback — a defensible trade for a generic SaaS.
+
+        It is not defensible here. The endpoint is AllowAny, so the 404 let anyone
+        with curl ask "does this person have a FixitLab account?", and because
+        FixitLab sells interview practice, a yes reveals that a named individual is
+        preparing for interviews. A colleague or a current employer can run that
+        check. The usual enumeration argument is about credential stuffing; the
+        leak here is membership itself.
+
+        The UX intent behind the original decision survives in the copy: a mistyped
+        address still gets "check the address or sign up". See
+        `tests/test_password_reset_enumeration.py` for the full three-path
+        comparison (unknown / known / mail-failure).
         """
         resp = self.client.post("/api/auth/forgot-password/", {"email": "nobody@test.com"})
-        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertIn("error", resp.data)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        known = self.client.post("/api/auth/forgot-password/", {"email": "user@test.com"})
+        self.assertEqual(resp.data, known.data)
 
 
 # ═════════════════════════════════════════════

@@ -43,7 +43,9 @@ fi
 # Ensure argon2 password hasher is available (required for registration)
 python -c "import argon2" 2>/dev/null || pip install -q argon2-cffi
 
-WORKERS=${UVICORN_WORKERS:-4}
+# Default 2 matches the 2-vCPU app droplet and halves the fan-out of
+# process-local _SIM_SESSIONS copies (audit §Z5-1 interim mitigation).
+WORKERS=${UVICORN_WORKERS:-2}
 echo "[startup] Starting uvicorn with ${WORKERS} workers on :8000"
 exec uvicorn config.asgi:application \
   --host 0.0.0.0 \

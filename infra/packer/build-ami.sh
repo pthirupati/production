@@ -2,6 +2,13 @@
 ###############################################################################
 # FixitLab Golden AMI Builder
 #
+# NOTE ON THIS DIRECTORY'S NAME: despite living under infra/packer/, this is NOT
+# Packer. There is no .pkr.hcl template anywhere in the repo. This is a plain
+# bash builder that drives the AWS CLI directly (run-instances -> wait for
+# user-data -> create-image -> terminate). Do not go looking for a Packer
+# template or a `packer build` step in CI; none exists. The directory should be
+# renamed to infra/ami/ (nothing outside this directory references the path).
+#
 # Creates a pre-baked Ubuntu 22.04 AMI with all base packages already installed.
 # This eliminates the 2-3 minute apt-get install during cloud-init, reducing
 # EC2 lab boot time from ~3-4 minutes to ~30-40 seconds.
@@ -20,6 +27,11 @@
 #   AWS_LAB_BASE_AMI=ami-0xxxxxxxxxxxx
 ###############################################################################
 set -euo pipefail
+
+# The user-data file is referenced by AWS CLI as a relative `file://` path, which
+# resolves against the caller's cwd — not this script's location. Anchor to the
+# script directory so `./infra/packer/build-ami.sh` from the repo root works.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 REGION="${1:-ap-south-1}"
 INSTANCE_TYPE="t3.micro"
@@ -60,7 +72,7 @@ LAUNCH_PARAMS=(
 echo "🚀 Launching builder instance..."
 INSTANCE_ID=$(aws ec2 run-instances \
   "${LAUNCH_PARAMS[@]}" \
-  --user-data file://golden-ami-userdata.sh \
+  --user-data "file://${SCRIPT_DIR}/golden-ami-userdata.sh" \
   --query 'Instances[0].InstanceId' \
   --output text)
 

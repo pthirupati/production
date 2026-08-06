@@ -260,6 +260,10 @@ def _apply_preset(state: dict, slug: str) -> None:
             "objective": "Start vm-web01 and confirm it reaches the Running power state.",
         }
         state["broken"] = {"vm_stopped": vm["name"]}
+    # Record whether a console objective was actually seeded. validate_azure_lab
+    # grades "no broken markers left" as success, which is only meaningful if a
+    # marker existed to begin with — otherwise an unmatched slug auto-passes.
+    state["_preset_applied"] = bool(state.get("broken"))
 
 
 def _ensure(session_id: str, slug: str = "") -> dict:
@@ -807,4 +811,12 @@ def validate_azure_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, 
     vm = state["vms"][0] if state.get("vms") else None
     if vm and vm.get("_transition"):
         return False, f"{vm['name']} is still transitioning ({vm['power_state']}) — wait for it to settle"
+    # Fail-CLOSED on an unseeded world. _apply_preset is keyword-driven
+    # (resize/nsg/disk/power); replaying it over the shipped academy-azure-*
+    # slugs leaves 117 of 147 with no `broken` key at all. Returning True here
+    # awarded completion on the first Check with zero learner actions. An
+    # unmapped slug has no console objective to grade, so it must not pass —
+    # it falls through to the terminal sentinel path instead.
+    if not state.get("_preset_applied"):
+        return False, "NO_VALIDATION_SCRIPT"
     return True, "Azure validation passed"

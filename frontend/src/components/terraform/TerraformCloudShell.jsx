@@ -13,7 +13,7 @@ import {
   TFC_STATES, TFC_LOCKS, TFC_WS_NOTIFICATIONS, TFC_TEAM_ACCESS, TFC_HEALTH,
   TFC_SETTINGS_GENERAL, TFC_SETTINGS_SSO, TFC_SETTINGS_VCS, TFC_SETTINGS_TOKENS,
   TFC_AUDIT_LOG, TFC_USAGE,
-} from '../../mockData/terraformCloud'
+} from '../../simFixtures/terraformCloud'
 import TerraformWorkspaceIde from './TerraformWorkspaceIde'
 import { terraformApi } from '../../api/terraform'
 import { getIacProfile } from '../../utils/iacFlavor'

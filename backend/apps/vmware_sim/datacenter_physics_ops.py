@@ -235,6 +235,47 @@ def build_ops_ticket(
     }
 
 
+# Above this share of the rack breaker, pulling a redundant feed during a visit
+# risks tripping the remaining one — the classic "maintenance caused the outage".
+_WINDOW_LOAD_WARN_PCT = 70
+_WINDOW_LOAD_BLOCK_PCT = 85
+
+
+def assess_window_load(facility: dict | None, asset_id: str | None = None, rack: str | None = None) -> dict:
+    """Judge a maintenance window against what the floor is actually carrying.
+
+    Deliberately advisory: it returns a verdict and a reason, and never vetoes
+    an action. Hard-blocking ops on live load would make labs that never
+    expected a load conflict look broken rather than show a policy message.
+    """
+    facility = facility or {}
+    it_kw = float(facility.get("it_kw") or 0.0)
+    racks = facility.get("rack_loads") or {}
+    target = rack
+    if not target and asset_id:
+        # Asset ids look like srv-r03-u08 → rack R03.
+        parts = str(asset_id).split("-")
+        if len(parts) >= 2 and parts[1][:1].lower() == "r":
+            target = parts[1].upper()
+    rack_pct = int(racks.get(target) or 0) if target else 0
+    if rack_pct >= _WINDOW_LOAD_BLOCK_PCT:
+        verdict, reason = "conflict", (
+            f"{target} is at {rack_pct}% of breaker — shed load or schedule off-peak "
+            "before pulling a feed"
+        )
+    elif rack_pct >= _WINDOW_LOAD_WARN_PCT:
+        verdict, reason = "caution", f"{target} at {rack_pct}% of breaker — no headroom for a feed loss"
+    else:
+        verdict, reason = "clear", "Load within safe margin for the window"
+    return {
+        "rack": target,
+        "rack_load_pct": rack_pct,
+        "it_kw_at_schedule": round(it_kw, 2),
+        "load_verdict": verdict,
+        "load_reason": reason,
+    }
+
+
 def advance_ticket(ticket: dict, action: str, **kwargs) -> dict:
     """assign | escalate | ship_rma | schedule_visit | add_rca | resolve | close."""
     hist = ticket.setdefault("history", [])
@@ -272,13 +313,19 @@ def advance_ticket(ticket: dict, action: str, **kwargs) -> dict:
         hist.insert(0, {"time": _now(), "event": f"rma:{rma_number}"})
     elif action == "schedule_visit":
         ticket["type"] = "field_visit"
-        ticket["maintenance_window"] = {
+        window = {
             "start": kwargs.get("start") or _now(),
             "duration_min": int(kwargs.get("duration_min") or 120),
             "engineer": kwargs.get("engineer") or "field-eng-01",
         }
+        # The window is only meaningful if it knows what the floor is doing.
+        window.update(assess_window_load(kwargs.get("facility"), ticket.get("asset_id"), kwargs.get("rack")))
+        ticket["maintenance_window"] = window
         ticket["status"] = "scheduled"
-        hist.insert(0, {"time": _now(), "event": "field_visit_scheduled"})
+        hist.insert(0, {
+            "time": _now(),
+            "event": f"field_visit_scheduled:{window['load_verdict']}",
+        })
     elif action == "add_rca":
         ticket["rca"] = {
             "root_cause": kwargs.get("root_cause") or "Component wear-out",

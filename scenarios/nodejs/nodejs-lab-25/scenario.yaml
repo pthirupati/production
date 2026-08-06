@@ -1,3 +1,8 @@
+# Unpublished: this lab ships a bare `raise NotImplementedError` stub with no
+# starter code, no seeded fault and only a `placeholder` grader, so there is
+# nothing to diagnose and any trivial return earns XP. Set is_active: true
+# once it has real content and a grader that checks it (audit §G1).
+is_active: false
 title: Secure nodejs scheduling (lab 25)
 slug: nodejs-lab-25
 technology: nodejs
@@ -112,10 +117,10 @@ coding_spec:
     readonly: false
   visible_tests:
   - name: placeholder
-    code: assert callable(solution)
+    code: assert solution() is not None
   hidden_tests:
   - name: placeholder_hidden
-    code: assert callable(solution)
+    code: assert solution() is not None
   timeout: 8
 summary: Complete the secure nodejs scheduling (lab 25) nodejs lab and verify success with the checker
 estimated_minutes: 20

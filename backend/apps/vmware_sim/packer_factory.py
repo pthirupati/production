@@ -6,6 +6,7 @@ Pipeline mirrors GitHub Actions–style Image Factory workflow runs.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -54,11 +55,128 @@ def _boot_resource_name(sku: str) -> str:
     return f"custom/{sku}-jammy"
 
 
+def _strip_hcl_comments(text: str) -> str:
+    """Drop `#`/`//` line comments and `/* */` blocks, preserving quoted strings.
+
+    A marker inside a comment must not count as a driver install, so comments are
+    removed BEFORE any marker matching. Quote tracking matters because a real
+    provisioner line can legitimately contain `#` (e.g. a shell inline with a
+    `#!/bin/bash` shebang or a URL fragment) — naively cutting at the first `#`
+    would truncate a valid block and reject a solvable template.
+    """
+    out: list[str] = []
+    i, n = 0, len(text)
+    quote = ""          # active quote char, "" when outside a string
+    heredoc = ""        # active heredoc terminator, "" when outside one
+    while i < n:
+        ch = text[i]
+        if heredoc:
+            # Inside <<-EOF … EOF the payload is literal; only the terminator ends it.
+            line_end = text.find("\n", i)
+            line_end = n if line_end == -1 else line_end
+            line = text[i:line_end]
+            out.append(line)
+            if line.strip().rstrip(";") == heredoc:
+                heredoc = ""
+            if line_end < n:
+                out.append("\n")
+            i = line_end + 1
+            continue
+        if quote:
+            out.append(ch)
+            if ch == "\\" and i + 1 < n:      # escaped char inside a string
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if ch == quote:
+                quote = ""
+            i += 1
+            continue
+        if ch in "\"'":
+            quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        if text.startswith("<<-", i) or text.startswith("<<", i):
+            j = i + (3 if text.startswith("<<-", i) else 2)
+            k = j
+            while k < n and (text[k].isalnum() or text[k] == "_"):
+                k += 1
+            if k > j:
+                heredoc = text[j:k]
+                out.append(" " * (k - i))
+                i = k
+                continue
+        if ch == "#" or text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j == -1 else j
+            continue
+        if text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j == -1 else j + 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def _block_bodies(text: str, header_re) -> list[str]:
+    """Return the `{…}` body of every block whose header matches `header_re`.
+
+    Brace-counting rather than a regex: provisioner bodies nest (inline lists,
+    nested blocks), so a non-greedy `\\{.*?\\}` would stop at the first inner
+    close brace and miss markers past it.
+    """
+    bodies: list[str] = []
+    for m in header_re.finditer(text):
+        start = text.find("{", m.end() - 1)
+        if start == -1:
+            continue
+        depth, i, n = 0, start, len(text)
+        while i < n:
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    bodies.append(text[start + 1:i])
+                    break
+            i += 1
+    return bodies
+
+
+_SHELL_PROV_RE = re.compile(
+    r"\bprovisioner\s+\"(?:shell|shell-local|ansible|file)\"\s*\{"
+)
+
+
 def _has_nvidia_marker(files: dict | None, template_blob: str = "") -> bool:
-    blob = (template_blob or "").lower()
+    """True when the template genuinely provisions the NVIDIA driver stack.
+
+    Previously this was a substring scan over the whole template plus every file
+    value, so `# nvidia-smi` in a comment — the exact token the gpu-sanity failure
+    log tells the learner to add — passed the gate. Now the marker must appear
+    inside the body of a real `provisioner` block. Comments are stripped first, so
+    a commented-out provisioner no longer counts.
+
+    Provisioners are matched at any depth, not only nested inside `build {}`.
+    Requiring the `build` wrapper would add no anti-cheat value (a comment is
+    already excluded by the strip) while rejecting the bare-provisioner templates
+    that existing packer labs and their reference solutions use — exactly the
+    "previously-accepted templates become unsolvable" regression to avoid.
+    """
+    sources = [template_blob or ""]
     if isinstance(files, dict):
-        blob += "\n" + "\n".join(str(v) for v in files.values()).lower()
-    return any(m in blob for m in NVIDIA_MARKERS)
+        sources.extend(str(v) for v in files.values())
+
+    for raw in sources:
+        if not raw:
+            continue
+        code = _strip_hcl_comments(raw)
+        for prov_body in _block_bodies(code, _SHELL_PROV_RE):
+            if any(m in prov_body.lower() for m in NVIDIA_MARKERS):
+                return True
+    return False
 
 
 def ensure_factory(state: dict) -> dict:

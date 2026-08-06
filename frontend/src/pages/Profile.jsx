@@ -17,6 +17,8 @@ import toast from 'react-hot-toast'
 import { useConfirm } from '../hooks/useConfirm'
 import { startOAuth } from '../utils/oauth'
 import { validators } from '../utils/validators'
+import { INDIAN_STATES } from '../utils/indianStates'
+import MfaSetupPanel from '../components/MfaSetupPanel'
 import { SkeletonCard } from '../components/Skeleton'
 import { PageHeader } from '../components/design'
 import { interviewsApi } from '../api/interviews'
@@ -31,6 +33,7 @@ export default function Profile() {
   const [lastName, setLastName] = useState(user?.last_name || '')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [country, setCountry] = useState('')
+  const [billingState, setBillingState] = useState('')
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [saving, setSaving] = useState(false)
@@ -44,6 +47,8 @@ export default function Profile() {
   const [organizations, setOrganizations] = useState([])
   const [socialAccounts, setSocialAccounts] = useState([])
   const [socialConfig, setSocialConfig] = useState(null)
+  const [socialConfigFailed, setSocialConfigFailed] = useState(false)
+  const [billingLoadFailed, setBillingLoadFailed] = useState(false)
   const [interviewProfile, setInterviewProfile] = useState(null)
   const [gdprBusy, setGdprBusy] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState('')
@@ -54,23 +59,36 @@ export default function Profile() {
 
   // Load full profile data including phone number
   useEffect(() => {
-    authApi.getSocialConfig().then(setSocialConfig).catch(() => {})
-    Promise.all([
+    // A failed config fetch is not the same as "provider disabled" — leaving
+    // socialConfig null made handleSocialLink tell the user GitHub/Google was
+    // "not configured on this server", which sends them chasing a server
+    // misconfiguration that may not exist. Track the failure separately.
+    authApi.getSocialConfig()
+      .then((cfg) => { setSocialConfig(cfg); setSocialConfigFailed(false) })
+      .catch(() => setSocialConfigFailed(true))
+    Promise.allSettled([
       authApi.getProfile(),
-      labApi.getUserPlan().catch(() => null),
-      api.get('/notifications/preferences/').then(r => r.data).catch(() => null),
-      subscriptionApi.getMySubscriptions().catch(() => ({ subscriptions: [] })),
-      subscriptionApi.getMyInvoices().catch(() => ({ invoices: [] })),
-      subscriptionApi.getUnifiedBilling().catch(() => null),
-      interviewsApi.getProfile().catch(() => null),
-    ]).then(([profileData, plan, prefs, subsData, invData, unified, intProfile]) => {
+      labApi.getUserPlan(),
+      api.get('/notifications/preferences/').then(r => r.data),
+      subscriptionApi.getMySubscriptions(),
+      subscriptionApi.getMyInvoices(),
+      subscriptionApi.getUnifiedBilling(),
+      interviewsApi.getProfile(),
+    ]).then(([profileRes, planRes, prefsRes, subsRes, invRes, unifiedRes, intRes]) => {
+      const val = (r) => (r.status === 'fulfilled' ? r.value : null)
+      const profileData = val(profileRes) || {}
+      const subsData = val(subsRes)
+      const invData = val(invRes)
+      const unified = val(unifiedRes)
+
       setUsername(profileData.username || '')
       setFirstName(profileData.first_name || '')
       setLastName(profileData.last_name || '')
       setPhoneNumber(profileData.phone_number || '')
       setCountry(profileData.country || '')
-      if (plan) setPlanInfo(plan)
-      if (prefs) setNotifPrefs(prefs)
+      setBillingState(profileData.billing_state || '')
+      if (val(planRes)) setPlanInfo(val(planRes))
+      if (val(prefsRes)) setNotifPrefs(val(prefsRes))
       setTechSubscriptions(subsData?.subscriptions || [])
       setComplimentaryAccess(subsData?.complimentary_access || false)
       setInvoices(invData?.invoices || [])
@@ -78,9 +96,20 @@ export default function Profile() {
       setHasUsablePassword(profileData.has_usable_password !== false)
       setSupportBotEnabled(profileData.support_bot_enabled !== false)
       setOrganizations(unified?.organizations || [])
-      setInterviewProfile(intProfile)
-    }).catch(console.error)
-      .finally(() => setLoading(false))
+      setInterviewProfile(val(intRes))
+
+      // Scoped to the billing calls on purpose. A failed subscriptions/invoices
+      // fetch renders "No active technology subscriptions" plus a buy-now link
+      // to someone who already paid, which is the one empty state here that can
+      // cause a duplicate purchase. A missing notification pref just renders a
+      // default toggle, so it stays quiet.
+      setBillingLoadFailed(
+        [subsRes, invRes, unifiedRes].some(r => r.status === 'rejected')
+      )
+      if (profileRes.status === 'rejected') {
+        toast.error('Failed to load your profile')
+      }
+    }).finally(() => setLoading(false))
   }, [])
 
   const validateProfile = () => {
@@ -98,7 +127,7 @@ export default function Profile() {
     if (!validateProfile()) return
     setSaving(true)
     try {
-      await authApi.updateProfile({ username, phone_number: phoneNumber, first_name: firstName, last_name: lastName, country })
+      await authApi.updateProfile({ username, phone_number: phoneNumber, first_name: firstName, last_name: lastName, country, billing_state: billingState })
       toast.success('Profile updated')
       setErrors({})
     } catch (err) {
@@ -132,8 +161,13 @@ export default function Profile() {
   const pwStrength = validators.passwordStrength(newPassword)
 
   const handleSocialLink = (provider) => {
+    const label = provider === 'github' ? 'GitHub' : 'Google'
+    if (socialConfigFailed) {
+      toast.error(`Couldn't check whether ${label} sign-in is available. Reload and try again.`)
+      return
+    }
     if (!socialConfig?.[provider]?.enabled) {
-      toast.error(`${provider === 'github' ? 'GitHub' : 'Google'} is not configured on this server.`)
+      toast.error(`${label} is not configured on this server.`)
       return
     }
     startOAuth(provider, 'link')
@@ -245,11 +279,39 @@ export default function Profile() {
               placeholder="e.g., United States, India, Germany"
             />
           </div>
+          {/* GST place of supply (audit Z1-13). Optional and India-only: with no
+              state on record the place-of-supply rules fall back to the seller's
+              location, so leaving it blank is valid — it just means an in-state
+              invoice. Free text is deliberately not offered; a typo like
+              "Karnatka" would flip the sale to inter-state IGST. */}
+          <div>
+            <label className="block text-sm font-medium text-surface-300 mb-1.5 flex items-center gap-1.5">
+              <MapPin size={14} /> State (for GST invoices)
+            </label>
+            <select
+              value={billingState}
+              onChange={(e) => setBillingState(e.target.value)}
+              className="input-field"
+            >
+              <option value="">Not specified</option>
+              {INDIAN_STATES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <p className="text-xs text-surface-600 mt-1">
+              Indian customers only. Determines CGST/SGST vs IGST on your tax invoice.
+            </p>
+          </div>
           <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2">
             <Save size={16} /> Save Changes
           </button>
         </form>
       </div>
+
+      {/* Audit Z2-3. Placed directly above Change Password: both are account
+          security, and someone here to harden their account should see the
+          stronger control first. */}
+      <MfaSetupPanel />
 
       <div className="glass-card p-6">
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -453,7 +515,21 @@ export default function Profile() {
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
           <CreditCard size={18} className="text-accent-amber" /> Technology Subscriptions
         </h2>
-        {complimentaryAccess ? (
+        {billingLoadFailed ? (
+          <div
+            data-testid="profile-billing-error"
+            className="p-4 rounded-lg bg-accent-red/[0.06] border border-accent-red/25 text-sm"
+          >
+            <p className="text-surface-200">Couldn't load your subscriptions</p>
+            <p className="text-xs text-surface-500 mt-1">
+              Don't purchase again — this is a loading problem, not a lapsed subscription.
+              Reload to try again.
+            </p>
+            <button onClick={() => window.location.reload()} className="btn-secondary text-xs px-3 py-1.5 mt-3">
+              Reload
+            </button>
+          </div>
+        ) : complimentaryAccess ? (
           <div className="p-4 rounded-lg bg-accent-green/10 border border-accent-green/20 text-sm text-accent-green">
             You have complimentary free access to all technologies.
           </div>

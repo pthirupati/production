@@ -1,10 +1,28 @@
-# e2e-smoke.yml — Critical-path smoke test (~10 min)
-# Called as a reusable workflow by production.yml after deploy (runs inline, not as a separate run).
-# Can also be triggered manually.
-# Covers: login, start lab, complete scenario, payment flow
+# e2e-smoke.yml — Critical-path smoke test
+# Covers: health, public API, login, SPA routes, payment/lab flow
+#
+# Two jobs, two targets:
+#
+#   smoke      — runs against a DEPLOYED environment. Called as a reusable
+#                workflow by production.yml after deploy, or manually via
+#                workflow_dispatch. Provisions a real lab.
+#   merge-gate — runs on every merge to main, BEFORE production.yml deploys.
+#                Boots the whole stack inside the runner (Postgres, Redis,
+#                Django, built SPA behind nginx) and smoke-tests that.
+#
+# Audit L1621: nothing validated a merge to main before production.yml ran.
+# The first attempt at closing this pointed merge runs at STAGING_* secrets,
+# but FixitLab has no staging environment and never has — see
+# docs/PRODUCTION_SETUP.md — so those secrets were unset and every merge run
+# no-oped. The gap was closed on paper only. merge-gate replaces that with an
+# ephemeral in-runner stack, which needs no infrastructure and therefore
+# cannot silently go dormant. What it does NOT cover is recorded in
+# docs/PRODUCTION_SETUP.md; a merge run never touches fixitlab.in.
 name: E2E Smoke
 
 on:
+  push:
+    branches: [main]
   workflow_call:
     inputs:
       base_url:
@@ -22,19 +40,9 @@ on:
         required: false
       PRODUCTION_SITE_URL:
         required: false
-      STAGING_BASE_URL:
-        required: false
-      STAGING_SITE_URL:
-        required: false
       PROD_SUPERUSER_EMAIL:
         required: false
       PROD_SUPERUSER_PASSWORD:
-        required: false
-      STAGING_SUPERUSER_EMAIL:
-        required: false
-      STAGING_SUPERUSER_PASSWORD:
-        required: false
-      SLACK_WEBHOOK_URL:
         required: false
   workflow_dispatch:
     inputs:
@@ -50,9 +58,21 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Keyed on the event so merge runs never cancel production.yml's post-deploy
+# smoke: a called run reports the caller's event (workflow_dispatch), landing in
+# a different group with cancel-in-progress false. Merge runs are disposable —
+# a newer commit supersedes an older one — so only those get cancelled.
+concurrency:
+  group: e2e-smoke-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
 jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Deployed-environment smoke (post-deploy / manual)
+  # ─────────────────────────────────────────────────────────────
   smoke:
     name: Critical path E2E smoke
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -77,15 +97,13 @@ jobs:
           SITE="${{ inputs.site_url }}"
           if [ -z "$BASE" ]; then BASE="${{ secrets.PRODUCTION_BASE_URL }}"; fi
           if [ -z "$SITE" ]; then SITE="${{ secrets.PRODUCTION_SITE_URL }}"; fi
-          if [ -z "$BASE" ]; then BASE="${{ secrets.STAGING_BASE_URL }}"; fi
-          if [ -z "$SITE" ]; then SITE="${{ secrets.STAGING_SITE_URL }}"; fi
           if [ -z "$BASE" ]; then BASE="https://fixitlab.in"; fi
           if [ -z "$SITE" ]; then SITE="https://fixitlab.in"; fi
           echo "base_url=${BASE}" >> "$GITHUB_OUTPUT"
           echo "site_url=${SITE}" >> "$GITHUB_OUTPUT"
           echo "Resolved BASE=${BASE} SITE=${SITE}"
 
-      - name: Wait for staging health (up to 120s)
+      - name: Wait for health (up to 120s)
         env:
           BASE_URL: ${{ steps.urls.outputs.base_url }}
           SITE_URL: ${{ steps.urls.outputs.site_url }}
@@ -111,12 +129,10 @@ jobs:
         run: |
           EMAIL="${{ secrets.PROD_SUPERUSER_EMAIL }}"
           PASS="${{ secrets.PROD_SUPERUSER_PASSWORD }}"
-          if [ -z "$EMAIL" ]; then EMAIL="${{ secrets.STAGING_SUPERUSER_EMAIL }}"; fi
-          if [ -z "$PASS" ]; then PASS="${{ secrets.STAGING_SUPERUSER_PASSWORD }}"; fi
           echo "email=${EMAIL}" >> "$GITHUB_OUTPUT"
           echo "password=${PASS}" >> "$GITHUB_OUTPUT"
           if [ -z "$EMAIL" ] || [ -z "$PASS" ]; then
-            echo "WARN: SUPERUSER credentials not configured — auth smoke tests will fail"
+            echo "WARN: PROD_SUPERUSER_* not configured — auth smoke tests will fail"
           fi
 
       - name: Run Playwright smoke tests
@@ -142,6 +158,7 @@ jobs:
           name: playwright-smoke-report-${{ github.run_id }}
           path: playwright-report/
           retention-days: 7
+          if-no-files-found: ignore
 
       - name: Upload failure screenshots
         if: failure()
@@ -151,18 +168,200 @@ jobs:
           path: playwright-results/
           retention-days: 7
 
-      - name: Notify Slack on failure
-        if: failure()
-        uses: ./.github/actions/notify-slack
-        with:
-          status: failure
-          workflow: "E2E Smoke"
-          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+  # ─────────────────────────────────────────────────────────────
+  # Merge gate — ephemeral stack, no deployed environment needed
+  # ─────────────────────────────────────────────────────────────
+  merge-gate:
+    name: Merge gate — ephemeral stack smoke
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
 
-      - name: Notify Slack on success
-        if: success()
-        uses: ./.github/actions/notify-slack
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fixitlab_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # test_settings routes to the Postgres service when GITHUB_ACTIONS=true and
+      # DATABASE_URL is set (backend/config/test_settings.py:35). Base settings
+      # demand Vault and a real SECRET_KEY, so they cannot boot on a runner.
+      DJANGO_SETTINGS_MODULE: config.test_settings
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/fixitlab_ci
+      REDIS_URL: redis://localhost:6379/0
+      STACK_URL: http://localhost:8080
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-python-backend
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
-          status: success
-          workflow: "E2E Smoke"
-          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build SPA
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+          test -f dist/index.html || { echo "SPA build produced no index.html"; exit 1; }
+
+      - name: Migrate database
+        working-directory: backend
+        run: python manage.py migrate --run-syncdb
+
+      - name: Seed catalog data
+        working-directory: backend
+        run: |
+          # A subset, not the whole ~4k-scenario catalog: enough that the public
+          # endpoints and the SPA render real rows, small enough to stay inside
+          # the job budget. Non-fatal — a seeder regression should not block a
+          # merge on its own, and the smoke specs still assert the API answers.
+          python manage.py seed_scenarios \
+            --dir "$GITHUB_WORKSPACE/scenarios" \
+            --technologies linux,docker,networking \
+            || echo "WARN: seed_scenarios failed — continuing with empty catalog"
+          # After seeding: sync_catalog links tutorials to scenario slugs that
+          # must already exist.
+          python manage.py sync_technology_catalog \
+            || echo "WARN: sync_technology_catalog failed — learning paths unlinked"
+
+      - name: Create smoke superuser
+        working-directory: backend
+        env:
+          # Generated per run rather than stored: this account exists only for
+          # the lifetime of the runner, and a literal password in a tracked
+          # workflow would be a finding for scripts/scan-secrets.
+          SMOKE_EMAIL: ci-smoke@fixitlab.test
+        run: |
+          SMOKE_PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::${SMOKE_PASSWORD}"
+          echo "SMOKE_EMAIL=${SMOKE_EMAIL}" >> "$GITHUB_ENV"
+          echo "SMOKE_PASSWORD=${SMOKE_PASSWORD}" >> "$GITHUB_ENV"
+          SMOKE_PASSWORD="$SMOKE_PASSWORD" python manage.py shell <<'PY'
+          import os
+          from django.contrib.auth import get_user_model
+
+          User = get_user_model()
+          email = os.environ["SMOKE_EMAIL"]
+          password = os.environ["SMOKE_PASSWORD"]
+
+          user = User.objects.filter(email=email).first()
+          if user is None:
+              user = User.objects.create_superuser(
+                  username="ci-smoke", email=email, password=password
+              )
+          else:
+              user.set_password(password)
+              user.is_staff = True
+              user.is_superuser = True
+              user.save()
+          print("superuser ready:", user.email)
+          PY
+
+      - name: Start Django
+        working-directory: backend
+        run: |
+          nohup python manage.py runserver 127.0.0.1:8001 --noreload \
+            > "$RUNNER_TEMP/django.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/django.pid"
+          for i in $(seq 1 30); do
+            if curl -sf --max-time 5 http://127.0.0.1:8001/api/config/ > /dev/null; then
+              echo "Django up (attempt $i)"; exit 0
+            fi
+            sleep 2
+          done
+          echo "Django never became healthy — last 100 log lines:"
+          tail -n 100 "$RUNNER_TEMP/django.log"
+          exit 1
+
+      - name: Start gateway
+        run: |
+          # --network host so the container reaches Django on 127.0.0.1:8001 and
+          # publishes 8080 on the runner without a bridge hop.
+          docker run -d --name ci-gateway --network host \
+            -v "$GITHUB_WORKSPACE/frontend/dist:/srv/spa:ro" \
+            -v "$GITHUB_WORKSPACE/.github/ci/nginx-ephemeral.conf:/etc/nginx/conf.d/default.conf:ro" \
+            nginx:1.27-alpine
+          for i in $(seq 1 20); do
+            if [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$STACK_URL/health")" = "200" ]; then
+              echo "Gateway up (attempt $i)"; exit 0
+            fi
+            sleep 2
+          done
+          echo "Gateway never became healthy — container logs:"
+          docker logs ci-gateway
+          exit 1
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install --save-dev @playwright/test
+          npx playwright install chromium --with-deps
+
+      - name: Run Playwright smoke tests
+        env:
+          # Same origin for both: the built SPA calls the API on relative paths,
+          # so a split BASE_URL/SITE_URL would send /api/* to the static server.
+          BASE_URL: ${{ env.STACK_URL }}
+          SITE_URL: ${{ env.STACK_URL }}
+          SUPERUSER_EMAIL: ${{ env.SMOKE_EMAIL }}
+          SUPERUSER_PASSWORD: ${{ env.SMOKE_PASSWORD }}
+          # The runner has no lab host, so lab provisioning cannot run here and
+          # a merge can never orphan a real container
+          # (smoke/critical-path.spec.js:89 honours this).
+          E2E_SKIP_LAB: "1"
+          E2E_SKIP_EMAIL: "true"
+          E2E_ISOLATION_ONCE: "1"
+          PLAYWRIGHT_HTML_REPORT: playwright-report
+        run: |
+          npx playwright test tests/e2e/smoke/ \
+            --reporter=html \
+            --output=playwright-results \
+            --timeout=60000
+
+      - name: Dump stack logs on failure
+        if: failure()
+        run: |
+          echo "───── Django ─────"
+          tail -n 200 "$RUNNER_TEMP/django.log" || true
+          echo "───── Gateway ─────"
+          docker logs --tail 200 ci-gateway || true
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merge-gate-smoke-report-${{ github.run_id }}
+          path: playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merge-gate-screenshots-${{ github.run_id }}
+          path: playwright-results/
+          retention-days: 7

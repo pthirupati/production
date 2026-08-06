@@ -222,6 +222,22 @@ class CertEarnedCertificate(models.Model):
     issued_at = models.DateTimeField(default=timezone.now)
     expires_at = models.DateTimeField()
 
+    # ── Revocation ───────────────────────────────────────────────────────────
+    # Expiry used to be the ONLY way a certificate could become invalid, so there
+    # was no way to withdraw one that should not have been issued. That matters
+    # concretely here: a number of certificates were earned against fail-open
+    # graders (see docs/AUDIT_2026_08_TODO.md section G), and the only remedy was a
+    # raw DB delete -- which would orphan the OneToOne OpenBadgeCredential while
+    # any already-distributed, Ed25519-signed credential JSON stayed independently
+    # verifiable forever.
+    #
+    # Revoking rather than deleting keeps the record so public verification can say
+    # "revoked" instead of "not found". "Not found" is indistinguishable from a
+    # typo and invites the holder to assume a bug.
+    revoked = models.BooleanField(default=False, db_index=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_reason = models.CharField(max_length=300, blank=True, default="")
+
     class Meta:
         ordering = ["-issued_at"]
         # One certificate per learner per track; a re-pass updates it in place.
@@ -233,6 +249,19 @@ class CertEarnedCertificate(models.Model):
     @property
     def is_expired(self):
         return timezone.now() > self.expires_at
+
+    @property
+    def is_valid(self):
+        """Single source of truth for validity. Revocation beats expiry."""
+        return not self.revoked and not self.is_expired
+
+    def revoke(self, reason: str = "") -> None:
+        if self.revoked:
+            return
+        self.revoked = True
+        self.revoked_at = timezone.now()
+        self.revoked_reason = (reason or "")[:300]
+        self.save(update_fields=["revoked", "revoked_at", "revoked_reason"])
 
 
 class OpenBadgeCredential(models.Model):

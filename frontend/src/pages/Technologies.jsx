@@ -9,8 +9,10 @@ import { TechCardGrid } from '../components/marketing'
 import { PageHeader } from '../components/design'
 import ScrollReveal from '../ui/ScrollReveal'
 import { fadeUp, staggerContainer } from '../ui/motion'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 export default function Technologies() {
+  usePageTitle('Technologies', 'Every technology track on FixitLab — Linux, Kubernetes, Docker, AWS, VMware, networking, databases and AI infrastructure.')
   const getTechnologies = useDataStore(s => s.getTechnologies)
   const [technologies, setTechnologies] = useState([])
   const [loading, setLoading] = useState(true)

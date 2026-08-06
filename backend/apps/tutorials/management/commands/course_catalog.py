@@ -7,6 +7,8 @@ hand-authoring giant JSON files.
 
 from __future__ import annotations
 
+from collections import Counter
+
 LEVEL_BY_MODULE = (
     "beginner",
     "beginner",
@@ -394,13 +396,31 @@ COURSE_DEFINITIONS: list[dict] = [
 
 
 def all_course_definitions() -> list[dict]:
-    """Base + extended tracks for seed expansion."""
+    """Base + extended tracks for seed expansion.
+
+    Raises on a duplicate ``course_slug``. Two definitions sharing a slug do not
+    collide loudly at the tutorial level (module titles differ, so the derived
+    slugs stay unique) — instead they silently merge into a single oversized
+    course with repeated ``module_order`` values and a ``course_title`` decided
+    by row ordering. That is exactly how github-actions-zero-hero became a
+    20-module course, so fail the seed rather than ship a scrambled syllabus.
+    """
     try:
         from .course_catalog_tracks import EXTENDED_COURSES
 
-        return COURSE_DEFINITIONS + EXTENDED_COURSES
+        courses = COURSE_DEFINITIONS + EXTENDED_COURSES
     except ImportError:
-        return list(COURSE_DEFINITIONS)
+        courses = list(COURSE_DEFINITIONS)
+
+    counts = Counter(c["course_slug"] for c in courses)
+    dupes = sorted(slug for slug, n in counts.items() if n > 1)
+    if dupes:
+        raise ValueError(
+            f"duplicate course_slug in course catalog: {', '.join(dupes)}. "
+            "Each course_slug must be declared once across COURSE_DEFINITIONS "
+            "and EXTENDED_COURSES."
+        )
+    return courses
 
 
 def _sections_for_module(course: dict, module_title: str, level: str, module_order: int = 0) -> list:

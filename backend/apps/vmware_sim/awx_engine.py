@@ -72,6 +72,187 @@ def _ansi(color: str, text: str) -> str:
     return f"{codes.get(color, '')}{text}\x1b[0m"
 
 
+# ---------------------------------------------------------------------------
+# Playbook content model
+#
+# A job template owns real playbook TEXT (state["playbooks"][<filename>]), not
+# just a filename. Whether a launched job succeeds is DERIVED by evaluating
+# that text against the live inventory — it is never a preset boolean. The
+# defects below are the ones a learner can see in the editor and fix with the
+# edit_playbook action; each maps to the ansible error a real run would emit.
+# ---------------------------------------------------------------------------
+
+# Modules the simulated execution environment ships. Anything else is a
+# "couldn't resolve module/action" failure, which is the single most common
+# real-world cause of a red PLAY RECAP in a training environment.
+_KNOWN_MODULES = {
+    "ansible.builtin.package", "ansible.builtin.apt", "ansible.builtin.yum",
+    "ansible.builtin.dnf", "ansible.builtin.service", "ansible.builtin.systemd",
+    "ansible.builtin.copy", "ansible.builtin.template", "ansible.builtin.file",
+    "ansible.builtin.command", "ansible.builtin.shell", "ansible.builtin.assert",
+    "ansible.builtin.debug", "ansible.builtin.setup", "ansible.builtin.stat",
+    "ansible.builtin.lineinfile", "ansible.builtin.reboot", "ansible.builtin.wait_for",
+    # Short (unqualified) names resolve to the builtin collection.
+    "package", "apt", "yum", "dnf", "service", "systemd", "copy", "template",
+    "file", "command", "shell", "assert", "debug", "setup", "stat",
+    "lineinfile", "reboot", "wait_for",
+}
+
+
+def _parse_playbook(text: str) -> dict:
+    """Minimal structural parse of a playbook's YAML text.
+
+    Deliberately not a real YAML parser: the simulator only needs the handful
+    of facts that decide whether a run goes green — the target host pattern,
+    the module each task calls, and the variables the text interpolates. A
+    hand-rolled scan keeps this dependency-free and tolerant of the partially
+    broken text a learner is asked to repair.
+    """
+    hosts = ""
+    modules: list[str] = []
+    variables: set[str] = set()
+    defined: set[str] = set()
+    in_vars = False
+    vars_indent = 0
+    has_tasks = False
+
+    for raw in (text or "").splitlines():
+        line = raw.rstrip()
+        if not line.strip() or line.strip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        body = line.strip().lstrip("- ").strip()
+
+        # {{ var }} references anywhere in the file.
+        rest = line
+        while "{{" in rest and "}}" in rest:
+            start = rest.index("{{") + 2
+            end = rest.index("}}", start)
+            # Strip filters/defaults: `pkg | default('x')` references `pkg`.
+            token = rest[start:end].split("|")[0].strip()
+            token = token.split(".")[0].split("[")[0].strip()
+            if token and token.replace("_", "").isalnum() and not token.isdigit():
+                variables.add(token)
+            rest = rest[end + 2:]
+
+        if body.startswith("hosts:"):
+            hosts = body.split(":", 1)[1].strip()
+            in_vars = False
+            continue
+        if body.startswith("tasks:"):
+            has_tasks = True
+            in_vars = False
+            continue
+        if body.startswith("vars:"):
+            in_vars = True
+            vars_indent = indent
+            continue
+        if in_vars:
+            if indent <= vars_indent:
+                in_vars = False
+            elif ":" in body:
+                defined.add(body.split(":", 1)[0].strip())
+                continue
+
+        # A task's module is the first mapping key that is not a task keyword.
+        if ":" in body:
+            key = body.split(":", 1)[0].strip()
+            if key in ("name", "become", "when", "register", "loop", "with_items",
+                       "notify", "tags", "vars", "hosts", "tasks", "handlers",
+                       "gather_facts", "ignore_errors", "changed_when", "failed_when",
+                       "delegate_to", "run_once", "state", "enabled", "msg", "that",
+                       "src", "dest", "mode", "owner", "group", "line", "path"):
+                continue
+            if key and (key in _KNOWN_MODULES or "." in key or key.islower()):
+                modules.append(key)
+
+    return {
+        "hosts": hosts,
+        "modules": modules,
+        "variables": variables,
+        "defined_vars": defined,
+        "has_tasks": has_tasks,
+    }
+
+
+def _inventory_targets(state: dict, pattern: str) -> list[dict] | None:
+    """Hosts an ansible host pattern matches, or None if the pattern is unknown.
+
+    Returning [] and None are different outcomes: [] means a real group that is
+    currently empty/disabled, None means the pattern names nothing in AWX at
+    all. Only the latter is a playbook defect — an inventory that simply has no
+    host rows seeded is a fixture gap, not something the learner authored.
+    """
+    pattern = (pattern or "").strip().strip("'\"")
+    hosts = state.get("hosts") or []
+    if not pattern:
+        return None
+    if pattern in ("all", "*"):
+        return list(hosts)
+    matched = [h for h in hosts if (h.get("inventory") or "") == pattern]
+    if matched:
+        return matched
+    by_name = [h for h in hosts if (h.get("name") or "") == pattern]
+    if by_name:
+        return by_name
+    # A declared inventory with no host rows is still a valid target.
+    if any((i.get("name") or "") == pattern for i in state.get("inventories") or []):
+        return []
+    return None
+
+
+def _evaluate_playbook(state: dict, template_name: str, playbook: str) -> str:
+    """Return the reason a run of `playbook` would fail, or "" if it will pass.
+
+    This is the whole point of the content model: outcome comes from the text
+    plus the live inventory, so a job cannot go green until the learner has
+    actually corrected the playbook AND the hosts it targets are usable.
+    """
+    text = (state.get("playbooks") or {}).get(playbook)
+    if text is None:
+        # No content recorded (ad-hoc template created mid-lab): nothing to be
+        # wrong with, so it runs clean. Fail-open only where there is no
+        # authored defect to detect.
+        return ""
+
+    parsed = _parse_playbook(text)
+
+    if not parsed["hosts"]:
+        return "ERROR! the field 'hosts' is required but was not set"
+    if not parsed["has_tasks"]:
+        return f"ERROR! no tasks/entries found in {playbook}"
+
+    for module in parsed["modules"]:
+        if module not in _KNOWN_MODULES:
+            return (f"ERROR! couldn't resolve module/action '{module}'. "
+                    "This often indicates a misspelling, missing collection, "
+                    "or incorrect module path.")
+
+    undefined = sorted(parsed["variables"] - parsed["defined_vars"] - _host_facts(state))
+    if undefined:
+        return (f"The task includes an option with an undefined variable. "
+                f"The error was: '{undefined[0]}' is undefined")
+
+    targets = _inventory_targets(state, parsed["hosts"])
+    if targets is None:
+        return (f"ERROR! Could not match supplied host pattern, "
+                f"ignoring: {parsed['hosts']}")
+    if targets and not any(h.get("enabled", True) for h in targets):
+        return (f"ERROR! Could not match supplied host pattern, "
+                f"ignoring: {parsed['hosts']} (all hosts disabled)")
+
+    return ""
+
+
+def _host_facts(state: dict) -> set[str]:
+    """Variables ansible always provides, so referencing them is never undefined."""
+    return {
+        "inventory_hostname", "ansible_hostname", "ansible_fqdn", "ansible_host",
+        "ansible_distribution", "ansible_os_family", "ansible_facts", "item",
+        "groups", "hostvars", "playbook_dir", "ansible_user",
+    }
+
+
 def _is_gpu_template(name: str, playbook: str = "") -> bool:
     blob = f"{name} {playbook}".lower()
     return any(
@@ -83,14 +264,17 @@ def _is_gpu_template(name: str, playbook: str = "") -> bool:
     )
 
 
-def _build_job_stdout(name: str, playbook: str, host: str, will_fail: bool) -> list[str]:
+def _build_job_stdout(name: str, playbook: str, host: str, will_fail: bool,
+                      reason: str = "") -> list[str]:
     """A realistic ansible-playbook run log for a job template launch.
 
     Returned as an ordered list; get_state reveals a growing prefix as the job
-    advances so the UI streams the output line by line.
+    advances so the UI streams the output line by line. `reason` is the message
+    _evaluate_playbook derived from the playbook text, so the fatal line names
+    the actual defect instead of a generic "task failed".
     """
     if _is_gpu_template(name, playbook):
-        return _build_gpu_job_stdout(name, playbook, host, will_fail)
+        return _build_gpu_job_stdout(name, playbook, host, will_fail, reason)
 
     lines = [
         _ansi("cyan", f"PLAY [{name}] " + "*" * max(4, 52 - len(name))),
@@ -104,8 +288,9 @@ def _build_job_stdout(name: str, playbook: str, host: str, will_fail: bool) -> l
         _ansi("cyan", f"TASK [Run {playbook}] " + "*" * max(4, 40 - len(playbook))),
     ]
     if will_fail:
+        msg = reason or "task failed"
         lines += [
-            _ansi("red", f"fatal: [{host}]: FAILED! => {{\"changed\": false, \"msg\": \"task failed\"}}"),
+            _ansi("red", f"fatal: [{host}]: FAILED! => {{\"changed\": false, \"msg\": \"{msg}\"}}"),
             "",
             _ansi("red", "PLAY RECAP " + "*" * 58),
             f"{host} : {_ansi('green', 'ok=2')} {_ansi('amber', 'changed=1')} unreachable=0 {_ansi('red', 'failed=1')}",
@@ -123,7 +308,8 @@ def _build_job_stdout(name: str, playbook: str, host: str, will_fail: bool) -> l
     return lines
 
 
-def _build_gpu_job_stdout(name: str, playbook: str, host: str, will_fail: bool) -> list[str]:
+def _build_gpu_job_stdout(name: str, playbook: str, host: str, will_fail: bool,
+                          reason: str = "") -> list[str]:
     """Stdout narrative for AI Infra GPU driver / DCGM / repave job templates."""
     low = f"{name} {playbook}".lower()
     if "dcgm" in low:
@@ -164,8 +350,9 @@ def _build_gpu_job_stdout(name: str, playbook: str, host: str, will_fail: bool) 
     for title, result in tasks:
         lines.append(_ansi("cyan", f"TASK [{title}] " + "*" * max(4, 48 - len(title))))
         if will_fail and result == "changed":
+            msg = reason or "driver install failed"
             lines += [
-                _ansi("red", f"fatal: [{host}]: FAILED! => {{\"msg\": \"driver install failed\"}}"),
+                _ansi("red", f"fatal: [{host}]: FAILED! => {{\"msg\": \"{msg}\"}}"),
                 "",
             ]
             break
@@ -203,11 +390,18 @@ def _job_host_for(state: dict, inventory: str) -> str:
 
 
 def _make_job(state: dict, name: str, *, playbook: str = "site.yml",
-              inventory: str = "Production", will_fail: bool = False,
+              inventory: str = "Production",
               started_ts: float | None = None) -> dict:
-    """Create a launched job object with a live wall-clock timeline."""
+    """Create a launched job object with a live wall-clock timeline.
+
+    The end state is DERIVED from the playbook's text (see _evaluate_playbook),
+    never passed in by the caller — a job goes red exactly when the playbook it
+    runs is still broken, and the fatal line quotes the derived reason.
+    """
     new_id = max((int(j.get("id", 0)) for j in state.get("jobs", [])), default=500) + 1
     host = _job_host_for(state, inventory)
+    reason = _evaluate_playbook(state, name, playbook)
+    will_fail = bool(reason)
     finish = "failed" if will_fail else "successful"
     return {
         "id": new_id,
@@ -218,7 +412,8 @@ def _make_job(state: dict, name: str, *, playbook: str = "site.yml",
         "started": _now_iso(),
         "started_ts": started_ts if started_ts is not None else _now(),
         "finish_status": finish,
-        "stdout_plan": _build_job_stdout(name, playbook, host, will_fail),
+        "failure_reason": reason,
+        "stdout_plan": _build_job_stdout(name, playbook, host, will_fail, reason),
         "stdout": [_ansi("cyan", "Identifying playbook process...")],
     }
 
@@ -393,6 +588,137 @@ def _maybe_trigger_maas_deploy(session_id: str, job: dict, state: dict) -> None:
         pass
 
 
+# --- Seeded playbook text -------------------------------------------------
+# Authored so each defect is visible in the editor and repairable with
+# edit_playbook. A healthy playbook must satisfy _evaluate_playbook: a host
+# pattern that matches an enabled host, a tasks: block, only known modules,
+# and no variable referenced without being defined.
+
+_PATCH_PLAYBOOK = """---
+- name: Patch Linux
+  hosts: Production
+  become: true
+  tasks:
+    - name: Apply all available security updates
+      ansible.builtin.package:
+        name: '*'
+        state: latest
+"""
+
+_DEPLOY_PLAYBOOK = """---
+- name: Deploy App
+  hosts: Staging
+  become: true
+  tasks:
+    - name: Ship the application bundle
+      ansible.builtin.copy:
+        src: app.tar.gz
+        dest: /opt/app/app.tar.gz
+    - name: Restart the application service
+      ansible.builtin.service:
+        name: app
+        state: restarted
+"""
+
+# Defect: `servce` (missing 'i') does not resolve to a module, so every run
+# fails with ansible's real resolve error until the learner fixes the spelling.
+# Only seeded for slugs whose objective IS repairing the playbook — the
+# launch-and-verify labs keep healthy text so their outcome is derived-green.
+_BROKEN_DEPLOY_PLAYBOOK = _DEPLOY_PLAYBOOK.replace(
+    "ansible.builtin.service:", "ansible.builtin.servce:"
+)
+
+_SSH_HARDENING_PLAYBOOK = """---
+- name: Harden SSH
+  hosts: Production
+  become: true
+  tasks:
+    - name: Disable root login over SSH
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        line: PermitRootLogin no
+    - name: Reload sshd
+      ansible.builtin.service:
+        name: sshd
+        state: restarted
+"""
+
+_GPU_DRIVER_PLAYBOOK = """---
+- name: GPU Driver Install (H100)
+  hosts: maas-gpu-nodes
+  become: true
+  vars:
+    nvidia_driver_version: 565
+  tasks:
+    - name: Install the pinned NVIDIA driver
+      ansible.builtin.package:
+        name: nvidia-driver-{{ nvidia_driver_version }}
+        state: present
+    - name: Enable persistence mode
+      ansible.builtin.service:
+        name: nvidia-persistenced
+        state: started
+"""
+
+# Defect variant: the vars: block is gone, so `nvidia_driver_version` is
+# interpolated while undefined. Seeded only for repair-objective slugs.
+_BROKEN_GPU_DRIVER_PLAYBOOK = _GPU_DRIVER_PLAYBOOK.replace(
+    "  vars:\n    nvidia_driver_version: 565\n", ""
+)
+
+_DCGM_PLAYBOOK = """---
+- name: DCGM Exporter Deploy
+  hosts: maas-gpu-nodes
+  become: true
+  tasks:
+    - name: Install datacenter-gpu-manager
+      ansible.builtin.package:
+        name: datacenter-gpu-manager
+        state: present
+    - name: Start dcgm-exporter on :9400
+      ansible.builtin.service:
+        name: dcgm-exporter
+        state: started
+"""
+
+_REPAVE_PLAYBOOK = """---
+- name: Image Repave (jammy-h100)
+  hosts: maas-gpu-nodes
+  become: true
+  tasks:
+    - name: Drain workloads before repave
+      ansible.builtin.service:
+        name: nvidia-persistenced
+        state: stopped
+    - name: Trigger the MAAS deploy of custom/h100-jammy
+      ansible.builtin.command: maas admin machine deploy custom/h100-jammy
+"""
+
+_PERSISTENCE_PLAYBOOK = """---
+- name: NVIDIA Persistence Mode
+  hosts: maas-gpu-nodes
+  become: true
+  tasks:
+    - name: Enable nvidia-persistenced
+      ansible.builtin.service:
+        name: nvidia-persistenced
+        state: started
+        enabled: true
+"""
+
+# Template created mid-lab with no authored text runs a trivially clean play.
+_DEFAULT_NEW_PLAYBOOK = """---
+- name: Site
+  hosts: Production
+  become: true
+  tasks:
+    - name: Converge the host to its desired state
+      ansible.builtin.package:
+        name: '*'
+        state: present
+"""
+
+
 def _base_state() -> dict:
     return {
         "session": {"logged_in": False, "user": ""},
@@ -425,7 +751,11 @@ def _base_state() -> dict:
             {
                 "id": 502, "name": "Deploy App", "status": "failed", "started": _now_iso(),
                 "playbook": "deploy.yml", "inventory": "Staging",
-                "stdout": _build_job_stdout("Deploy App", "deploy.yml", "web02.fixitlab.local", True),
+                # Historical failed run kept as backstory for the Jobs list.
+                "stdout": _build_job_stdout(
+                    "Deploy App", "deploy.yml", "web02.fixitlab.local", True,
+                    "Timed out waiting for privilege escalation prompt",
+                ),
             },
         ],
         "credentials": [
@@ -456,6 +786,15 @@ def _base_state() -> dict:
             {"id": "a3", "time": _now_iso(), "user": "labuser", "action": "Created credential", "object": "prod-ssh-key"},
             {"id": "a4", "time": _now_iso(), "user": "ci-bot", "action": "Job failed", "object": "DB Backup #4408"},
         ],
+        # Playbook TEXT backing each template. deploy.yml is the authored defect
+        # for the "failed template" scenarios: `ansible.builtin.servce` is a
+        # typo, so a launch fails with the same resolve error real ansible
+        # emits until the learner corrects it via edit_playbook.
+        "playbooks": {
+            "patch.yml": _PATCH_PLAYBOOK,
+            "deploy.yml": _DEPLOY_PLAYBOOK,
+            "ssh_hardening.yml": _SSH_HARDENING_PLAYBOOK,
+        },
         "goal": {"title": "Fix AWX", "objective": "Sync the failing project and re-run the failed job template."},
         "broken": {"project_sync_failed": True, "failed_template_id": 11},
         "events": [],
@@ -512,10 +851,17 @@ def _seed_ai_infra_awx(state: dict, slug: str = "") -> None:
             "playbook": "nvidia_driver_h100.yml",
             "inventory": "maas-gpu-nodes",
             "stdout": _build_job_stdout(
-                "GPU Driver Install (H100)", "nvidia_driver_h100.yml", "gpu-node-03", True
+                "GPU Driver Install (H100)", "nvidia_driver_h100.yml", "gpu-node-03", True,
+                "Unable to acquire the dpkg frontend lock",
             ),
         },
     ]
+    state["playbooks"] = {
+        "nvidia_driver_h100.yml": _GPU_DRIVER_PLAYBOOK,
+        "dcgm_exporter.yml": _DCGM_PLAYBOOK,
+        "maas_repave_h100.yml": _REPAVE_PLAYBOOK,
+        "nvidia_persistenced.yml": _PERSISTENCE_PLAYBOOK,
+    }
     state["credentials"] = [
         {"id": 1, "name": "MAAS GPU Machine SSH", "kind": "Machine"},
         {"id": 2, "name": "Vault Password", "kind": "Vault"},
@@ -545,6 +891,18 @@ def _seed_ai_infra_awx(state: dict, slug: str = "") -> None:
             "objective": "Launch Image Repave (jammy-h100) after the Packer image lands in MAAS.",
         }
         state["broken"] = {"failed_template_id": 24}
+    elif any(k in s for k in ("playbook", "undefined-var", "broken-play")):
+        # Repair objective: nvidia_driver_h100.yml interpolates an undefined
+        # var, so relaunching keeps failing until the vars: block is restored.
+        state["playbooks"]["nvidia_driver_h100.yml"] = _BROKEN_GPU_DRIVER_PLAYBOOK
+        state["goal"] = {
+            "title": "Fix the driver playbook",
+            "objective": (
+                "GPU Driver Install (H100) fails on every node. Correct "
+                "nvidia_driver_h100.yml, then relaunch until PLAY RECAP is clean."
+            ),
+        }
+        state["broken"] = {"failed_template_id": 12, "canary_driver_stale": True}
 
 
 def _apply_preset(state: dict, slug: str) -> None:
@@ -553,6 +911,21 @@ def _apply_preset(state: dict, slug: str) -> None:
     # "template"/"job" presets that strip JT lists down to Patch Linux.
     if _is_ai_infra_awx_slug(slug):
         _seed_ai_infra_awx(state, slug)
+        return
+    # Playbook-repair labs: the defect lives in the playbook TEXT, so relaunching
+    # is not a fix — the learner must correct the YAML (edit_playbook) before a
+    # run can go green. Checked before the generic "launch"/"job" branch because
+    # these slugs contain those words too.
+    if any(k in slug for k in ("playbook", "syntax", "undefined-var", "broken-play")):
+        state["playbooks"]["deploy.yml"] = _BROKEN_DEPLOY_PLAYBOOK
+        state["goal"] = {
+            "title": "Fix the failing playbook",
+            "objective": (
+                "Deploy App fails every run. Read the job output, correct "
+                "deploy.yml, then relaunch the template until PLAY RECAP is clean."
+            ),
+        }
+        state["broken"] = {"failed_template_id": 11}
         return
     if "install" in slug:
         state["goal"] = {"title": "Install AWX", "objective": "Complete AWX operator install and verify the web UI is reachable."}
@@ -755,31 +1128,74 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             jt.get("name", "Job"),
             playbook=jt.get("playbook", "site.yml"),
             inventory=jt.get("inventory", "Production"),
-            will_fail=False,
         )
-        # Launching resolves the failing template + clears the blocker so grading
-        # (validate_awx_lab) still passes the moment the job is launched, while
-        # the job's own status streams pending->...->successful on wall-clock.
+        will_succeed = job["finish_status"] == "successful"
+        # Grading follows the DERIVED outcome, not the act of launching. A job
+        # whose playbook is still broken leaves the template failed and the
+        # blocker in place, so validate_awx_lab keeps failing until the learner
+        # actually repairs the playbook and relaunches.
         for t in state.get("job_templates", []):
             if t["id"] == tid:
-                t["status"] = "successful"
-        broken.pop("failed_template_id", None)
-        broken.pop("canary_driver_stale", None)
+                t["status"] = "successful" if will_succeed else "failed"
+        if will_succeed:
+            broken.pop("failed_template_id", None)
+            broken.pop("canary_driver_stale", None)
         state.setdefault("jobs", []).insert(0, job)
-        state["events"].insert(0, {"time": _now_iso(), "message": f"Job {job['name']} launched (#{job['id']})", "severity": "success"})
+        state["events"].insert(0, {
+            "time": _now_iso(),
+            "message": (f"Job {job['name']} launched (#{job['id']})" if will_succeed
+                        else f"Job {job['name']} launched (#{job['id']}) — playbook error: {job['failure_reason']}"),
+            "severity": "success" if will_succeed else "error",
+        })
         _activity(state, f"Launched job template {job['name']}", f"Job #{job['id']}")
         _save(session_id, entry)
-        # Cross-tech: a service-configuring template launched successfully →
-        # publish its intended end state so the Linux terminal reveals it.
-        _bridge_ansible_result(session_id, job.get("name", ""), job.get("playbook", ""), payload)
-        _maybe_trigger_maas_deploy(session_id, job, state)
-        return {"ok": True, "message": "Job launched", "job_id": job["id"]}
+        if will_succeed:
+            # Cross-tech: only a run that actually converges may publish its end
+            # state downstream — a failed play must not reveal the service on
+            # the Linux guest or kick a MAAS deploy.
+            _bridge_ansible_result(session_id, job.get("name", ""), job.get("playbook", ""), payload)
+            _maybe_trigger_maas_deploy(session_id, job, state)
+        return {
+            "ok": True,
+            "message": "Job launched" if will_succeed else "Job launched (playbook will fail)",
+            "job_id": job["id"],
+            "will_fail": not will_succeed,
+            "failure_reason": job["failure_reason"],
+        }
+
+    if action == "edit_playbook":
+        # The repair surface for the content model: a learner rewrites the
+        # playbook text, then relaunches. Nothing here decides pass/fail — the
+        # next launch re-derives the outcome from whatever was saved.
+        name = (payload.get("playbook") or "").strip()
+        content = payload.get("content")
+        if not name:
+            return {"ok": False, "error": "playbook filename required"}
+        if not isinstance(content, str) or not content.strip():
+            return {"ok": False, "error": "playbook content required"}
+        state.setdefault("playbooks", {})[name] = content
+        reason = _evaluate_playbook(state, "", name)
+        state["events"].insert(0, {
+            "time": _now_iso(),
+            "message": f"Playbook {name} saved" + (f" (still failing: {reason})" if reason else ""),
+            "severity": "info" if reason else "success",
+        })
+        _activity(state, "Edited playbook", name)
+        _save(session_id, entry)
+        return {"ok": True, "message": "Playbook saved", "will_fail": bool(reason),
+                "failure_reason": reason}
 
     if action == "create_template":
         name = (payload.get("name") or "New Template").strip()
         tid = max((jt.get("id", 0) for jt in state.get("job_templates", [])), default=0) + 1
+        playbook = (payload.get("playbook") or "site.yml").strip()
         state.setdefault("job_templates", []).append(
-            {"id": tid, "name": name, "playbook": "site.yml", "inventory": "Production", "status": "never"}
+            {"id": tid, "name": name, "playbook": playbook, "inventory": "Production", "status": "never"}
+        )
+        # A template the learner authors gets real (healthy) text, so its runs
+        # go through the same content evaluation as the seeded ones.
+        state.setdefault("playbooks", {}).setdefault(
+            playbook, payload.get("content") or _DEFAULT_NEW_PLAYBOOK
         )
         broken.pop("missing_template", None)
         state["events"].insert(0, {"time": _now_iso(), "message": f"Template {name} created", "severity": "success"})
@@ -865,15 +1281,34 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             src.get("name", "Job"),
             playbook=src.get("playbook", "site.yml"),
             inventory=src.get("inventory", "Production"),
-            will_fail=False,
         )
+        will_succeed = job["finish_status"] == "successful"
+        # A relaunch of a still-broken playbook fails again — retrying is not a
+        # fix, so it must not clear the template's failed status or the blocker.
+        if will_succeed:
+            for t in state.get("job_templates", []):
+                if t.get("name") == job["name"]:
+                    t["status"] = "successful"
+            if broken.get("failed_template_id") is not None:
+                failed_jt = next((t for t in state.get("job_templates", [])
+                                  if t["id"] == broken.get("failed_template_id")), None)
+                if failed_jt and failed_jt.get("name") == job["name"]:
+                    broken.pop("failed_template_id", None)
+                    broken.pop("canary_driver_stale", None)
         state.setdefault("jobs", []).insert(0, job)
-        state["events"].insert(0, {"time": _now_iso(), "message": f"Job {job['name']} relaunched (#{job['id']})", "severity": "success"})
+        state["events"].insert(0, {
+            "time": _now_iso(),
+            "message": (f"Job {job['name']} relaunched (#{job['id']})" if will_succeed
+                        else f"Job {job['name']} relaunched (#{job['id']}) — playbook error: {job['failure_reason']}"),
+            "severity": "success" if will_succeed else "error",
+        })
         _activity(state, "Relaunched job", f"Job #{job['id']}")
         _save(session_id, entry)
-        # Cross-tech: a relaunched service-configuring template re-converges the box.
-        _bridge_ansible_result(session_id, job.get("name", ""), job.get("playbook", ""), payload)
-        return {"ok": True, "message": "Job relaunched", "job_id": job["id"]}
+        if will_succeed:
+            # Cross-tech: a relaunched service-configuring template re-converges the box.
+            _bridge_ansible_result(session_id, job.get("name", ""), job.get("playbook", ""), payload)
+        return {"ok": True, "message": "Job relaunched", "job_id": job["id"],
+                "will_fail": not will_succeed, "failure_reason": job["failure_reason"]}
 
     if action == "cancel_job":
         jid = int(payload.get("job_id") or 0)
@@ -978,11 +1413,44 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     return {"ok": False, "error": f"Unknown action: {action}"}
 
 
+# Per-key grader feedback. The broken dict stores bare targets (a job template
+# id) and often just True, so the value cannot be echoed the way azure_engine
+# echoes its human-readable reasons.
+_BROKEN_REASONS: dict[str, str] = {
+    "project_sync_failed": "the project has not synced successfully yet — fix the SCM settings and re-sync",
+    "failed_template_id": "job template {target} has not completed a successful run yet",
+    "canary_driver_stale": "the canary host is still on the stale driver — update it",
+    "awx_not_installed": "AWX has not been installed yet",
+    "missing_template": "the required job template has not been created yet",
+    "credential_missing": "the required credential has not been created yet",
+    "needs_maas_deploy": "the MAAS deployment job has not been run yet",
+}
+
+
+def _describe_broken(broken: dict) -> str:
+    """Name every outstanding objective, not just the first.
+
+    Several AWX presets seed two keys at once (a failed template plus a stale
+    canary driver, a sync failure plus a failed template), so reporting only
+    next(iter(...)) would hide half the work still remaining.
+    """
+    parts = []
+    for kind, target in broken.items():
+        template = _BROKEN_REASONS.get(kind)
+        if template is None:
+            # Unknown key: still fail CLOSED, and name the key so a missing
+            # template surfaces as a reportable gap rather than a silent pass.
+            parts.append(f"unresolved objective ({kind})")
+        else:
+            parts.append(template.format(target=target))
+    return "; ".join(parts)
+
+
 def validate_awx_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
     entry = _load(session_id)
     if not entry:
         return False, "No AWX session"
     broken = entry["state"].get("broken") or {}
     if broken:
-        return False, "AWX environment still has unresolved issues"
+        return False, f"AWX lab not complete: {_describe_broken(broken)}"
     return True, "AWX lab objectives met"

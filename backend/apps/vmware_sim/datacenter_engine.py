@@ -290,16 +290,58 @@ def _server(asset_id: str, rack: str, u_slot: int, hostname: str, **overrides) -
 
 # ── Power chain ────────────────────────────────────────────────────────────
 
-def _rack_pdus() -> list[dict]:
+# Steady-state draw per powered-on server, by role. Loosely tracks real 2U
+# hardware: a GPU node with 2x2200W PSUs pulls multiples of an app node.
+_ROLE_DRAW_KW = {
+    "esxi_host": 1.45,
+    "db": 1.7,
+    "gpu_node": 4.6,
+    "storage": 1.55,
+    "app": 1.3,
+    "cache": 1.1,
+    None: 1.2,
+}
+# A powered-off server still draws BMC/standby power — the PSU is live.
+_STANDBY_DRAW_KW = 0.35
+# ToR switch + rack fans + PDU conversion loss on any populated rack.
+_RACK_OVERHEAD_KW = 0.8
+# MDF racks hold switching gear that is not modelled as a server object.
+_MDF_GEAR_KW = 1.6
+# Breaker trips above this; 208V/30A single-phase derated to 80% ≈ 5.0 kW.
+RACK_BREAKER_KW = 5.8
+
+
+def rack_load_kw(rack_id: str, servers: list[dict]) -> float:
+    """Actual draw for one rack, summed from the servers physically in it.
+
+    Replaces a hardcoded 4.2 kW so that racking, powering off, or losing a
+    server visibly moves power, heat and PUE instead of decorating the panel.
+    """
+    rack_servers = [s for s in servers or [] if s.get("rack") == rack_id]
+    total = 0.0
+    for s in rack_servers:
+        if s.get("power_state") == "on":
+            total += _ROLE_DRAW_KW.get(s.get("role"), _ROLE_DRAW_KW[None])
+        else:
+            total += _STANDBY_DRAW_KW
+    if rack_servers:
+        total += _RACK_OVERHEAD_KW
+    elif rack_id in _MDF_RACKS:
+        total += _MDF_GEAR_KW
+    return round(total, 2)
+
+
+def _rack_pdus(servers: list[dict] | None = None) -> list[dict]:
     pdus = []
     for r in _RACKS:
+        load_kw = rack_load_kw(r, servers or [])
         pdus.append({
             "id": f"PDU-{r}",
             "rack": r,
             "status": "online",
             "breaker": "closed",
-            "load_pct": 45,
-            "load_kw": 4.2,
+            "load_pct": int(min(100, round(load_kw / RACK_BREAKER_KW * 100))),
+            "load_kw": load_kw,
         })
     return pdus
 
@@ -329,8 +371,31 @@ def _power_chain(rack_pdus: list[dict]) -> dict:
     }
 
 
+# Compressor work per kW of IT heat rejected (inverse of a ~1.8 CoP chiller).
+_COOLING_KW_PER_IT_KW = 0.55
+
+
+def _apply_cooling_load(it_kw: float, cooling: list[dict]) -> None:
+    """Split the IT heat across running CRACs so cooling draw follows load.
+
+    Previously each CRAC held a constant 9.0 kW, which made PUE a fixed number
+    no matter what the racks were doing. Load is shared evenly; a unit that is
+    over its capacity_kw is left at capacity so the overload stays visible.
+    """
+    running = [c for c in cooling or [] if c.get("status") == "running"]
+    for c in cooling or []:
+        if c.get("status") != "running":
+            c["load_kw"] = 0.0
+    if not running:
+        return
+    share = it_kw * _COOLING_KW_PER_IT_KW / len(running)
+    for c in running:
+        c["load_kw"] = round(min(share, float(c.get("capacity_kw") or share)), 2)
+
+
 def _facility_summary(rack_pdus: list[dict], cooling: list[dict]) -> dict:
     it_kw = round(sum(p["load_kw"] for p in rack_pdus if p.get("status") == "online"), 2)
+    _apply_cooling_load(it_kw, cooling)
     cooling_kw = round(sum(c["load_kw"] for c in cooling if c.get("status") == "running"), 2)
     overhead_kw = round(it_kw * 0.08, 2)
     total_kw = round(it_kw + cooling_kw + overhead_kw, 2)
@@ -349,6 +414,24 @@ def _facility_summary(rack_pdus: list[dict], cooling: list[dict]) -> dict:
 def _recompute_facility(state: dict) -> None:
     rack_pdus = state.get("power_chain", {}).get("rack_pdus", [])
     cooling = state.get("cooling", [])
+    servers = state.get("servers") or []
+    # Re-derive each PDU from live server state so powering a host off (or a
+    # GPU node dropping out) actually moves kW, heat and PUE. A PDU whose
+    # breaker is open or that is offline carries no load.
+    for p in rack_pdus:
+        if p.get("status") != "online" or p.get("breaker") == "open":
+            p["load_kw"] = 0.0
+            p["load_pct"] = 0
+            continue
+        load_kw = rack_load_kw(p.get("rack"), servers)
+        p["load_kw"] = load_kw
+        p["load_pct"] = int(min(100, round(load_kw / RACK_BREAKER_KW * 100)))
+    # Floor PDUs are the sum of the rack PDUs they feed.
+    for floor_pdu in state.get("power_chain", {}).get("floor_pdus", []) or []:
+        feeds = set(floor_pdu.get("feeds") or [])
+        floor_pdu["load_kw"] = round(
+            sum(p["load_kw"] for p in rack_pdus if p.get("rack") in feeds), 1
+        )
     state["facility"] = {
         **state.get("facility", {}),
         **_facility_summary(rack_pdus, cooling),
@@ -461,7 +544,7 @@ def _base_state() -> dict:
         _server("srv-r06-u08", "R06", 8, "edge-cache-01", role="cache", vendor="Gigabyte"),
     ]
     rooms = _rooms()
-    rack_pdus = _rack_pdus()
+    rack_pdus = _rack_pdus(servers)
     power_chain = _power_chain(rack_pdus)
     cooling = _cooling_units()
     network = _network()
@@ -936,6 +1019,8 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             srv["power_state"] = "on" if all(v == "healthy" for v in srv["components"].values()) else "off"
         srv["bmc"]["power"] = "on" if srv["power_state"] == "on" else "off"
         srv["bmc"].setdefault("sel", []).insert(0, {"time": _now_iso(), "message": f"Power {mode} issued via Redfish"})
+        # Rack draw is derived from powered-on servers, so power ops move kW.
+        _recompute_facility(state)
         _event(state, f"BMC {mode} issued for {srv['id']}", "info")
         _save(session_id, entry)
         _sync_identity(session_id, state)
@@ -949,6 +1034,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": f"Asset {asset_id} not found"}
         srv["power_state"] = "on" if all(v == "healthy" for v in srv["components"].values()) else "off"
         srv["bmc"]["power"] = "on" if srv["power_state"] == "on" else "off"
+        _recompute_facility(state)
         _event(state, f"Power cycled {srv['id']}", "info")
         _save(session_id, entry)
         _sync_identity(session_id, state)
@@ -2586,10 +2672,21 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             "biometrics": (ac.get("biometrics") or {}).get("status", "online"),
             "cameras": (ac.get("cameras") or {}).get("online", 24),
         }
+        # `broken` is a single-fault slot shared with hardware chaos injection,
+        # so a security event must not evict an in-flight hardware fault a lab
+        # is grading on. Only claim the slot when it is free, and restore what
+        # was there on clear.
         if op == "tailgate_alarm":
-            state["broken"] = {"server": None, "component": "security", "target": "gate"}
+            if not broken:
+                state["broken"] = {"server": None, "component": "security", "target": "gate"}
+            else:
+                ac.setdefault("events", []).insert(0, {
+                    "time": _now_iso(), "type": "warning",
+                    "message": "Tailgate alarm raised while a hardware fault is open",
+                })
         if op == "clear_alarms" and broken.get("component") == "security":
             broken.clear()
+            state["broken"] = {}
         _twin_journal(state, "access_ops", {"op": op})
         _event(state, f"Access: {msg}", "warning" if "alarm" in op or "deny" in msg.lower() or "Denied" in msg else "info")
         _save(session_id, entry)
@@ -2799,18 +2896,36 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 duration_min=payload.get("duration_min"),
                 sku=payload.get("sku"),
                 carrier=payload.get("carrier"),
+                eta_days=payload.get("eta_days"),
+                rack=payload.get("rack"),
+                # Live floor state so a window can be judged against real load
+                # rather than being a free-text note (audit L2267).
+                facility={
+                    **(state.get("facility") or {}),
+                    "rack_loads": {
+                        p.get("rack"): p.get("load_pct")
+                        for p in (state.get("power_chain") or {}).get("rack_pdus") or []
+                    },
+                },
             )
         except ValueError as exc:
             return {"ok": False, "error": str(exc)}
         # Close FRU loop: ship_rma enqueues a loading-dock ASN tied to ticket+asset.
         pending = ticket.pop("_pending_dock_asn", None)
         if pending:
-            from apps.vmware_sim.datacenter_facility_ops import ensure_campus_plant
+            from apps.vmware_sim.datacenter_facility_ops import (
+                TICKS_PER_TRANSIT_DAY,
+                ensure_campus_plant,
+                eta_summary,
+            )
             campus = ensure_campus_plant(state.get("campus") or {}, state.get("power_chain"))
             dock = campus.setdefault("loading_dock", {})
             queue = dock.setdefault("queue", [])
             asn_id = f"ASN-RMA-{pending.get('rma_number') or len(queue) + 1}"
-            queue.insert(0, {
+            # The RMA already carried eta_days but nothing enforced it; convert
+            # it to sim ticks so the part is genuinely unavailable until then.
+            eta_days = int((ticket.get("rma") or {}).get("eta_days") or 2)
+            asn = {
                 "id": asn_id,
                 "carrier": pending.get("carrier") or "FedEx",
                 "contents": pending.get("contents") or "FRU",
@@ -2819,9 +2934,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 "asset_id": pending.get("asset_id"),
                 "rma_number": pending.get("rma_number"),
                 "sku": pending.get("sku"),
-            })
+                "eta_days": eta_days,
+                "ticks_remaining": max(1, eta_days * TICKS_PER_TRANSIT_DAY),
+            }
+            queue.insert(0, asn)
             state["campus"] = campus
-            _event(state, f"Dock ASN {asn_id} queued for {pending.get('rma_number')}", "info")
+            _event(state, f"Dock ASN {asn_id} queued for {pending.get('rma_number')} · {eta_summary(asn)}", "info")
         _event(state, f"Ticket {ticket_id} → {ticket.get('status')}", "info")
         _save(session_id, entry)
         return {"ok": True, "message": f"Ticket {ticket_id} updated", "ticket": ticket}
@@ -2890,11 +3008,21 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 
     if action == "live_tick":
         # Live scrape without flooding the twin journal (not replayed).
-        from apps.vmware_sim.datacenter_facility_ops import tick_live
+        from apps.vmware_sim.datacenter_facility_ops import advance_shipments, tick_live
         from apps.vmware_sim.datacenter_physics_ops import build_monitoring_snapshot
         env = tick_live(state)
         state["environmental"] = env
         state["monitoring"] = build_monitoring_snapshot(state)
+        # Inbound RMA parts close distance on the sim clock, not wall-clock, so
+        # an idle session never conjures a part and a busy one still finishes.
+        arrived = advance_shipments(state.get("campus") or {})
+        for item in arrived:
+            _event(state, f"Dock: {item['id']} arrived at bay ({item.get('contents')})", "info")
+        # Propped doors and unescorted visitors escalate on the same clock.
+        from apps.vmware_sim.datacenter_facility_ops import advance_physical_security
+        violations = advance_physical_security(state)
+        for viol in violations:
+            _event(state, f"Security: {viol['message']}", "danger")
         from apps.vmware_sim.datacenter_facility_ops import build_capacity_snapshot
         state["capacity"] = build_capacity_snapshot(state)
         _save(session_id, entry)
@@ -2904,6 +3032,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             "environmental": env,
             "monitoring": state["monitoring"],
             "capacity": state["capacity"],
+            "shipments_arrived": [i["id"] for i in arrived],
         }
 
     if action == "hypervisor_ops":
@@ -3010,6 +3139,77 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     return {"ok": False, "error": f"Unknown action: {action}"}
 
 
+# Per-component grader feedback. Unlike the other console engines, this one's
+# broken dict is a single fault RECORD -- {"server": ..., "component": ...,
+# "target": ..., "cable_id": ...} -- not a bag of independent objective keys.
+# So the reason is keyed on the component, and the target is resolved from
+# whichever of server/cable_id/target the injector filled in.
+_BROKEN_REASONS: dict[str, str] = {
+    # Field-replaceable server hardware.
+    "power": "the power supply in {target} is still failed — replace the PSU",
+    "nic": "the NIC in {target} is still failed — replace it",
+    "disk": "the disk in {target} is still failed — replace it",
+    "motherboard": "the motherboard in {target} is still failed — replace it",
+    "cpu": "the CPU in {target} is still failed — replace it",
+    "gpu": "the GPU in {target} is still failed — replace it",
+    "fan": "the fan in {target} is still failed — replace it",
+    "dimm": "the DIMM in {target} is still failed — replace it",
+    "pcie": "the PCIe/NVLink device in {target} is still failed — replace it",
+    "raid": "the RAID controller in {target} is still failed — replace it",
+    "hba": "the HBA in {target} is still failed — replace it",
+    # Server-scoped, but fixed by something other than a part swap.
+    "firmware": "the firmware on {target} is still corrupt — reflash it",
+    "cable": "cable {target} is still faulted — reseat or replace it",
+    "pxe": "PXE boot for {target} is still broken — re-enable PXE and DHCP",
+    # Facility.
+    "cooling": "cooling unit {target} is still failed — restore cooling",
+    "pdu": "PDU {target} is still failed — restore the power feed",
+    "ups": "UPS {target} is still on fault — restore utility power",
+    "leak": "the water leak at {target} has not been contained yet",
+    "fire": "the fire/smoke alarm in zone {target} has not been cleared yet",
+    "security": "the security breach at {target} has not been resolved yet",
+    # Network fabric.
+    "switch": "switch {target} is still down — bring it back up",
+    "bgp": "BGP on {target} has not been restored yet",
+    "ospf": "OSPF on {target} has not been restored yet",
+    "mpls": "MPLS on {target} has not been re-enabled yet",
+    "evpn": "EVPN on {target} has not been re-enabled yet",
+    "vxlan": "the VXLAN overlay on {target} has not been restored yet",
+    "vlan": "the VLAN misconfiguration on {target} has not been corrected yet",
+    "dns": "DNS resolution for {target} has not been restored yet",
+    "dhcp": "DHCP for {target} has not been restored yet",
+    # Site-level.
+    "dr": "the DR failover for {target} has not completed yet",
+}
+
+
+def _broken_target(broken: dict) -> str:
+    """Best available name for the faulted asset.
+
+    Server faults carry "server"; facility/network faults set server to None
+    and carry "target" instead; cable faults carry both plus "cable_id".
+    """
+    server = broken.get("server")
+    cable_id = broken.get("cable_id")
+    if cable_id and server:
+        return f"{cable_id} on {server}"
+    return str(cable_id or server or broken.get("target") or "this environment")
+
+
+def _describe_broken(broken: dict) -> str:
+    component = broken.get("component")
+    if not component:
+        # A fault record with no component at all: fail CLOSED and name the
+        # keys present so the gap is reportable rather than silently generic.
+        return f"unresolved objective ({', '.join(sorted(broken))})"
+    template = _BROKEN_REASONS.get(component)
+    if template is None:
+        # Unknown component: still fail CLOSED, and name it so a missing
+        # template surfaces as a reportable gap rather than a silent pass.
+        return f"unresolved objective ({component})"
+    return template.format(target=_broken_target(broken))
+
+
 def validate_datacenter_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
     entry = _load(session_id)
     if not entry:
@@ -3017,5 +3217,5 @@ def validate_datacenter_lab(session_id: str, scenario_slug: str = "") -> tuple[b
     state = entry["state"]
     broken = state.get("broken") or {}
     if broken:
-        return False, "Datacenter environment still has unresolved issues"
+        return False, f"Datacenter lab not complete: {_describe_broken(broken)}"
     return True, "Datacenter lab objectives met"

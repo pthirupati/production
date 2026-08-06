@@ -17,6 +17,7 @@ import { fadeUp, staggerContainer, viewportOnce } from '../ui/motion'
 import { useAuthStore } from '../store/authStore'
 import { usePageTitle } from '../hooks/usePageTitle'
 import LimitReachedModal from '../components/LimitReachedModal'
+import SmallScreenLabGate, { useSmallScreenLabGate } from '../components/SmallScreenLabGate'
 
 const difficultyConfig = {
   easy:   { label: 'Easy',   color: '#56e0b0', bg: 'rgba(86,224,176,.12)' },
@@ -252,6 +253,7 @@ export default function TechnologyDetail() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
   const [techDetail, setTechDetail] = useState(null)
+  const labGate = useSmallScreenLabGate()
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('scenarios')
   const [techTutorials, setTechTutorials] = useState([])
@@ -305,6 +307,12 @@ export default function TechnologyDetail() {
   }, [slug])
 
   const handleStartProject = async (project) => {
+    // Audit Z6-9: the other path that provisions a lab and spends a daily slot.
+    if (!labGate.guard(() => { void startProjectNow(project) })) return
+    await startProjectNow(project)
+  }
+
+  const startProjectNow = async (project) => {
     try {
       const { default: apiClient } = await import('../api/client')
       const { data: started } = await apiClient.post(`/projects/${project.id}/start/`)
@@ -464,6 +472,11 @@ export default function TechnologyDetail() {
       initial="hidden"
       animate="visible"
     >
+      <SmallScreenLabGate
+        open={labGate.gateOpen}
+        onCancel={labGate.dismiss}
+        onProceed={labGate.proceed}
+      />
       <LimitReachedModal info={limitInfo} onClose={() => setLimitInfo(null)} />
       {/* Page header row */}
       <div className="flex items-center justify-between gap-4 flex-wrap">

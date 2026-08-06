@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import {
   Cloud, Server, Activity, Gauge, Monitor, Users, Radar, Waves, Bot, BarChart3, Cpu, Terminal,
+  ArrowRight,
 } from 'lucide-react'
 import { PageHeader } from '../components/design'
 
@@ -24,9 +25,12 @@ const SIMULATORS = [
 export default function SimulatorLauncher() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
+      {/* This page is a catalog, not a launcher: every card below routes to /technologies/:slug,
+          which is where scenario selection and entitlement checks happen. Launching a session
+          straight from this grid would bypass both, so the copy promises browsing, not a console. */}
       <PageHeader
         title="Enterprise Lab Consoles"
-        subtitle="Interactive production-style consoles — launch a lab from each technology to work hands-on."
+        subtitle="Browse the production-style consoles FixitLab simulates. Pick a technology to see its scenarios, then start one to open the console in a lab session."
       />
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
         {SIMULATORS.map((sim) => {
@@ -41,6 +45,10 @@ export default function SimulatorLauncher() {
                 <div className="min-w-0">
                   <h3 className="font-semibold text-white group-hover:text-accent-cyan transition-colors">{sim.name}</h3>
                   <p className="text-xs text-surface-400 mt-1 leading-relaxed">{sim.desc}</p>
+                  <span className="text-[11px] font-medium text-surface-500 group-hover:text-accent-cyan transition-colors mt-2 inline-flex items-center gap-1">
+                    Browse {sim.name} scenarios
+                    <ArrowRight size={11} />
+                  </span>
                 </div>
               </div>
             </Link>
@@ -48,7 +56,7 @@ export default function SimulatorLauncher() {
         })}
       </div>
       <p className="text-xs text-surface-500 mt-8 text-center">
-        Lab consoles open inside sessions with Hints, Check, +30m, and Stop controls. VMware vCenter is available from VM-backed labs (Linux, Windows, monitoring, AWX, Terraform, and cross-tech scenarios).
+        There are no consoles on this page — each console opens only inside a lab session, with Hints, Check, +30m, and Stop controls. Start a scenario from any technology above to open one. VMware vCenter is available from VM-backed labs (Linux, Windows, monitoring, AWX, Terraform, and cross-tech scenarios).
       </p>
     </div>
   )

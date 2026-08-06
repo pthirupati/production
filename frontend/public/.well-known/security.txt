@@ -1,0 +1,13 @@
+# FixitLab security contact — RFC 9116
+# https://www.rfc-editor.org/rfc/rfc9116
+#
+# If you have found a vulnerability, please report it privately using the contact
+# below and give us a chance to fix it before disclosing publicly. We will not
+# pursue legal action against researchers who follow this policy in good faith.
+
+Contact: mailto:security@fixitlab.in
+Contact: https://github.com/pthirupati/production/security/advisories/new
+Expires: 2027-08-07T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://fixitlab.in/.well-known/security.txt
+Policy: https://github.com/pthirupati/production/blob/main/SECURITY.md

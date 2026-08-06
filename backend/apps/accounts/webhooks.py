@@ -36,7 +36,21 @@ def _post_org_webhook(org, event: str, payload: dict) -> bool:
         headers["X-FixitLab-Signature"] = _sign_payload(org.webhook_secret, body)
 
     try:
-        resp = requests.post(org.webhook_url, data=body, headers=headers, timeout=5)
+        # allow_redirects=False is load-bearing, not a preference. validate_outbound_url()
+        # only vets the URL we are about to request; requests follows redirects by default,
+        # so an org owner could point the webhook at a public host they control and have it
+        # answer 302 → http://169.254.169.254/. requests would follow that to instance
+        # metadata and the entire SSRF guard would be bypassed without ever storing an
+        # unsafe URL. A webhook receiver has no legitimate need to redirect us.
+        resp = requests.post(
+            org.webhook_url, data=body, headers=headers, timeout=5, allow_redirects=False
+        )
+        if resp.is_redirect or resp.is_permanent_redirect:
+            logger.warning(
+                "Org webhook %s → %s returned redirect %s; refusing to follow",
+                org.slug, event, resp.status_code,
+            )
+            return False
         if not resp.ok:
             logger.warning("Org webhook %s → %s returned %s", org.slug, event, resp.status_code)
         return resp.ok

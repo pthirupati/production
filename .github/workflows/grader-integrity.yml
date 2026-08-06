@@ -10,6 +10,21 @@
 # optional allowlist), else 0. FAIL-OPEN is currently 0, so any PR that
 # re-introduces a fail-open grader turns this job red.
 #
+# The same --check run enforces three further rules, because "fail-closed" is a
+# weaker guarantee than it sounds — a grader can fail-close perfectly while
+# grading something that has nothing to do with the lab:
+#
+#   * decorative coding graders — tests any trivial stub satisfies (ceiling 0).
+#   * topic coherence — a scenario whose `technology` shares no vocabulary with
+#     its `tasks[].validation.command` (e.g. 100 grafana labs graded by
+#     `systemctl is-active rsyslog`). Ratcheted at a recorded ceiling of 617.
+#   * checker uniqueness — N scenarios in one technology behind a byte-identical
+#     check.sh (aws: 420). Ratcheted per technology against a recorded baseline.
+#
+# The last two are ratchets, not zero-tolerance gates: each has hundreds of
+# pre-existing violations, so they fail only on GROWTH. Lower the ceilings as
+# families are repaired; never raise them.
+#
 # This is a lightweight, read-only CODE-QUALITY check for PRs. It provisions no
 # droplets, needs no secrets, and is completely separate from the production
 # deploy (production.yml) — it neither triggers nor gates a deploy.
@@ -35,6 +50,10 @@ jobs:
   grader-integrity:
     name: Grader integrity (no fail-open labs)
     runs-on: ubuntu-latest
+    # The scan builds a simulation engine per scenario across ~7.3k scenarios, so it
+    # is minutes, not seconds. It had no timeout at all, which means a hang would sit
+    # on GitHub's 6-hour default; 30 gives generous headroom over the observed run.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

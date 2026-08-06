@@ -248,17 +248,23 @@ def subscription_status_payload(sub) -> dict:
     in_grace = is_tech_subscription_in_grace(sub)
     days_left = None
     needs_renewal = False
+    # A cancelled subscription keeps access to the end of its paid term
+    # (audit Z1-11), so it is still `active` — but prompting the customer to renew
+    # something they just cancelled would be the wrong message.
+    cancelled = bool(getattr(sub, "cancelled_at", None))
     if sub.expires_at:
         delta = (sub.expires_at - now).days
         days_left = max(0, delta)
-        needs_renewal = active and delta <= RENEWAL_WARNING_DAYS
+        needs_renewal = active and not cancelled and delta <= RENEWAL_WARNING_DAYS
     return {
         "is_active": active,
         "in_grace_period": in_grace,
         "has_access": active or in_grace,
+        "cancelled": cancelled,
+        "cancelled_at": sub.cancelled_at.isoformat() if cancelled else None,
         "created_at": sub.created_at.isoformat() if sub.created_at else None,
         "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
         "days_until_expiry": days_left,
-        "needs_renewal": needs_renewal or in_grace,
+        "needs_renewal": (needs_renewal or in_grace) and not cancelled,
         "is_expired": bool(sub.expires_at and sub.expires_at <= now and not in_grace),
     }

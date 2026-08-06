@@ -410,6 +410,17 @@ PACKAGE_SERVICES.update({
 
 
 @dataclass
+class SimGPU:
+    """One physical GPU as seen by nvidia-smi (audit §A1 / top-10 #6)."""
+    index: int = 0
+    name: str = "NVIDIA L4"
+    uuid: str = "GPU-00000000-0000-0000-0000-000000000001"
+    healthy: bool = True
+    memory_total_mib: int = 23034
+    memory_used_mib: int = 0
+
+
+@dataclass
 class SimBlockDevice:
     """A whole disk, partition, or LV as seen by lsblk/blkid/mkfs/mount."""
     name: str                       # /dev/sdb, /dev/sdb1, /dev/mapper/rhel-data
@@ -470,7 +481,9 @@ class RHELOSState:
             "rhel-9-for-x86_64-baseos-rpms",
             "rhel-9-for-x86_64-appstream-rpms",
         }
-        self.gpu_healthy: bool = True
+        # Per-GPU inventory. ``gpu_healthy`` remains a convenience aggregate so
+        # existing presets/validators keep working (audit §A1).
+        self.gpus: list[SimGPU] = [SimGPU(index=0)]
         self.initramfs_fixed: bool = False
         self.grub_fixed: bool = False
         self.mbr_fixed: bool = False
@@ -560,6 +573,20 @@ class RHELOSState:
         self.pending_confirm = None
         self._init_base_system()
         self._init_block_devices()
+
+    @property
+    def gpu_healthy(self) -> bool:
+        gpus = getattr(self, "gpus", None) or []
+        return all(g.healthy for g in gpus) if gpus else True
+
+    @gpu_healthy.setter
+    def gpu_healthy(self, value: bool) -> None:
+        flag = bool(value)
+        if not getattr(self, "gpus", None):
+            self.gpus = [SimGPU(index=0, healthy=flag)]
+            return
+        for g in self.gpus:
+            g.healthy = flag
 
     def _init_base_system(self) -> None:
         self.users["root"] = SimUser("root", 0, 0, "/root", "/bin/bash", "root")

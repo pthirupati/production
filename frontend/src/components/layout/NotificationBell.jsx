@@ -20,7 +20,10 @@ export default function NotificationBell({ variant = 'default' }) {
   const panelRef = useRef(null)
   const [pos, setPos] = useState({ top: 0, left: 0 })
 
-  // Poll every 60s
+  // Poll every 60s. `fetchNotifications` is a zustand action, so its identity is
+  // fixed at store creation and never changes across renders — listing it cannot
+  // recreate the interval or the listener, it just lets exhaustive-deps verify
+  // the effect instead of trusting a bare `[]`.
   useEffect(() => {
     fetchNotifications()
     const onVis = () => { if (document.visibilityState === 'visible') fetchNotifications() }
@@ -30,7 +33,7 @@ export default function NotificationBell({ variant = 'default' }) {
       clearInterval(interval)
       document.removeEventListener('visibilitychange', onVis)
     }
-  }, [])
+  }, [fetchNotifications])
 
   // Position the panel relative to the bell using a portal.
   // Right-aligned to the bell and clamped inside the viewport on both axes so

@@ -160,7 +160,6 @@ class BillingWebhookTests(TestCase):
 
         # Patch stripe.Webhook.construct_event to return our event object and patch PaymentTransaction.objects
         import stripe
-        from unittest.mock import patch
 
         mock_mgr2 = MagicMock()
         mock_mgr2.filter.return_value = mock_filter2

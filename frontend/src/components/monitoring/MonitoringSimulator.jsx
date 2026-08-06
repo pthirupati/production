@@ -18,10 +18,10 @@ import PrometheusTopNav from './PrometheusTopNav'
 import {
   PROMETHEUS_ALERT_GROUPS, PROMETHEUS_CONFIG_YAML, PROMETHEUS_SERVICE_DISCOVERY,
   PROM_TSDB_TOP_METRICS, PROM_TSDB_TOP_LABELS, PROMETHEUS_FLAGS,
-} from '../../mockData/prometheus'
+} from '../../simFixtures/prometheus'
 import {
   GRAFANA_FOLDERS, GRAFANA_DASHBOARD_BROWSE, GRAFANA_PLAYLISTS, GRAFANA_SNAPSHOTS, GRAFANA_LIBRARY_PANELS,
-} from '../../mockData/grafana'
+} from '../../simFixtures/grafana'
 import '../../styles/monitoring-sim.css'
 import { simShellClass } from '../../utils/simLayout'
 

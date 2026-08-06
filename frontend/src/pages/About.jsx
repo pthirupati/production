@@ -11,6 +11,7 @@ import {
   Ticket, Bot, MessageSquare, Trophy, Sparkles, Layers,
   GitBranch, Bookmark, BarChart3, Lock, Monitor, Brain, GraduationCap
 } from 'lucide-react'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 const team = [
   {
@@ -200,12 +201,22 @@ const colorMap = {
 }
 
 export default function About() {
-  const [stats, setStats] = useState({ total_scenarios: 360, total_technologies: 18, total_users: 10000, total_completions: 50000 })
+  usePageTitle('About', 'Why FixitLab exists: practice on real broken systems instead of watching videos.')
+  // Audit W5: this used to seed hardcoded marketing numbers (360 scenarios,
+  // 10k users). Those were both invented and stale — the live corpus is an
+  // order of magnitude larger — so a failed /stats/ call silently published
+  // wrong figures instead of admitting it could not load. Start empty and
+  // track the request state so the stat bar can say "—" rather than lie.
+  const [stats, setStats] = useState({})
+  const [statsState, setStatsState] = useState('loading') // loading | ready | error
 
   useEffect(() => {
     api.get('/stats/', { silentError: true })
-      .then(res => setStats(prev => ({ ...prev, ...res.data })))
-      .catch(() => {})
+      .then(res => {
+        setStats(prev => ({ ...prev, ...res.data }))
+        setStatsState('ready')
+      })
+      .catch(() => setStatsState('error'))
   }, [])
 
   // Values, milestones, and team cards use `.reveal` (opacity:0 until
@@ -213,6 +224,9 @@ export default function About() {
   useRevealOnScroll()
 
   const fmtNum = (n) => {
+    // No live value (still loading, or /stats/ failed) → an em dash. Rendering
+    // "0+" would be a worse lie than showing nothing on a public page.
+    if (n === null || n === undefined || Number.isNaN(Number(n))) return '—'
     const v = Number(n) || 0
     if (v >= 10000) return `${Math.floor(v / 1000)}k+`
     if (v >= 1000) return `${(v / 1000).toFixed(1).replace(/\.0$/, '')}k+`
@@ -275,6 +289,14 @@ export default function About() {
               </div>
             ))}
           </div>
+          {/* Quiet, non-blocking. A loud banner on an anonymous marketing page
+              costs conversions, but the visitor still deserves to know the
+              dashes are a failure rather than a real zero. */}
+          {statsState === 'error' && (
+            <p data-testid="about-stats-error" className="text-xs text-surface-500 text-center mt-6">
+              Live platform numbers are unavailable right now.
+            </p>
+          )}
         </div>
       </section>
 

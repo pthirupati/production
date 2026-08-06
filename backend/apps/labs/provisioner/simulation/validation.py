@@ -548,7 +548,21 @@ def _run_line_check(
                     failures.append(f"{marker_path} not corrected — apply the documented fix")
                     return True
         # Fail-closed: a scenario only passes when the fix genuinely marked the
-        # GPU healthy. An uninitialised flag must NOT count as resolved.
+        # GPU healthy.
+        #
+        # The `getattr(..., False)` default below used to BE that guard, back when
+        # gpu_healthy was a plain attribute that could be absent. It is now a
+        # PROPERTY over the per-GPU inventory (RHELOSState.gpu_healthy) that always
+        # returns a bool — and returns True for the default inventory — so the
+        # default can never fire and the guard had quietly become dead code.
+        # Restore it explicitly: with no scenario slug there is no marker file and no
+        # preset, so nothing can establish that a fix happened, and a default-healthy
+        # GPU must not be mistaken for a resolved lab. Real labs always carry a slug
+        # (verified across the 359 nvidia-smi scenarios), so this only closes the
+        # no-context hole.
+        if not slug:
+            failures.append("no scenario context — cannot verify the GPU fix")
+            return True
         if not getattr(state, "gpu_healthy", False):
             failures.append("GPU still unhealthy — load the nvidia driver first")
             return True

@@ -27,6 +27,45 @@ Your Jira Cloud    Your Razorpay account
 
 **No staging environment** — only `production` GitHub environment and `main` branch deploys.
 
+### How merges to main are validated (decision, 2026-08-10)
+
+Audit item L1621 flagged that nothing validated a merge to `main` before
+`production.yml` deployed it. Standing up a staging host was considered and
+**rejected**: a second droplet, domain, TLS cert, Vault and database would have
+to be paid for and kept patched to run a ten-minute smoke test.
+
+Instead, `.github/workflows/e2e-smoke.yml` has a `merge-gate` job that builds
+the whole stack **inside the GitHub runner** on every push to `main` — Postgres
+and Redis service containers, `manage.py migrate`, a seeded subset of the
+scenario catalog, `runserver`, the real `vite build` output, and nginx
+(`.github/ci/nginx-ephemeral.conf`) fronting both on one origin. The smoke specs
+then run against `http://localhost:8080`.
+
+The point of doing it this way is that it **has no external dependency, so it
+cannot silently stop working**. The first attempt at closing L1621 pointed merge
+runs at `STAGING_BASE_URL` / `STAGING_SITE_URL` and skipped when they were
+unset — and since no staging environment exists, every merge run no-oped. The
+gap was closed on paper only. Anything gated on infrastructure that does not
+exist will do the same.
+
+**What the merge gate does NOT cover** (still first exercised in production):
+- Lab provisioning — `E2E_SKIP_LAB=1`; the runner has no lab host.
+- The real deploy path — compose files, migrations against production data,
+  container restart ordering.
+- nginx rate limiting, TLS/HSTS, and the ACME path — the CI gateway drops
+  `limit_req` (parallel Playwright workers would trip the 20r/m login limit) and
+  serves plain HTTP.
+- Vault — the job runs under `config.test_settings`, which supplies a dummy
+  `SECRET_KEY` instead of unsealing Vault.
+- Anything that depends on production data volume or real third-party
+  credentials (Razorpay, Jira, SMTP).
+
+Post-deploy verification against the live site therefore still matters; the
+merge gate narrows what reaches it, it does not replace it.
+
+`STAGING_SUPERUSER_EMAIL` and `STAGING_SUPERUSER_PASSWORD` still exist as repo
+secrets and now point at nothing. They can be deleted.
+
 ---
 
 ## Step 1 — Server (DigitalOcean or any VPS)

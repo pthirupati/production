@@ -9,8 +9,20 @@ Provides:
 
 from __future__ import annotations
 
+import hashlib
 import random
 import re
+
+
+def _seeded_rng(*parts) -> random.Random:
+    """Deterministic RNG from conversation / answer material (audit §Y1g).
+
+    Comment sites previously claimed seeding then called ``random.Random()``
+    with no seed — nondeterministic and untestable across processes.
+    """
+    blob = "|".join("" if p is None else str(p) for p in parts)
+    digest = hashlib.blake2b(blob.encode("utf-8", errors="replace"), digest_size=8).digest()
+    return random.Random(int.from_bytes(digest, "big"))
 
 
 # ---------------------------------------------------------------------------
@@ -888,7 +900,12 @@ def generate_interviewer_reply(
     used = _prior_interviewer_lines(conversation_tail)
     last_line = _last_interviewer_line(conversation_tail)
     # Seed RNG off what's been said so picks vary turn-to-turn but stay free.
-    rng = random.Random()
+    rng = _seeded_rng(
+        candidate_answer,
+        "".join((m.get("content") or "")[:40] for m in (conversation_tail or [])),
+        quality,
+        correctness,
+    )
     phrase = _extract_quote_phrase(candidate_answer) if quality not in ("skipped",) else None
 
     def verdict_reaction() -> str:
@@ -1120,7 +1137,7 @@ def generate_round_closing(
     pool = _CLOSING_PASSED if passed else _CLOSING_Mixed
     if round_type == "hr":
         pool = _CLOSING_HR
-    rng = random.Random()
+    rng = _seeded_rng(round_type, passed, tone, name, mem.get("strong_streak", 0))
     line = rng.choice(pool)
     if tone == "nervous" and passed:
         line = f"{line} You settled in well as we went — trust that pace."
@@ -1149,7 +1166,12 @@ def generate_clarify_probe(
     through "the cache TTL" concretely') so the re-prompt reads like a real
     interviewer pressing for specifics rather than a canned retry."""
     used = _prior_interviewer_lines(conversation_tail or [])
-    rng = random.Random()
+    rng = _seeded_rng(
+        candidate_answer,
+        question_text,
+        "".join((m.get("content") or "")[:40] for m in (conversation_tail or [])),
+        correctness,
+    )
     phrase = _extract_quote_phrase(candidate_answer)
     partial = correctness == "partial"
     if phrase:
@@ -1179,7 +1201,12 @@ def generate_transition_bridge(
 ) -> str:
     """Short spoken bridge before the next question — keeps pacing human."""
     used = _prior_interviewer_lines(conversation_tail or [])
-    rng = random.Random()
+    rng = _seeded_rng(
+        round_type,
+        quality,
+        correctness,
+        "".join((m.get("content") or "")[:40] for m in (conversation_tail or [])),
+    )
     if quality == "skipped":
         pool = _TRANSITION_SKIPPED
     elif correctness == "correct":
@@ -1228,7 +1255,11 @@ def generate_force_advance_reply(
     conversation_tail: list[dict] | None = None,
 ) -> str:
     used = _prior_interviewer_lines(conversation_tail or [])
-    rng = random.Random()
+    rng = _seeded_rng(
+        had_partial_answer,
+        has_next_question,
+        "".join((m.get("content") or "")[:40] for m in (conversation_tail or [])),
+    )
     if not has_next_question:
         return _pick_unused(_FORCE_ADVANCE_END, used, rng) or _FORCE_ADVANCE_END[0]
     if had_partial_answer:
@@ -1243,7 +1274,11 @@ def generate_unclear_audio_reply(
     conversation_tail: list[dict] | None = None,
 ) -> str:
     used = _prior_interviewer_lines(conversation_tail or [])
-    rng = random.Random()
+    rng = _seeded_rng(
+        question_text,
+        partial_transcript,
+        "".join((m.get("content") or "")[:40] for m in (conversation_tail or [])),
+    )
     q = (question_text or "").strip()
     words = len((partial_transcript or "").split())
     if words >= 3:

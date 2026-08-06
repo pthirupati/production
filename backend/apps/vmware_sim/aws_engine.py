@@ -1550,10 +1550,10 @@ def validate_aws_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, st
         ok, reason = _grade_script(state, vscript)
         return ok, reason
 
-    # Fail-closed fallthrough: an unmapped AWS lab requires learner activity.
-    if not state.get("events"):
-        return False, "NO_VALIDATION_SCRIPT"
-    return True, "AWS lab objectives met"
+    # Fail-closed fallthrough: an unmapped AWS lab must not auto-pass on a
+    # non-empty event log (that awarded XP for any console click). Explicit
+    # broken markers or validation_script are required.
+    return False, "NO_VALIDATION_SCRIPT"
 
 
 def _grade_script(state: dict, vscript: Any) -> tuple[bool, str]:

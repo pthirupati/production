@@ -24,6 +24,8 @@ import {
   Star, Award, ChevronRight, ArrowRight, Zap, Shield
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { resolveChargeAmountPaise, isOrderUsable, hasDisplayableGst } from '../utils/checkoutAmount'
+import { SUPPORT_EMAIL } from '../constants/contact'
 
 /* ──────── PAYMENT METHODS ──────── */
 const paymentMethods = [
@@ -108,6 +110,65 @@ function FloatingParticles() {
   )
 }
 
+/* ──────── RAZORPAY SDK LOADER ──────── */
+/**
+ * Loads the Razorpay checkout SDK exactly once per document and reports the
+ * outcome through the two setters.
+ *
+ * Exported only so the unmount behaviour can be tested directly — rendering the
+ * whole PaymentPage in jsdom drags in the auth/theme stores and four API
+ * modules, which makes a leak test measure everything except the leak.
+ *
+ * Two things here are deliberate and easy to get wrong:
+ *
+ * 1. The listeners are named, not inline arrows. `removeEventListener` compares
+ *    by identity, so re-creating `() => setRazorpayReady(true)` in the cleanup
+ *    would detach nothing while looking correct.
+ * 2. Cleanup only stops *pending* callbacks via `cancelled`; it never resets
+ *    readiness. Setting `razorpayReady` back to false on unmount would disable
+ *    the checkout button on remount (StrictMode double-invokes effects), which
+ *    turns a harmless leak into a broken payment flow.
+ */
+export function useRazorpaySdk(setRazorpayReady, setRazorpayFailed) {
+  useEffect(() => {
+    if (window.Razorpay) { setRazorpayReady(true); return }
+
+    let cancelled = false
+    const handleLoad = () => { if (!cancelled) setRazorpayReady(true) }
+    const handleError = () => {
+      if (cancelled) return
+      console.error('Razorpay SDK failed to load')
+      setRazorpayFailed(true)
+    }
+
+    const existing = document.getElementById('razorpay-sdk')
+    if (existing) {
+      existing.addEventListener('load', handleLoad)
+      existing.addEventListener('error', handleError)
+      return () => {
+        cancelled = true
+        existing.removeEventListener('load', handleLoad)
+        existing.removeEventListener('error', handleError)
+      }
+    }
+
+    // The tag is left in the document on unmount so a remount reuses the
+    // in-flight download instead of re-requesting the SDK.
+    const script = document.createElement('script')
+    script.id = 'razorpay-sdk'
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.async = true
+    script.addEventListener('load', handleLoad)
+    script.addEventListener('error', handleError)
+    document.body.appendChild(script)
+    return () => {
+      cancelled = true
+      script.removeEventListener('load', handleLoad)
+      script.removeEventListener('error', handleError)
+    }
+  }, [setRazorpayReady, setRazorpayFailed])
+}
+
 /* ──────── MAIN COMPONENT ──────── */
 export default function PaymentPage() {
   const { user } = useAuthStore()
@@ -159,6 +220,16 @@ export default function PaymentPage() {
   const [appliedCoupon, setAppliedCoupon] = useState(null)
   const [couponLoading, setCouponLoading] = useState(false)
   const [hoveredMethod, setHoveredMethod] = useState(null)
+  // Server-computed GST breakup, populated from the create-order response. Null
+  // until an order exists, because until then we genuinely do not know the tax
+  // (audit Z1-14 — this line used to print a hardcoded "GST (included) ₹0").
+  const [gstBreakup, setGstBreakup] = useState(null)
+  // Double-submit guard (audit Z1-14). `step` was doing this job, but it is set
+  // back to 'summary' before Razorpay's modal opens, so a second click in that
+  // window created a second order — two Razorpay orders and two pending
+  // PaymentTransaction rows for one purchase. A ref, not state: two clicks in the
+  // same tick would both read a stale `false` from state.
+  const checkoutInFlight = useRef(false)
   const cardRef = useRef(null)
 
   // Display amounts (coupon may override URL amount)
@@ -208,25 +279,7 @@ export default function PaymentPage() {
     api.get('/config/').then(res => setPlatformConfig(res.data)).catch(() => {})
   }, [])
 
-  useEffect(() => {
-    if (window.Razorpay) { setRazorpayReady(true); return }
-    if (document.getElementById('razorpay-sdk')) {
-      const existing = document.getElementById('razorpay-sdk')
-      existing.addEventListener('load', () => setRazorpayReady(true))
-      existing.addEventListener('error', () => setRazorpayFailed(true))
-      return
-    }
-    const script = document.createElement('script')
-    script.id = 'razorpay-sdk'
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
-    script.async = true
-    script.onload = () => setRazorpayReady(true)
-    script.onerror = () => {
-      console.error('Razorpay SDK failed to load')
-      setRazorpayFailed(true)
-    }
-    document.body.appendChild(script)
-  }, [])
+  useRazorpaySdk(setRazorpayReady, setRazorpayFailed)
 
   // Renewal deep link: /payment?technology=linux&renew=1
   useEffect(() => {
@@ -350,7 +403,22 @@ export default function PaymentPage() {
     }
   }, [step])
 
+  // Wrapper holds the double-submit guard so every exit path releases it,
+  // including the several early `return`s below. Releasing after `rzp.open()` is
+  // deliberate and sufficient: the window being guarded is order creation, and
+  // once the Razorpay modal is up it owns the screen. If the user dismisses it,
+  // the page is interactive again and a retry should be allowed.
   const openRazorpayCheckout = async () => {
+    if (checkoutInFlight.current) return
+    checkoutInFlight.current = true
+    try {
+      await runRazorpayCheckout()
+    } finally {
+      checkoutInFlight.current = false
+    }
+  }
+
+  const runRazorpayCheckout = async () => {
     setError('')
 
     // Validate payment method inputs
@@ -393,7 +461,7 @@ export default function PaymentPage() {
                 couponToUse,
               )
 
-        if (!orderData.order_id && !orderData.demo_mode) {
+        if (!isOrderUsable(orderData)) {
           setError(orderData.error || 'Payment gateway is unavailable.')
           setStep('gateway_down')
           return
@@ -401,7 +469,15 @@ export default function PaymentPage() {
 
         orderId = orderData.order_id
         razorpayKey = orderData.razorpay_key_id
-        amountPaise = orderData.amount_paise || (appliedCoupon ? finalAmountINR * 100 : amountPaise)
+        // The server's figure always wins — the page amount comes from an editable
+        // URL parameter (audit Z6-12, tested in utils/checkoutAmount.test.js).
+        amountPaise = resolveChargeAmountPaise({
+          serverAmountPaise: orderData.amount_paise,
+          couponApplied: Boolean(appliedCoupon),
+          discountedTotalInr: finalAmountINR,
+          baseAmountInr: amountNum,
+        })
+        if (orderData.gst) setGstBreakup(orderData.gst)
       }
 
       if (!orderId) {
@@ -890,10 +966,41 @@ export default function PaymentPage() {
                       <span>${displayAmountUSD}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-surface-500">
-                    <span>GST (included)</span>
-                    <span>{'\u20B9'}0</span>
-                  </div>
+                  {/* Audit Z1-14: this was a hardcoded "GST (included) ₹0", which
+                      would have been a false statement on the invoice the moment GST
+                      was switched on. The figures come from the create-order response,
+                      which reads them off the transaction that was actually written —
+                      so what is shown here is what appears on the tax invoice. Before
+                      an order exists we do not know the tax, so we say nothing rather
+                      than assert a zero. */}
+                  {hasDisplayableGst(gstBreakup) ? (
+                    <>
+                      <div className="flex justify-between text-surface-500">
+                        <span>Taxable value</span>
+                        <span>{'\u20B9'}{gstBreakup.taxable_amount}</span>
+                      </div>
+                      {Number(gstBreakup.igst_amount) > 0 ? (
+                        <div className="flex justify-between text-surface-500">
+                          <span>IGST ({Math.round(Number(gstBreakup.gst_rate) * 100)}%)</span>
+                          <span>{'\u20B9'}{gstBreakup.igst_amount}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex justify-between text-surface-500">
+                            <span>CGST ({Math.round(Number(gstBreakup.gst_rate) * 50)}%)</span>
+                            <span>{'\u20B9'}{gstBreakup.cgst_amount}</span>
+                          </div>
+                          <div className="flex justify-between text-surface-500">
+                            <span>SGST ({Math.round(Number(gstBreakup.gst_rate) * 50)}%)</span>
+                            <span>{'\u20B9'}{gstBreakup.sgst_amount}</span>
+                          </div>
+                        </>
+                      )}
+                      <p className="text-[10px] text-surface-600">
+                        Tax is included in the total below — you are not charged extra.
+                      </p>
+                    </>
+                  ) : null}
                   <div className="border-t border-surface-700/30 pt-3 flex justify-between text-white font-bold">
                     <span>Total</span>
                     <div className="text-right">
@@ -1103,7 +1210,7 @@ export default function PaymentPage() {
 
             <p className="text-xs text-surface-500 mt-6 text-center">
               If amount was deducted, it will be refunded within 5-7 business days. Contact{' '}
-              <a href="mailto:fixitlab.techsupport@gmail.com" className="text-accent-cyan hover:underline">support</a> for help.
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent-cyan hover:underline">support</a> for help.
             </p>
           </div>
         )}

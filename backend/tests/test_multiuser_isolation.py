@@ -409,7 +409,6 @@ class ScalabilityTestCase(TestCase):
             )
         
         # Query should be fast (using indexes)
-        import time
         start = time.time()
         
         labs = LabSession.objects.filter(
@@ -451,7 +450,6 @@ class ScalabilityTestCase(TestCase):
             )
         
         # Get a specific user's labs - should still be fast
-        import time
         start = time.time()
         
         user_labs = LabSession.objects.filter(
@@ -479,7 +477,6 @@ class ScalabilityTestCase(TestCase):
             is_free=True, is_active=True,
         )
 
-        import time
 
         # Create 1000 users and measure lab creation time per user
         times = []
@@ -637,7 +634,3 @@ class EnvironmentIsolationTestCase(TestCase):
             "User2's lab status should not change")
         self.assertEqual(lab2.score, 0, 
             "User2's lab score should not change")
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

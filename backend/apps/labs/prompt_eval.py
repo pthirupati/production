@@ -22,21 +22,42 @@ from dataclasses import dataclass, field
 
 
 # Words that signal the user assigned a ROLE / persona to the assistant.
+# NOTE: matched on WORD BOUNDARIES (see _compile_hints), not raw substrings. The
+# old substring form made "as a " fire on "this was a great outage" and "has a ",
+# i.e. almost any past-tense sentence satisfied require_any_role. The list is a
+# superset of the original so no previously-passing prompt regresses.
 _ROLE_HINTS = (
-    "you are", "act as", "you're a", "you are a", "as a ", "imagine you",
-    "pretend you", "your role", "role:", "persona", "system prompt",
+    "you are", "act as", "acting as", "you're a", "you're an", "as a", "as an",
+    "imagine you", "pretend you", "your role", "role:", "persona", "system prompt",
+    # Additional genuine role assignments the original list rejected outright.
+    "you will be", "assume the role", "take on the role", "take on the identity",
+    "respond as", "reply as", "answer as", "behave like", "speak as", "roleplay",
+    "role-play", "in the voice of", "from the perspective of", "you play",
+    "your job is", "your task is to act", "expert in", "acts as", "serve as",
 )
 
 # Phrases that signal a LENGTH / size constraint.
 _LIMIT_HINTS = (
-    "word", "words", "sentence", "sentences", "bullet", "bullets", "paragraph",
-    "characters", "chars", "under ", "at most", "no more than", "max ", "maximum",
-    "limit", "concise", "brief", "short", "one line", "tl;dr", "in 1", "in 2",
-    "in 3", "exactly",
+    "word", "sentence", "bullet", "paragraph", "character", "char", "under",
+    "at most", "no more than", "max", "maximum", "limit", "concise", "brief",
+    "briefly", "short", "shorter", "one line", "single line", "tl;dr", "exactly",
+    # Additional real constraint phrasings the original list missed.
+    "fewer", "less than", "no longer than", "cap", "token", "at maximum",
+    "up to", "keep it to", "not exceed", "one-liner",
+)
+
+# A numeric length cap ("in 120 tokens", "3 bullets", "under 50 words", "<=200
+# chars") is a limit even when phrased without any of the words above.
+_NUMERIC_LIMIT_RE = re.compile(
+    r"(?:<=?\s*\d+|\b\d+\s*(?:word|sentence|bullet|line|paragraph|char|character|token|item|point|step)s?\b)",
+    flags=re.I,
 )
 
 # Phrases that signal the user asked for an EXAMPLE in the prompt.
-_EXAMPLE_HINTS = ("example", "e.g.", "for instance", "such as", "like this", "->", "sample")
+_EXAMPLE_HINTS = (
+    "example", "e.g.", "for instance", "such as", "like this", "->", "sample",
+    "for example", "demonstrated by", "as shown", "here's one", "here is one",
+)
 
 # Delimiters that fence reference material from the instruction.
 _DELIMITER_HINTS = ('"""', "```", "<document>", "</document>", "<context>", "<<<", "###", "'''")
@@ -55,7 +76,74 @@ def _normalize(text: str) -> str:
     return (text or "").strip().lower()
 
 
+def _compile_hints(hints) -> re.Pattern:
+    """Compile a hint tuple into a word-boundary matcher.
+
+    Plain `in` matching was the core grading bug: "short" fired on
+    "shortcoming", "limit" on "limitations", "word" on "wording"/"password",
+    and "persona" on "personal". We anchor on non-alphanumeric boundaries and
+    allow only a trailing "s" (bullet/bullets, character/characters) — a blanket
+    "ing"/"ed" suffix would re-introduce the "word" -> "wording" false positive.
+    Longest hints first so "no more than" wins over "more".
+    """
+    parts = []
+    for hint in sorted({h.strip() for h in hints if h and h.strip()}, key=len, reverse=True):
+        escaped = re.escape(hint)
+        # Only append the optional plural when the hint ends in a word char;
+        # hints like "e.g." or "->" must stay literal.
+        parts.append(rf"{escaped}s?\b" if hint[-1].isalnum() else escaped)
+    return re.compile(r"(?<![A-Za-z0-9])(?:" + "|".join(parts) + r")", flags=re.I)
+
+
+_ROLE_RE = _compile_hints(_ROLE_HINTS)
+_LIMIT_RE = _compile_hints(_LIMIT_HINTS)
+_EXAMPLE_RE = _compile_hints(_EXAMPLE_HINTS)
+
+
+def _assigns_role(text: str) -> bool:
+    """True when the prompt names a role/persona for the assistant."""
+    return bool(_ROLE_RE.search(text))
+
+
+def _states_limit(text: str) -> bool:
+    """True when the prompt caps length/size, by keyword or by a number+unit."""
+    return bool(_LIMIT_RE.search(text) or _NUMERIC_LIMIT_RE.search(text))
+
+
+def _looks_like_word(token: str) -> bool:
+    """Cheap proxy for "is this a real word" — no dictionary dependency."""
+    t = re.sub(r"[^a-z]", "", token.lower())
+    if len(t) < 2:
+        return False
+    if not re.search(r"[aeiouy]", t):    # rejects xxx / zzz / qwrt
+        return False
+    return len(set(t)) > 1               # rejects aaa / bbb
+
+
+def _is_gibberish(text: str) -> bool:
+    """Reject keyword-stuffed filler like "you are xxx yyy zzz aaa bbb ...".
+
+    Without this, min_words + require_any_role was clearable by typing a role
+    phrase followed by nonsense padding. Measured on real prompts the
+    word-like ratio sits at 0.87-0.93; the gibberish above scores 0.13, so 0.6
+    leaves a wide margin. JSON-shaped prompts ({"name": string}) measure 0.93,
+    so structured-output answers are unaffected. Only applied to prompts long
+    enough for the ratio to mean anything.
+    """
+    tokens = re.findall(r"\S+", text or "")
+    if len(tokens) < 6:
+        return False
+    real = sum(1 for t in tokens if _looks_like_word(t))
+    return (real / len(tokens)) < 0.6
+
+
 def _has_any(text: str, needles) -> bool:
+    """Substring match — kept for AUTHOR-supplied `require`/`any_of` term lists.
+
+    Scenario YAML deliberately ships stems ("instruction" must catch
+    "instructions", "param" -> "parameters", "class" -> "classify"), so those
+    lists must NOT get word-boundary treatment or ~150 prompt lessons un-solve.
+    """
     return any(n in text for n in needles)
 
 
@@ -116,16 +204,20 @@ def evaluate_prompt(prompt: str, success: dict | None) -> PromptCheck:
         missing.append(label)
 
     if "min_words" in success:
-        (ok if words >= int(success["min_words"]) else bad)("enough detail")
+        # Word COUNT alone was gameable with filler, so a min_words rule also
+        # requires the words to be word-like. Paired with min_words only: a
+        # short prompt with no length floor is not asked to prove substance.
+        enough = words >= int(success["min_words"]) and not _is_gibberish(prompt or "")
+        (ok if enough else bad)("enough detail")
     if "max_words" in success:
         (ok if words <= int(success["max_words"]) else bad)("concise enough")
 
     if success.get("require_any_role"):
-        (ok if _has_any(text, _ROLE_HINTS) else bad)("assigns a role")
+        (ok if _assigns_role(text) else bad)("assigns a role")
     if success.get("mentions_limit"):
-        (ok if _has_any(text, _LIMIT_HINTS) else bad)("states a length/format limit")
+        (ok if _states_limit(text) else bad)("states a length/format limit")
     if success.get("mentions_example"):
-        (ok if _has_any(text, _EXAMPLE_HINTS) else bad)("includes an example")
+        (ok if _EXAMPLE_RE.search(text) else bad)("includes an example")
     if success.get("has_delimiter"):
         (ok if _has_any(prompt or "", _DELIMITER_HINTS) else bad)("delimits the reference text")
     if success.get("requires_json_request"):

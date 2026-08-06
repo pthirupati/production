@@ -26,6 +26,13 @@ const AZ_LAB_USER = 'admin@fixitlab.onmicrosoft.com'
 const AZ_LAB_PASS = 'lab123'
 const ACCENT = '#0078d4'
 
+// Stable fallbacks for absent server state. A bare `|| {}` mints a new identity
+// every render, so the `indexAzureState(st)` memo below re-indexed the entire
+// console state on every pass. Frozen so an accidental in-place mutation throws
+// rather than silently corrupting the shared fallback.
+const EMPTY_OBJ = Object.freeze({})
+const EMPTY_ARR = Object.freeze([])
+
 const SIDEBAR = [
   { key: 'overview', label: 'Overview', icon: Cloud },
   { key: 'vms', label: 'Virtual machines', icon: Server },
@@ -122,27 +129,27 @@ export default function AzureConsole({
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteUpn, setInviteUpn] = useState('partner@fabrikam.com')
 
-  const st = state?.state || {}
+  const st = state?.state || EMPTY_OBJ
   const loggedIn = st?.session?.logged_in
-  const goal = st?.goal || {}
-  const broken = st?.broken || {}
-  const vms = st.vms || []
-  const nsgs = st.nsgs || []
-  const disks = st.disks || []
-  const vnets = st.vnets || []
-  const resourceGroups = st.resource_groups || []
-  const storageAccounts = st.storage_accounts || []
-  const keyVaults = st.key_vaults || []
-  const roleAssignments = st.role_assignments || []
-  const loadBalancers = st.load_balancers || []
+  const goal = st?.goal || EMPTY_OBJ
+  const broken = st?.broken || EMPTY_OBJ
+  const vms = st.vms || EMPTY_ARR
+  const nsgs = st.nsgs || EMPTY_ARR
+  const disks = st.disks || EMPTY_ARR
+  const vnets = st.vnets || EMPTY_ARR
+  const resourceGroups = st.resource_groups || EMPTY_ARR
+  const storageAccounts = st.storage_accounts || EMPTY_ARR
+  const keyVaults = st.key_vaults || EMPTY_ARR
+  const roleAssignments = st.role_assignments || EMPTY_ARR
+  const loadBalancers = st.load_balancers || EMPTY_ARR
   const searchServices = useMemo(
     () => SIDEBAR.map((s) => ({ key: s.key, label: s.label, keywords: s.key })),
     [],
   )
   const searchResources = useMemo(() => indexAzureState(st), [st])
-  const publicIps = st.public_ips || []
-  const activityLog = st.activity_log || st.events || []
-  const snapshots = st.snapshots || []
+  const publicIps = st.public_ips || EMPTY_ARR
+  const activityLog = st.activity_log || st.events || EMPTY_ARR
+  const snapshots = st.snapshots || EMPTY_ARR
 
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,

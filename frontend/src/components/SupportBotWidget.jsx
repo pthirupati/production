@@ -3,8 +3,11 @@ import { useLocation } from 'react-router-dom'
 import { Bot, X, Send, Minimize2, MessageCircle, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { supportApi } from '../api/support'
 import { useAuthStore } from '../store/authStore'
+import { currentUserScopedKey, migrateUnscopedKey } from '../utils/userScopedStorage'
 
-const STORAGE_KEY = 'fixitlab_support_bot_hidden'
+// Scoped per user: an unscoped key let one account's "hide the bot" choice
+// follow every other account signing in on the same browser.
+const STORAGE_KEY_BASE = 'fixitlab_support_bot_hidden'
 
 function TypingIndicator({ name }) {
   return (
@@ -90,7 +93,7 @@ export default function SupportBotWidget() {
   const { isAuthenticated } = useAuthStore()
   const [config, setConfig] = useState(null)
   const [open, setOpen] = useState(false)
-  const [fabHidden, setFabHidden] = useState(() => localStorage.getItem(STORAGE_KEY) === '1')
+  const [fabHidden, setFabHidden] = useState(() => localStorage.getItem(migrateUnscopedKey(STORAGE_KEY_BASE)) === '1')
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [typing, setTyping] = useState(false)
@@ -124,7 +127,7 @@ export default function SupportBotWidget() {
   useEffect(() => {
     const onOpen = () => {
       setFabHidden(false)
-      localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem(currentUserScopedKey(STORAGE_KEY_BASE))
       setOpen(true)
     }
     window.addEventListener('fixitlab-support-open', onOpen)
@@ -185,7 +188,7 @@ export default function SupportBotWidget() {
   const hideFab = () => {
     setOpen(false)
     setFabHidden(true)
-    localStorage.setItem(STORAGE_KEY, '1')
+    localStorage.setItem(currentUserScopedKey(STORAGE_KEY_BASE), '1')
   }
 
   if (!config?.enabled) return null
@@ -317,7 +320,7 @@ export default function SupportBotWidget() {
           type="button"
           onClick={() => {
             setFabHidden(false)
-            localStorage.removeItem(STORAGE_KEY)
+            localStorage.removeItem(currentUserScopedKey(STORAGE_KEY_BASE))
             setOpen(true)
           }}
           className="fixed bottom-4 right-4 z-[58] p-2.5 rounded-full bg-surface-800/90 border border-surface-600/50 text-surface-400 hover:text-accent-cyan transition-colors"

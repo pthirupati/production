@@ -105,7 +105,7 @@ There are **two paradigms** for "fake infrastructure," and the platform implemen
 ### 1.5 Deploy topologies
 
 - **Single-droplet (dev / small prod):** `docker-compose.prod.yml` runs everything (nginx, backend, celery, postgres, redis, rabbitmq) on one host; lab containers via local Docker socket. `docs/ARCHITECTURE.md` documents this as the recommended <10k-user setup.
-- **Four-droplet (cluster):** D1 edge (gateway + Redis + RabbitMQ + Vault), D2 app (`docker-compose.app.yml` — backend + all Celery + **sims in-process**), D3 data (`docker-compose.data.yml` — Postgres + pgBouncer), D4 labs (remote Docker engine reached via `ssh://root@D4`, wired through `DOCKER_HOST`). Connectivity wired by `scripts/ci-wire-cluster-env.py`; firewalls by `scripts/ci-setup-firewalls.sh`. IaC under `infra/` (`terraform/main.tf`, `digitalocean/cluster.json`, `kubernetes/deployment.yaml`, Packer golden AMI).
+- **Four-droplet (cluster):** D1 edge (gateway + Redis + RabbitMQ + Vault), D2 app (`docker-compose.app.yml` — backend + all Celery + **sims in-process**), D3 data (`docker-compose.data.yml` — Postgres + pgBouncer), D4 labs (remote Docker engine reached via `ssh://root@D4`, wired through `DOCKER_HOST`). Connectivity wired by `scripts/ci-wire-cluster-env.py`; firewalls by `scripts/ci-setup-firewalls.sh`. IaC under `infra/` (`terraform/main.tf`, `digitalocean/cluster.json`, `k8s/base/` + `k8s/overlays/{doks,eks}` kustomize, Packer golden AMI).
 
 ### 1.6 End-to-end data flow — the three core journeys
 

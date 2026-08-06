@@ -35,11 +35,43 @@ function loginErrorMessage(err) {
   return data.error || data.detail || 'Invalid credentials'
 }
 
+/**
+ * Read a post-login redirect target from a `?next=` query string.
+ *
+ * Unlike the router-state convention, this value IS attacker-controllable — a
+ * crafted /login?next=... link is a classic open redirect, and a `javascript:`
+ * payload would be worse. So only a same-origin, site-root-relative path is
+ * accepted, and everything else degrades to null (the caller's default home):
+ *
+ *   - must start with a single '/' — rejects 'https://evil.test' and, critically,
+ *     protocol-relative '//evil.test', which browsers treat as absolute
+ *   - rejects '/\evil.test', which some parsers normalise to a network path
+ *   - rejects a bare '/login' target, which would bounce the user straight back
+ *
+ * Exported for direct testing; there is no other consumer.
+ */
+export function safeNextParam(search) {
+  let next
+  try {
+    next = new URLSearchParams(search || '').get('next')
+  } catch {
+    return null
+  }
+  if (!next) return null
+  if (!next.startsWith('/')) return null
+  if (next.startsWith('//') || next.startsWith('/\\')) return null
+  if (next === '/login' || next.startsWith('/login?')) return null
+  return next
+}
+
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [mfaToken, setMfaToken] = useState('')
+  const [mfaCode, setMfaCode] = useState('')
+  const [useRecovery, setUseRecovery] = useState(false)
   const [error, setError] = useState('')
   const [socialConfig, setSocialConfig] = useState(null)
   const navigate = useNavigate()
@@ -57,19 +89,67 @@ export default function Login() {
     startOAuth(provider, 'login')
   }
 
+  const finishLogin = (data) => {
+    toast.success('Welcome back!')
+    // Honor a redirect target set by a gated page (e.g. starting a cert exam),
+    // otherwise land on the role's default home.
+    //
+    // Two conventions reach us and both must be honored. ProtectedRoute /
+    // AdminRoute (AppRouter.jsx:124,135) pass `location.state.from`, but three
+    // call sites redirect with a `?next=` query param instead —
+    // PaymentPage.jsx:288 (renewal), :325 (cert checkout) and
+    // InterviewInvite.jsx:29 (invitation). Those are the highest-intent deep
+    // links in the product and, until this read `next`, all three silently
+    // dumped the user on /dashboard. state.from is preferred because it is not
+    // attacker-controllable; `next` is validated by safeNextParam.
+    const target = location.state?.from || safeNextParam(location.search)
+    navigate(target || (data.user?.is_staff ? '/admin' : '/dashboard'))
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
       const data = await authApi.login(email, password)
-      toast.success('Welcome back!')
-      // Honor a redirect target set by a gated page (e.g. starting a cert exam),
-      // otherwise land on the role's default home.
-      const from = location.state?.from
-      navigate(from || (data.user?.is_staff ? '/admin' : '/dashboard'))
+      // Audit Z2-3: MFA accounts get a challenge here, not a session.
+      if (data.mfa_required) {
+        setMfaToken(data.mfa_token)
+        setLoading(false)
+        return
+      }
+      finishLogin(data)
     } catch (err) {
       setError(loginErrorMessage(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMfaSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const data = await authApi.verifyMfa({
+        mfaToken,
+        ...(useRecovery ? { recoveryCode: mfaCode.trim() } : { code: mfaCode.trim() }),
+      })
+      if (data.recovery_codes_remaining !== undefined && data.recovery_codes_remaining <= 2) {
+        // Running out silently is how people end up locked out permanently.
+        toast(`Only ${data.recovery_codes_remaining} recovery codes left — generate new ones in your profile.`,
+          { icon: '\u26A0\uFE0F', duration: 8000 })
+      }
+      finishLogin(data)
+    } catch (err) {
+      // The challenge expires after 5 minutes; say so rather than showing a bare
+      // "invalid code" that sends people hunting for a wrong answer.
+      const detail = err?.response?.data?.error
+      setError(detail || 'Could not verify that code. Please try again.')
+      if (err?.response?.status === 401 && detail?.includes('expired')) {
+        setMfaToken('')
+        setMfaCode('')
+      }
     } finally {
       setLoading(false)
     }
@@ -103,6 +183,59 @@ export default function Login() {
         </div>
       )}
 
+      {/* Audit Z2-3: second factor. Replaces the credential form rather than
+          appearing beside it — leaving the email/password fields on screen invites
+          people to retype credentials that were already accepted. */}
+      {mfaToken ? (
+        <form onSubmit={handleMfaSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-surface-300 mb-1.5">
+              {useRecovery ? 'Recovery code' : 'Authentication code'}
+            </label>
+            <input
+              type="text"
+              value={mfaCode}
+              onChange={(e) => { setMfaCode(e.target.value); setError('') }}
+              className="input-field text-center tracking-[0.4em] text-lg"
+              placeholder={useRecovery ? 'xxxxxxxxxx' : '000000'}
+              /* `one-time-code` is what lets iOS and Android offer the code from
+                 the authenticator or SMS without the user switching apps. */
+              autoComplete="one-time-code"
+              inputMode={useRecovery ? 'text' : 'numeric'}
+              maxLength={useRecovery ? 20 : 6}
+              required
+              autoFocus
+            />
+            <p className="text-xs text-surface-500 mt-2">
+              {useRecovery
+                ? 'Each recovery code works once.'
+                : 'Open your authenticator app and enter the 6-digit code.'}
+            </p>
+          </div>
+
+          <button type="submit" disabled={loading || !mfaCode.trim()} className="btn-primary w-full">
+            {loading ? 'Verifying…' : 'Verify'}
+          </button>
+
+          <div className="flex items-center justify-between text-xs">
+            <button
+              type="button"
+              onClick={() => { setUseRecovery((v) => !v); setMfaCode(''); setError('') }}
+              className="text-accent-cyan hover:underline"
+            >
+              {useRecovery ? 'Use authenticator code' : 'Lost your device? Use a recovery code'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMfaToken(''); setMfaCode(''); setUseRecovery(false); setError('') }}
+              className="text-surface-500 hover:text-surface-300"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+      <>
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label className="block text-sm font-medium text-surface-300 mb-1.5">Email</label>
@@ -188,6 +321,8 @@ export default function Login() {
         <p className="text-xs text-surface-500 text-center mt-3">
           Sign in with GitHub or Google if you already have a FixitLab account with the same email.
         </p>
+      )}
+      </>
       )}
     </AuthShell>
   )

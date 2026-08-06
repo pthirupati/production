@@ -1,10 +1,11 @@
 """
 Speech-to-text helpers for FixitLab interviews.
 
-100% FREE path: browser Web Speech API is the default (frontend).
+Default path: browser Web Speech API (frontend). Note Chrome Web Speech
+streams audio to Google — it is free to us but NOT offline/privacy-local.
 Server-side paid APIs (OpenAI Whisper, etc.) are intentionally disabled.
 
-Optional future hook: local Vosk when INTERVIEW_STT_ENGINE=vosk (still free/offline).
+Optional future hook: local Vosk when INTERVIEW_STT_ENGINE=vosk (free + offline).
 """
 
 from __future__ import annotations
@@ -57,7 +58,7 @@ def transcribe_audio(
         "provider": "browser",
         "word_count": 0,
         "duration_seconds": None,
-        "message": "Use browser speech recognition (free, offline-capable in supported browsers).",
+        "message": "Use browser speech recognition (free; Chrome may send audio to Google — not offline).",
     }
 
 

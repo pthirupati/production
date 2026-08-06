@@ -93,8 +93,25 @@ export default function CommvaultSimulator({
   refreshRef.current = refresh
   useEffect(() => {
     if (!loggedIn || !hasLiveJob) return undefined
-    const t = setInterval(() => { refreshRef.current?.() }, 1000)
-    return () => clearInterval(t)
+    // A 1s poll is a network round-trip + full re-render each tick, so stop it
+    // entirely while the tab is hidden instead of burning it in the background.
+    // Backup/restore jobs here are long-running, so the resume path MUST refresh
+    // immediately before restarting the timer — a job routinely reaches a
+    // terminal status while hidden, and only restarting the interval would keep
+    // showing a stale "Running" badge. The hasLiveJob guard above still owns the
+    // real teardown: once every job is terminal the effect re-runs and returns
+    // early, removing the listener along with the timer.
+    let t = null
+    const stop = () => { if (t) { clearInterval(t); t = null } }
+    const start = () => { if (!t) t = setInterval(() => { refreshRef.current?.() }, 1000) }
+    const onVis = () => {
+      if (document.visibilityState === 'visible') { refreshRef.current?.(); start() } else stop()
+    }
+    // refreshRef (not refresh) is deliberate: the effect must not re-run — and
+    // therefore must not drop the listener — every time refresh is re-created.
+    if (document.visibilityState === 'visible') start()
+    document.addEventListener('visibilitychange', onVis)
+    return () => { stop(); document.removeEventListener('visibilitychange', onVis) }
   }, [loggedIn, hasLiveJob])
 
   const chromeProps = {

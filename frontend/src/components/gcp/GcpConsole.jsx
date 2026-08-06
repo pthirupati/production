@@ -25,6 +25,13 @@ const GCP_LAB_USER = 'admin@fixitlab.io'
 const GCP_LAB_PASS = 'lab123'
 const ACCENT = '#4285f4'
 
+// Stable fallbacks for absent server state. A bare `|| {}` mints a new identity
+// every render, so the `indexGcpState(st)` memo below re-indexed the entire
+// console state on every pass. Frozen so an accidental in-place mutation throws
+// rather than silently corrupting the shared fallback.
+const EMPTY_OBJ = Object.freeze({})
+const EMPTY_ARR = Object.freeze([])
+
 const SIDEBAR = [
   { key: 'overview', label: 'Overview', icon: Cloud },
   { key: 'instances', label: 'VM instances', icon: Server },
@@ -107,20 +114,20 @@ export default function GcpConsole({
   const [vmName, setVmName] = useState('lab-vm')
   const [vmMachineType, setVmMachineType] = useState('e2-medium')
 
-  const st = state?.state || {}
+  const st = state?.state || EMPTY_OBJ
   const loggedIn = st?.session?.logged_in
-  const goal = st?.goal || {}
-  const broken = st?.broken || {}
-  const instances = st.instances || []
-  const firewallRules = st.firewall_rules || []
-  const disks = st.disks || []
-  const networks = st.networks || []
-  const buckets = st.buckets || []
-  const iamBindings = st.iam_bindings || []
-  const operations = st.operations || st.events || []
-  const routes = st.routes || []
-  const forwardingRules = st.forwarding_rules || []
-  const snapshots = st.snapshots || []
+  const goal = st?.goal || EMPTY_OBJ
+  const broken = st?.broken || EMPTY_OBJ
+  const instances = st.instances || EMPTY_ARR
+  const firewallRules = st.firewall_rules || EMPTY_ARR
+  const disks = st.disks || EMPTY_ARR
+  const networks = st.networks || EMPTY_ARR
+  const buckets = st.buckets || EMPTY_ARR
+  const iamBindings = st.iam_bindings || EMPTY_ARR
+  const operations = st.operations || st.events || EMPTY_ARR
+  const routes = st.routes || EMPTY_ARR
+  const forwardingRules = st.forwarding_rules || EMPTY_ARR
+  const snapshots = st.snapshots || EMPTY_ARR
   const searchServices = useMemo(
     () => SIDEBAR.map((s) => ({ key: s.key, label: s.label, keywords: s.key })),
     [],

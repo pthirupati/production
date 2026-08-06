@@ -1,6 +1,7 @@
 import { Component } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { isChunkLoadError } from '../utils/lazyWithRetry'
+import { reportClientError } from '../utils/reportClientError'
 
 /**
  * Localized error boundary for heavy lab consoles (AWS, VMware, Interview, labs).
@@ -19,6 +20,13 @@ export default class SimErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error(`SimErrorBoundary [${this.props.name || 'lab'}]:`, error, info)
+    // Audit Z6-6. This boundary matters more than the generic one: it wraps the
+    // simulators, so a crash here means a learner lost a lab they may have paid for
+    // and burned a daily quota slot. `name` identifies which simulator.
+    reportClientError(error, {
+      componentStack: info?.componentStack,
+      kind: `sim_error:${this.props.name || 'lab'}`,
+    })
     // Missing-chunk failures cannot be recovered in place — auto-reload once.
     if (isChunkLoadError(error)) {
       this.hardReloadForChunk()

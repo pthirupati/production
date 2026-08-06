@@ -156,6 +156,12 @@ class SecurityHeadersMiddleware(MiddlewareMixin):
         if not settings.DEBUG:
             response['Content-Security-Policy'] = (
                 "default-src 'self'; "
+                # NOTE: jsdelivr here is NOT the SPA's old Pyodide/MediaPipe
+                # dependency (those are now self-hosted). It is still required by
+                # drf-spectacular, which renders the admin-only /api/docs/
+                # Swagger UI from cdn.jsdelivr.net by default. Dropping it breaks
+                # that page; removing it properly means adding the
+                # drf-spectacular-sidecar package and SWAGGER_UI_DIST="SIDECAR".
                 "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 "img-src 'self' data: https:; "

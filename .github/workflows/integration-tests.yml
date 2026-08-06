@@ -1,9 +1,23 @@
 # integration-tests.yml — Django integration tests + API contract checks
-# Triggers: every PR + merge to main
+#
+# Audit Z6-10. The header used to claim "every PR + merge to main" while the only
+# trigger was workflow_dispatch, so none of this had gated a PR in a long time.
+#
+# It is NOT all re-enabled: `django-integration` largely duplicates ci.yml's suite
+# and `api-contract` runs schemathesis, which is slow and fuzz-flaky. Turning both
+# on for every PR would roughly double CI time for very little new signal.
+# `migration-safety` is different — it is the only check that applies the PR's
+# migrations *on top of main's schema*, which is the failure that reaches
+# production — so that one job now runs on every PR and the other two stay manual.
 name: Integration Tests
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "backend/**/migrations/**"
+      - "backend/**/models.py"
+      - ".github/workflows/integration-tests.yml"
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -16,6 +30,8 @@ jobs:
   # ─── Extended Django tests (real Postgres + Redis) ────────────────────────
   django-integration:
     name: Django integration tests
+    # Manual only: ci.yml already runs `manage.py test tests apps` on every PR.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -95,21 +111,33 @@ jobs:
           # Fetch full history so we can compare base branch
           fetch-depth: 0
       - uses: ./.github/actions/setup-python-backend
-      - name: Apply migrations from main (base state)
+      # The previous version ran `git stash` here to "go back to main". On a clean
+      # PR checkout there is nothing to stash, so it was a no-op and the job simply
+      # migrated the PR's own state twice — it never tested the thing it is named
+      # after. Checking out the base commit is what actually reproduces production's
+      # starting schema.
+      - name: Build the base schema (target branch)
         working-directory: backend
         env:
           DJANGO_SETTINGS_MODULE: config.test_settings
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/fixitlab_migrate_test
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'origin/main' }}
         run: |
-          git stash || true
+          set -euo pipefail
+          git -C .. checkout --detach "$BASE_SHA"
           python manage.py migrate --run-syncdb
-          git stash pop || true
-      - name: Apply PR migrations on top
+      - name: Apply this PR's migrations on top
         working-directory: backend
         env:
           DJANGO_SETTINGS_MODULE: config.test_settings
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/fixitlab_migrate_test
-        run: python manage.py migrate
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          git -C .. checkout --detach "$HEAD_SHA"
+          # No --run-syncdb: a migration that only works because syncdb created the
+          # table for it is exactly the migration that fails on the real database.
+          python manage.py migrate
       - name: Check no missing migrations
         working-directory: backend
         env:
@@ -120,6 +148,9 @@ jobs:
   # ─── API contract: key endpoint response shape ────────────────────────────
   api-contract:
     name: API contract tests
+    # Manual only: schemathesis fuzzing is slow and its failures are frequently
+    # about the fuzzer's expectations rather than the API.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [django-integration]
@@ -165,16 +196,3 @@ jobs:
           path: schemathesis-results.xml
           retention-days: 14
           if-no-files-found: ignore
-
-  notify-failure:
-    name: Notify Slack on failure
-    runs-on: ubuntu-latest
-    needs: [django-integration, migration-safety, api-contract]
-    if: failure()
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/notify-slack
-        with:
-          status: failure
-          workflow: "Integration Tests (${{ github.ref_name }})"
-          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}

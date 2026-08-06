@@ -1,20 +1,47 @@
 /**
  * Client-side Python execution via Pyodide (free, MIT, WASM).
  *
- * Loads the Pyodide runtime from a pinned jsDelivr CDN on first use and caches
- * it for the page lifetime. All execution happens in the browser — no servers,
- * no paid APIs. If the CDN can't be reached (offline, blocked), every call
- * rejects with a friendly message so the IDE can degrade gracefully instead of
- * crashing.
+ * Loads the Pyodide runtime on first use and caches it for the page lifetime.
+ * All execution happens in the browser — no servers, no paid APIs. If the
+ * runtime can't be reached (offline, blocked), every call rejects with a
+ * friendly message so the IDE can degrade gracefully instead of crashing.
  *
  * IMPORTANT: this runner is for the user-facing Run button and VISIBLE tests
  * only. It is convenience, not a source of truth — the authoritative pass/fail
  * decision (including hidden tests) is always made on the backend.
  */
 
-// Pin the version so a CDN-side major bump can never silently change behaviour.
+// Pin the version so a runtime bump can never silently change behaviour. This
+// string is asserted against the installed package by
+// frontend/scripts/vendor-assets.mjs, which fails the build on a mismatch.
 const PYODIDE_VERSION = 'v0.26.2'
-const PYODIDE_CDN = `https://cdn.jsdelivr.net/pyodide/${PYODIDE_VERSION}/full/`
+
+// Pyodide is served SAME-ORIGIN. There is deliberately no CDN fallback:
+//   1. it never worked in production anyway — gateway/nginx.prod.conf ships
+//      `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com`,
+//      so a cdn.jsdelivr.net <script> was refused by CSP before it ever hit the
+//      network, and the Run button only ever showed the offline banner;
+//   2. offline / air-gapped learners can't reach a CDN at all;
+//   3. allowing a public CDN to inject script into this origin is supply-chain
+//      surface we don't need now that the bytes ship with the image.
+// The assets come from the pinned npm package and are copied into
+// public/pyodide/ at build time. VITE_PYODIDE_URL can repoint this, but it
+// should stay same-origin — anything else reintroduces both problems above.
+const PYODIDE_BASE =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_PYODIDE_URL) || '/pyodide/'
+
+/**
+ * Candidate bases, most-preferred first, deduped.
+ *
+ * Kept as a list (rather than collapsed to a single string) because the loader
+ * below iterates it, and because the offline tests assert that every entry is
+ * same-origin — that assertion is what stops a CDN being quietly reintroduced.
+ */
+export function pyodideSources() {
+  return [PYODIDE_BASE].filter((v, i, a) => v && a.indexOf(v) === i)
+}
+
+export { PYODIDE_VERSION }
 
 let pyodidePromise = null
 
@@ -36,7 +63,10 @@ function loadScript(src) {
     script.async = true
     script.dataset.pyodide = '1'
     script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Failed to load Pyodide from CDN'))
+    script.onerror = () => reject(new Error(`Failed to load Pyodide from ${src}`))
+    // A CSP refusal fires `error` but leaves the tag in the DOM; drop it so the
+    // next base isn't short-circuited by the `[data-pyodide]` lookup above.
+    script.addEventListener('error', () => script.remove())
     document.head.appendChild(script)
   })
 }
@@ -45,12 +75,20 @@ function loadScript(src) {
 export async function getPyodide() {
   if (pyodidePromise) return pyodidePromise
   pyodidePromise = (async () => {
-    await loadScript(`${PYODIDE_CDN}pyodide.js`)
-    if (!window.loadPyodide) {
-      throw new Error('Pyodide loader unavailable')
+    let lastErr = null
+    for (const base of pyodideSources()) {
+      try {
+        await loadScript(`${base}pyodide.js`)
+        if (!window.loadPyodide) throw new Error('Pyodide loader unavailable')
+        // indexURL must match the base the loader came from — Pyodide resolves
+        // its .wasm and stdlib relative to it, so a mismatch would fetch the
+        // runtime from somewhere other than the copy we actually shipped.
+        return await window.loadPyodide({ indexURL: base })
+      } catch (err) {
+        lastErr = err
+      }
     }
-    const pyodide = await window.loadPyodide({ indexURL: PYODIDE_CDN })
-    return pyodide
+    throw lastErr || new Error('Pyodide loader unavailable')
   })().catch((err) => {
     // Reset so a later attempt can retry after a transient failure.
     pyodidePromise = null
@@ -61,7 +99,12 @@ export async function getPyodide() {
 
 /**
  * Run Python source and capture stdout/stderr.
- * Returns { ok, stdout, stderr, error }.
+ * Returns { ok, stdout, stderr, error, runtimeMissing }.
+ *
+ * `runtimeMissing` distinguishes "the Pyodide runtime never loaded" from "your
+ * code threw". Callers surface an explicit banner for the former — without that
+ * flag a learner only saw a stderr line and had no way to tell the runtime
+ * never loaded at all.
  */
 export async function runPython(source) {
   let pyodide
@@ -70,6 +113,7 @@ export async function runPython(source) {
   } catch (err) {
     return {
       ok: false,
+      runtimeMissing: true,
       stdout: '',
       stderr: '',
       error: 'Python runtime could not be loaded (check your connection). You can still submit — the server will run your code.',

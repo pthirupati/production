@@ -60,8 +60,12 @@ export const PRIMARY_SIM_COMPONENTS = {
   azure: LazyAzureConsole,
   gcp: LazyGcpConsole,
   openstack: LazyOpenStackConsole,
-  kubernetes: LazyK8sConsole,
+  // Only 'k8s' is ever produced. scenarioConsoles CONSOLE_TO_KIND folds both
+  // `kubernetes` and `k8s` YAML keys to 'k8s', and LabRunner's primarySimKind
+  // chain emits 'k8s' for the openshift/service-mesh technology slugs too — so
+  // 'kubernetes' and 'openshift' keys here were unreachable aliases. Removed
+  // 2026-08; labSimLoader.deadKinds.test.js pins the invariant so a future
+  // CONSOLE_TO_KIND entry cannot reintroduce a kind with no component.
   k8s: LazyK8sConsole,
   docker: LazyDockerConsole,
-  openshift: LazyK8sConsole,
 }

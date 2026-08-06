@@ -6,7 +6,7 @@ import {
   SearchCode, Code2, BookOpen, Receipt, FileSpreadsheet, Wallet,
 } from 'lucide-react'
 import LabChromeBar from '../lab/LabChromeBar'
-import { PS_NAV_MENU } from '../../mockData/peoplesoft'
+import { PS_NAV_MENU } from '../../simFixtures/peoplesoft'
 import {
   FluidHome, JobDataComponent, BenefitsEnrollment, PaycheckReview,
   ProcessMonitorTable, PeopleSoftNavMenu,
@@ -59,11 +59,22 @@ export default function PeopleSoftSimulator({
   // While self-service submissions are queued/running on the Process Scheduler,
   // poll so the Process Monitor advances (queued -> running -> success) on
   // wall-clock without the learner having to click Refresh.
+  // Gated on visibility: a hidden tab cannot show the Process Monitor advancing,
+  // so the round-trip is pure waste. On refocus we refresh IMMEDIATELY before
+  // restarting the timer, otherwise a run that finished while hidden would keep
+  // rendering as queued/running for up to another 3.5s and look stuck.
   const runningJobs = state?.summary?.process_runs_running || 0
   useEffect(() => {
     if (!runningJobs) return undefined
-    const id = setInterval(() => { refresh() }, 3500)
-    return () => clearInterval(id)
+    let id = null
+    const stop = () => { if (id) { clearInterval(id); id = null } }
+    const start = () => { if (!id) id = setInterval(() => { refresh() }, 3500) }
+    const onVis = () => {
+      if (document.visibilityState === 'visible') { refresh(); start() } else stop()
+    }
+    if (document.visibilityState === 'visible') start()
+    document.addEventListener('visibilitychange', onVis)
+    return () => { stop(); document.removeEventListener('visibilitychange', onVis) }
   }, [runningJobs, refresh])
 
   const run = useCallback(async (fn, okMsg) => {

@@ -76,8 +76,13 @@ FixitLab is a **modular monolith** — Django backend + React frontend + Celery 
 | Environment | Branch | Host | Lab provider |
 |-------------|--------|------|--------------|
 | **Local dev** | any | `docker compose up` | Docker containers |
-| **stage2** | `develop` | DO droplet (staging) | Docker + DO droplets |
-| **production** | `main` | DO droplet (prod) | Docker + DO droplets |
+| **merge gate** | `main` (push) | GitHub runner, ephemeral | none — `E2E_SKIP_LAB=1` |
+| **production** | `main` (deploy) | DO droplet (prod) | Docker + DO droplets |
+
+There is no staging environment. The `merge-gate` job in
+`.github/workflows/e2e-smoke.yml` boots a throwaway stack inside the CI runner
+to smoke-test each merge before `production.yml` deploys it — see
+[PRODUCTION_SETUP.md](PRODUCTION_SETUP.md) for what that does and does not cover.
 
 ---
 
@@ -107,7 +112,9 @@ FixitLab is a **modular monolith** — Django backend + React frontend + Celery 
 | `docker-compose.yml` | Local development |
 | `docker-compose.prod.yml` | Production with TLS |
 | `scripts/deploy.sh` | SSL + certbot + rolling deploy |
-| `.github/workflows/ci-cd-digitalocean.yml` | Test + deploy to stage2/prod |
+| `.github/workflows/production.yml` | Deploy to production + post-deploy E2E |
+| `.github/workflows/e2e-smoke.yml` | Merge gate (ephemeral stack) + post-deploy smoke |
+| `.github/ci/nginx-ephemeral.conf` | Same-origin gateway for the merge-gate stack |
 | `infra/digitalocean/` | Droplet bootstrap scripts |
 
 ---
@@ -203,10 +210,11 @@ cp env.production.example .env.production
 
 ### 4. CI/CD (GitHub Actions)
 
-Add secrets: `STAGE2_HOST`, `STAGE2_SSH_KEY`, `PROD_HOST`, `PROD_SSH_KEY`
+Add secrets: `PROD_HOST`, `PROD_USER`, `PROD_SSH_KEY`
 
-- Push to `develop` → deploys stage2
-- Push to `main` → deploys production
+- Push to `main` → runs the `merge-gate` smoke job (ephemeral CI stack, no
+  deploy). Deploying is a separate, manually dispatched `production.yml` run.
+- No staging secrets are needed; there is no staging environment.
 
 ### Manual vs automated
 

@@ -465,7 +465,7 @@ class CreateRazorpayOrderView(APIView):
             order = client.order.create(data=order_data)
 
             from .razorpay_fulfillment import create_technology_payment_transaction
-            create_technology_payment_transaction(
+            txn = create_technology_payment_transaction(
                 user=request.user,
                 amount=amount,
                 order=order,
@@ -476,6 +476,20 @@ class CreateRazorpayOrderView(APIView):
             return Response({
                 "order_id": order["id"],
                 "amount": amount,
+                # Audit Z1-14: the checkout page printed a hardcoded "GST (included)
+                # ₹0". Read off the transaction that was just written rather than
+                # recomputed here, so the figure shown to the customer is by
+                # construction the figure on their invoice — a second computation
+                # could drift from the first and nobody would notice which was right.
+                "gst": {
+                    "taxable_amount": str(txn.taxable_amount),
+                    "gst_amount": str(txn.gst_amount),
+                    "gst_rate": str(txn.gst_rate),
+                    "cgst_amount": str(txn.cgst_amount),
+                    "sgst_amount": str(txn.sgst_amount),
+                    "igst_amount": str(txn.igst_amount),
+                    "place_of_supply": txn.place_of_supply,
+                },
                 "original_amount": original_amount,
                 "amount_paise": amount_paise,
                 "currency": "INR",
@@ -1232,8 +1246,30 @@ class CancelTechSubscriptionView(APIView):
                 status=http_status.HTTP_404_NOT_FOUND,
             )
 
-        sub.is_active = False
-        sub.save()
+        if sub.cancelled_at:
+            return Response(
+                {"error": "This subscription is already cancelled."},
+                status=http_status.HTTP_409_CONFLICT,
+            )
+
+        # Cancel at period end, not immediately (audit Z1-11).
+        #
+        # These are prepaid annual terms with no auto-renewal, so flipping
+        # `is_active` here took away months the customer had already paid for and
+        # gave them nothing in return — there was no future charge to stop. Someone
+        # cancelling in month two lost ten months, which is a refund dispute rather
+        # than a cancellation. Every comparable service (KodeKloud, Pluralsight,
+        # GitHub) honours the paid term.
+        #
+        # `is_active` stays True so `is_tech_subscription_active` keeps granting
+        # access until `expires_at` passes, at which point the existing expiry check
+        # ends it with no extra machinery. `cancelled_at` is what suppresses renewal
+        # reminders and marks the intent.
+        sub.cancelled_at = timezone.now()
+        sub.renewal_reminder_at = None
+        sub.save(update_fields=["cancelled_at", "renewal_reminder_at"])
+
+        access_until = sub.expires_at
 
         # Send cancellation notification
         try:
@@ -1243,7 +1279,12 @@ class CancelTechSubscriptionView(APIView):
                 user_id=request.user.id,
                 notification_type="system",
                 title=f"Subscription Cancelled — {sub.technology.name}",
-                message=f"Your subscription (ID: {sub_id}) has been cancelled. You can resubscribe anytime.",
+                message=(
+                    f"Your subscription (ID: {sub_id}) will not renew. You keep full "
+                    f"access until {access_until:%d %b %Y}."
+                    if access_until else
+                    f"Your subscription (ID: {sub_id}) has been cancelled."
+                ),
             )
             queue_user_email(
                 request.user,
@@ -1253,6 +1294,7 @@ class CancelTechSubscriptionView(APIView):
                     "username": request.user.get_full_name() or request.user.username,
                     "technology": sub.technology.name,
                     "subscription_id": sub_id,
+                    "access_until": access_until,
                 },
                 email_type="subscription",
             )
@@ -1262,7 +1304,17 @@ class CancelTechSubscriptionView(APIView):
         return Response({
             "subscription_id": sub_id,
             "technology": sub.technology.name,
-            "is_active": False,
+            # Still active — access runs to the end of the paid term. `cancelled`
+            # is the field a client should read; `is_active` is kept for older
+            # clients and now means "does this still grant access", which is the
+            # honest answer either way.
+            "is_active": True,
+            "cancelled": True,
+            "access_until": access_until.isoformat() if access_until else None,
+            "message": (
+                f"Cancelled. You keep full access until {access_until:%d %b %Y}."
+                if access_until else "Cancelled."
+            ),
         })
 
 
@@ -1594,6 +1646,42 @@ def _revoke_entitlement_for_transaction(tx) -> str:
             )
             if n:
                 revoked.append("interview_entitlement")
+
+        # 4. Organisation seat purchase (audit Z1-6 made these refundable; without
+        #    this branch a refund returned the money and left the org with its seats
+        #    and technology grants — worse than not being refundable, because the
+        #    admin reasonably assumes revocation happened as it does for every other
+        #    product type).
+        if product == "organization":
+            from apps.accounts.models import Organization, OrganizationTechnologyGrant
+
+            org_id = resp.get("org_id")
+            if org_id:
+                tech_ids = [t for t in (resp.get("granted_technology_ids") or []) if t]
+                if tech_ids:
+                    n = OrganizationTechnologyGrant.objects.filter(
+                        organization_id=org_id, technology_id__in=tech_ids,
+                        is_active=True,
+                    ).update(is_active=False)
+                    if n:
+                        revoked.append(f"org_tech_grants={n}")
+                # Restore the seat limit this purchase raised. Recorded at
+                # fulfilment because seat_limit is set with max(), so the prior
+                # value cannot be derived afterwards.
+                prev = resp.get("previous_seat_limit")
+                if isinstance(prev, int):
+                    Organization.objects.filter(id=org_id).update(seat_limit=prev)
+                    revoked.append(f"seat_limit->{prev}")
+                # Members are deliberately NOT removed. Which people to drop when a
+                # seat block is refunded is a decision only the org owner can make,
+                # and silently deleting memberships would be destructive and
+                # unrecoverable. Flag it for the operator instead.
+                logger.warning(
+                    "Org refund for tx=%s org=%s: grants and seat_limit reverted, "
+                    "but existing members were left in place — review whether any "
+                    "now exceed the seat limit.",
+                    tx.id, org_id,
+                )
     except Exception as exc:  # pragma: no cover - defensive
         logger.error(
             "Entitlement revocation FAILED after refund for tx=%s user=%s: %s — "
@@ -1604,6 +1692,172 @@ def _revoke_entitlement_for_transaction(tx) -> str:
     return ", ".join(revoked)
 
 
+def perform_refund(*, payment_id: str, amount_inr, actor, idempotency_key: str = ""):
+    """Issue a Razorpay refund and revoke entitlement, returning ``(payload, status)``.
+
+    This is the ONLY sanctioned refund path. It was extracted from
+    :class:`RazorpayRefundView` so the Django admin (audit L5828/L5861: the API
+    endpoint had no caller in any UI, so refunds were done by hand at the gateway)
+    can reuse the exact same locking, ceiling, idempotency and revocation logic
+    instead of re-implementing it. A second implementation is how you get a
+    double refund, or a refunded customer who keeps paid access because
+    ``_revoke_entitlement_for_transaction`` never ran.
+
+    ``actor`` is the acting user; only ``username`` is used, for gateway notes and
+    the log line. Returns a JSON-serialisable dict and an HTTP status code so the
+    view can return it verbatim and the admin action can render a message.
+    """
+    from django.db import transaction as db_transaction
+    from .models import PaymentTransaction
+
+    payment_id = (payment_id or "").strip()
+    # Optional client-supplied idempotency key; otherwise derive a stable one
+    # from (payment_id, amount) so an identical retry hits the same Razorpay
+    # refund instead of creating a second one.
+    idem_key = (idempotency_key or "").strip()
+
+    if not payment_id:
+        return {"error": "payment_id is required"}, http_status.HTTP_400_BAD_REQUEST
+    if amount_inr is None or amount_inr == "":
+        return {"error": "amount is required (in INR)"}, http_status.HTTP_400_BAD_REQUEST
+
+    # Decimal paise — never float. Quantise to whole paise.
+    try:
+        amount_dec = Decimal(str(amount_inr))
+    except (InvalidOperation, TypeError, ValueError):
+        return {"error": "Invalid amount"}, http_status.HTTP_400_BAD_REQUEST
+    if amount_dec <= 0:
+        return {"error": "Amount must be positive"}, http_status.HTTP_400_BAD_REQUEST
+    amount_paise = int((amount_dec * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+    if not settings.RAZORPAY_KEY_ID or not settings.RAZORPAY_KEY_SECRET:
+        return {"error": "Razorpay is not configured"}, http_status.HTTP_503_SERVICE_UNAVAILABLE
+
+    if not idem_key:
+        idem_key = hashlib.sha256(
+            f"refund-{payment_id}-{amount_paise}".encode()
+        ).hexdigest()
+
+    actor_name = getattr(actor, "username", "") or "system"
+
+    try:
+        import razorpay
+        client = razorpay.Client(
+            auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+        )
+
+        # Everything below is serialised per-transaction under a row lock so
+        # the ceiling check and the refund issuance can't interleave.
+        with db_transaction.atomic():
+            tx = (
+                PaymentTransaction.objects.select_for_update()
+                .filter(gateway_payment_id=payment_id)
+                .first()
+            )
+            if not tx:
+                return (
+                    {"error": "No transaction found for this payment ID"},
+                    http_status.HTTP_404_NOT_FOUND,
+                )
+            if tx.status not in ("success", "refunded"):
+                return (
+                    {"error": "Only a captured/successful payment can be refunded"},
+                    http_status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Idempotency: if this exact idempotency key already produced a
+            # refund, return it without calling the gateway again.
+            gw = tx.gateway_response if isinstance(tx.gateway_response, dict) else {}
+            existing_refunds = gw.get("refunds") or []
+            for r in existing_refunds:
+                if r.get("idempotency_key") and r["idempotency_key"] == idem_key:
+                    return ({
+                        "refund_id": r.get("id"),
+                        "payment_id": payment_id,
+                        "amount_inr": str((Decimal(str(r.get("amount", 0))) / 100)),
+                        "status": r.get("status", "processed"),
+                        "already_refunded": True,
+                    }, http_status.HTTP_200_OK)
+
+            # Ceiling: cumulative refunds may never exceed the captured amount.
+            captured_paise = int((tx.amount * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            already_paise = int((tx.refunded_amount * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            if amount_paise > captured_paise - already_paise:
+                return (
+                    {
+                        "error": "Refund exceeds refundable amount",
+                        "captured_inr": str(tx.amount),
+                        "already_refunded_inr": str(tx.refunded_amount),
+                        "refundable_inr": str(tx.amount - tx.refunded_amount),
+                    },
+                    http_status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Issue the refund. Pass idempotency so a gateway-level retry is
+            # deduped by Razorpay itself.
+            refund = client.payment.refund(
+                payment_id,
+                {
+                    "amount": amount_paise,
+                    "notes": {"by": actor_name},
+                },
+                headers={"X-Razorpay-Idempotency": idem_key},
+            )
+
+            # Persist the refund id + bump cumulative refunded amount.
+            existing_refunds.append({
+                "id": refund.get("id", ""),
+                "amount": amount_paise,
+                "idempotency_key": idem_key,
+                "status": refund.get("status", ""),
+                "by": actor_name,
+            })
+            gw["refunds"] = existing_refunds
+            tx.gateway_response = gw
+            tx.refunded_amount = (tx.refunded_amount or Decimal("0")) + amount_dec
+            # Mark fully refunded only when the whole captured amount is back.
+            if tx.refunded_amount >= tx.amount:
+                tx.status = "refunded"
+            tx.save(update_fields=["gateway_response", "refunded_amount", "status"])
+
+            # Revoke the entitlement the refund paid for.
+            #
+            # This used to touch only the transaction row, so a refunded
+            # customer kept a full year of paid access — the money went back
+            # and the product did not. FAQ.jsx publicly promises "refunds
+            # within 7 days", which made this a standing revenue leak rather
+            # than an edge case.
+            #
+            # Only on FULL refund: a partial refund (goodwill credit, price
+            # adjustment) should not strip access that was partly paid for.
+            if tx.status == "refunded":
+                revoked = _revoke_entitlement_for_transaction(tx)
+                logger.info(
+                    "Refund revoked entitlement for tx=%s user=%s: %s",
+                    tx.id, tx.user_id, revoked or "nothing matched",
+                )
+
+        logger.info(
+            "Refund issued by admin %s: payment_id=%s amount=₹%s refund_id=%s",
+            actor_name, payment_id, amount_dec, refund.get("id", ""),
+        )
+        return ({
+            "refund_id": refund.get("id"),
+            "payment_id": payment_id,
+            "amount_inr": str(amount_dec),
+            "status": refund.get("status"),
+        }, http_status.HTTP_201_CREATED)
+
+    except Exception as e:
+        # Log the detail server-side; do not echo the raw gateway/SDK
+        # exception text back to the client (may leak internals).
+        logger.error(f"Razorpay refund failed for {payment_id}: {e}")
+        return (
+            {"error": "Refund failed. Please check the payment ID and try again, or contact support."},
+            http_status.HTTP_502_BAD_GATEWAY,
+        )
+
+
 class RazorpayRefundView(APIView):
     """
     Admin-only: issue a partial or full refund for a Razorpay payment.
@@ -1611,7 +1865,8 @@ class RazorpayRefundView(APIView):
     POST /api/billing/razorpay/refund/
     Body: { "payment_id": "pay_xxx", "amount": 499 }   (amount in INR)
 
-    PRODUCTION_AUDIT FIN-02 — hardened:
+    All of the hardening (PRODUCTION_AUDIT FIN-02) lives in :func:`perform_refund`
+    so the admin refund action shares it byte-for-byte:
       * The transaction row is locked with ``select_for_update`` inside a single
         ``transaction.atomic()`` so two concurrent refunds (double-click / two
         admins) are serialised — the second sees the first's effect.
@@ -1623,165 +1878,16 @@ class RazorpayRefundView(APIView):
         gateway dedupes a retried refund), the Razorpay ``refund.id`` is persisted
         in ``gateway_response['refunds']``, and a refund whose id we've already
         recorded is treated as a no-op success rather than refunding again.
+      * A full refund revokes the entitlement it paid for.
     """
     permission_classes = [IsAdminUser]
     throttle_classes = [BillingRateThrottle]
 
     def post(self, request):
-        from django.db import transaction as db_transaction
-        from .models import PaymentTransaction
-
-        payment_id = (request.data.get("payment_id") or "").strip()
-        amount_inr = request.data.get("amount")
-        # Optional client-supplied idempotency key; otherwise derive a stable one
-        # from (payment_id, amount) so an identical retry hits the same Razorpay
-        # refund instead of creating a second one.
-        idem_key = (request.data.get("idempotency_key") or "").strip()
-
-        if not payment_id:
-            return Response(
-                {"error": "payment_id is required"},
-                status=http_status.HTTP_400_BAD_REQUEST,
-            )
-        if amount_inr is None or amount_inr == "":
-            return Response(
-                {"error": "amount is required (in INR)"},
-                status=http_status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Decimal paise — never float. Quantise to whole paise.
-        try:
-            amount_dec = Decimal(str(amount_inr))
-        except (InvalidOperation, TypeError, ValueError):
-            return Response({"error": "Invalid amount"}, status=http_status.HTTP_400_BAD_REQUEST)
-        if amount_dec <= 0:
-            return Response({"error": "Amount must be positive"}, status=http_status.HTTP_400_BAD_REQUEST)
-        amount_paise = int((amount_dec * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-
-        if not settings.RAZORPAY_KEY_ID or not settings.RAZORPAY_KEY_SECRET:
-            return Response(
-                {"error": "Razorpay is not configured"},
-                status=http_status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
-        if not idem_key:
-            idem_key = hashlib.sha256(
-                f"refund-{payment_id}-{amount_paise}".encode()
-            ).hexdigest()
-
-        try:
-            import razorpay
-            client = razorpay.Client(
-                auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
-            )
-
-            # Everything below is serialised per-transaction under a row lock so
-            # the ceiling check and the refund issuance can't interleave.
-            with db_transaction.atomic():
-                tx = (
-                    PaymentTransaction.objects.select_for_update()
-                    .filter(gateway_payment_id=payment_id)
-                    .first()
-                )
-                if not tx:
-                    return Response(
-                        {"error": "No transaction found for this payment ID"},
-                        status=http_status.HTTP_404_NOT_FOUND,
-                    )
-                if tx.status not in ("success", "refunded"):
-                    return Response(
-                        {"error": "Only a captured/successful payment can be refunded"},
-                        status=http_status.HTTP_400_BAD_REQUEST,
-                    )
-
-                # Idempotency: if this exact idempotency key already produced a
-                # refund, return it without calling the gateway again.
-                gw = tx.gateway_response if isinstance(tx.gateway_response, dict) else {}
-                existing_refunds = gw.get("refunds") or []
-                for r in existing_refunds:
-                    if r.get("idempotency_key") and r["idempotency_key"] == idem_key:
-                        return Response({
-                            "refund_id": r.get("id"),
-                            "payment_id": payment_id,
-                            "amount_inr": str((Decimal(str(r.get("amount", 0))) / 100)),
-                            "status": r.get("status", "processed"),
-                            "already_refunded": True,
-                        }, status=http_status.HTTP_200_OK)
-
-                # Ceiling: cumulative refunds may never exceed the captured amount.
-                captured_paise = int((tx.amount * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-                already_paise = int((tx.refunded_amount * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-                if amount_paise > captured_paise - already_paise:
-                    return Response(
-                        {
-                            "error": "Refund exceeds refundable amount",
-                            "captured_inr": str(tx.amount),
-                            "already_refunded_inr": str(tx.refunded_amount),
-                            "refundable_inr": str(tx.amount - tx.refunded_amount),
-                        },
-                        status=http_status.HTTP_400_BAD_REQUEST,
-                    )
-
-                # Issue the refund. Pass idempotency so a gateway-level retry is
-                # deduped by Razorpay itself.
-                refund = client.payment.refund(
-                    payment_id,
-                    {
-                        "amount": amount_paise,
-                        "notes": {"by": request.user.username},
-                    },
-                    headers={"X-Razorpay-Idempotency": idem_key},
-                )
-
-                # Persist the refund id + bump cumulative refunded amount.
-                existing_refunds.append({
-                    "id": refund.get("id", ""),
-                    "amount": amount_paise,
-                    "idempotency_key": idem_key,
-                    "status": refund.get("status", ""),
-                    "by": request.user.username,
-                })
-                gw["refunds"] = existing_refunds
-                tx.gateway_response = gw
-                tx.refunded_amount = (tx.refunded_amount or Decimal("0")) + amount_dec
-                # Mark fully refunded only when the whole captured amount is back.
-                if tx.refunded_amount >= tx.amount:
-                    tx.status = "refunded"
-                tx.save(update_fields=["gateway_response", "refunded_amount", "status"])
-
-                # Revoke the entitlement the refund paid for.
-                #
-                # This used to touch only the transaction row, so a refunded
-                # customer kept a full year of paid access — the money went back
-                # and the product did not. FAQ.jsx publicly promises "refunds
-                # within 7 days", which made this a standing revenue leak rather
-                # than an edge case.
-                #
-                # Only on FULL refund: a partial refund (goodwill credit, price
-                # adjustment) should not strip access that was partly paid for.
-                if tx.status == "refunded":
-                    revoked = _revoke_entitlement_for_transaction(tx)
-                    logger.info(
-                        "Refund revoked entitlement for tx=%s user=%s: %s",
-                        tx.id, tx.user_id, revoked or "nothing matched",
-                    )
-
-            logger.info(
-                "Refund issued by admin %s: payment_id=%s amount=₹%s refund_id=%s",
-                request.user.username, payment_id, amount_dec, refund.get("id", ""),
-            )
-            return Response({
-                "refund_id": refund.get("id"),
-                "payment_id": payment_id,
-                "amount_inr": str(amount_dec),
-                "status": refund.get("status"),
-            }, status=http_status.HTTP_201_CREATED)
-
-        except Exception as e:
-            # Log the detail server-side; do not echo the raw gateway/SDK
-            # exception text back to the client (may leak internals).
-            logger.error(f"Razorpay refund failed for {payment_id}: {e}")
-            return Response(
-                {"error": "Refund failed. Please check the payment ID and try again, or contact support."},
-                status=http_status.HTTP_502_BAD_GATEWAY,
-            )
+        payload, status_code = perform_refund(
+            payment_id=request.data.get("payment_id") or "",
+            amount_inr=request.data.get("amount"),
+            actor=request.user,
+            idempotency_key=request.data.get("idempotency_key") or "",
+        )
+        return Response(payload, status=status_code)

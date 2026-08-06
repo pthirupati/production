@@ -605,6 +605,11 @@ class InterviewRoundScheduleView(APIView):
         return Response(InterviewRoundSerializer(round_obj).data)
 
 
+# Bump when the camera/mic/transcript consent text in InterviewRoom.jsx changes, so
+# a stored consent still identifies the exact wording it was given against.
+CONSENT_POLICY_VERSION = "2026-08-07"
+
+
 class InterviewRoundStartView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_classes = [InterviewRateThrottle]
@@ -639,6 +644,20 @@ class InterviewRoundStartView(APIView):
 
         if round_obj.status not in ("scheduled", "ready", "schedulable", "in_progress"):
             return Response({"error": "Round not ready to start"}, status=400)
+
+        # Record camera/mic/transcript consent (audit Z4-5). The UI has always
+        # required the checkbox before enabling this call, but nothing persisted it,
+        # so we had no evidence consent was given for biometric-adjacent processing.
+        # Recorded on FIRST start only — a reconnect must not overwrite the original
+        # timestamp, which is the thing that has to be defensible.
+        if round_obj.consent_granted_at is None:
+            round_obj.consent_granted_at = timezone.now()
+            round_obj.consent_policy_version = str(
+                request.data.get("consent_policy_version") or ""
+            ).strip()[:32] or CONSENT_POLICY_VERSION
+            round_obj.save(
+                update_fields=["consent_granted_at", "consent_policy_version"]
+            )
 
         # The interview must work with the free rule-based engine and no paid API.
         # Wrap the engine calls so any optional/edge failure degrades gracefully
@@ -828,6 +847,7 @@ class InterviewRoundMessageView(APIView):
                 has_keywords=bool(keyword_hits) or bool(score_result.get("keyword_hit_rate")),
                 topic_detected=score_result.get("topic_detected"),
                 command_validated=bool(score_result.get("command_validated")),
+                relevance_score=score_result.get("relevance_score"),
             )
         except Exception:  # noqa: BLE001 - verdict is best-effort, never 500
             return CORRECTNESS_UNKNOWN
@@ -854,8 +874,38 @@ class InterviewRoundAvStatusView(APIView):
         return Response(result)
 
 
+class InterviewTimerRateThrottle(InterviewRateThrottle):
+    """Own bucket for the timer endpoints, at the `interview` rate.
+
+    These were originally given plain `InterviewRateThrottle`, which shares ONE
+    cache key per user with start/message. That scope is 200/day (settings.py),
+    not per-minute, so the two uses compete for a finite daily budget — and
+    pause/resume is not user-initiated. `InterviewRoom.jsx` fires pause on every
+    `visibilitychange` to hidden and resume on every return (debounced only
+    400ms, which stops focus blips, not sustained alt-tabbing). A candidate who
+    switches tabs 100 times to read docs therefore spends half the allowance
+    that *answering questions* draws from, and the 429 lands on `message` —
+    killing the interview mid-answer, which is far worse than the clock-farming
+    this throttle exists to bound.
+
+    Subclassing to re-key rather than registering a new scope keeps the rate
+    configured in one place and needs no `DEFAULT_THROTTLE_RATES` entry, which
+    must otherwise be added to BOTH settings modules (test_settings replaces the
+    dict wholesale) or every request 500s.
+    """
+
+    def get_cache_key(self, request, view):
+        key = super().get_cache_key(request, view)
+        # None when unauthenticated — leave it as the no-throttle signal.
+        return f"{key}:timer" if key else key
+
+
 class InterviewRoundExtendView(APIView):
     permission_classes = [IsAuthenticated]
+    # Timer-mutating endpoint: unthrottled, these let a client hammer
+    # pause/resume/extend to farm clock. Separate bucket from start/message so
+    # background pause/resume cannot 429 a real answer — see the class docstring.
+    throttle_classes = [InterviewTimerRateThrottle]
 
     def post(self, request, round_id):
         round_obj = get_object_or_404(
@@ -872,6 +922,9 @@ class InterviewRoundExtendView(APIView):
 
 class InterviewRoundPauseView(APIView):
     permission_classes = [IsAuthenticated]
+    # Fired automatically by the room on tab-hide, so it must not share the
+    # start/message bucket. See InterviewTimerRateThrottle.
+    throttle_classes = [InterviewTimerRateThrottle]
 
     def post(self, request, round_id):
         round_obj = get_object_or_404(
@@ -887,6 +940,8 @@ class InterviewRoundPauseView(APIView):
 
 class InterviewRoundResumeView(APIView):
     permission_classes = [IsAuthenticated]
+    # Fired automatically by the room on tab-return. See InterviewTimerRateThrottle.
+    throttle_classes = [InterviewTimerRateThrottle]
 
     def post(self, request, round_id):
         round_obj = get_object_or_404(

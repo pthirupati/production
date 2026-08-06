@@ -521,7 +521,6 @@ class RHELShell:
             "esxcli": self._cmd_esxcli,
             "vmware-toolbox-cmd": self._cmd_vmware,
             "reboot": self._cmd_reboot,
-            "shutdown": self._cmd_shutdown,
             "poweroff": self._cmd_poweroff,
             "halt": self._cmd_poweroff,
         }
@@ -1484,6 +1483,18 @@ class RHELShell:
         opts = [a for a in p[1:] if a.startswith("-")]
         words = [a for a in p[1:] if not a.startswith("-")]
         want_failed = "--failed" in opts
+        # `-p/--property NAME` takes a value, so that NAME is an option argument
+        # and not the unit — otherwise `systemctl show -p ActiveState nginx`
+        # parses "ActiveState" as the unit and reports it as not found.
+        show_props: list[str] = []
+        for i, a in enumerate(p[1:]):
+            if a in ("-p", "--property") and i + 2 <= len(p) - 1:
+                value = p[i + 2]
+                show_props.extend(x for x in value.split(",") if x)
+                if value in words:
+                    words.remove(value)
+            elif a.startswith("--property="):
+                show_props.extend(x for x in a.split("=", 1)[1].split(",") if x)
         action = words[0] if words else ""
         unit = words[1] if len(words) > 1 else ""
         unit = unit.replace(".service", "").replace(".socket", "").replace(".target", "")
@@ -1540,6 +1551,15 @@ class RHELShell:
             if action == "status":
                 self.state.last_exit_code = 4
                 return f"Unit {unit}.service could not be found."
+            if action == "cat":
+                # A unit file can exist for a unit systemd has no service record
+                # for (e.g. one the learner just wrote); read it if so.
+                found = self._find_unit_file(unit)
+                if found is not None:
+                    path, src = found
+                    return f"# {path}\n{src.rstrip(chr(10))}"
+                self.state.last_exit_code = 1
+                return f"No files found for {unit}.service."
             # A masked unit still reports as not-found by name here; everything
             # else that references a real unit needs it to exist.
             return f"Unit {unit}.service could not be found."
@@ -1561,6 +1581,13 @@ class RHELShell:
                 f"{main}"
             )
         if action == "start":
+            failure = self._nginx_config_failure(unit)
+            if failure is not None:
+                svc.active = "failed"
+                svc.sub_state = "failed"
+                self.state.last_exit_code = 1
+                self._publish_workload(unit)
+                return failure
             svc.active = "active"
             svc.sub_state = "running"
             self._publish_workload(unit)  # cross-tech: surface in monitoring as up
@@ -1577,13 +1604,48 @@ class RHELShell:
                 self.state.last_exit_code = 5
                 return (f"Failed to reload {unit}.service: Job type reload is not "
                         f"applicable for unit {unit}.service.")
+            # `start` used to be the ONLY causal path, so `systemctl restart nginx`
+            # brought the service up against a config that `nginx -t` rejects — and
+            # restart is what a learner actually types after editing a file. Any
+            # grader asserting `systemctl is-active nginx` then passed a config lab
+            # in which nothing was fixed.
+            failure = self._nginx_config_failure(unit)
+            if failure is not None:
+                if action == "reload":
+                    # Real nginx tests the config before applying it, so a failed
+                    # reload leaves the master process serving the OLD config: the
+                    # command fails, the unit keeps running.
+                    self.state.last_exit_code = 1
+                    return (
+                        f"Job for {unit}.service failed.\n"
+                        f"See \"systemctl status {unit}.service\" and \"journalctl "
+                        f"-xeu {unit}.service\" for details.\n"
+                        f"{self._nginx_test_output()}"
+                    )
+                # restart = stop then start; the start half fails, so the unit ends
+                # up failed rather than running.
+                svc.active = "failed"
+                svc.sub_state = "failed"
+                self.state.last_exit_code = 1
+                self._publish_workload(unit)
+                return failure
             svc.active = "active"
             svc.sub_state = "running"
+            self._publish_workload(unit)
             return ""
         if action == "enable":
             svc.enabled = "enabled"
             msg = f"Created symlink /etc/systemd/system/multi-user.target.wants/{unit}.service → /usr/lib/systemd/system/{unit}.service."
             if "--now" in opts:
+                # `enable --now` is enable + start, so it must honour the same config
+                # gate — otherwise it is a third way to bring up a broken nginx.
+                failure = self._nginx_config_failure(unit)
+                if failure is not None:
+                    svc.active = "failed"
+                    svc.sub_state = "failed"
+                    self.state.last_exit_code = 1
+                    self._publish_workload(unit)
+                    return f"{msg}\n{failure}"
                 svc.active = "active"
                 svc.sub_state = "running"
             return msg
@@ -1616,18 +1678,116 @@ class RHELShell:
             svc.sub_state = "dead"
             return ""
         if action == "cat":
+            found = self._find_unit_file(unit)
+            if found is not None:
+                path, src = found
+                return f"# {path}\n{src.rstrip(chr(10))}"
+            # No unit file on disk: describe the unit from service state instead
+            # of fabricating an ExecStart. The synthesised version used to claim
+            # ExecStart=/usr/sbin/<unit> even when a real file said otherwise,
+            # so an edited unit was invisible here while `cat <path>` showed it.
             return (f"# /usr/lib/systemd/system/{unit}.service\n"
                     f"[Unit]\nDescription={svc.description}\n\n"
-                    f"[Service]\nType=notify\nExecStart=/usr/sbin/{unit}\n\n"
+                    f"[Service]\nType=notify\n\n"
                     f"[Install]\nWantedBy=multi-user.target")
         if action == "show":
-            return (f"Id={unit}.service\nNames={unit}.service\n"
-                    f"Description={svc.description}\n"
-                    f"LoadState={svc.loaded}\nActiveState={svc.active}\nSubState={svc.sub_state}\n"
-                    f"UnitFileState={svc.enabled}\nMainPID={'891' if svc.active == 'active' else '0'}")
+            props: dict[str, str] = {
+                "Id": f"{unit}.service",
+                "Names": f"{unit}.service",
+                "Description": svc.description,
+                "LoadState": svc.loaded,
+                "ActiveState": svc.active,
+                "SubState": svc.sub_state,
+                "UnitFileState": svc.enabled,
+                "MainPID": "891" if svc.active == "active" else "0",
+            }
+            found = self._find_unit_file(unit)
+            if found is not None:
+                path, src = found
+                props["FragmentPath"] = path
+                sections, err = self._parse_unit_file(src)
+                if err is None:
+                    # Surface the file's own directives so an edit is observable.
+                    for section, keys in sections.items():
+                        for k, v in keys.items():
+                            if section == "Unit" and k == "Description":
+                                props["Description"] = v
+                            else:
+                                props[k] = v
+            if show_props:
+                return "\n".join(f"{k}={props.get(k, '')}" for k in show_props)
+            return "\n".join(f"{k}={v}" for k, v in props.items())
         if action == "list-dependencies":
             return f"{unit}.service\n● ├─system.slice\n● └─sysinit.target"
         return f"Unknown operation '{action}'."
+
+    # systemd searches these in order; the first hit wins (/etc overrides /usr).
+    UNIT_DIRS = ("/etc/systemd/system", "/usr/lib/systemd/system", "/lib/systemd/system")
+
+    def _find_unit_file(self, unit: str) -> tuple[str, str] | None:
+        """(path, content) of `unit`'s file on the VFS, or None when it has none."""
+        for directory in self.UNIT_DIRS:
+            path = f"{directory}/{unit}.service"
+            src = self.state.read_file(path)
+            if src is not None:
+                return path, src
+        return None
+
+    @staticmethod
+    def _parse_unit_file(src: str) -> tuple[dict[str, dict[str, str]], str | None]:
+        """Parse an INI-ish unit file into ({section: {key: value}}, error)."""
+        sections: dict[str, dict[str, str]] = {}
+        current: str | None = None
+        for i, raw in enumerate(src.split("\n"), start=1):
+            line = raw.strip()
+            if not line or line.startswith("#") or line.startswith(";"):
+                continue
+            if line.startswith("["):
+                if not line.endswith("]") or len(line) < 3:
+                    return sections, f"Invalid section header '{line}' at line {i}"
+                current = line[1:-1]
+                sections.setdefault(current, {})
+                continue
+            if "=" not in line:
+                return sections, f"Missing '=' in assignment '{line}' at line {i}"
+            if current is None:
+                return sections, f"Assignment '{line}' outside of section at line {i}"
+            key, _, value = line.partition("=")
+            sections[current][key.strip()] = value.strip()
+        return sections, None
+
+    def _nginx_test_output(self) -> str:
+        """Raw `nginx -t` output, or '' when nginx isn't installed."""
+        if self.state.resolve_binary("nginx") is None:
+            return ""
+        return self._cmd_nginx(["nginx", "-t"]) or ""
+
+    def _nginx_config_failure(self, unit: str) -> str | None:
+        """The systemd failure message when bringing `unit` up would fail, else None.
+
+        Config and service state used to be decoupled: the simulator started nginx
+        whatever `nginx -t` said, so a config lab could be "solved" without fixing
+        anything. This is the single gate every activating verb routes through
+        (start / restart / reload-or-restart / try-restart / reload / enable --now)
+        so it cannot be bypassed by reaching for a different verb (audit §F1).
+
+        Preserves the caller's exit code on success — running `nginx -t` internally
+        must not clobber the `$?` a learner is about to inspect.
+        """
+        if unit != "nginx" or self.state.resolve_binary("nginx") is None:
+            return None
+        prev_rc = getattr(self.state, "last_exit_code", 0)
+        out = self._cmd_nginx(["nginx", "-t"]) or ""
+        if "test is successful" in out:
+            self.state.last_exit_code = prev_rc if prev_rc is not None else 0
+            return None
+        return (
+            "Job for nginx.service failed because the control process exited "
+            "with error code.\n"
+            "See \"systemctl status nginx.service\" and \"journalctl -xeu "
+            "nginx.service\" for details.\n"
+            f"{out}"
+        )
 
     def _systemctl_list_units(self, failed_only: bool = False) -> str:
         header = ("UNIT                       LOAD   ACTIVE   SUB     DESCRIPTION")

@@ -9,6 +9,7 @@ import { BLOG_FALLBACK_POSTS, BLOG_CATEGORIES, getCategoryClass } from '../data/
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
 import { useRevealOnScroll } from '../hooks/useRevealOnScroll'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 function mergePosts(apiPosts) {
   const bySlug = new Map()
@@ -60,6 +61,7 @@ function PostCardSkeleton() {
 }
 
 export default function Blog() {
+  usePageTitle('Blog', 'Practical write-ups on troubleshooting, infrastructure and interview preparation from the FixitLab team.')
   const [posts, setPosts] = useState(BLOG_FALLBACK_POSTS)
   const [loading, setLoading] = useState(true)
   const [activeCategory, setActiveCategory] = useState('All')

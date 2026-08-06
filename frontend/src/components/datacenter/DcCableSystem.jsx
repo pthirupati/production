@@ -2,7 +2,7 @@
  * Interactive plant cabling for the 3D twin:
  * RJ45/DAC/QSFP connectors, sagging tubes, drag-to-unplug + snap-to-plug.
  */
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { RigidBody, BallCollider } from '@react-three/rapier'
@@ -112,6 +112,55 @@ function cableColor(cableType = '', loose = false) {
   return '#38bdf8'
 }
 
+// Decay rates for the unplug recoil and the snap-to-plug flash. These used to be
+// React state decremented inside useFrame, which re-rendered the cable ~60x/sec.
+const RECOIL_DECAY = 2.2
+const SNAP_DECAY = 3
+
+/** Frame-rate independent decay, clamped at 0. Pure so it can be tested. */
+export function decay(value, dt, rate) {
+  if (!(value > 0)) return 0
+  const next = value - (Number.isFinite(dt) ? dt : 0) * rate
+  return next > 0 ? next : 0
+}
+
+/**
+ * Resting world position of the draggable connector tip.
+ * Writes into `out` instead of allocating: this runs every frame while a cable
+ * recoils, and the old useMemo version cloned three Vector3s per call.
+ */
+export function computeTipWorld(out, { to, loose, dragging, tipOffset, recoil }) {
+  out.copy(to)
+  if (loose || dragging || recoil > 0) {
+    out.y -= loose ? 0.55 : 0.08
+    out.x += loose ? 0.22 : 0
+    if (tipOffset) out.add(tipOffset)
+    if (recoil > 0) out.y -= recoil * 0.25
+  }
+  return out
+}
+
+/**
+ * Rewrites the four control points of an existing CatmullRomCurve3 in place.
+ * Mutating is what lets us keep one curve + one TubeGeometry for the lifetime of
+ * the cable; callers that captured `curve` (the packet animation) keep reading
+ * the live object rather than a stale closure.
+ */
+export function updateCurvePoints(curve, { from, tip, loose, dragging }) {
+  const [a, mid1, mid2, b] = curve.points
+  a.copy(from)
+  b.copy(tip)
+  mid1.lerpVectors(a, b, 0.33)
+  mid1.y -= loose || dragging ? 0.42 : 0.12
+  mid1.x += loose ? 0.15 : 0.04
+  mid2.lerpVectors(a, b, 0.66)
+  mid2.y -= loose || dragging ? 0.55 : 0.18
+  // CatmullRomCurve3 caches arc lengths for getPointAt(); without this the
+  // packets would keep pathing along the previous frame's geometry.
+  curve.updateArcLengths()
+  return curve
+}
+
 /**
  * Interactive plant cable with drag plug/unplug.
  * from = chassis port, to = tray / switch end.
@@ -134,8 +183,13 @@ export function InteractiveCable({
   const tipRef = useRef()
   const [dragging, setDragging] = useState(false)
   const [tipOffset, setTipOffset] = useState(() => new THREE.Vector3())
-  const [snapFlash, setSnapFlash] = useState(0)
-  const [recoil, setRecoil] = useState(0)
+  // recoil/snapFlash decay every frame. They are refs, not state, because as
+  // state each tick re-rendered the cable and rebuilt curve + TubeGeometry(36x8)
+  // — a new GPU buffer per frame per cable, none of them disposed.
+  const snapFlash = useRef(0)
+  const recoil = useRef(0)
+  const tipMatRef = useRef()
+  const tubeMatRef = useRef()
   const dragStart = useRef(null)
   const controls = useThree((s) => s.controls)
   const { camera, gl } = useThree()
@@ -147,36 +201,81 @@ export function InteractiveCable({
   const kind = connectorKind(cableType)
   const color = cableColor(cableType, loose)
 
-  const tipWorld = useMemo(() => {
-    if (loose || dragging || recoil > 0) {
-      const hang = to.clone()
-      hang.y -= loose ? 0.55 : 0.08
-      hang.x += loose ? 0.22 : 0
-      hang.add(tipOffset)
-      if (recoil > 0) hang.y -= recoil * 0.25
-      return hang
-    }
-    return to.clone()
-  }, [to, loose, dragging, tipOffset, recoil])
-
-  const curve = useMemo(() => {
-    const a = from.clone()
-    const b = tipWorld.clone()
-    const mid1 = new THREE.Vector3().lerpVectors(a, b, 0.33)
-    mid1.y -= loose || dragging ? 0.42 : 0.12
-    mid1.x += loose ? 0.15 : 0.04
-    const mid2 = new THREE.Vector3().lerpVectors(a, b, 0.66)
-    mid2.y -= loose || dragging ? 0.55 : 0.18
-    return new THREE.CatmullRomCurve3([a, mid1, mid2, b])
-  }, [from, tipWorld, loose, dragging])
-
-  const tube = useMemo(
-    () => new THREE.TubeGeometry(curve, 36, loose || dragging ? 0.011 : 0.013, 8, false),
-    [curve, loose, dragging],
+  // One curve and one tube for the life of the cable. Both are mutated in place
+  // below; `curve.points` are pre-allocated so no frame ever allocates a Vector3.
+  const tipWorld = useMemo(() => new THREE.Vector3(), [])
+  const curve = useMemo(
+    () =>
+      new THREE.CatmullRomCurve3([
+        new THREE.Vector3(),
+        new THREE.Vector3(),
+        new THREE.Vector3(),
+        new THREE.Vector3(),
+      ]),
+    [],
   )
+  const tube = useMemo(() => new THREE.TubeGeometry(curve, 36, 0.013, 8, false), [curve])
+
+  // syncTube runs inside useFrame and must see the current loose/dragging values
+  // without being rebuilt (and without re-running the effect) on every change.
+  const loosePropRef = useRef(loose)
+  const draggingRef = useRef(dragging)
+  loosePropRef.current = loose
+  draggingRef.current = dragging
+
+  // Rewrites the tube's existing position/normal buffers from the current curve.
+  // TubeGeometry has no update() method, so we build a throwaway on the same
+  // topology (identical segment counts => identical buffer lengths), copy the
+  // arrays across and dispose it immediately. That keeps ONE long-lived GPU
+  // allocation per cable instead of one per frame.
+  const syncTube = useMemo(
+    () => () => {
+      const radius = loosePropRef.current || draggingRef.current ? 0.011 : 0.013
+      const next = new THREE.TubeGeometry(curve, 36, radius, 8, false)
+      for (const name of ['position', 'normal']) {
+        tube.attributes[name].copy(next.attributes[name])
+        tube.attributes[name].needsUpdate = true
+      }
+      tube.computeBoundingSphere()
+      next.dispose()
+    },
+    [curve, tube],
+  )
+
+  // TubeGeometry allocates real GPU buffers and R3F does not own this one (it
+  // came from useMemo, not JSX), so nothing disposed it. The twin also unmounts
+  // on every 2D/3D toggle and room switch, so this leaked per toggle.
+  useEffect(() => () => tube.dispose(), [tube])
+
+  // Keep the tube in sync with prop-driven changes (rack moves, plug/unplug)
+  // even on a paused/idle frame loop.
+  useEffect(() => {
+    computeTipWorld(tipWorld, { to, loose, dragging, tipOffset, recoil: recoil.current })
+    updateCurvePoints(curve, { from, tip: tipWorld, loose, dragging })
+    syncTube()
+    if (tipRef.current) tipRef.current.position.copy(tipWorld)
+  }, [from, to, loose, dragging, tipOffset, tipWorld, curve, syncTube])
 
   useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime
+    // Decay first so the geometry we build this frame reflects this frame's recoil.
+    const hadMotion = recoil.current > 0 || snapFlash.current > 0
+    recoil.current = decay(recoil.current, dt, RECOIL_DECAY)
+    snapFlash.current = decay(snapFlash.current, dt, SNAP_DECAY)
+
+    if (hadMotion) {
+      computeTipWorld(tipWorld, { to, loose, dragging, tipOffset, recoil: recoil.current })
+      updateCurvePoints(curve, { from, tip: tipWorld, loose, dragging })
+      syncTube()
+      // tipWorld is mutated in place and is the same object R3F copies into the
+      // tip group and drei's Html wrapper, so both overlays track it without a
+      // re-render. tipRef is written directly for the frames React never sees.
+      if (tipRef.current) tipRef.current.position.copy(tipWorld)
+      // These read snapFlash, which no longer re-renders: drive them imperatively.
+      if (tipMatRef.current) tipMatRef.current.emissiveIntensity = 0.9 + snapFlash.current + (arNetwork ? 0.45 : 0)
+      if (tubeMatRef.current && !loose) tubeMatRef.current.emissiveIntensity = 0.18 + snapFlash.current * 0.5
+    }
+
     if (packetRef.current && traffic && !loose && !dragging) {
       const u = (t * 0.4) % 1
       packetRef.current.position.copy(curve.getPointAt(u))
@@ -193,9 +292,7 @@ export function InteractiveCable({
     } else if (packetRef2.current) {
       packetRef2.current.visible = false
     }
-    if (recoil > 0) setRecoil((r) => Math.max(0, r - dt * 2.2))
-    if (snapFlash > 0) setSnapFlash((s) => Math.max(0, s - dt * 3))
-    if (tipRef.current) tipRef.current.scale.setScalar(1 + snapFlash * 0.35)
+    if (tipRef.current) tipRef.current.scale.setScalar(1 + snapFlash.current * 0.35)
   })
 
   const projectPointer = (clientX, clientY) => {
@@ -224,7 +321,7 @@ export function InteractiveCable({
     if (distMoved < 18) return
 
     if (!loose && onUnplug) {
-      setRecoil(1)
+      recoil.current = 1
       setTipOffset(new THREE.Vector3(0.15, -0.35, 0.12))
       onUnplug({ serverId, cableId })
       return
@@ -233,7 +330,7 @@ export function InteractiveCable({
       const tip = projectPointer(clientX, clientY)
       if (tip.distanceTo(from) < 0.55) {
         setTipOffset(new THREE.Vector3())
-        setSnapFlash(1)
+        snapFlash.current = 1
         onPlug({ serverId, cableId })
       }
     }
@@ -250,9 +347,10 @@ export function InteractiveCable({
       />
       <mesh geometry={tube}>
         <meshStandardMaterial
+          ref={tubeMatRef}
           color={color}
           emissive={loose ? '#f59e0b' : color}
-          emissiveIntensity={loose ? 0.35 : 0.18 + snapFlash * 0.5}
+          emissiveIntensity={loose ? 0.35 : 0.18}
           metalness={0.25}
           roughness={0.55}
           toneMapped={false}
@@ -297,9 +395,10 @@ export function InteractiveCable({
         <mesh position={[0, 0.03, 0]}>
           <sphereGeometry args={[0.012, 8, 8]} />
           <meshStandardMaterial
+            ref={tipMatRef}
             color="#fff"
             emissive={loose ? '#f59e0b' : '#38bdf8'}
-            emissiveIntensity={0.9 + snapFlash + (arNetwork ? 0.45 : 0)}
+            emissiveIntensity={0.9 + (arNetwork ? 0.45 : 0)}
             toneMapped={false}
           />
         </mesh>

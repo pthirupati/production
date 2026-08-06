@@ -10,7 +10,7 @@ import useSessionTimeout from './hooks/useSessionTimeout'
 import { useThemeStore } from './store/themeStore'
 import { useAuthStore } from './store/authStore'
 import { authApi } from './api/auth'
-import { rehydrateAwsSimForUser, useAwsStore } from './components/aws/store/awsStore'
+import { rehydrateAwsSimForUser, waitAwsPersistHydrated } from './utils/awsSimLifecycle'
 
 function SessionMonitor() {
   useSessionTimeout()
@@ -21,25 +21,6 @@ function ThemeInit() {
   const initTheme = useThemeStore((s) => s.initTheme)
   useEffect(() => { initTheme() }, [])
   return null
-}
-
-async function waitAwsPersistHydrated(timeoutMs = 2500) {
-  const persist = useAwsStore?.persist
-  if (!persist?.hasHydrated) return
-  if (persist.hasHydrated()) return
-  await new Promise((resolve) => {
-    let done = false
-    const finish = () => {
-      if (done) return
-      done = true
-      resolve()
-    }
-    const unsub = persist.onFinishHydration?.(() => {
-      try { unsub?.() } catch { /* ignore */ }
-      finish()
-    })
-    setTimeout(finish, timeoutMs)
-  })
 }
 
 /** Validate persisted auth against the server on boot; clear stale local state.

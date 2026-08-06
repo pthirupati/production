@@ -1157,12 +1157,17 @@ export default function InterviewRoom() {
     if (thinking) {
       // Server already includes ±15% jitter (P2.R1). Only add client jitter when
       // the API omitted thinking_delay_ms (older payloads / start-round).
+      //
+      // Floor is 300ms to match timing._MIN_MS. The old 500ms floor here would
+      // silently re-inflate any value the server had already shortened to
+      // absorb slow scoring, so the backend's latency work never reached the
+      // candidate. Keep the two floors in sync.
       let delay
       if (thinkingDelayMs != null && Number.isFinite(Number(thinkingDelayMs))) {
-        delay = Math.max(500, Number(thinkingDelayMs))
+        delay = Math.max(300, Number(thinkingDelayMs))
       } else {
         const base = sp?.thinking_base_ms ?? 600
-        delay = Math.max(500, base + 120 + Math.random() * 200)
+        delay = Math.max(300, base + 120 + Math.random() * 200)
       }
       setIsThinking(true)
       setAiCaption(`${round?.persona_name || 'Interviewer'} is typing…`)
@@ -2303,11 +2308,22 @@ export default function InterviewRoom() {
                 <span className={`interview-nameplate-dot ${candidateSpeaking ? 'is-on' : ''}`} />
                 You
               </div>
-              {/* Live candidate caption (interim STT) */}
+              {/* Live candidate caption (interim STT).
+                  aria-live is "polite", not "assertive": interim results update on
+                  roughly every recognised word, and assertive would make the screen
+                  reader cut itself off continuously while the candidate is still
+                  talking. aria-atomic=false so only the appended words are spoken
+                  rather than re-reading the whole sentence on each revision. */}
               {isListening && interimTranscript && (
                 <div className="interview-caption interview-caption-candidate">
                   <span className="interview-caption-name">You</span>
-                  <p className="interview-caption-text">{interimTranscript}</p>
+                  <p
+                    className="interview-caption-text"
+                    aria-live="polite"
+                    aria-atomic="false"
+                  >
+                    {interimTranscript}
+                  </p>
                 </div>
               )}
             </div>
@@ -2370,7 +2386,8 @@ export default function InterviewRoom() {
           )}
           {practicalMode && activePracticalConfig?.kind === 'code' && (
             <p className="text-[10px] text-surface-500 px-4 py-2 border-t border-surface-800">
-              Live coding — paste your solution below. I&apos;ll grade it inline (no separate lab needed).
+              Live coding — write your solution in the editor below. I&apos;ll run it against the
+              tests inline (no separate lab needed).
             </p>
           )}
 

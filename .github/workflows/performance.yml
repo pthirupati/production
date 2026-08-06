@@ -158,18 +158,16 @@ jobs:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/fixitlab_test
           JIRA_SIMULATION_MODE: "False"
         run: |
-          # Run tests that assert query counts; these live in tests/test_query_counts.py
-          python manage.py test tests.test_query_counts --verbosity=2 || true
-
-  notify:
-    name: Notify Slack
-    runs-on: ubuntu-latest
-    needs: [lighthouse, k6-load, db-query-count]
-    if: failure()
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/notify-slack
-        with:
-          status: failure
-          workflow: "Performance (weekly)"
-          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          # This step used to end in `|| true`, which made it green in the one
+          # case that matters: backend/tests/test_query_counts.py does not
+          # exist, so the "N+1 regression guard" has never executed. Masking a
+          # missing suite is worse than having no step at all, because the
+          # green check actively asserts coverage we do not have.
+          #
+          # Fail loudly and specifically when the suite is absent, so the gap
+          # is fixed rather than re-hidden; run it for real when it exists.
+          if [ ! -f tests/test_query_counts.py ]; then
+            echo "::error::backend/tests/test_query_counts.py is missing — the query-count/N+1 guard is not implemented. Add it or delete this job; do not mask it with '|| true'."
+            exit 1
+          fi
+          python manage.py test tests.test_query_counts --verbosity=2

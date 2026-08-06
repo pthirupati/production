@@ -33,6 +33,7 @@ from apps.labs.completion import finalize_validated_session
 from apps.question_bank.scenario_copy import public_objectives
 from apps.hints.models import Hint
 from apps.progress.models import UserScenarioProgress, UserAchievement
+from apps.progress.services import record_attempt_started
 from apps.billing.services import can_start_lab
 from apps.billing.models import TechnologySubscription
 from apps.notifications.tasks import notify_lab_completed, notify_achievement_earned
@@ -57,6 +58,100 @@ LAB_CAPACITY_FULL_RESPONSE = {
     "error": "All lab capacity is in use right now — please try again in a few minutes.",
     "code": "CAPACITY_FULL",
 }
+
+
+def _enqueue_provisioning(task, session) -> bool:
+    """Queue a provisioning task, releasing the capacity slot if the broker is down.
+
+    Audit Z5-18. Both enqueue sites called `.delay()` unguarded, and the failure
+    cascaded rather than stopping at a 500:
+
+      1. the LabSession row is created,
+      2. `.delay()` raises because the broker is unreachable,
+      3. the row stays PROVISIONING and **counts against the global capacity cap**
+         (`at_global_capacity` counts live rows, deliberately — see capacity.py),
+      4. the beat task that clears stuck sessions cannot run either, because it
+         needs the same broker.
+
+    So a broker outage did not merely fail lab starts; it permanently consumed
+    capacity that nothing could reclaim until someone noticed and cleared it by
+    hand. Marking the session FAILED here is what stops step 3 — the row no longer
+    counts, so the platform recovers on its own when the broker returns.
+
+    Returns True when queued. The caller turns False into a 503, not a 500: the
+    request was valid and the service is temporarily unable to fulfil it, which is
+    also what tells a client it is worth retrying.
+    """
+    try:
+        task.delay(str(session.id))
+        return True
+    except Exception as exc:
+        logger.error(
+            "Could not queue provisioning for session %s (%s) — releasing the "
+            "capacity slot so a broker outage does not fill the cap with rows "
+            "nothing can clear",
+            session.id, exc,
+        )
+        try:
+            # `status` only — LabSession has no error_message field, and assigning
+            # one here would raise *inside the error handler*, turning a broker
+            # outage into an unhandled 500 and leaving the slot held anyway.
+            session.status = "FAILED"
+            session.save(update_fields=["status"])
+        except Exception:
+            # If we cannot even mark it, the stuck-session sweep is the backstop —
+            # but say so, because that sweep also needs the broker.
+            logger.error(
+                "Failed to release capacity slot for session %s; it will hold a "
+                "slot until the stuck-session sweep runs", session.id,
+            )
+        return False
+
+
+QUEUE_UNAVAILABLE_RESPONSE = {
+    "error": "Lab provisioning is temporarily unavailable. Please try again in a moment.",
+    "code": "QUEUE_UNAVAILABLE",
+}
+
+
+def _schedule_lab_teardown(session):
+    """Destroy `session`'s container/instance *after* the current transaction commits.
+
+    Audit Z5-9. Kept out of the atomic block because it is network I/O (SSH to D4 or
+    the docker daemon) and the block holds the global capacity advisory lock.
+
+    `transaction.on_commit` rather than a bare `.delay()`: if the surrounding lab
+    start rolls back, the user's existing lab is still theirs and must not be torn
+    down. Falls back to an inline teardown when the queue is unreachable — the
+    alternative is a container that runs until the reaper notices, on a box with a
+    hard capacity cap — but still only on commit, and still outside the lock.
+    """
+    from django.db import transaction as _db_transaction
+
+    session_id = str(session.id)
+
+    def _dispatch():
+        try:
+            from celery_app.tasks import teardown_lab_resource
+
+            teardown_lab_resource.apply_async(
+                args=[session_id], queue="provisioning"
+            )
+        except Exception as exc:
+            logger.warning(
+                "Could not queue teardown for session %s (%s); tearing down inline",
+                session_id, exc,
+            )
+            try:
+                terminate_lab_session(
+                    get_provisioner(session.provider or "docker"), session
+                )
+            except Exception as inner:
+                logger.error(
+                    "Inline teardown also failed for session %s: %s", session_id, inner
+                )
+
+    _db_transaction.on_commit(_dispatch)
 
 
 def _get_subscribed_tech_ids(user):
@@ -311,19 +406,34 @@ class TechnologyDetailView(APIView):
                 "-is_free", "difficulty", "title"
             )
 
-            tech_data = TechnologySerializer(tech).data
-            tech_data["scenario_count"] = scenarios.count()
+            # Audit Z5-13: this block used to issue 6 queries against `scenarios`
+            # — .count(), one .filter().count() per difficulty, a DISTINCT on
+            # category, and finally the serializer's own SELECT. Every one of them
+            # re-ran the same filter/exclude over the same rows.
+            #
+            # We need the full row set anyway (the serializer below fetches it), so
+            # evaluate the queryset ONCE and derive the aggregates in Python. This
+            # is exact rather than approximate: the counts are computed from the
+            # identical row set that gets serialised, so they cannot drift from the
+            # filters (is_active, certification_only=False, cert_ids excluded) the
+            # way a separately-filtered aggregate could.
+            scenario_list = list(scenarios)
 
-            difficulty_counts = {}
-            for d in ["easy", "medium", "hard"]:
-                difficulty_counts[d] = scenarios.filter(difficulty=d).count()
+            tech_data = TechnologySerializer(tech).data
+            tech_data["scenario_count"] = len(scenario_list)
+
+            difficulty_counts = {"easy": 0, "medium": 0, "hard": 0}
+            for s in scenario_list:
+                if s.difficulty in difficulty_counts:
+                    difficulty_counts[s.difficulty] += 1
             tech_data["difficulty_counts"] = difficulty_counts
 
-            tech_data["categories"] = list(
-                scenarios.values_list("category", flat=True).distinct().order_by("category")
+            # sorted() matches the previous .distinct().order_by("category").
+            tech_data["categories"] = sorted(
+                {s.category for s in scenario_list if s.category is not None}
             )
 
-            scenario_data = ScenarioListSerializer(scenarios, many=True).data
+            scenario_data = ScenarioListSerializer(scenario_list, many=True).data
             subscribed_anon = _get_subscribed_tech_ids(None)
             _mark_accessible(scenario_data, subscribed_anon, user=None)
 
@@ -339,10 +449,33 @@ class TechnologyDetailView(APIView):
         if not request.user.is_authenticated:
             return Response({**base, "projects": _serialize_projects(tech, None), "cert_tracks": cert_tracks})
 
-        # Deep-copy to avoid mutating the cached dict
-        import copy
-        tech_data = copy.deepcopy(base["technology"])
-        scenario_data = copy.deepcopy(base["scenarios"])
+        # Copy before overlaying per-user fields.
+        #
+        # Audit Z5-13 flagged the copy.deepcopy() this replaces. Worth recording
+        # WHY the one-level copy below is safe, because the audit's stated reason
+        # for keeping the deepcopy ("a shallow copy silently corrupts the shared
+        # cache entry and leaks one user's progress to everyone") does not hold
+        # here — measured, not assumed:
+        #
+        #   Both cache backends serialise. Redis in prod obviously does, and
+        #   LocMemCache pickles on set and unpickles on every get, so two
+        #   cache.get() calls never return the same object graph and a mutation
+        #   made after the get is never written back. On the cache-MISS branch
+        #   above, `base` is the freshly-built local object and cache.set() has
+        #   already stored a snapshot of it. Either way, mutating `base` cannot
+        #   reach another request.
+        #
+        # So the deepcopy was never load-bearing for cross-user isolation — it was
+        # pure cost: a full recursive clone of every nested tags/technology dict on
+        # every authenticated request. We still copy, because the overlay must not
+        # corrupt `base` within THIS request (the anonymous branch just above
+        # returns `base` directly), and one level is exactly enough: the overlay
+        # only ever writes top-level keys — `is_accessible` (all _mark_accessible
+        # assigns), plus `user_progress` and `is_bookmarked` in the loop below.
+        # Nested values stay shared, which is safe precisely because nothing here
+        # mutates them.
+        tech_data = dict(base["technology"])
+        scenario_data = [dict(item) for item in base["scenarios"]]
 
         # Overlay per-user: bookmarks, progress, learning path
         from apps.progress.learning_path import get_learning_path_progress
@@ -852,17 +985,24 @@ class StartLabView(APIView):
                     status=status.HTTP_503_SERVICE_UNAVAILABLE,
                 )
 
-            # Terminate active sessions for OTHER scenarios
+            # Terminate active sessions for OTHER scenarios.
+            #
+            # Audit Z5-9: this used to call `terminate_lab_session` inline — SSH to
+            # D4, or a round trip to the docker daemon — *inside* this
+            # `transaction.atomic()` block, which holds both the session row lock and
+            # the global capacity advisory lock that every other lab start on the
+            # platform is queued behind. One slow D4 response serialised lab starts
+            # for everybody.
+            #
+            # The DB half stays here: capacity accounting must be atomic with the
+            # INSERT below, or two concurrent starts could both see room. Only the
+            # resource teardown is deferred, and via `transaction.on_commit` rather
+            # than a bare `.delay()` — a start that rolls back after this point must
+            # not destroy a lab the user still has running.
             for existing in existing_sessions:
-                try:
-                    old_provisioner = get_provisioner(existing.provider or "docker")
-                    resource_id = existing.container_id or existing.instance_id
-                    if resource_id:
-                        terminate_lab_session(old_provisioner, existing)
-                except Exception as e:
-                    logger.warning(f"Failed to terminate existing resource: {e}")
                 existing.mark_terminated()
                 logger.info(f"Auto-terminated session {existing.id} for new lab start")
+                _schedule_lab_teardown(existing)
 
             # Create a fresh session — always, regardless of prior completion
             session = LabSession.objects.create(
@@ -882,16 +1022,14 @@ class StartLabView(APIView):
                 # Cloud labs (AWS EC2, DigitalOcean): provision asynchronously
                 # Return PROVISIONING status immediately — frontend polls until RUNNING
                 from celery_app.tasks import provision_cloud_lab
-                provision_cloud_lab.delay(str(session.id))
+                if not _enqueue_provisioning(provision_cloud_lab, session):
+                    return Response(
+                        QUEUE_UNAVAILABLE_RESPONSE,
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
 
                 # Record attempt eagerly so the user sees it immediately
-                progress, _ = UserScenarioProgress.objects.get_or_create(
-                    user=request.user, scenario=scenario
-                )
-                progress.attempts += 1
-                progress.completed = False
-                progress.completed_at = None
-                progress.save()
+                record_attempt_started(request.user, scenario)
 
                 Scenario.objects.filter(pk=scenario.pk).update(
                     attempts_count=F("attempts_count") + 1
@@ -904,16 +1042,14 @@ class StartLabView(APIView):
 
             # Docker and simulation labs: provision asynchronously via Celery
             from celery_app.tasks import provision_docker_lab
-            provision_docker_lab.delay(str(session.id))
+            if not _enqueue_provisioning(provision_docker_lab, session):
+                return Response(
+                    QUEUE_UNAVAILABLE_RESPONSE,
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
 
             # Record attempt eagerly so the user sees it immediately
-            progress, _ = UserScenarioProgress.objects.get_or_create(
-                user=request.user, scenario=scenario
-            )
-            progress.attempts += 1
-            progress.completed = False
-            progress.completed_at = None
-            progress.save()
+            record_attempt_started(request.user, scenario)
 
             Scenario.objects.filter(pk=scenario.pk).update(
                 attempts_count=F("attempts_count") + 1
@@ -1148,6 +1284,44 @@ class ValidateLabView(APIView):
             return Response({"error": "Validation failed"}, status=500)
 
 
+def _step_failure_message(step, output="", exit_code=None):
+    """Explain WHY a guided step did not pass, without handing over the answer.
+
+    The old messages were three fixed strings ("Apply the documented fix, then
+    verify this step again.") that said nothing about which assertion failed, so
+    a stuck learner had no signal to act on (audit L2335).
+
+    Only fields the learner can ALREADY see are echoed: ``title`` and
+    ``expected_output`` are rendered in the guided panel next to this step. The
+    scenario's ``solution``, ``validation_script`` and any hidden test source are
+    never touched here.
+
+    Validator ``output`` is NOT interpolated into ``message``. It stays in its
+    own response field (as before) and LabRunner renders it below the
+    explanation, so raw check output stays attributable to the check rather than
+    reading as platform guidance. Previously ``output or <generic>`` meant a
+    validator that echoed the expected value became the whole message.
+    """
+    step = step or {}
+    title = str(step.get("title") or "").strip()
+    expected = str(step.get("expected_output") or "").strip()
+
+    what = f"'{title}' did not pass" if title else "This step did not pass"
+    if exit_code is not None and exit_code != 0:
+        what += f" (command exited {exit_code})"
+
+    parts = [f"{what}."]
+    if expected:
+        # Truncated: expected_output is a short human phrase in every seeded
+        # scenario, but nothing enforces that, and this string lands in a toast.
+        parts.append(f"Still looking for: {expected[:200]}.")
+    if str(output or "").strip():
+        parts.append("See the check output below for what the lab actually found.")
+    else:
+        parts.append("Apply the fix, then verify this step again.")
+    return " ".join(parts)
+
+
 class ValidateGuidedStepView(APIView):
     """Verify a single guided-mode step against live simulation state."""
 
@@ -1226,12 +1400,12 @@ class ValidateGuidedStepView(APIView):
                         return Response({"passed": True, "message": "Fix verified — advancing.", "output": output})
                     return Response({
                         "passed": False,
-                        "message": output or "Apply the documented fix, then verify this step again.",
+                        "message": _step_failure_message(step, output=output),
                         "output": output,
                     })
                 return Response({
                     "passed": False,
-                    "message": "Run the fix command in the terminal, then verify again.",
+                    "message": _step_failure_message(step),
                 })
 
             if is_simulation:
@@ -1243,7 +1417,7 @@ class ValidateGuidedStepView(APIView):
                 return Response({"passed": True, "message": "Command succeeded.", "output": output})
             return Response({
                 "passed": False,
-                "message": output or f"Command failed (exit {code}). Check output and retry.",
+                "message": _step_failure_message(step, output=output, exit_code=code),
                 "output": output,
             })
         except Exception as e:
@@ -2368,7 +2542,6 @@ class AchievementsCertificateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        from apps.billing.models import TechnologySubscription
         from apps.question_bank.models import Technology as Tech
 
         user = request.user
@@ -2557,8 +2730,12 @@ class CertificateVerifyView(APIView):
             .first()
         )
         if track_cert:
-            return Response({
-                "valid": not track_cert.is_expired,
+            # ``is_valid`` (not just expiry) is the single source of truth --
+            # revocation beats expiry, and this is the endpoint the shared verify
+            # page hits, so an expiry-only check here means an employer following
+            # a shared link is told a withdrawn certificate still stands.
+            payload = {
+                "valid": track_cert.is_valid,
                 "type": "certification",
                 "certificate_id": track_cert.certificate_id,
                 "holder_name": track_cert.holder_name,
@@ -2567,7 +2744,27 @@ class CertificateVerifyView(APIView):
                 "overall_score": track_cert.score,
                 "total_score": track_cert.score,
                 "issued_date": track_cert.issued_at.strftime("%Y-%m-%d"),
-            })
+            }
+            if track_cert.revoked:
+                # Say "revoked", not "not found" -- a bare miss is
+                # indistinguishable from a typo and invites the holder to assume a
+                # bug rather than a withdrawal. Holder/score stay in the payload
+                # for the same reason the expired path below keeps them: the
+                # opaque id genuinely identifies this holder's certificate, and
+                # the withdrawal is unambiguous alongside ``valid: false``.
+                # Mirrors CertVerifyView (apps/certifications/views.py).
+                payload["revoked"] = True
+                payload["revoked_at"] = track_cert.revoked_at
+                payload["revoked_reason"] = track_cert.revoked_reason
+                payload["error"] = "Certificate has been revoked"
+                if track_cert.revoked_reason:
+                    payload["error"] += f": {track_cert.revoked_reason}"
+            elif track_cert.is_expired:
+                payload["is_expired"] = True
+                payload["error"] = (
+                    "Certificate is out of date. Please renew your certification."
+                )
+            return Response(payload)
 
         # ── Look up STRICTLY by the stored opaque certificate id ──
         # (PRODUCTION_AUDIT PRIV-01) Certificate ids embed a user id

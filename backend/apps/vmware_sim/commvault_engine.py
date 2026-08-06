@@ -457,6 +457,39 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     return {"ok": False, "error": f"Unknown action: {action}"}
 
 
+# Per-key grader feedback. The broken dict stores bare targets (a client name,
+# a policy name) and sometimes just True, so the value cannot be echoed the way
+# azure_engine echoes its human-readable reasons.
+_BROKEN_REASONS: dict[str, str] = {
+    "overdue_client": "client {target} is still overdue for a backup — run one to completion",
+    "needs_restore": "a restore for {target} has not been run to completion yet",
+    "policy_disabled": "storage policy {target} is still disabled — enable it",
+    "missing_subclient": "the subclient for {target} has not been created yet",
+    "missing_client": "the new client has not been registered yet",
+    "schedule_disabled": "schedule {target} is still disabled — enable it",
+    "needs_aux_copy": "aux copy {target} has not been run yet",
+}
+
+
+def _describe_broken(broken: dict) -> str:
+    """Name every outstanding objective, not just the first.
+
+    Presets currently seed a single key each, but joining rather than taking
+    next(iter(...)) means a future multi-key preset cannot silently hide half
+    the remaining work.
+    """
+    parts = []
+    for kind, target in broken.items():
+        template = _BROKEN_REASONS.get(kind)
+        if template is None:
+            # Unknown key: still fail CLOSED, and name the key so a missing
+            # template surfaces as a reportable gap rather than a silent pass.
+            parts.append(f"unresolved objective ({kind})")
+        else:
+            parts.append(template.format(target=target))
+    return "; ".join(parts)
+
+
 def validate_commvault_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
     entry = _load(session_id)
     if not entry:
@@ -487,7 +520,7 @@ def validate_commvault_lab(session_id: str, scenario_slug: str = "") -> tuple[bo
         return True, "Client registered"
 
     if broken:
-        return False, "Commvault environment still has unresolved issues"
+        return False, f"Commvault lab not complete: {_describe_broken(broken)}"
     ok = any(j.get("kind") == "backup" and j.get("status") == "completed" for j in state.get("jobs", []))
     if not ok:
         return False, "Run a backup job to completion"

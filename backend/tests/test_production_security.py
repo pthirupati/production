@@ -589,7 +589,3 @@ class NoPublicAPIExposureTestCase(APITestCase):
         """Test that starting a scenario requires authentication."""
         response = self.client.post('/api/labs/1/start/', {})
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
-
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])

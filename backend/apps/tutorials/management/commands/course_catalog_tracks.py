@@ -958,9 +958,15 @@ EXTENDED_COURSES: list[dict] = [
             "Enterprise SIEM architecture",
         ],
     },
+    # Distinct slug from "github-actions-zero-hero" above. Both entries used to
+    # declare that same course_slug, so seeding merged them into one 20-module
+    # course with two m01s, two m02s, ... and a course_title that flipped
+    # depending on which module row sorted first. The two syllabi are genuinely
+    # different (that one covers repos/PRs *and* Actions; this one is CI-only),
+    # so they are kept as separate courses rather than dropping 10 modules.
     {
-        "course_slug": "github-actions-zero-hero",
-        "course_title": "GitHub Actions: Zero to Hero",
+        "course_slug": "github-actions-ci-zero-hero",
+        "course_title": "GitHub Actions CI/CD: Zero to Hero",
         "topic": "GitHub",
         "playground_slug": "github",
         "modules": [

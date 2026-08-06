@@ -3,7 +3,7 @@ import { useThemeStore } from '../../store/themeStore'
 import { useState } from 'react'
 import {
   LayoutDashboard, Target, Cpu, Users, MonitorPlay, ArrowLeft, Shield, Menu, X, Ticket, Activity, ScrollText, FileText, Tag, ShieldAlert,
-  BarChart3, Building2, Mic2, Award, CreditCard, MessageSquare, Wrench, Megaphone, Briefcase, Boxes, LifeBuoy,
+  BarChart3, Building2, Mic2, Award, CreditCard, MessageSquare, Wrench, Megaphone, Briefcase, Boxes, LifeBuoy, Filter,
 } from 'lucide-react'
 import AdminTopbar from './AdminTopbar'
 
@@ -13,6 +13,7 @@ const NAV_GROUPS = [
     items: [
       { path: '/admin', icon: LayoutDashboard, label: 'Overview' },
       { path: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
+      { path: '/admin/funnel', icon: Filter, label: 'Funnel' },
       { path: '/admin/monitoring', icon: Activity, label: 'Monitoring' },
       { path: '/admin/security', icon: ShieldAlert, label: 'Security' },
     ],
@@ -120,6 +121,14 @@ export default function AdminLayout() {
 
   return (
     <div className="h-screen flex overflow-hidden bg-[#080a16] relative">
+      {/* Same visually-hidden-until-focused treatment as MainLayout. z-[60]
+          clears the z-50 mobile sidebar drawer. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[60] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:rounded-md focus:bg-accent-cyan focus:text-surface-950 focus:font-semibold"
+      >
+        Skip to main content
+      </a>
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute inset-0 bg-[#080a16]" />
         <div className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full bg-accent-purple/[0.05] blur-[120px]" />
@@ -146,7 +155,7 @@ export default function AdminLayout() {
 
         <AdminTopbar />
 
-        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:px-7 lg:py-[26px]">
+        <main id="main-content" role="main" tabIndex={-1} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:px-7 lg:py-[26px]">
           <div className="max-w-[1320px] w-full mx-auto">
             <Outlet />
           </div>

@@ -107,6 +107,11 @@ class SupportBotTests(TestCase):
             "something is broken, not sure what",
             is_authenticated=True,
             page_path=f"/lab/{session.id}",
+            # Lab context is now resolved against THIS user's sessions (audit Z3-9).
+            # Previously `is_authenticated=True` was an unbacked claim — the caller
+            # asserted authentication without saying who, so any session id resolved
+            # for anyone. That gap is precisely what the flag's shape allowed.
+            user=user,
         )
         joined = " ".join(result["suggestions"]).lower()
         self.assertTrue(

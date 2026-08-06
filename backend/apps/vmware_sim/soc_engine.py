@@ -406,11 +406,43 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     return {"ok": False, "error": f"Unknown action: {action}"}
 
 
+# Per-key grader feedback. The broken dict stores bare targets (an alert id, a
+# hostname, an IP), not the human-readable reasons azure_engine stores, so each
+# template names the unmet objective and interpolates only the target.
+_BROKEN_REASONS: dict[str, str] = {
+    "open_critical_alert": "critical alert {target} is still open — triage and close it",
+    "open_alert": "alert {target} is still open — triage and close it",
+    "needs_escalation": "alert {target} has not been escalated yet",
+    "needs_quarantine": "host {target} has not been quarantined yet",
+    "needs_block_ip": "IP {target} has not been blocked yet",
+    "needs_playbook": "playbook {target} has not been run yet",
+    "needs_log_search": "the logs have not been searched for {target} yet",
+}
+
+
+def _describe_broken(broken: dict) -> str:
+    """Name every outstanding objective, not just the first.
+
+    Several SOC presets seed two keys at once (quarantine + block IP), so
+    reporting only next(iter(...)) would hide half the work still remaining.
+    """
+    parts = []
+    for kind, target in broken.items():
+        template = _BROKEN_REASONS.get(kind)
+        if template is None:
+            # Unknown key: still fail CLOSED, and name the key so a missing
+            # template surfaces as a reportable gap rather than a silent pass.
+            parts.append(f"unresolved objective ({kind})")
+        else:
+            parts.append(template.format(target=target))
+    return "; ".join(parts)
+
+
 def validate_soc_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
     entry = _load(session_id)
     if not entry:
         return False, "No SOC session"
     broken = entry["state"].get("broken") or {}
     if broken:
-        return False, "SOC environment still has unresolved issues"
+        return False, f"SOC lab not complete: {_describe_broken(broken)}"
     return True, "SOC lab objectives met"

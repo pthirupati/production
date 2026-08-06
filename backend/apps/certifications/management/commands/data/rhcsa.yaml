@@ -46,7 +46,7 @@ objectives:
     order: 2
     scenarios:
       - systemd-unit-wont-start
-      - sim-rhel-boot-grub
+      - sim-rhel-grub-rescue
       - linux-grub-password
       - rhel-grub-default-target
       - linux-high-load-no-cpu

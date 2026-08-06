@@ -1,0 +1,47 @@
+{
+  "name": "FixitLab — Hands-on DevOps & Cloud Labs",
+  "short_name": "FixitLab",
+  "description": "Fix broken production systems in real environments — Linux, Kubernetes, AWS, VMware, GPU and AI infrastructure labs.",
+  "id": "/",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#080a16",
+  "theme_color": "#080a16",
+  "categories": ["education", "developer", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Browse scenarios",
+      "short_name": "Scenarios",
+      "url": "/scenarios",
+      "description": "Find a lab to work through"
+    },
+    {
+      "name": "My progress",
+      "short_name": "Progress",
+      "url": "/dashboard",
+      "description": "Streak, XP and completed labs"
+    }
+  ]
+}

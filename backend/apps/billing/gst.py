@@ -90,6 +90,56 @@ def gst_should_charge() -> bool:
     return bool(enabled and _gstin())
 
 
+# Indian states and union territories, as GST place-of-supply values. Kept here
+# rather than in the model so both validation and the tax path read one list.
+INDIAN_STATES = (
+    "Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam",
+    "Bihar", "Chandigarh", "Chhattisgarh", "Dadra and Nagar Haveli and Daman and Diu",
+    "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu and Kashmir",
+    "Jharkhand", "Karnataka", "Kerala", "Ladakh", "Lakshadweep", "Madhya Pradesh",
+    "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha",
+    "Puducherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana",
+    "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+)
+
+
+def place_of_supply_for(user) -> str:
+    """The customer's GST place of supply, or "" when nothing is on record.
+
+    Audit Z1-13: every order-creation path called ``compute_gst(amount)`` with no
+    place of supply, so the seller's state was assumed and **every** sale booked
+    intra-state CGST+SGST. Nothing was ever wrong in `compute_gst` itself — the
+    argument simply never arrived. This is the single place that answers the
+    question, so a new checkout path cannot quietly re-open the hole.
+
+    Returning "" is a real answer, not a failure: with no address on record the
+    place-of-supply rules for B2C services fall back to the supplier's location,
+    which is what `compute_gst` already does with an empty value.
+
+    Queries `Profile` directly instead of going through ``user.profile``. Django
+    caches the reverse one-to-one on the user instance, and the post-save signal
+    that creates the profile populates that cache at registration — so
+    ``user.profile`` on a long-lived instance can hand back a Profile loaded
+    *before* the customer set their state, and the order would be taxed against a
+    stale value. That is one extra query on a checkout path, which is the right
+    side of the trade for a figure that ends up on a tax invoice.
+    """
+    if user is None or not getattr(user, "is_authenticated", True):
+        return ""
+    user_id = getattr(user, "pk", None)
+    if user_id is None:
+        return ""
+
+    from apps.accounts.models import Profile
+
+    state = (
+        Profile.objects.filter(user_id=user_id)
+        .values_list("billing_state", flat=True)
+        .first()
+    )
+    return (state or "").strip()
+
+
 @dataclass(frozen=True)
 class GstBreakup:
     """Immutable, server-computed tax breakup for one order/invoice.
@@ -109,6 +159,7 @@ class GstBreakup:
     is_inter_state: bool = False
     place_of_supply: str = ""
     gstin: str = ""
+    is_export: bool = False   # non-INR: export of services, zero-rated
 
     @property
     def total_paise(self) -> int:
@@ -116,7 +167,7 @@ class GstBreakup:
         return int((self.total_amount * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
-def compute_gst(total_inclusive_inr, place_of_supply: str = "") -> GstBreakup:
+def compute_gst(total_inclusive_inr, place_of_supply: str = "", currency: str = "INR") -> GstBreakup:
     """Compute the GST breakup for a GST-inclusive INR total.
 
     ``total_inclusive_inr`` is the server-side price (catalog price, post-coupon)
@@ -126,6 +177,8 @@ def compute_gst(total_inclusive_inr, place_of_supply: str = "") -> GstBreakup:
     is the full amount as ``taxable_amount`` with zero tax, so the total is
     unchanged and downstream code is uniform.
 
+    ``currency`` other than INR is treated as an export of services and zero-rated.
+
     Place of supply: if the customer's state differs from ``BUSINESS_STATE`` the
     supply is inter-state → a single IGST. Otherwise intra-state → CGST + SGST
     (each half the rate). When no customer state is supplied we default to the
@@ -133,7 +186,14 @@ def compute_gst(total_inclusive_inr, place_of_supply: str = "") -> GstBreakup:
     """
     total = _q(Decimal(str(total_inclusive_inr)))
 
-    if not gst_should_charge() or total <= 0:
+    # Non-INR charges are export of services and zero-rated; levying CGST+SGST on a
+    # USD card would be both wrong and unrecoverable from the customer (audit Z1-13).
+    # `is_export` is recorded so a zero-tax export invoice is distinguishable from a
+    # zero-tax "we are not GST-registered yet" invoice — they look identical in the
+    # numbers and mean completely different things to an auditor.
+    is_export = (currency or "INR").upper() != "INR"
+
+    if is_export or not gst_should_charge() or total <= 0:
         return GstBreakup(
             total_amount=total,
             taxable_amount=total,
@@ -141,6 +201,7 @@ def compute_gst(total_inclusive_inr, place_of_supply: str = "") -> GstBreakup:
             gst_rate=Decimal("0"),
             place_of_supply=(place_of_supply or _business_state()).strip(),
             gstin=_gstin(),
+            is_export=is_export,
         )
 
     rate = gst_rate()

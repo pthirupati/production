@@ -197,7 +197,7 @@ jobs:
 
       - name: Build and push backend
         if: steps.meta.outputs.pushed == 'true'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ./backend
           file: ./backend/Dockerfile
@@ -210,7 +210,7 @@ jobs:
 
       - name: Build and push frontend
         if: steps.meta.outputs.pushed == 'true'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ./frontend
           file: ./frontend/Dockerfile.prod
@@ -223,7 +223,7 @@ jobs:
 
       - name: Build and push gateway
         if: steps.meta.outputs.pushed == 'true'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: ./gateway
           file: ./gateway/Dockerfile.prod
@@ -259,7 +259,7 @@ jobs:
     environment: production
     steps:
       - name: Stop containers on server
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -304,7 +304,7 @@ jobs:
             echo "token=$(echo "$PRODUCTION_ENV_B64" | base64 -d | grep '^DO_API_TOKEN=' | cut -d= -f2- | tr -d '\r')" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: digitalocean/action-doctl@v2
+      - uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f # v2.5.2
         with:
           token: ${{ steps.do_token.outputs.token }}
 
@@ -336,8 +336,32 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add infra/digitalocean/production.json 2>/dev/null || true
-          git diff --cached --quiet || git commit -m "ci: production droplet ${{ steps.droplet.outputs.public_ip }}"
-          git push origin HEAD:main || true
+          git diff --cached --quiet && echo "no droplet metadata change to push" && exit 0
+          git commit -m "ci: production droplet ${{ steps.droplet.outputs.public_ip }}"
+          # This push races other jobs in this same run (and the ci-metadata
+          # commit pushed at deploy start), so a non-fast-forward reject is
+          # expected, not exceptional. `|| true` used to swallow it — and a
+          # dropped push means the NEXT run reads a stale droplet IP from
+          # production.json and targets the wrong host. Rebase and retry,
+          # then fail loudly rather than silently losing the IP.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              echo "pushed droplet metadata on attempt $attempt"
+              exit 0
+            fi
+            echo "push rejected (attempt $attempt) — rebasing onto origin/main"
+            git fetch origin main
+            # Rebase only our metadata commit; --autostash keeps any stray
+            # worktree changes from aborting the rebase mid-deploy.
+            if ! git rebase --autostash origin/main; then
+              git rebase --abort || true
+              echo "::error::Could not rebase droplet metadata onto origin/main"
+              exit 1
+            fi
+            sleep $((attempt * 3))
+          done
+          echo "::error::Failed to push droplet metadata after 5 attempts. infra/digitalocean/production.json is NOT persisted; later runs would read a stale droplet IP."
+          exit 1
 
   # ─────────────────────────────────────────────────────────────
   # TEST-FRONTEND — parallel with test-backend
@@ -459,7 +483,7 @@ jobs:
           echo "host=$H" >> "$GITHUB_OUTPUT"
 
       - name: Pull and deploy
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
@@ -532,7 +556,7 @@ jobs:
     environment: production
     steps:
       - name: Check container health and collect logs
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -594,7 +618,7 @@ jobs:
     environment: production
     steps:
       - name: Run Django unit tests
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -630,7 +654,7 @@ jobs:
     environment: production
     steps:
       - name: Disable JWT session enforcement for E2E
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -660,7 +684,7 @@ jobs:
     environment: production
     steps:
       - name: Reseed scenarios and projects
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -691,7 +715,7 @@ jobs:
               python -c "import django; django.setup(); from apps.question_bank.models import Scenario; print(Scenario.objects.count(), 'scenarios')" || true
 
       - name: Run all-scenarios lab E2E
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -723,7 +747,7 @@ jobs:
     environment: production
     steps:
       - name: Internal API E2E (bypass nginx)
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -743,8 +767,18 @@ jobs:
               python /scripts/e2e_production_test.py
 
       - name: External API E2E (through gateway)
+        # Deliberately advisory, unlike "Internal API E2E" above which gates the
+        # deploy. This one traverses DNS + nginx + TLS at fixitlab.in, so it can
+        # red-X on infrastructure outside the artifact being deployed, and this
+        # job is a hard `needs:` of the release gate.
+        #
+        # The internal step already covers the same suite against the app
+        # directly, so a failure here means "the edge is unhealthy", not "the
+        # build is bad" — worth a warning, not an automatic deploy abort.
+        # If the edge starts breaking silently and often, promote this to a
+        # blocking check rather than deleting it.
         continue-on-error: true
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -775,7 +809,7 @@ jobs:
     environment: production
     steps:
       - name: Run interview studio E2E
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -819,7 +853,7 @@ jobs:
     environment: production
     steps:
       - name: Remove E2E test users and data
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -837,7 +871,7 @@ jobs:
 
       - name: Restore JWT session enforcement
         if: always()
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
@@ -963,7 +997,7 @@ jobs:
           echo "::add-mask::$TOK"
           echo "token=$TOK" >> "$GITHUB_OUTPUT"
 
-      - uses: digitalocean/action-doctl@v2
+      - uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f # v2.5.2
         with:
           token: ${{ steps.do_token.outputs.token }}
 
@@ -1146,8 +1180,27 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add infra/digitalocean/cluster.json 2>/dev/null || true
-          git diff --cached --quiet || git commit -m "ci: four-droplet cluster metadata"
-          git push origin HEAD:main || true
+          git diff --cached --quiet && echo "no cluster metadata change to push" && exit 0
+          git commit -m "ci: four-droplet cluster metadata"
+          # Same race as "Commit droplet metadata" above. Losing this push is
+          # worse: cluster.json holds all four droplet IPs, so a stale copy
+          # points bootstrap/deploy at hosts that no longer exist.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              echo "pushed cluster metadata on attempt $attempt"
+              exit 0
+            fi
+            echo "push rejected (attempt $attempt) — rebasing onto origin/main"
+            git fetch origin main
+            if ! git rebase --autostash origin/main; then
+              git rebase --abort || true
+              echo "::error::Could not rebase cluster metadata onto origin/main"
+              exit 1
+            fi
+            sleep $((attempt * 3))
+          done
+          echo "::error::Failed to push cluster metadata after 5 attempts. infra/digitalocean/cluster.json is NOT persisted; later runs would read stale droplet IPs."
+          exit 1
 
   bootstrap-cluster:
     name: "[4D] Bootstrap cluster"
@@ -1372,7 +1425,7 @@ jobs:
           echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
           [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Container health per node (via edge)
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ env.EDGE_PUBLIC_IP }}
           username: ${{ secrets.PROD_USER }}
@@ -1412,7 +1465,7 @@ jobs:
           echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
           [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Django unit tests in backend container on D2 (via edge)
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ env.EDGE_PUBLIC_IP }}
           username: ${{ secrets.PROD_USER }}
@@ -1456,7 +1509,7 @@ jobs:
           echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
           [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Disable JWT session enforcement on D2 backend (via edge)
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ env.EDGE_PUBLIC_IP }}
           username: ${{ secrets.PROD_USER }}
@@ -1490,7 +1543,7 @@ jobs:
           echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
           [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Internal API E2E on D2 (via edge)
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ env.EDGE_PUBLIC_IP }}
           username: ${{ secrets.PROD_USER }}
@@ -1550,7 +1603,7 @@ jobs:
             echo "All-tech mode: sampling 3 deployable labs per technology"
           fi
       - name: All-scenarios lab E2E on D2 (labs run on D4 via remote docker)
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ env.EDGE_PUBLIC_IP }}
           username: ${{ secrets.PROD_USER }}
@@ -1590,7 +1643,7 @@ jobs:
           echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
           [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Remove E2E data + restore JWT enforcement on D2 (via edge)
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         with:
           host: ${{ env.EDGE_PUBLIC_IP }}
           username: ${{ secrets.PROD_USER }}
@@ -1640,6 +1693,45 @@ jobs:
             echo "::notice::cluster-edge-host artifact missing — summary will omit public edge IP"
           fi
           [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
+
+      # A from-scratch launch creates NEW droplets, so the edge gets a NEW public
+      # IP. The A record is only updated automatically when GoDaddy API keys are
+      # present in the rotated env; otherwise ci-sync-droplet-secrets.sh just
+      # echoes a NOTE into a step log and the deploy still reports success — the
+      # site stays unreachable at the domain until someone updates DNS by hand.
+      # Resolve the domain and say so loudly instead.
+      - name: Verify DNS points at the new edge
+        id: dns
+        continue-on-error: true
+        env:
+          DOMAIN: ${{ vars.SITE_DOMAIN || 'fixitlab.in' }}
+        run: |
+          set -u
+          if [ -z "${EDGE_PUBLIC_IP:-}" ] || [ "${EDGE_PUBLIC_IP}" = "(unavailable)" ]; then
+            echo "status=unknown (edge IP unavailable)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # +short can emit CNAMEs too; keep only A-record dotted quads. Fall back
+          # to getent if dig is absent, so a missing tool cannot masquerade as a
+          # missing A record and fire a false alarm.
+          if command -v dig >/dev/null 2>&1; then
+            RESOLVED="$(dig +short A "$DOMAIN" 2>/dev/null \
+              | grep -E '^[0-9]+(\.[0-9]+){3}$' | sort -u | tr '\n' ' ' | sed 's/ $//')"
+          else
+            RESOLVED="$(getent hosts "$DOMAIN" 2>/dev/null | awk '{print $1}' \
+              | grep -E '^[0-9]+(\.[0-9]+){3}$' | sort -u | tr '\n' ' ' | sed 's/ $//')"
+          fi
+          echo "domain=$DOMAIN  resolved=[${RESOLVED:-none}]  edge=$EDGE_PUBLIC_IP"
+          if [ -z "$RESOLVED" ]; then
+            echo "status=**no A record** — point \`$DOMAIN\` at \`$EDGE_PUBLIC_IP\`" >> "$GITHUB_OUTPUT"
+            echo "::warning title=DNS not configured::$DOMAIN has no A record. Set it to $EDGE_PUBLIC_IP or the site is unreachable."
+          elif echo " $RESOLVED " | grep -q " $EDGE_PUBLIC_IP "; then
+            echo "status=OK — resolves to edge (\`$EDGE_PUBLIC_IP\`)" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=**MISMATCH** — resolves to \`$RESOLVED\`, edge is \`$EDGE_PUBLIC_IP\`" >> "$GITHUB_OUTPUT"
+            echo "::warning title=DNS points at the wrong host::$DOMAIN resolves to $RESOLVED but this deploy's edge is $EDGE_PUBLIC_IP. Update the A record (set GODADDY_API_KEY/GODADDY_API_SECRET in the production env to automate this)."
+          fi
+
       - name: Write cluster summary
         run: |
           {
@@ -1656,7 +1748,8 @@ jobs:
             echo "| Rotate secrets | \`${{ inputs.rotate_secrets }}\` |"
             echo "| Create cluster | \`${{ needs.create-cluster.result }}\` |"
             echo "| Deploy cluster | \`${{ needs.deploy-cluster.result }}\` |"
-            echo "| Site | https://fixitlab.in |"
+            echo "| Site | https://${{ vars.SITE_DOMAIN || 'fixitlab.in' }} |"
+            echo "| DNS | ${{ steps.dns.outputs.status || 'not checked' }} |"
             echo ""
             echo "## Job results"
             echo ""

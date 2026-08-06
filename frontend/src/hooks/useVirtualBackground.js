@@ -10,9 +10,10 @@ import { useEffect, useRef, useState, useCallback } from 'react'
  *
  * Person segmentation (cutting the background out behind the person) is treated
  * as *progressive enhancement*: if MediaPipe's free Selfie Segmentation model
- * happens to load from the CDN we use it for a clean cut-out; if it does NOT
- * load (offline, blocked, CSP, slow link) we fall back to a full-frame stylized
- * effect that still visibly changes the preview. We NEVER show an empty canvas.
+ * loads from our own origin we use it for a clean cut-out; if it does NOT load
+ * (missing assets, slow link, unsupported browser) we fall back to a full-frame
+ * stylized effect that still visibly changes the preview. We NEVER show an empty
+ * canvas.
  */
 
 export const VIRTUAL_BACKGROUNDS = [
@@ -25,7 +26,30 @@ export const VIRTUAL_BACKGROUNDS = [
   { id: 'brand', label: 'FixitLab', type: 'gradient', colors: ['#0891b2', '#4f46e5', '#312e81'] },
 ]
 
-const SEGMENTER_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation'
+// The segmentation model is served SAME-ORIGIN, with no CDN fallback. The old
+// cdn.jsdelivr.net load never actually worked in production: gateway/nginx.prod.conf
+// ships `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com`,
+// so the tag was refused by CSP before the request left the browser and every
+// user silently got the no-model path below. The files now come from the pinned
+// @mediapipe/selfie_segmentation npm package, copied into
+// public/vendor/selfie_segmentation/ at build time.
+//
+// This stays PROGRESSIVE ENHANCEMENT regardless: if the model fails to load for
+// any reason we still fall back to the no-model compositor, never a blank canvas.
+const SEGMENTER_BASE =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SEGMENTER_URL) ||
+  '/vendor/selfie_segmentation'
+
+/**
+ * Candidate bases, most-preferred first, deduped.
+ *
+ * Kept as a list because getSegmenter() iterates it and because the offline
+ * tests assert every entry is same-origin — that assertion is what stops a CDN
+ * being quietly reintroduced.
+ */
+export function segmenterSources() {
+  return [SEGMENTER_BASE].filter((v, i, a) => v && a.indexOf(v) === i)
+}
 
 // Module-level singletons so the (optional) model is loaded at most once and the
 // result is shared across every preview instance.
@@ -40,12 +64,19 @@ function loadScript(src, timeoutMs = 6000) {
     }
     const script = document.createElement('script')
     script.src = src
-    script.crossOrigin = 'anonymous'
+    // Only cross-origin sources need the CORS attribute. Setting it on a
+    // same-origin path would force a CORS check that a plain static file server
+    // has no reason to satisfy, turning the self-hosted copy into a load error.
+    if (/^https?:\/\//i.test(src)) script.crossOrigin = 'anonymous'
     let done = false
     const finish = (ok, err) => {
       if (done) return
       done = true
       clearTimeout(timer)
+      // Remove the dead tag so a later attempt at the same src isn't
+      // short-circuited by the `script[src=...]` lookup above into a false
+      // "already loaded" resolve.
+      if (!ok) script.remove()
       ok ? resolve() : reject(err || new Error('script load failed'))
     }
     const timer = setTimeout(() => finish(false, new Error('script load timeout')), timeoutMs)
@@ -60,15 +91,26 @@ async function getSegmenter() {
   if (segmenterUnavailable) return null
   if (segmenterPromise) return segmenterPromise
   segmenterPromise = (async () => {
-    await loadScript(`${SEGMENTER_CDN}/selfie_segmentation.js`)
-    const SelfieSegmentation = window.SelfieSegmentation
-    if (!SelfieSegmentation) throw new Error('Segmentation unavailable')
-    const segmenter = new SelfieSegmentation({
-      locateFile: (file) => `${SEGMENTER_CDN}/${file}`,
-    })
-    segmenter.setOptions({ modelSelection: 1, selfieMode: true })
-    await segmenter.initialize()
-    return segmenter
+    let lastErr = null
+    for (const base of segmenterSources()) {
+      try {
+        await loadScript(`${base}/selfie_segmentation.js`)
+        const SelfieSegmentation = window.SelfieSegmentation
+        if (!SelfieSegmentation) throw new Error('Segmentation unavailable')
+        // locateFile must point at the SAME base the script came from — the
+        // model's .tflite/.wasm siblings are resolved through it, so a mismatch
+        // would fetch the weights from somewhere other than the shipped copy.
+        const segmenter = new SelfieSegmentation({
+          locateFile: (file) => `${base}/${file}`,
+        })
+        segmenter.setOptions({ modelSelection: 1, selfieMode: true })
+        await segmenter.initialize()
+        return segmenter
+      } catch (err) {
+        lastErr = err
+      }
+    }
+    throw lastErr || new Error('Segmentation unavailable')
   })().catch((err) => {
     // Mark unavailable so the render loop permanently uses the no-model path.
     segmenterUnavailable = true

@@ -355,6 +355,10 @@ def schedule_team_replies(ticket, user_text: str, session=None) -> dict:
             },
             countdown=delay,
         )
+        logger.info(
+            "Queued team reply issue=%s author=%s delay=%ss teams=%s",
+            ticket.issue_key, author, delay, teams,
+        )
     except Exception as exc:
         logger.warning("Celery unavailable for team reply, delivering immediately: %s", exc)
         deliver_team_reply_now(
@@ -383,6 +387,10 @@ def deliver_team_reply_now(
 
     ticket = UserScenarioJiraTicket.objects.filter(issue_key=issue_key).first()
     if not ticket:
+        logger.warning(
+            "Dropping team reply — ticket missing issue_key=%s author=%s",
+            issue_key, author,
+        )
         return
 
     engine = None

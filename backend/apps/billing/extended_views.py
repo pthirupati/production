@@ -125,7 +125,58 @@ class SubscriptionsOverviewView(APIView):
         })
 
 
-def _create_technology_subscription(user, technology, amount, payment_method="stripe"):
+def record_payment_transaction(
+    user, amount, *, payment_method, product_type,
+    gateway_payment_id="", gateway_order_id="", extra=None,
+):
+    """Write the PaymentTransaction for a fulfilled purchase (audit Z1-6).
+
+    The Stripe-technology and org-seat paths granted access without ever writing a
+    transaction, so those sales had no invoice, no GST breakup and no
+    gateway_payment_id: invisible to payment history and revenue totals, and
+    **impossible to refund through the product** — `RazorpayRefundView` refunds a
+    PaymentTransaction, so a sale with no row cannot be refunded at all. Access
+    granted with no financial record is the worst half of a payment to get wrong.
+
+    Idempotent by construction: the key is derived from the gateway identifier, so a
+    replayed webhook or a double-clicked verify resolves to the same row rather than
+    inflating revenue.
+    """
+    import hashlib
+
+    from .gst import compute_gst, place_of_supply_for
+    from .models import PaymentTransaction
+
+    ident = gateway_payment_id or gateway_order_id or f"{user.id}-{product_type}-{amount}"
+    idem = hashlib.sha256(f"{product_type}-v1-{user.id}-{ident}".encode()).hexdigest()
+    breakup = compute_gst(amount, place_of_supply=place_of_supply_for(user))
+    txn, _created = PaymentTransaction.objects.get_or_create(
+        idempotency_key=idem,
+        defaults=dict(
+            user=user,
+            amount=breakup.total_amount,
+            taxable_amount=breakup.taxable_amount,
+            gst_rate=breakup.gst_rate,
+            gst_amount=breakup.gst_amount,
+            cgst_amount=breakup.cgst_amount,
+            sgst_amount=breakup.sgst_amount,
+            igst_amount=breakup.igst_amount,
+            place_of_supply=breakup.place_of_supply,
+            currency="INR",
+            payment_method=payment_method,
+            status="success",
+            gateway_payment_id=gateway_payment_id or "",
+            gateway_order_id=gateway_order_id or "",
+            gateway_response={"product_type": product_type, **(extra or {})},
+        ),
+    )
+    return txn
+
+
+def _create_technology_subscription(
+    user, technology, amount, payment_method="stripe",
+    *, gateway_payment_id="", gateway_order_id="",
+):
     """Shared helper after successful payment."""
     from datetime import timedelta
 
@@ -142,6 +193,26 @@ def _create_technology_subscription(user, technology, amount, payment_method="st
             "payment_method": payment_method,
         },
     )
+    # Financial record for the sale (audit Z1-6). Best-effort: a bookkeeping failure
+    # must not revoke access the customer has already paid for — but it is logged
+    # loudly, because a granted subscription with no transaction is exactly the state
+    # that cannot be refunded later.
+    try:
+        record_payment_transaction(
+            user, amount,
+            payment_method=payment_method,
+            product_type="technology",
+            gateway_payment_id=gateway_payment_id,
+            gateway_order_id=gateway_order_id,
+            extra={"technology_id": str(technology.id), "technology": technology.slug},
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Technology subscription granted for user=%s tech=%s but the "
+            "PaymentTransaction failed (%s) — this sale is unrefundable until "
+            "reconciled.",
+            user.id, technology.slug, exc,
+        )
     return sub
 
 
@@ -337,8 +408,8 @@ class OrgSeatCheckoutView(APIView):
         # FIN-01). The catalog/seat price is treated as GST-inclusive, so the
         # Razorpay order amount equals the displayed total. The breakup is stored
         # in notes so the capture-verify + fulfilment can reconcile it.
-        from .gst import compute_gst
-        breakup = compute_gst(amount_inr)
+        from .gst import compute_gst, place_of_supply_for
+        breakup = compute_gst(amount_inr, place_of_supply=place_of_supply_for(request.user))
 
         import razorpay
         client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
@@ -387,12 +458,23 @@ def fulfill_stripe_technology_checkout(session: dict) -> None:
     User = get_user_model()
     user = User.objects.get(id=int(user_id))
     technology = Technology.objects.get(id=int(tech_id))
-    _create_technology_subscription(user, technology, amount_inr, payment_method="stripe")
+    _create_technology_subscription(
+        user, technology, amount_inr, payment_method="stripe",
+        # Without a gateway id the transaction exists but cannot be refunded, which
+        # is most of the point of recording it.
+        gateway_payment_id=str(session.get("payment_intent") or ""),
+        gateway_order_id=str(session.get("id") or ""),
+    )
     logger.info("Stripe tech subscription created for %s — %s", user.email, technology.slug)
 
 
-def fulfill_org_razorpay_order(notes: dict) -> None:
-    """Apply org seats and tech grants after Razorpay payment."""
+def fulfill_org_razorpay_order(notes: dict, *, payment_id="", order_id="") -> None:
+    """Apply org seats and tech grants after Razorpay payment.
+
+    `payment_id` / `order_id` are optional for backwards compatibility, but without
+    them the seat purchase is recorded with no gateway reference and cannot be
+    refunded through the product (audit Z1-6).
+    """
     from datetime import timedelta
     from django.contrib.auth import get_user_model
     from apps.accounts.models import Organization, OrganizationTechnologyGrant
@@ -402,6 +484,11 @@ def fulfill_org_razorpay_order(notes: dict) -> None:
         return
     org = Organization.objects.get(id=notes["org_id"])
     seats = int(notes.get("seats") or org.seat_limit)
+    # Capture what a refund would need to undo, BEFORE mutating it. seat_limit is
+    # raised with max(), so the prior value is unrecoverable afterwards — without
+    # recording it here a refund could only guess (audit Z1-6/Z1-8).
+    previous_seat_limit = org.seat_limit
+    granted_technology_ids: list[str] = []
     org.seat_limit = max(org.seat_limit, seats)
     org.save(update_fields=["seat_limit", "updated_at"])
     expires = timezone.now() + timedelta(days=365)
@@ -417,5 +504,31 @@ def fulfill_org_razorpay_order(notes: dict) -> None:
             organization=org,
             technology=tech,
             defaults={"expires_at": expires, "is_active": True},
+        )
+        granted_technology_ids.append(str(tech.id))
+    # Financial record for the seat purchase (audit Z1-6) — org checkouts granted
+    # seats with no PaymentTransaction at all.
+    try:
+        amount_inr = int(notes.get("amount_inr") or 0)
+        if amount_inr > 0 and org.owner_id:
+            record_payment_transaction(
+                org.owner, amount_inr,
+                payment_method="razorpay",
+                product_type="organization",
+                gateway_payment_id=payment_id,
+                gateway_order_id=order_id,
+                extra={
+                    "org_id": str(org.id),
+                    "org": org.slug,
+                    "seats": seats,
+                    # Undo information for a refund.
+                    "previous_seat_limit": previous_seat_limit,
+                    "granted_technology_ids": granted_technology_ids,
+                },
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Org seats granted for %s but the PaymentTransaction failed (%s) — "
+            "this sale is unrefundable until reconciled.", org.slug, exc,
         )
     logger.info("Org checkout fulfilled for %s (%s seats)", org.slug, seats)

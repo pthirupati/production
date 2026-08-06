@@ -25,6 +25,46 @@ from .serializers import (
 logger = logging.getLogger(__name__)
 
 
+def _record_moderation(actor, thread, changes: dict) -> None:
+    """Record who moderated what (audit Z3-8).
+
+    Pinning, locking and soft-deleting other people's threads left no trace at all,
+    so "why was my thread removed?" had no answer and neither did "who removed it".
+    The Z2-4 meta-audit made the same argument for clearing the security log: an
+    accountability trail that can be bypassed provides the *appearance* of
+    accountability rather than the fact of it.
+
+    Uses `action="admin_action"`, deliberately — that action is outside
+    `_SECURITY_CLEAR_ACTIONS`, so these rows survive the security-log sweep. A
+    moderation record deleted by an unrelated cleanup would be worse than none,
+    because the gap reads as "nothing happened".
+
+    Best-effort: a bookkeeping failure must not block a moderator mid-action, but it
+    is logged at ERROR rather than swallowed, because the resulting action is
+    unattributed.
+    """
+    try:
+        from apps.audit.models import AuditLog
+
+        AuditLog.objects.create(
+            user=actor,
+            action="admin_action",
+            resource=f"/community/threads/{thread.id}",
+            metadata={
+                "event": "thread_moderated",
+                "thread_id": str(thread.id),
+                "thread_author_id": thread.author_id,
+                "changes": changes,
+            },
+        )
+    except Exception as exc:
+        logger.error(
+            "Moderation meta-audit failed for thread %s by user %s (%s) — this "
+            "action is now unattributed",
+            thread.id, getattr(actor, "id", "?"), exc,
+        )
+
+
 class ThreadPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = "page_size"
@@ -106,6 +146,32 @@ class ThreadDetailView(APIView):
         if request.user.is_staff:
             allowed_fields.extend(["is_pinned", "is_locked"])
 
+        # `title` is CharField(max_length=300) and this wrote straight through with
+        # setattr, so a 301-character title reached the database and came back as a
+        # DataError — a 500 for what is plainly a bad request (audit Z3-8).
+        title = request.data.get("title")
+        if title is not None and len(str(title)) > 300:
+            return Response(
+                {"error": "Title must be 300 characters or fewer."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+        if title is not None and not str(title).strip():
+            return Response(
+                {"error": "Title cannot be empty."},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Moderator actions are recorded before they take effect, and only when a
+        # moderator is acting on someone else's thread — an author editing their own
+        # post is not moderation, and logging it would bury the rows that matter.
+        moderation_changes = {
+            f: request.data[f]
+            for f in ("is_pinned", "is_locked")
+            if f in request.data and getattr(thread, f) != request.data[f]
+        }
+        if moderation_changes and thread.author_id != request.user.id:
+            _record_moderation(request.user, thread, moderation_changes)
+
         for field in allowed_fields:
             if field in request.data:
                 setattr(thread, field, request.data[field])
@@ -123,6 +189,9 @@ class ThreadDetailView(APIView):
         # Only author or admin can delete
         if thread.author != request.user and not request.user.is_staff:
             return Response({"error": "Permission denied"}, status=http_status.HTTP_403_FORBIDDEN)
+
+        if thread.author_id != request.user.id:
+            _record_moderation(request.user, thread, {"is_deleted": True})
 
         thread.is_deleted = True
         thread.save(update_fields=["is_deleted"])
@@ -163,13 +232,17 @@ class ReplyView(APIView):
                 User = get_user_model()
                 mentioned_user = User.objects.filter(username=username).first()
                 if mentioned_user and mentioned_user != request.user:
-                    from apps.notifications.models import Notification
-                    Notification.objects.create(
-                        user=mentioned_user,
-                        type='system',
-                        title=f'@{request.user.username} mentioned you',
-                        message=reply_content[:200],
-                        metadata={'mention_by': request.user.username, 'thread_id': str(thread_id)},
+                    # Shared helper so the user's in-app preference is honoured
+                    # (audit Z3-6) — this wrote straight to the table before.
+                    from apps.notifications.email_helpers import (
+                        deliver_inapp_notification,
+                    )
+                    deliver_inapp_notification(
+                        mentioned_user,
+                        'system',
+                        f'@{request.user.username} mentioned you',
+                        reply_content[:200],
+                        {'mention_by': request.user.username, 'thread_id': str(thread_id)},
                     )
             except Exception:
                 pass

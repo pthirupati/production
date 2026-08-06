@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { useThemeStore } from '../../store/themeStore'
 import {
-  LayoutDashboard, Target, Trophy, User, LogOut, Shield, Menu, X, Bookmark, Layers, Sun, Moon, History, Award, MessageSquare, Search, Mic2, CreditCard, Bot,
+  LayoutDashboard, Target, Trophy, User, LogOut, Shield, Menu, X, Bookmark, Layers, Sun, Moon, History, Award, MessageSquare, Search, Mic2, CreditCard, Bot, MonitorPlay,
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import NotificationBell from './NotificationBell'
@@ -16,6 +16,11 @@ import { FixitLogo } from '../design'
 const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/technologies', icon: Layers, label: 'Technologies' },
+  // /simulators is an authenticated route whose only inbound link used to be the
+  // anonymous public nav ("Lab Consoles"), so logged-out users bounced to /login
+  // and logged-in users never saw it. Sits next to Technologies because every
+  // card on the page links to /technologies/:slug.
+  { path: '/simulators', icon: MonitorPlay, label: 'Lab Consoles' },
   { path: '/scenarios', icon: Target, label: 'All Scenarios' },
   { path: '/interviews', icon: Mic2, label: 'Interviews' },
   { path: '/leaderboard', icon: Trophy, label: 'Leaderboard' },

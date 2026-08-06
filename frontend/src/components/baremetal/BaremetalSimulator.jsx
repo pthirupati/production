@@ -160,6 +160,12 @@ export default function BaremetalSimulator({
     setLoading(false)
   }, [sessionId, slug])
 
+  // Lets the visibility-gated poll below read the latest refresh without
+  // listing it as a dependency (which would tear down its listener on every
+  // re-created callback).
+  const refreshRef = useRef(refresh)
+  refreshRef.current = refresh
+
   useEffect(() => { refresh() }, [refresh])
 
   useEffect(() => {
@@ -292,15 +298,27 @@ export default function BaremetalSimulator({
 
   // Fast transient-only poll — a stopgap for machines mid-commission/deploy
   // while the WebSocket is down; the WS pushes updates instantly once back up.
+  // Also gated on tab visibility (audit L1422): each 2s tick is a network
+  // round-trip + full re-render, and commissioning runs server-side, so polling
+  // a hidden tab buys nothing — the machine advances regardless. On resume we
+  // refresh IMMEDIATELY before restarting the timer, so a machine that reached
+  // Deployed while hidden doesn't show a stale "Commissioning" badge for 2s.
   useEffect(() => {
     if (!loggedIn || !anyTransient || wsConnected) {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
       return undefined
     }
-    if (pollRef.current) return undefined
-    pollRef.current = setInterval(() => { refresh() }, 2000)
-    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }
-  }, [loggedIn, anyTransient, wsConnected, refresh])
+    const stop = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }
+    const start = () => { if (!pollRef.current) pollRef.current = setInterval(() => { refreshRef.current?.() }, 2000) }
+    const onVis = () => {
+      if (document.visibilityState === 'visible') { refreshRef.current?.(); start() } else stop()
+    }
+    // refreshRef (not refresh) is deliberate: the effect must not re-run — and
+    // therefore must not drop the listener — every time refresh is re-created.
+    if (document.visibilityState === 'visible') start()
+    document.addEventListener('visibilitychange', onVis)
+    return () => { stop(); document.removeEventListener('visibilitychange', onVis) }
+  }, [loggedIn, anyTransient, wsConnected])
 
   useEffect(() => () => {
     if (pollRef.current) clearInterval(pollRef.current)

@@ -166,6 +166,20 @@ def _find_volume(state: dict, name: str) -> dict | None:
     return next((v for v in state.get("volumes", []) if v.get("name") == name), None)
 
 
+def _find_aggregate(state: dict, name: str) -> dict | None:
+    return next((a for a in state.get("aggregates", []) if a.get("name") == name), None)
+
+
+def _aggr_free_gb(aggr: dict) -> int:
+    """Free space on an aggregate, floored at 0.
+
+    used_gb is the aggregate's own allocated figure (aggr1 ships 1800GB used
+    against 5000GB with only 300GB of that from the seeded volumes), not a
+    derived sum — so provisioning has to add to it rather than recompute it.
+    """
+    return max(0, int(aggr.get("size_gb", 0)) - int(aggr.get("used_gb", 0)))
+
+
 def apply_action(session_id: str, action: str, payload: dict | None = None) -> dict:
     payload = payload or {}
     entry = _load(session_id)
@@ -190,10 +204,27 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         size_gb = int(payload.get("size_gb") or 50)
         if _find_volume(state, name):
             return {"ok": False, "error": f"Volume {name} already exists"}
+        if size_gb <= 0:
+            return {"ok": False, "error": "Volume size must be greater than 0GB"}
+        aggr = _find_aggregate(state, aggregate)
+        if not aggr:
+            return {"ok": False, "error": f"Aggregate {aggregate} not found"}
+        free_gb = _aggr_free_gb(aggr)
+        if size_gb > free_gb:
+            return {
+                "ok": False,
+                "error": (
+                    f"Aggregate {aggregate} has only {free_gb}GB free — "
+                    f"cannot provision a {size_gb}GB volume"
+                ),
+            }
         state.setdefault("volumes", []).append({
             "name": name, "svm": svm, "aggregate": aggregate, "size_gb": size_gb,
             "used_gb": 0, "state": "online", "type": "rw",
         })
+        # Thick-provision accounting: charge the aggregate for the full size so
+        # free space does not drift across a multi-step lab.
+        aggr["used_gb"] = int(aggr.get("used_gb", 0)) + size_gb
         broken.pop("needs_volume", None)
         _event(state, f"Volume {name} created ({size_gb}GB) on {aggregate}", "success")
         _save(session_id, entry)
@@ -205,9 +236,24 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if not vol:
             return {"ok": False, "error": f"Volume {name} not found"}
         new_size = int(payload.get("size_gb") or (vol.get("size_gb", 100) * 2))
-        if new_size <= vol.get("size_gb", 0):
+        current_size = int(vol.get("size_gb", 0))
+        if new_size <= current_size:
             return {"ok": False, "error": "New size must be larger than current size"}
+        aggr = _find_aggregate(state, vol.get("aggregate"))
+        if not aggr:
+            return {"ok": False, "error": f"Aggregate {vol.get('aggregate')} not found"}
+        delta_gb = new_size - current_size
+        free_gb = _aggr_free_gb(aggr)
+        if delta_gb > free_gb:
+            return {
+                "ok": False,
+                "error": (
+                    f"Aggregate {aggr['name']} has only {free_gb}GB free — "
+                    f"cannot grow {name} by {delta_gb}GB"
+                ),
+            }
         vol["size_gb"] = new_size
+        aggr["used_gb"] = int(aggr.get("used_gb", 0)) + delta_gb
         if broken.get("volume_near_full") == name:
             broken.pop("volume_near_full", None)
         _event(state, f"Volume {name} resized to {new_size}GB", "success")
@@ -363,11 +409,37 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     return {"ok": False, "error": f"Unknown action: {action}"}
 
 
+# Per-key grader feedback. Unlike azure_engine, whose broken dict stores
+# human-readable reasons, this engine stores bare targets (a volume name, a
+# SnapMirror id) and sometimes just True — so the value cannot be echoed
+# directly. Each template names the unmet objective and only interpolates the
+# target when there is one worth showing.
+_BROKEN_REASONS: dict[str, str] = {
+    "volume_near_full": "volume {target} is still near full — grow it",
+    "needs_volume": "the requested volume has not been created yet",
+    "needs_snapmirror": "no SnapMirror relationship exists for {target} yet",
+    "needs_break_mirror": "SnapMirror relationship {target} has not been broken off yet",
+    "lun_unmapped": "LUN {target} is not mapped to an initiator yet",
+    "needs_export": "volume {target} has no export policy rule yet",
+}
+
+
+def _describe_broken(broken: dict) -> str:
+    kind = next(iter(broken.keys()))
+    target = broken[kind]
+    template = _BROKEN_REASONS.get(kind)
+    if template is None:
+        # Unknown key: still fail CLOSED, and name the key so a missing
+        # template shows up as a reportable gap rather than a silent pass.
+        return f"unresolved objective ({kind})"
+    return template.format(target=target)
+
+
 def validate_netapp_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
     entry = _load(session_id)
     if not entry:
         return False, "No NetApp session"
     broken = entry["state"].get("broken") or {}
     if broken:
-        return False, "NetApp environment still has unresolved issues"
+        return False, f"NetApp lab not complete: {_describe_broken(broken)}"
     return True, "NetApp lab objectives met"

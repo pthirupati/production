@@ -35,6 +35,22 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
+    # ── Self-hosted runtimes: Pyodide + MediaPipe (~28MB, version-pinned) ──
+    # Kept in sync with Dockerfile.prod, which serves the same dist/. `^~` beats
+    # the regex above so the .wasm/.zip/.tflite siblings get the long cache too,
+    # not just the .js entry points.
+    location ^~ /pyodide/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
+        access_log off;
+    }
+
+    location ^~ /vendor/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
+        access_log off;
+    }
+
     # SPA fallback — all routes serve index.html
     location / {
         try_files $uri $uri/ /index.html;

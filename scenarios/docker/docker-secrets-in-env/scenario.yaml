@@ -1,4 +1,4 @@
-title: Secrets Baked Into Image Env
+title: Credential Exposed via docker inspect
 slug: docker-secrets-in-env
 technology: docker
 category: Build
@@ -10,10 +10,10 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: 'CONTEXT: A team operating Docker containers has raised a ticket for `Secrets Baked Into
-  Image Env`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and
-  resolve it. Business impact: reduced service reliability and blocked users until the underlying state
-  is repaired.
+description: 'CONTEXT: A routine access review found that the production database password for the `api`
+  service is readable by anyone who can talk to the Docker socket. `docker inspect api` prints it in
+  plaintext, and so does `docker exec api env`. Business impact: every operator, every CI job, and every
+  log shipper that captures container metadata has effectively been handed the database credential.
 
 
   ENVIRONMENT: You are working in FixitLab''s offline Docker host. The architecture is a single lab-primary
@@ -21,81 +21,99 @@ description: 'CONTEXT: A team operating Docker containers has raised a ticket fo
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: A Dockerfile baking secrets into image layers.
+  SYMPTOM / STARTING STATE: The `api` container carries `DATABASE_PASSWORD` (and the same value inside
+  `DATABASE_URL`) as environment variables. The service is healthy and serving traffic — this is a
+  disclosure problem, not an outage, and the service must stay up while you fix it.
 
 
-  OBJECTIVE: Confirm the issue: Secret visible in image history; Apply the documented fix in /opt/app/Dockerfile;
-  Verify the configuration is corrected. Acceptance criteria: the change is minimal and reversible, and
-  success means `check.sh` exits successfully.
+  OBJECTIVE: Confirm the credential is readable via `docker inspect api`; move it to a secret mounted at
+  `/run/secrets/api_db_password`; remove it from every environment variable; and confirm `api` still
+  resolves the credential from the mount and is still running. Acceptance criteria: the change is minimal
+  and reversible.
 
 
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant docker CLI, images, containers, and compose files), changing one thing at a time.
-  Check your work continuously against the objective — success means `check.sh` exits successfully.
+  WORK TO DO: A secret named `api_db_password` already holds the correct value — this is a migration, not
+  a rotation, so do not invent a new password. Mount it into `api`, then remove the environment variables
+  that expose it. Change one thing at a time and re-check between steps.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
-  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
-  check, not just once.
+  VERIFY: `docker inspect api` must no longer show the value anywhere in its env list, while
+  `docker exec api cat /run/secrets/api_db_password` must still return it and the container must still be
+  running. Both halves are graded.
 
 
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  ROLLBACK: If a change makes things worse, revert that single change immediately (re-mount the secret /
+  restore the env var / restart the affected container) and re-observe before trying another hypothesis.
   Never stack unverified changes.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
-initial_state: A Dockerfile baking secrets into image layers.
+  WHAT TO AVOID: Do not simply delete the environment variable — that closes the disclosure by breaking
+  the service, and the checker rejects it. Do not delete or replace the secret, and do not stop the
+  container to make the leak "go away".'
+initial_state: The `api` container exposes the production database password as a plaintext environment
+  variable, readable via `docker inspect api` and `docker exec api env`. The service is healthy and must
+  stay that way.
 objectives:
-- 'Confirm the issue: Secret visible in image history'
-- Apply the documented fix in /opt/app/Dockerfile
-- Verify the configuration is corrected
+- 'Confirm the issue: the database password is visible in `docker inspect api`'
+- Mount the existing `api_db_password` secret into the `api` container
+- Remove `DATABASE_PASSWORD` and `DATABASE_URL` from the container environment
+- Verify `api` still resolves the credential from `/run/secrets/api_db_password` and is still running
 hints:
 - order: 1
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: secrets baked into image env is not behaving
-    as the scenario objectives require. This lab is about secrets baked into image env — how secrets baked
-    into image env behaves in a Docker containers environment. Read the objectives and the current state,
-    and note precisely what looks wrong versus healthy before you form any theory.'
+    Do not change anything yet. Nothing is down: `api` is running and serving traffic. The finding is a
+    disclosure — a credential is readable by anyone with Docker socket access. Before you touch the
+    container, establish exactly where the value is visible and who can see it, because that is what you
+    will have to prove you closed.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For secrets baked into image env problems the reliable method is:
-    (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component that
-    owns the symptom, (3) change exactly one thing, (4) re-check. Create the smallest working slice of
-    secrets baked into image env first, validate it, then add the remaining pieces one at a time.'
+    Environment variables are not a secret store: they are visible to `docker inspect`, to anything that
+    scrapes container metadata, and to every process inside the container. The fix is a migration with two
+    halves that must land together — give the credential a safer home first, then take away the unsafe one.
+    Removing the env var on its own does not fix a disclosure, it causes an outage.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+    `docker inspect api` — read the env list and note every entry containing the password (check for it
+    embedded in connection strings too, not just in an obviously-named variable).
+
+    `docker exec api env` — confirm the same value is visible from inside.
+
+    `docker secret ls` — see what is already available to mount.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Identify the exited/unhealthy container and read its logs.
+    1. The password appears in more than one environment variable on `api`. Find all of them — a value
+    left behind inside `DATABASE_URL` is the same leak.
 
-    2. Inspect the image, env vars, and volume mounts (`docker inspect`).
+    2. A secret named `api_db_password` already exists and already holds the correct value. You are
+    relocating the credential, not rotating it, so do not create a replacement.
 
-    3. Compare container state to the scenario objectives.'
+    3. Mounted secrets surface as a file under `/run/secrets/`, never as an environment variable — that
+    asymmetry is the point of the exercise.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Fix the Dockerfile, compose file, or runtime config.
+    1. Mount `api_db_password` into `api` (target `/run/secrets/api_db_password`).
 
-    2. Rebuild/restart the container.
+    2. Remove `DATABASE_PASSWORD` from the container env, then remove `DATABASE_URL` — the password is
+    embedded in it too.
 
-    3. Confirm `bash check.sh` succeeds.
+    3. Verify both halves: `docker inspect api` no longer shows the value anywhere, and
+    `docker exec api cat /run/secrets/api_db_password` still returns it.
 
 
-    WHY: Docker labs grade real container state.'
-summary: Complete the secrets baked into image env docker lab and verify success with the checker
+    WHY: the checker grades both. A container that no longer leaks the credential but can no longer read
+    it either is a broken service, not a fixed one — and stopping the container does not count.'
+summary: Move a database password out of a container environment variable and into a mounted secret,
+  without breaking the service that depends on it
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -106,9 +124,10 @@ tags:
 - hands-on
 linked_tutorial: docker-fundamentals
 what_you_will_learn:
-- 'Confirm the issue: Secret visible in image history'
-- Apply the documented fix in /opt/app/Dockerfile
-- Verify the configuration is corrected
+- Why an environment variable is not a secret store, and exactly who can read one
+- How to find a credential that leaked into more than one variable, including inside a connection string
+- How to mount a Docker secret and read it from `/run/secrets/` instead
+- Why closing a disclosure by deleting the credential is an outage, not a fix
 environment:
   nodes:
   - role: primary
@@ -126,41 +145,58 @@ environment:
     password: lab123
 tasks:
 - id: task_1
-  title: Secrets Baked Into Image Env
-  description: Restore healthy behavior for Secrets Baked Into Image Env by investigating the failure,
-    applying the smallest safe fix, and validating the outcome.
-  background: 'This docker lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  title: Move the database password out of the container environment
+  description: Relocate the `api` service's database password from its environment variables to a mounted
+    secret, so that `docker inspect` no longer discloses it while the service keeps working.
+  background: 'Environment variables are metadata, not storage: the daemon hands them to anyone who can
+    call the inspect API. A mounted secret lands as a tmpfs file readable only from inside the container,
+    which is why the same value is safe there and unsafe in `env`.'
   validation:
+    # Simulation labs are graded by docker_engine.validate_docker_lab (see
+    # apps.labs.infra.lab_infra_type), not by this script — check.sh is retained
+    # only to satisfy the catalog schema's custom_script contract.
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. The credential must be absent from every environment variable
+      AND still resolvable by the running container from /run/secrets/api_db_password.
 solution:
-  summary: Identify the misconfiguration affecting this docker lab and apply the minimal fix.
+  summary: Mount the existing `api_db_password` secret into `api`, then remove both `DATABASE_PASSWORD`
+    and the password embedded in `DATABASE_URL` from the container environment. The secret itself is not
+    rotated or deleted, and the container is never stopped.
   files_changed: []
   commands_run:
-  - bash check.sh
+  - docker inspect api
+  - docker secret ls
+  - docker exec api cat /run/secrets/api_db_password
   reference_docs: docker-fundamentals
 guided_mode:
   enabled: true
   steps:
   - step: 1
-    title: Inspect current state
-    instruction: Run a read-only diagnostic before changing anything.
-    command: check.sh
-    expected_output: Output shows the current failure mode
-    explanation: Evidence-first troubleshooting avoids guessing.
+    title: Confirm the disclosure
+    instruction: Read the container's environment and note every variable that contains the password.
+    command: docker inspect api
+    expected_output: The password appears in DATABASE_PASSWORD and again inside DATABASE_URL
+    explanation: Finding both copies now avoids a "fix" that leaves the value in a connection string.
     next_on: command_success
   - step: 2
-    title: Apply the minimal fix
-    instruction: Make one reversible change aligned with the objectives.
-    command: '# your fix command here'
-    expected_output: State moves toward the objective
-    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    title: Give the credential a safer home
+    instruction: Mount the existing secret into the container before removing anything.
+    command: docker secret ls
+    expected_output: api_db_password is available and can be mounted at /run/secrets/api_db_password
+    explanation: Mount first, remove second — the reverse order takes the service down.
     next_on: command_success
   - step: 3
-    title: Verify with the grader
-    instruction: Run the same verification the checker uses.
-    command: check.sh
-    expected_output: '`check.sh` exits successfully'
-    explanation: The lab passes only when real state is healthy.
+    title: Remove the exposed variables
+    instruction: Unset DATABASE_PASSWORD and DATABASE_URL on the api container.
+    command: '# unset the exposed env vars on api'
+    expected_output: docker inspect api no longer shows the password anywhere
+    explanation: This is the half that actually closes the disclosure.
+    next_on: command_success
+  - step: 4
+    title: Prove the service still works
+    instruction: Confirm the container can still read the credential from its mount.
+    command: docker exec api cat /run/secrets/api_db_password
+    expected_output: The password is returned from the mounted file
+    explanation: The lab passes only when the leak is closed and the workload still resolves the credential.
     next_on: command_success

@@ -98,12 +98,15 @@ class JourneyStepDetailSerializer(serializers.ModelSerializer):
                 "title": titles.get(slug, slug), "resolved": slug in titles,
             }]
         if obj.kind == "tutorial_course":
-            # course_slug references live in apps.tutorials (read-only, may be
-            # seeded by a separate process); surface the slug without a hard
-            # dependency so this endpoint never couples to that app's schema.
+            # course_slug references live in apps.tutorials, which may be seeded
+            # by a separate process. The view resolves them best-effort in its
+            # single prefetch pass; when the course isn't seeded we keep the
+            # step's stored title rather than echoing a raw slug at the user.
+            titles = ctx.get("course_titles", {})
             return [{
                 "kind": "tutorial_course", "slug": slug,
-                "title": obj.title, "resolved": None,
+                "title": titles.get(slug) or obj.title,
+                "resolved": slug in titles,
             }]
         return [{"kind": obj.kind, "slug": slug, "title": obj.title, "resolved": None}]
 

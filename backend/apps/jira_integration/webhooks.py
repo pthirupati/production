@@ -62,12 +62,16 @@ def _extract_comment_text(body) -> str:
 
 
 def _notify_user(ticket, title, message, metadata=None):
-    Notification.objects.create(
-        user=ticket.user,
-        type="system",
-        title=title,
-        message=message,
-        metadata=metadata or {},
+    # Routed through the shared helper so "System notifications" in Profile is
+    # actually honoured (audit Z3-6); this used to write straight to the table.
+    from apps.notifications.email_helpers import deliver_inapp_notification
+
+    return deliver_inapp_notification(
+        ticket.user,
+        "system",
+        title,
+        message,
+        metadata or {},
     )
 
 

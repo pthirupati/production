@@ -93,8 +93,25 @@ export const dockerApi = {
   scaleSwarmService(sessionId, name, replicas) {
     return dockerApi.action(sessionId, 'scale_swarm_service', { name, replicas })
   },
-  createSecret(sessionId, name) {
-    return dockerApi.action(sessionId, 'create_secret', { name })
+  /** The engine rejects a valueless secret: one that holds nothing cannot be
+   *  mounted, and a mount that resolves to nothing cannot be graded. */
+  createSecret(sessionId, name, value) {
+    return dockerApi.action(sessionId, 'create_secret', { name, value })
+  },
+  removeSecret(sessionId, name) {
+    return dockerApi.action(sessionId, 'remove_secret', { name })
+  },
+  /** Omitting target lets the engine default to /run/secrets/<secret>. */
+  mountSecret(sessionId, container, secret, target = '') {
+    return dockerApi.action(sessionId, 'mount_secret', {
+      container, secret, ...(target ? { target } : {}),
+    })
+  },
+  unmountSecret(sessionId, container, secret) {
+    return dockerApi.action(sessionId, 'unmount_secret', { container, secret })
+  },
+  unsetContainerEnv(sessionId, container, key) {
+    return dockerApi.action(sessionId, 'remove_container_env', { container, key })
   },
   createConfig(sessionId, name) {
     return dockerApi.action(sessionId, 'create_config', { name })

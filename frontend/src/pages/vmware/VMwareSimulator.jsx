@@ -1200,7 +1200,12 @@ export default function VMwareSimulator() {
   }
 
   if (!vcAuth) {
-    return <VmwareLoginGate onAuthenticated={() => setVcAuth(true)} />
+    return (
+      <VmwareLoginGate
+        onAuthenticated={() => setVcAuth(true)}
+        backTo={sessionId ? `/lab/${sessionId}` : '/dashboard'}
+      />
+    )
   }
 
   const inv = state?.inventory || {}

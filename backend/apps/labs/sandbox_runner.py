@@ -74,10 +74,70 @@ _PROBE_TTL = 60.0
 _probe_lock = threading.Lock()
 _probe_cache: dict[str, object] = {"ok": None, "ts": 0.0}
 
+# Last-known engine health, kept so operators can *see* a Docker-socket outage
+# instead of inferring it from a log line. ``docker_runtime_available`` is the
+# only writer; ``sandbox_health`` is the read side (used by the grader's
+# fail-closed alert and available to any ops/health surface).
+#
+# ``consecutive_failures`` is the useful number: a single failed probe is noise
+# (a restart of the labs engine), a rising count is an outage that is making
+# every coding lab ungradeable.
+_health_lock = threading.Lock()
+_health: dict[str, object] = {
+    "last_ok": None,          # bool | None — None = never probed
+    "last_error": "",         # str — reason the last probe failed
+    "consecutive_failures": 0,
+    "last_ok_monotonic": None,
+}
+
+
+def _record_probe(ok: bool, error: str = "") -> None:
+    """Record a probe outcome for :func:`sandbox_health`."""
+    with _health_lock:
+        _health["last_ok"] = ok
+        if ok:
+            _health["consecutive_failures"] = 0
+            _health["last_error"] = ""
+            _health["last_ok_monotonic"] = _time.monotonic()
+        else:
+            _health["consecutive_failures"] = int(_health["consecutive_failures"]) + 1
+            _health["last_error"] = error or "docker engine unreachable"
+
+
+def sandbox_health() -> dict:
+    """Snapshot of container-sandbox reachability for monitoring.
+
+    Returns a plain dict (safe to JSON-encode) so an ops endpoint or an alert
+    payload can report *why* coding labs are being deferred to review. Keys:
+    ``enabled``, ``last_ok``, ``last_error``, ``consecutive_failures``,
+    ``seconds_since_ok`` (None when never seen healthy this process).
+    """
+    with _health_lock:
+        snapshot = dict(_health)
+    last_ok_mono = snapshot.pop("last_ok_monotonic", None)
+    snapshot["enabled"] = docker_sandbox_enabled()
+    snapshot["seconds_since_ok"] = (
+        None if last_ok_mono is None else round(_time.monotonic() - float(last_ok_mono), 1)
+    )
+    return snapshot
+
+
+def reset_sandbox_health() -> None:
+    """Clear probe + health caches. Test-only helper (module state is global)."""
+    with _probe_lock:
+        _probe_cache["ok"] = None
+        _probe_cache["ts"] = 0.0
+    with _health_lock:
+        _health.update(
+            last_ok=None, last_error="", consecutive_failures=0, last_ok_monotonic=None,
+        )
+
 
 def _image_for(language: str) -> Optional[str]:
     lang = (language or "").lower()
-    if lang == "python":
+    # "sql" is graded by a Python harness driving stdlib sqlite3, so it runs in
+    # the python image — no extra image to pull onto the labs engine.
+    if lang in ("python", "sql"):
         return getattr(settings, "SANDBOX_PYTHON_IMAGE", None) or _DEFAULT_PYTHON_IMAGE
     if lang == "javascript":
         return getattr(settings, "SANDBOX_NODE_IMAGE", None) or _DEFAULT_NODE_IMAGE
@@ -87,7 +147,7 @@ def _image_for(language: str) -> Optional[str]:
 def _runtime_argv(language: str, script_name: str) -> Optional[list[str]]:
     """Argv to run the harness *inside* the container (cwd is _WORKDIR)."""
     lang = (language or "").lower()
-    if lang == "python":
+    if lang in ("python", "sql"):
         # -I isolated mode (ignore env/user site), -B no .pyc writes.
         return ["python3", "-I", "-B", script_name]
     if lang == "javascript":
@@ -139,15 +199,20 @@ def docker_runtime_available(force: bool = False) -> bool:
 
     client = _get_client()
     ok = False
+    error = "docker client unavailable (SDK missing or engine misconfigured)"
     if client is not None:
         try:
             ok = bool(client.ping())
+            if not ok:
+                error = "docker ping returned falsy"
         except Exception as exc:
             logger.warning("sandbox_runner: docker ping failed (%s); using fallback", exc)
             ok = False
+            error = f"docker ping failed: {exc}"
         finally:
             _close(client)
 
+    _record_probe(ok, error)
     with _probe_lock:
         _probe_cache["ok"] = ok
         _probe_cache["ts"] = now

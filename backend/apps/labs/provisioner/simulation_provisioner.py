@@ -1222,7 +1222,13 @@ class SimulationProvisioner:
             try:
                 lab_session = LabSession.objects.get(container_id=resource_id)
                 az_ensure(str(lab_session.id), slug)
-                return validate_azure_lab(str(lab_session.id), slug)
+                _az_ok, _az_msg = validate_azure_lab(str(lab_session.id), slug)
+                # NO_VALIDATION_SCRIPT means the keyword-driven preset seeded no
+                # console objective for this slug (117 of 147 academy-azure-*).
+                # Fall through to the terminal sentinel sweep, which DOES plant a
+                # per-slug broken file — same treatment academy-aws-* already gets.
+                if not (not _az_ok and _az_msg == "NO_VALIDATION_SCRIPT"):
+                    return _az_ok, _az_msg
             except LabSession.DoesNotExist:
                 return False, "Azure simulation session not found"
         # Google Cloud Console (Compute Engine, VPC firewall, Persistent Disks).
@@ -1240,7 +1246,10 @@ class SimulationProvisioner:
             try:
                 lab_session = LabSession.objects.get(container_id=resource_id)
                 gcp_ensure(str(lab_session.id), slug)
-                return validate_gcp_lab(str(lab_session.id), slug)
+                _gcp_ok, _gcp_msg = validate_gcp_lab(str(lab_session.id), slug)
+                # Unseeded slug → terminal sentinel path, as for azure above.
+                if not (not _gcp_ok and _gcp_msg == "NO_VALIDATION_SCRIPT"):
+                    return _gcp_ok, _gcp_msg
             except LabSession.DoesNotExist:
                 return False, "GCP simulation session not found"
         # Monitoring (Grafana / Prometheus observability). Legacy simulation_type
@@ -1331,9 +1340,10 @@ class SimulationProvisioner:
             except LabSession.DoesNotExist:
                 return False, "Bare metal simulation session not found"
         # AWS console simulator: sim_type "aws" OR aws-/ec2-/s3-/iam- slug.
-        # Academy packs (academy-aws-*) are terminal FIXED-OK labs — do NOT
-        # intercept them here (same class of bug as G-06 cicd_engine). Console
-        # heroes keep validate_aws_lab.
+        # Academy packs (academy-aws-*) stay on the terminal FIXED-OK path until
+        # per-lab broken markers / validation_script exist for validate_aws_lab
+        # (all 420 currently ship empty validation_script — routing them here
+        # would either fail-open on any console click or strand every lab).
         _raw_aws_type = sim_type
         if not _raw_aws_type or _raw_aws_type == "generic":
             from apps.labs.models import LabSession

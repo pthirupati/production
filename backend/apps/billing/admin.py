@@ -3,12 +3,15 @@ Billing admin — Plan, Subscription, TechnologySubscription, PaymentTransaction
 SubscriptionInvoice, CouponCode, UserCertificate.
 """
 import csv
+import logging
 from decimal import Decimal
 
 from django.contrib import admin, messages
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.html import format_html
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     CouponCode,
@@ -79,6 +82,59 @@ class ExpiredCertFilter(admin.SimpleListFilter):
 # Plan admin
 # ---------------------------------------------------------------------------
 
+def _audit_subscription_action(request, queryset, *, action: str, kind: str) -> None:
+    """Record who changed whose paid access, and to what (audit Z1-15).
+
+    These admin actions did a bare ``queryset.update(is_active=...)`` with no audit
+    row at all — so support could grant or revoke paid access and nothing recorded
+    that it happened, who did it, or for whom. `grant_complimentary_access` already
+    wrote an AuditLog for exactly this reason; this is the same pattern applied to
+    the bulk actions.
+
+    One row per affected subscription rather than one per bulk action: "an admin
+    activated 40 subscriptions" is not answerable later, and the question an
+    investigation actually asks is "who granted access to THIS account".
+
+    Best-effort — a failure to audit must not leave the operator unable to act on a
+    live billing problem — but logged, because a silent gap here is the whole defect.
+    """
+    try:
+        from apps.audit.models import AuditLog
+
+        rows = []
+        for obj in queryset:
+            target = getattr(obj, "user", None)
+            meta = {
+                "event": f"{kind}_{action}",
+                "object_id": str(obj.pk),
+                "target_user_id": getattr(target, "id", None),
+                "target_email": getattr(target, "email", ""),
+            }
+            # A coupon has no owning user — the financially significant fact is
+            # which code was switched on, and by how much it discounts. Enabling a
+            # 100%-off code is as costly as granting access directly, so it belongs
+            # in the same trail with the metadata that actually identifies it.
+            code = getattr(obj, "code", None)
+            if code and target is None:
+                meta["coupon_code"] = str(code)
+                meta["discount_type"] = str(getattr(obj, "discount_type", "") or "")
+                meta["discount_value"] = str(getattr(obj, "discount_value", "") or "")
+            rows.append(AuditLog(
+                user=request.user if request.user.is_authenticated else None,
+                action="admin_action",
+                resource=f"/admin/billing/{kind}/{obj.pk}",
+                metadata=meta,
+            ))
+        if rows:
+            AuditLog.objects.bulk_create(rows)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Billing admin %s on %s was NOT audited (%s) — paid access changed "
+            "without a record.", action, kind, exc,
+        )
+
+
+
 @admin.register(Plan)
 class PlanAdmin(admin.ModelAdmin):
     list_display = ("name", "code", "price", "max_labs_per_day", "max_lab_duration_minutes", "is_active")
@@ -103,11 +159,13 @@ class SubscriptionAdmin(admin.ModelAdmin):
 
     @admin.action(description="Deactivate selected subscriptions")
     def action_deactivate(self, request, queryset):
+        _audit_subscription_action(request, queryset, action="deactivate", kind="subscription")
         queryset.update(is_active=False)
         self.message_user(request, "Subscriptions deactivated.", messages.WARNING)
 
     @admin.action(description="Activate selected subscriptions")
     def action_activate(self, request, queryset):
+        _audit_subscription_action(request, queryset, action="activate", kind="subscription")
         queryset.update(is_active=True)
         self.message_user(request, "Subscriptions activated.", messages.SUCCESS)
 
@@ -158,11 +216,13 @@ class TechnologySubscriptionAdmin(admin.ModelAdmin):
 
     @admin.action(description="Deactivate selected subscriptions")
     def action_deactivate(self, request, queryset):
+        _audit_subscription_action(request, queryset, action="deactivate", kind="technology_subscription")
         queryset.update(is_active=False)
         self.message_user(request, "Technology subscriptions deactivated.", messages.WARNING)
 
     @admin.action(description="Activate selected subscriptions")
     def action_activate(self, request, queryset):
+        _audit_subscription_action(request, queryset, action="activate", kind="technology_subscription")
         queryset.update(is_active=True)
         self.message_user(request, "Technology subscriptions activated.", messages.SUCCESS)
 
@@ -226,7 +286,7 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
     list_select_related = ("user",)
     date_hierarchy = "created_at"
     list_per_page = 50
-    actions = ["action_export_csv"]
+    actions = ["action_refund_full", "action_export_csv"]
 
     @admin.display(description="Amount")
     def amount_display(self, obj):
@@ -254,6 +314,79 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
         if obj.gateway_payment_id:
             return obj.gateway_payment_id[:20] + "..."
         return "—"
+
+    @admin.action(description="Refund selected payments in full (revokes access)")
+    def action_refund_full(self, request, queryset):
+        """Issue a FULL refund through the sanctioned code path (audit L5828/L5861).
+
+        `RazorpayRefundView` had no caller anywhere — not in the frontend, not
+        here — so every refund was done by hand in the Razorpay dashboard. A
+        gateway-side refund never bumps ``refunded_amount`` and never runs
+        ``_revoke_entitlement_for_transaction``, which means (a) the refunded user
+        keeps paid access and (b) our ceiling check goes blind, so a later
+        in-product refund can over-refund a payment that was already returned.
+
+        This calls :func:`apps.billing.views.perform_refund` rather than the
+        Razorpay SDK directly, deliberately: the row lock, the cumulative ceiling,
+        the idempotency key and the entitlement revocation all live there, and a
+        second implementation of that logic is exactly how you get a double
+        refund. The derived idempotency key means re-running the action on the
+        same rows is a no-op rather than a second refund.
+
+        FULL refund only, on the remaining refundable balance. Partial refunds
+        need an amount per transaction, which a bulk action has nowhere to put —
+        and partial is also the case that deliberately does NOT revoke access, so
+        the endpoint remains the right tool for it.
+        """
+        from apps.billing.views import perform_refund
+
+        refunded = failed = skipped = 0
+        for tx in queryset.select_related("user"):
+            if tx.status != "success" or not tx.gateway_payment_id:
+                skipped += 1
+                continue
+            remaining = (tx.amount or Decimal("0")) - (tx.refunded_amount or Decimal("0"))
+            if remaining <= 0:
+                skipped += 1
+                continue
+
+            payload, status_code = perform_refund(
+                payment_id=tx.gateway_payment_id,
+                amount_inr=remaining,
+                actor=request.user,
+            )
+            if status_code in (200, 201):
+                refunded += 1
+            else:
+                failed += 1
+                self.message_user(
+                    request,
+                    f"{tx.gateway_payment_id}: {payload.get('error', 'refund failed')}",
+                    messages.ERROR,
+                )
+
+        # Audited per-transaction for the same reason the activate/deactivate
+        # actions are: "who gave this account's money back" must be answerable.
+        if refunded:
+            _audit_subscription_action(
+                request,
+                queryset.filter(status="refunded"),
+                action="refund_full",
+                kind="payment_transaction",
+            )
+
+        parts = []
+        if refunded:
+            parts.append(f"{refunded} refunded in full (access revoked)")
+        if skipped:
+            parts.append(f"{skipped} skipped (not captured or nothing left to refund)")
+        if failed:
+            parts.append(f"{failed} failed")
+        self.message_user(
+            request,
+            "; ".join(parts) or "Nothing to refund.",
+            messages.ERROR if failed else messages.WARNING if refunded else messages.INFO,
+        )
 
     @admin.action(description="Export selected transactions to CSV")
     def action_export_csv(self, request, queryset):
@@ -358,11 +491,13 @@ class CouponCodeAdmin(admin.ModelAdmin):
 
     @admin.action(description="Activate selected coupons")
     def action_activate(self, request, queryset):
+        _audit_subscription_action(request, queryset, action="activate", kind="coupon")
         queryset.update(is_active=True)
         self.message_user(request, "Coupons activated.", messages.SUCCESS)
 
     @admin.action(description="Deactivate selected coupons")
     def action_deactivate(self, request, queryset):
+        _audit_subscription_action(request, queryset, action="deactivate", kind="coupon")
         queryset.update(is_active=False)
         self.message_user(request, "Coupons deactivated.", messages.WARNING)
 

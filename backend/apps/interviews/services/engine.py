@@ -1315,26 +1315,81 @@ def _should_ask_another(round_obj: InterviewRound) -> bool:
     return asked < baseline * 2
 
 
+# Tab-hidden time used to be refunded in full, without limit — stepping out to
+# look something up was strictly rewarded and never recorded. Credit is now
+# capped, but the pause itself is always allowed and always logged: a real
+# network drop should not end someone's interview, it should just stop paying
+# them for the time. Time beyond the cap is recorded as uncredited and surfaced
+# on the report so a human can judge it, rather than silently expiring the round.
+MAX_CREDITED_PAUSES = 2
+MAX_CREDITED_PAUSE_SECONDS = 60
+
+
+def pause_state(round_obj: InterviewRound) -> dict:
+    """Proctoring counters for this round (pause count + uncredited time)."""
+    meta = round_obj.metadata if isinstance(round_obj.metadata, dict) else {}
+    state = meta.get("pauses") if isinstance(meta.get("pauses"), dict) else {}
+    return {
+        "count": int(state.get("count") or 0),
+        "credited_count": int(state.get("credited_count") or 0),
+        "total_seconds": float(state.get("total_seconds") or 0.0),
+        "credited_seconds": float(state.get("credited_seconds") or 0.0),
+        "uncredited_seconds": float(state.get("uncredited_seconds") or 0.0),
+        "events": list(state.get("events") or []),
+    }
+
+
 def pause_round(round_obj: InterviewRound) -> bool:
     """Freeze the countdown while the candidate is away (tab hidden / left room)."""
     if round_obj.status != "in_progress" or round_obj.paused_at:
         return False
     round_obj.paused_at = timezone.now()
-    round_obj.save(update_fields=["paused_at"])
+    state = pause_state(round_obj)
+    state["count"] += 1
+    meta = round_obj.metadata if isinstance(round_obj.metadata, dict) else {}
+    meta["pauses"] = state
+    round_obj.metadata = meta
+    # "metadata" MUST stay in update_fields — this save previously listed only
+    # ["paused_at"], so a counter written here would be silently discarded while
+    # the code above still looked correct.
+    round_obj.save(update_fields=["paused_at", "metadata"])
     return True
 
 
 def resume_round(round_obj: InterviewRound) -> bool:
-    """Extend ends_at by the paused duration and clear the pause flag."""
+    """Give back the paused time up to the credit cap, and log the pause."""
     if round_obj.status != "in_progress":
         return False
     if not round_obj.paused_at:
         return True
-    if round_obj.ends_at:
-        delta = timezone.now() - round_obj.paused_at
-        round_obj.ends_at = round_obj.ends_at + delta
+
+    away = max(0.0, (timezone.now() - round_obj.paused_at).total_seconds())
+    state = pause_state(round_obj)
+
+    # Only the first N pauses earn credit at all, and each is individually capped.
+    within_allowance = state["credited_count"] < MAX_CREDITED_PAUSES
+    credited = min(away, MAX_CREDITED_PAUSE_SECONDS) if within_allowance else 0.0
+    if credited > 0:
+        state["credited_count"] += 1
+
+    state["total_seconds"] = round(state["total_seconds"] + away, 1)
+    state["credited_seconds"] = round(state["credited_seconds"] + credited, 1)
+    state["uncredited_seconds"] = round(state["uncredited_seconds"] + (away - credited), 1)
+    # Bounded so a flapping connection can't grow metadata without limit; the
+    # aggregate counters above stay exact however many events are trimmed.
+    state["events"] = (state["events"] + [{
+        "at": round_obj.paused_at.isoformat(),
+        "seconds": round(away, 1),
+        "credited_seconds": round(credited, 1),
+    }])[-20:]
+
+    if round_obj.ends_at and credited > 0:
+        round_obj.ends_at = round_obj.ends_at + timedelta(seconds=credited)
     round_obj.paused_at = None
-    round_obj.save(update_fields=["ends_at", "paused_at"])
+    meta = round_obj.metadata if isinstance(round_obj.metadata, dict) else {}
+    meta["pauses"] = state
+    round_obj.metadata = meta
+    round_obj.save(update_fields=["ends_at", "paused_at", "metadata"])
     return True
 
 
@@ -1465,6 +1520,18 @@ def end_round(round_obj: InterviewRound, reason: str = "completed") -> dict:
             confidence["phrase_coaching"] = phrase_coach
         if narrative:
             confidence["round_narrative"] = narrative
+
+        # Proctoring signal: report tab-switches rather than blocking on them.
+        # Only attached when the candidate actually left, so a clean round has
+        # no such key and reviewers don't learn to ignore an always-zero field.
+        pauses = pause_state(round_obj)
+        if pauses["count"]:
+            confidence["proctoring"] = {
+                "tab_switches": pauses["count"],
+                "away_seconds": pauses["total_seconds"],
+                "credited_seconds": pauses["credited_seconds"],
+                "uncredited_seconds": pauses["uncredited_seconds"],
+            }
 
         report = InterviewReport.objects.create(
             round=round_obj,

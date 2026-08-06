@@ -28,7 +28,7 @@ class STTTranscribeView(APIView):
     """
     POST /api/interviews/stt/transcribe/
     Multipart: audio_blob (file), mime_type (str), prompt (str, optional)
-    Returns Whisper transcript with filler filtering.
+    Returns a browser/Vosk transcript with filler filtering (no Whisper API).
     """
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser]

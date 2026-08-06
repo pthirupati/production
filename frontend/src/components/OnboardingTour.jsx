@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X, ArrowRight, ArrowLeft, Terminal, Target, Trophy, Layers, Sparkles } from 'lucide-react'
+import { currentUserScopedKey, migrateUnscopedKey } from '../utils/userScopedStorage'
 
 const TOUR_STEPS = [
   {
@@ -38,7 +39,9 @@ const TOUR_STEPS = [
   },
 ]
 
-const TOUR_KEY = 'fixitlab_tour_completed'
+// Scoped per user: an unscoped key meant a second account on a shared browser
+// was treated as already onboarded and never saw the tour.
+const TOUR_KEY_BASE = 'fixitlab_tour_completed'
 
 export default function OnboardingTour() {
   const [step, setStep] = useState(0)
@@ -46,7 +49,7 @@ export default function OnboardingTour() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    const completed = localStorage.getItem(TOUR_KEY)
+    const completed = localStorage.getItem(migrateUnscopedKey(TOUR_KEY_BASE))
     if (!completed) {
       // Show tour after a brief delay
       const timer = setTimeout(() => setShow(true), 1500)
@@ -67,7 +70,7 @@ export default function OnboardingTour() {
   }
 
   const handleClose = () => {
-    localStorage.setItem(TOUR_KEY, 'true')
+    localStorage.setItem(currentUserScopedKey(TOUR_KEY_BASE), 'true')
     setShow(false)
   }
 

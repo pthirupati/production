@@ -45,7 +45,6 @@ objectives:
       - configure-ansible-inventory
       - ansible-inventory-group-vars
       - ansible-inventory-unreachable
-      - sim-rhel-ansible-ssh
       - sim-ansible-ssh-key
       - ansible-become-password-missing
       - ansible-become-user-wrong

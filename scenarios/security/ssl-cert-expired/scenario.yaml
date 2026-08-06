@@ -23,8 +23,11 @@ description: 'CONTEXT: A team operating security hardening has raised a ticket f
 
 
   OBJECTIVE: Confirm the current certificate''s expiry; Generate/install a new valid certificate and key;
-  Reload nginx and verify HTTPS serves a non-expired certificate. Acceptance criteria: the change is minimal
-  and reversible, and success means HTTP 200 from http://localhost.
+  Reload nginx and verify HTTPS serves a non-expired certificate; then prevent the recurrence — a renewed
+  cert alone just re-arms the same fuse, so install an executable expiry monitor at /usr/local/bin/check-cert-expiry
+  (it takes a cert path and exits non-zero when that cert expires within 30 days) and schedule it via cron
+  or a systemd timer. Acceptance criteria: the change is minimal and reversible, and success means HTTP
+  200 from http://localhost with the monitor installed and scheduled.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
@@ -49,6 +52,9 @@ objectives:
 - Confirm the current certificate's expiry
 - Generate/install a new valid certificate and key
 - Reload nginx and verify HTTPS serves a non-expired certificate
+- 'Prevent recurrence: install an executable expiry monitor at /usr/local/bin/check-cert-expiry
+  that takes a certificate path, exits non-zero when it expires within 30 days, and schedule
+  it with cron or a systemd timer'
 initial_state: Linux server running nginx with an expired (or about-to-expire) TLS certificate at /etc/nginx/ssl/cert.pem,
   causing HTTPS validation failures.
 hints:
@@ -98,7 +104,15 @@ hints:
 
     2. Re-run `curl -I http://localhost` and confirm HTTP 200 from http://localhost.
 
-    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+    3. Then close the loop so this does not page you again: write /usr/local/bin/check-cert-expiry
+    so it exits non-zero when the cert it is given expires within 30 days and 0 otherwise —
+    `openssl x509 -in "$1" -noout -checkend 2592000` answers exactly that and, unlike parsing
+    `-enddate` with `date -d`, works on every host. `chmod +x` it, then schedule it (a line in
+    /etc/cron.d or a systemd timer).
+    The grader runs your script against a known-expired cert and against the one you just installed —
+    it must fail the first and pass the second.
+
+    4. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
@@ -117,6 +131,7 @@ what_you_will_learn:
 - Confirm the current certificate's expiry
 - Generate/install a new valid certificate and key
 - Reload nginx and verify HTTPS serves a non-expired certificate
+- Close the loop with expiry monitoring so the next renewal is scheduled, not paged at 03:00
 environment:
   nodes:
   - role: primary

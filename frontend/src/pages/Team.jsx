@@ -30,6 +30,7 @@ export default function Team() {
   const [orgs, setOrgs] = useState([])
   const [selected, setSelected] = useState(null)
   const [analytics, setAnalytics] = useState(null)
+  const [analyticsFailed, setAnalyticsFailed] = useState(false)
   const [memberDetail, setMemberDetail] = useState(null)
   const [loading, setLoading] = useState(true)
   const [inviteEmail, setInviteEmail] = useState('')
@@ -93,10 +94,20 @@ export default function Team() {
       setLogoUrl(data.logo_url || '')
       setPrimaryColor(data.primary_color || '')
       if (['owner', 'admin'].includes(data.role)) {
-        const stats = await orgApi.getAnalytics(slug).catch(() => null)
-        setAnalytics(stats)
+        // The analytics block renders under `analytics &&`, so a swallowed
+        // failure made the whole team overview silently vanish — an owner sees
+        // no numbers and no reason why. It also backstops pending_invites
+        // below, so a silent failure can under-report outstanding invites.
+        try {
+          setAnalytics(await orgApi.getAnalytics(slug))
+          setAnalyticsFailed(false)
+        } catch {
+          setAnalytics(null)
+          setAnalyticsFailed(true)
+        }
       } else {
         setAnalytics(null)
+        setAnalyticsFailed(false)
       }
     } catch {
       toast.error('Could not load team details')
@@ -364,6 +375,26 @@ export default function Team() {
               <h2 className="text-lg font-bold">{selected.name}</h2>
               <p className="text-sm text-surface-400">{selected.technologies?.length || 0} technology grants active</p>
             </div>
+
+            {analyticsFailed && (
+              <div
+                data-testid="team-analytics-error"
+                className="border border-accent-red/25 bg-accent-red/[0.05] rounded-xl p-4"
+              >
+                <h3 className="font-medium flex items-center gap-2 text-white">
+                  <BarChart3 size={16} className="text-accent-red/80" /> Team overview unavailable
+                </h3>
+                <p className="text-xs text-surface-500 mt-1">
+                  Couldn't load team analytics. Member and invite counts below may be incomplete.
+                </p>
+                <button
+                  onClick={() => loadOrg(selected.slug)}
+                  className="btn-secondary text-xs px-3 py-1.5 mt-3"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
 
             {analytics && (
               <div className="border border-surface-800 rounded-xl p-4 space-y-3">

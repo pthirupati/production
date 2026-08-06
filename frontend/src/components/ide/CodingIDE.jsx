@@ -6,7 +6,7 @@ import {
   Plus, Folder, RefreshCw, X, Files, Settings2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import CodeEditor from './CodeEditor'
+import CodeEditor, { computeDiagnostics } from './CodeEditor'
 import MentorPanel from './MentorPanel'
 import HtmlPreviewPane from './HtmlPreviewPane'
 import IdeExplorer from './IdeExplorer'
@@ -14,12 +14,13 @@ import VsCodeWorkbench, { VscEditorTab, VscPanelTab, VscActivityButton } from '.
 import '../../styles/vscode-workbench.css'
 import { runPython, runPythonTests } from '../../utils/ide/pyodideRunner'
 import { runJavaScript, runJavaScriptTests } from '../../utils/ide/jsRunner'
-import { hasHtmlPreview, editorLanguageForPath, listHtmlPaths } from '../../utils/ide/composeHtmlPreview'
+import { hasHtmlPreview, editorLanguageForPath, listHtmlPaths, preferredHtmlPath } from '../../utils/ide/composeHtmlPreview'
 import {
   parentDirs, fileBasename, stubContentForPath, newFileHint,
 } from '../../utils/ide/fileTree'
 import { labApi } from '../../api/labs'
 import { useThemeStore } from '../../store/themeStore'
+import { currentUserScopedKey } from '../../utils/userScopedStorage'
 
 const LANG_LABEL = {
   python: 'Python', javascript: 'JavaScript', js: 'JavaScript', node: 'Node.js', nodejs: 'Node.js',
@@ -37,31 +38,36 @@ function tsLine(text) {
 }
 
 // localStorage key for per-session autosaved drafts. Keyed by lab session so a
-// reload (or accidental navigation) restores the exact in-progress files.
-const draftKey = (sessionId) => `fixitlab:ide-draft:${sessionId}`
-/* SIMULATED-CREDENTIAL: lab-console flavour, not a real secret. Shown to the
-   learner on screen (with an autofill button) so the fake console feels real, and
-   the gate is bypassed entirely once a provisioned lab session exists. Grants no
-   access to anything. Secret scanners should allowlist this marker rather than
-   flagging these lines. See docs/AUDIT_2026_08_TODO.md §Y2e. */
-const IDE_LAB_USER = 'lab_ide'
-const IDE_LAB_PASS = 'lab_ide@123'
-const IDE_AUTH_KEY = 'fixitlab_ide_auth'
+// reload (or accidental navigation) restores the exact in-progress files, and
+// user-scoped so a second account on a shared browser cannot read back the
+// previous learner's code.
+const DRAFT_KEY_BASE = 'fixitlab:ide-draft'
+export const draftKey = (sessionId) => currentUserScopedKey(`${DRAFT_KEY_BASE}:${sessionId}`)
 
-function isIdeAuthenticated() {
-  try {
-    return sessionStorage.getItem(IDE_AUTH_KEY) === '1'
-  } catch {
-    return false
-  }
-}
+/**
+ * Drafts older than this are treated as abandoned and dropped on read.
+ *
+ * Deliberately generous: this is the learner's own unsaved code, so the cost of
+ * expiring too eagerly (losing work someone left open over a long weekend) is far
+ * worse than the cost of keeping a stale draft around. 90 days only reclaims
+ * quota from sessions that are long finished.
+ */
+export const DRAFT_TTL_MS = 90 * 24 * 60 * 60 * 1000
 
 function loadDraft(sessionId) {
   try {
-    const raw = localStorage.getItem(draftKey(sessionId))
+    const key = draftKey(sessionId)
+    const raw = localStorage.getItem(key)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    return parsed && typeof parsed.files === 'object' ? parsed : null
+    if (!parsed || typeof parsed.files !== 'object') return null
+    // `ts` was recorded but never read before, so drafts accumulated forever.
+    // Missing/!finite ts means a pre-TTL draft — keep it rather than guess.
+    if (Number.isFinite(parsed.ts) && Date.now() - parsed.ts > DRAFT_TTL_MS) {
+      try { localStorage.removeItem(key) } catch { /* noop */ }
+      return null
+    }
+    return parsed
   } catch {
     return null
   }
@@ -141,11 +147,11 @@ function TestRow({ name, passed, message, hidden }) {
  *   solved      boolean — externally controlled solved state (locks the editor)
  */
 export default function CodingIDE({ sessionId, scenario, onSolved, solved: solvedProp = false }) {
-  // Lab session already authenticates the learner — skip the fake IDE login gate.
-  const [authenticated, setAuthenticated] = useState(() => Boolean(sessionId) || isIdeAuthenticated())
-  const [loginUser, setLoginUser] = useState('')
-  const [loginPass, setLoginPass] = useState('')
-  const [loginError, setLoginError] = useState('')
+  // No IDE-local login gate: the lab session already authenticates the learner.
+  // The previous gate compared hardcoded credentials client-side and printed
+  // them on screen next to an autofill button, so it gated nothing and only
+  // shipped a fake secret in the public bundle. See docs/AUDIT_2026_08_TODO.md
+  // §Y2e (L2720).
   const [spec, setSpec] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -170,6 +176,10 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   const [running, setRunning] = useState(false)
   const [checking, setChecking] = useState(false)
   const [pyLoading, setPyLoading] = useState(false)
+  // Set when the in-browser runtime (Pyodide CDN) could not be reached, so we
+  // can say so explicitly instead of leaving the learner with a bare stderr
+  // line. Server grading is unaffected — Check Solution still works offline.
+  const [runtimeMissing, setRuntimeMissing] = useState(false)
   const [solved, setSolved] = useState(solvedProp)
   const [savedAt, setSavedAt] = useState(null)   // last autosave timestamp (ms)
   // Guards so we only persist AFTER the spec has loaded + any draft restored,
@@ -199,13 +209,6 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   useEffect(() => () => { mountedRef.current = false }, [])
   useEffect(() => { if (solvedProp) setSolved(true) }, [solvedProp])
 
-  useEffect(() => {
-    if (sessionId && !authenticated) {
-      try { sessionStorage.setItem(IDE_AUTH_KEY, '1') } catch { /* ignore */ }
-      setAuthenticated(true)
-    }
-  }, [sessionId, authenticated])
-
   const language = spec?.language || 'python'
   const showHtmlPreview = hasHtmlPreview(files, language)
   const editorLanguage = editorLanguageForPath(activePath, language)
@@ -215,7 +218,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   useEffect(() => {
     if (!showHtmlPreview || !htmlPaths.length) return
     if (activePath && /\.html?$/i.test(activePath)) return
-    const preferred = htmlPaths.find((p) => /index\.html?$/i.test(p)) || htmlPaths[0]
+    const preferred = preferredHtmlPath(files)
     if (preferred) {
       setActivePath(preferred)
       setOpenTabs((tabs) => (tabs.includes(preferred) ? tabs : [...tabs, preferred]))
@@ -226,6 +229,17 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
 
   const appendTerminal = useCallback((line) => {
     setTerminalText((prev) => (prev ? prev + '\n' : '') + tsLine(line))
+  }, [])
+
+  // console.* and uncaught errors forwarded from the sandboxed preview iframe.
+  // The iframe shim already caps what it sends; we bound the retained text too so
+  // a chatty page cannot grow React state without limit.
+  const handlePreviewLog = useCallback(({ level, text }) => {
+    const prefix = level === 'error' ? 'error' : level === 'warn' ? 'warn' : level
+    setLogsText((prev) => {
+      const next = (prev ? prev + '\n' : '') + `[preview:${prefix}] ${text}`
+      return next.length > 20000 ? next.slice(-20000) : next
+    })
   }, [])
 
   // ── Load the coding spec (hidden tests stripped server-side) ──
@@ -326,6 +340,30 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     return () => clearTimeout(id)
   }, [files, readonlyPaths, sessionId, loading])
 
+  // Advisory diagnostics for the Problems panel — the same ones the editor
+  // gutter shows. These NEVER gate Check Solution; grading is server-side only.
+  const problems = useMemo(() => {
+    if (!activePath || files[activePath] === undefined) return []
+    const src = files[activePath]
+    const lineStarts = []
+    let acc = 0
+    src.split('\n').forEach((l) => { lineStarts.push(acc); acc += l.length + 1 })
+    const lineOf = (offset) => {
+      let lo = 0
+      let hi = lineStarts.length - 1
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2)
+        if (lineStarts[mid] <= offset) lo = mid
+        else hi = mid - 1
+      }
+      return lo
+    }
+    return computeDiagnostics(src, editorLanguage).map((d) => {
+      const line = lineOf(d.from)
+      return { ...d, line: line + 1, column: d.from - lineStarts[line] + 1 }
+    })
+  }, [files, activePath, editorLanguage])
+
   const entrypoint = useMemo(() => {
     if (spec?.entrypoint && files[spec.entrypoint] !== undefined) return spec.entrypoint
     return Object.keys(files)[0] || ''
@@ -370,6 +408,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         const res = await runPython(source)
         setPyLoading(false)
         if (!mountedRef.current) return
+        setRuntimeMissing(Boolean(res.runtimeMissing))
         stdout = res.stdout || (res.ok ? '(no output)' : '')
         stderr = [res.stderr, res.error].filter(Boolean).join('\n')
         setOutput(stdout)
@@ -410,6 +449,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       setPyLoading(true)
       const r = await runPythonTests(source, tests)
       setPyLoading(false)
+      setRuntimeMissing(Boolean(r?.runtimeMissing))
       return r
     }
     if (isJs) {
@@ -735,62 +775,6 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     }
   }, [solved, loading, sessionId, applySpecFiles, appendTerminal])
 
-  if (!authenticated) {
-    const submitLogin = (e) => {
-      e.preventDefault()
-      const ok = loginUser.trim().toLowerCase() === IDE_LAB_USER && loginPass === IDE_LAB_PASS
-      if (ok) {
-        try { sessionStorage.setItem(IDE_AUTH_KEY, '1') } catch { /* ignore */ }
-        setLoginError('')
-        setAuthenticated(true)
-      } else {
-        setLoginError(`Invalid credentials. Use ${IDE_LAB_USER} / ${IDE_LAB_PASS} for training labs.`)
-      }
-    }
-
-    return (
-      <div className="flex-1 min-h-0 bg-[#1e1e1e] text-[#cccccc] flex flex-col">
-        <div className="h-9 bg-[#2d2d30] border-b border-[#3e3e42] flex items-center px-4 text-xs">
-          <span className="font-semibold text-white">FixitLab IDE</span>
-          <span className="ml-2 text-[#858585]">{scenario?.title || 'Coding Lab'}</span>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="w-full max-w-sm bg-[#252526] border border-[#3e3e42] shadow-2xl rounded overflow-hidden">
-            <div className="px-5 py-4 bg-[#007acc] text-white font-semibold flex items-center gap-2">
-              <FileCode size={18} /> VS Code Workbench
-            </div>
-            <form onSubmit={submitLogin} className="p-5 space-y-4">
-              <p className="text-sm text-[#cccccc]">Sign in to the multi-language IDE training environment.</p>
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#969696] mb-1">Username</label>
-                <input value={loginUser} onChange={(e) => setLoginUser(e.target.value)} autoFocus autoComplete="username"
-                  placeholder={IDE_LAB_USER}
-                  className="w-full bg-[#1e1e1e] border border-[#3e3e42] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#007acc]" />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#969696] mb-1">Password</label>
-                <input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} autoComplete="current-password"
-                  className="w-full bg-[#1e1e1e] border border-[#3e3e42] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#007acc]" />
-              </div>
-              {loginError && <p className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{loginError}</p>}
-              <button type="submit" className="w-full py-2 rounded bg-[#007acc] text-white font-semibold">
-                Sign In
-              </button>
-              <button type="button"
-                onClick={() => { setLoginUser(IDE_LAB_USER); setLoginPass(IDE_LAB_PASS); setLoginError('') }}
-                className="w-full py-1.5 text-xs text-[#cccccc] border border-[#3e3e42] rounded hover:bg-[#2d2d30]">
-                Use lab credentials (autofill)
-              </button>
-              <p className="text-[10px] text-[#969696] text-center pt-2 border-t border-[#3e3e42]">
-                Training credentials: <span className="font-mono text-white">{IDE_LAB_USER}</span> / <span className="font-mono text-white">{IDE_LAB_PASS}</span>
-              </p>
-            </form>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-surface-950">
@@ -823,6 +807,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   const protectedPaths = new Set(Object.keys(seedFilesRef.current).filter((p) => seedReadonlyRef.current.has(p)))
 
   const BOTTOM_TABS = [
+    { key: 'problems', label: 'Problems', icon: AlertTriangle },
     { key: 'terminal', label: 'Terminal', icon: TerminalIcon },
     { key: 'output', label: 'Output', icon: ScrollText },
     { key: 'logs', label: 'Logs', icon: FileText },
@@ -892,6 +877,14 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
               <Save size={11} /> {dirtyPaths.size ? 'Unsaved' : 'Saved'}
             </span>
           )}
+          {runtimeMissing && (
+            <span
+              className="text-[10px] text-amber-400 flex items-center gap-1"
+              title="The in-browser runtime could not be downloaded. Check Solution still grades on the server."
+            >
+              <AlertTriangle size={11} /> Offline: Run unavailable
+            </span>
+          )}
           <span className="text-[10px] text-[var(--vsc-muted)] hidden lg:inline flex items-center gap-1"><EyeOff size={10} /> {hiddenCount} hidden</span>
         </>
       )}
@@ -905,6 +898,9 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           </VscActivityButton>
           <VscActivityButton active={bottomTab === 'tests'} onClick={() => setBottomTab('tests')} title="Test Results">
             <ListChecks size={22} />
+          </VscActivityButton>
+          <VscActivityButton active={bottomTab === 'problems'} onClick={() => setBottomTab('problems')} title="Problems">
+            <AlertTriangle size={22} />
           </VscActivityButton>
         </div>
       )}
@@ -964,7 +960,10 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       editor={activePath && files[activePath] !== undefined ? (
         <CodeEditor
           ref={editorRef}
-          key={activePath}
+          // No key={activePath}: remounting on every tab switch destroyed the
+          // CodeMirror state and with it the undo history. CodeEditor swaps a
+          // per-path EditorState internally instead (L2741/L2859).
+          docPath={activePath}
           value={files[activePath] ?? ''}
           onChange={handleEditorChange}
           onSave={handleSave}
@@ -999,10 +998,40 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
             {key === 'tests' && testResults && (
               <span className="ml-1 text-[9px] opacity-80">{testResults.passed_count}/{testResults.total_count}</span>
             )}
+            {key === 'problems' && problems.length > 0 && (
+              <span className="ml-1 text-[9px] px-1 rounded bg-amber-500/20 text-amber-300">{problems.length}</span>
+            )}
           </VscPanelTab>
         )),
         content: (
           <>
+            {bottomTab === 'problems' && (
+              <div className="space-y-1 font-sans">
+                {!problems.length ? (
+                  <p className="text-xs text-[var(--vsc-muted)]">
+                    No problems detected in {activePath ? fileName(activePath) : 'this file'}.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-[10px] text-[var(--vsc-muted)] mb-1">
+                      Advisory only — your grade comes from Check Solution on the server.
+                    </p>
+                    {problems.map((p, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs px-2 py-1 rounded border border-surface-800 bg-surface-900/60">
+                        <AlertTriangle
+                          size={12}
+                          className={`mt-0.5 shrink-0 ${p.severity === 'info' ? 'text-cyan-400' : 'text-amber-400'}`}
+                        />
+                        <span className="text-[var(--vsc-text)] flex-1">{p.message}</span>
+                        <span className="text-[var(--vsc-muted)] shrink-0 font-mono">
+                          {fileName(activePath)}:{p.line}:{p.column}
+                        </span>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
             {bottomTab === 'terminal' && (
               <pre className="text-[var(--vsc-text)] whitespace-pre-wrap break-words m-0">
                 {terminalText || 'Run or Check Solution to see a session transcript here.'}
@@ -1055,6 +1084,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           </>
         ),
       }}
+      rightPanelLabel={rightTab === 'preview' ? 'Preview' : rightTab === 'mentor' ? 'Mentor' : 'Instructions'}
       rightPanel={{
         width: rightTab === 'preview' ? 420 : 320,
         header: (
@@ -1080,6 +1110,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
             files={files}
             htmlPath={/\.html?$/i.test(activePath || '') ? activePath : undefined}
             onRefresh={() => setPreviewKey((k) => k + 1)}
+            onLog={handlePreviewLog}
           />
         ) : (
           <div className="p-4 space-y-4 text-sm">
@@ -1108,6 +1139,16 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
             )}
             {!canRunInBrowser && (
               <p className="text-[11px] text-amber-400 flex gap-1.5"><Lightbulb size={12} className="shrink-0 mt-0.5" /> Use Check Solution for {langLabel} — server grades your code.</p>
+            )}
+            {runtimeMissing && (
+              <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-300 flex gap-1.5">
+                <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+                <span>
+                  The in-browser {langLabel} runtime could not be downloaded, so Run is
+                  unavailable offline. <strong>Check Solution still works</strong> — the server
+                  runs and grades your code.
+                </span>
+              </div>
             )}
           </div>
         ),

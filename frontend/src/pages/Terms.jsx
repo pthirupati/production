@@ -2,8 +2,11 @@ import PublicLayout from '../components/layout/PublicLayout'
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
 import { ScrollText, AlertCircle, CreditCard, UserX, Scale, Shield, ExternalLink } from 'lucide-react'
+import { usePageTitle } from '../hooks/usePageTitle'
+import { PRIMARY_EMAIL } from '../constants/contact'
 
 export default function Terms() {
+  usePageTitle('Terms of Service', 'The terms governing use of FixitLab labs, subscriptions and AI interviews.')
   const sections = [
     {
       icon: Scale,
@@ -167,8 +170,8 @@ export default function Terms() {
             <h2 className="text-xl font-bold text-white mb-4">7. Contact</h2>
             <p className="text-surface-300 leading-relaxed">
               Questions about these terms? Contact us at{' '}
-              <a href="mailto:fixitlab.admin@gmail.com" className="inline-flex items-center gap-1 text-accent-cyan hover:underline font-medium">
-                fixitlab.admin@gmail.com <ExternalLink size={12} />
+              <a href={`mailto:${PRIMARY_EMAIL}`} className="inline-flex items-center gap-1 text-accent-cyan hover:underline font-medium">
+                {PRIMARY_EMAIL} <ExternalLink size={12} />
               </a>
             </p>
           </FixitPanel>

@@ -112,6 +112,25 @@ class StrictAnonRateThrottle(AnonRateThrottle):
     scope = 'strict_anon'
 
 
+class ContactRateThrottle(AnonRateThrottle):
+    """Per-IP cap for the public contact form (audit Z2-6).
+
+    `ContactView` is AllowAny and, per POST, writes a ContactMessage row AND queues
+    an email to SUPPORT_EMAIL — calling `send_notification_email.delay` directly, so
+    it bypasses both the preference check and the daily-quota gate in
+    `queue_user_email`. Unthrottled, a loop is not merely spam: it burns the shared
+    ~500/day Gmail allowance, including the reserve held back for OTP and password
+    reset, and takes login out remotely. That is the Z6-3 auth outage reachable by
+    anyone with curl.
+
+    `strict_anon` (240/minute) is far too loose for something that sends mail — one
+    IP could queue 14,400 emails an hour. This scope is deliberately tiny: nobody
+    legitimately files six support requests in an hour, and a person who needs to
+    can still reply to the first one.
+    """
+    scope = "contact"
+
+
 class PlaygroundRateThrottle(AnonRateThrottle):
     """Per-IP throttle for the public, ephemeral Playgrounds.
 
@@ -201,3 +220,52 @@ class UgcUploadThrottle(_WriteOnlyUserThrottle):
 class UgcReportThrottle(_WriteOnlyUserThrottle):
     """Abuse reports. Enough to report a thread-storm without enabling one."""
     scope = "ugc_report"
+
+
+class RatingWriteThrottle(_WriteOnlyUserThrottle):
+    """Per-user cap on submitting ratings and reviews (audit Z3-10).
+
+    `RateView` had no throttle at all, so one authenticated account could 1-star
+    every scenario on the platform in a loop. The completion gate added alongside
+    this makes that expensive rather than free, but the gate is per-scenario and
+    the platform rating is not gated at all — a rate limit is what bounds the
+    remaining surface.
+
+    Deliberately generous relative to the real behaviour it must not block: a user
+    working through a track might finish and rate several labs in a sitting, and
+    editing an existing rating goes through the same endpoint.
+    """
+
+    scope = "rating_write"
+
+
+class ClientErrorThrottle(AnonRateThrottle):
+    """Per-IP cap on the public client-error intake (audit Z6-6).
+
+    The endpoint is AllowAny and writes a log line per POST, so unthrottled it is a
+    way to flood the log pipeline — and on a Sentry plan with a quota, a way to burn
+    someone else's error budget so real crashes are dropped.
+
+    Generous rather than tight: one broken deploy legitimately produces a burst from
+    many browsers at once, and throttling that away would silence exactly the signal
+    the endpoint exists to capture. It bounds a single abusive source, not an
+    incident.
+    """
+
+    scope = "client_error"
+
+
+class MfaVerifyThrottle(AnonRateThrottle):
+    """Per-IP cap on MFA code submission (audit Z2-3).
+
+    A TOTP code is six digits. Unthrottled, that is a million-guess space against a
+    30-second window with no lockout — brute-forceable in minutes from one host,
+    which would reduce the second factor to decoration.
+
+    Anonymous-keyed rather than user-keyed on purpose: the login-verify step runs
+    before a session exists, so there is no user to key on, and keying on the
+    challenge token would let an attacker mint a fresh token to reset their own
+    quota.
+    """
+
+    scope = "mfa_verify"

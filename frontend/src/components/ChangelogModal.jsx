@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import { X, Sparkles } from 'lucide-react'
 import api from '../api/client'
+import { currentUserScopedKey, migrateUnscopedKey } from '../utils/userScopedStorage'
 
-const STORAGE_KEY = 'fixitlab_changelog_dismissed'
+// Scoped per user: on a shared browser an unscoped key let account B inherit
+// account A's dismissal and never see the changelog.
+const STORAGE_KEY_BASE = 'fixitlab_changelog_dismissed'
 
 export default function ChangelogModal() {
   const [open, setOpen] = useState(false)
@@ -14,7 +17,7 @@ export default function ChangelogModal() {
         const log = res.data?.changelog || []
         if (!log.length) return
         const latest = log[0]
-        const dismissed = localStorage.getItem(STORAGE_KEY)
+        const dismissed = localStorage.getItem(migrateUnscopedKey(STORAGE_KEY_BASE))
         if (dismissed !== latest.id && dismissed !== latest.date) {
           setEntries(log.slice(0, 5))
           setOpen(true)
@@ -26,7 +29,7 @@ export default function ChangelogModal() {
   const dismiss = () => {
     const latest = entries[0]
     if (latest) {
-      localStorage.setItem(STORAGE_KEY, latest.id || latest.date || 'seen')
+      localStorage.setItem(currentUserScopedKey(STORAGE_KEY_BASE), latest.id || latest.date || 'seen')
     }
     setOpen(false)
   }

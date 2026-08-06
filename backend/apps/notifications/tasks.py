@@ -6,19 +6,42 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=10, retry_kwargs={"max_retries": 3})
-def send_notification_email(self, subject, to_email, template, context=None):
+def send_notification_email(self, subject, to_email, template, context=None, headers=None):
     """
     Async email sender via Celery (same path as subscription/invoice emails).
     Uses Gmail API → SendGrid → SMTP via notifications.email.send_email.
     """
+    from .idempotency import already_delivered, idempotency_key, mark_delivered, message_id_for
+
+    # Retries re-run with the arguments serialised at enqueue, so this key is stable
+    # across them while a genuinely new message produces a different one (audit
+    # Z6-16).
+    key = idempotency_key(subject, to_email, template, context)
+    if already_delivered(key):
+        logger.info(
+            "Skipping duplicate send to %s (template=%s) — already accepted by the "
+            "provider on an earlier attempt",
+            to_email, template,
+        )
+        return True
+
+    # A retry inside the ambiguous window (provider accepted, then the connection
+    # timed out) reuses the Message-ID of the send that may already have arrived, so
+    # clients that de-duplicate on it collapse the two. Set only when the caller has
+    # not supplied one.
+    headers = dict(headers or {})
+    headers.setdefault("Message-ID", message_id_for(key))
+
     ok = send_email(
         subject=subject,
         to_email=to_email,
         template=template,
         context=context,
+        headers=headers,
     )
     if not ok:
         raise RuntimeError(f"Email delivery failed for {to_email} (template={template})")
+    mark_delivered(key)
     return True
 
 
@@ -29,14 +52,16 @@ def create_in_app_notification(user_id, notification_type, title, message="", me
     Called from signals/views when events happen (achievements, lab expiry, etc.)
     """
     try:
-        from .models import Notification
-        Notification.objects.create(
-            user_id=user_id,
-            type=notification_type,
-            title=title,
-            message=message,
-            metadata=metadata or {},
-        )
+        from django.contrib.auth import get_user_model
+
+        from .email_helpers import deliver_inapp_notification
+
+        user = get_user_model().objects.filter(id=user_id).first()
+        if user is None:
+            return False
+        # Honours should_notify_inapp — this generic task used to write straight to
+        # the table, so it ignored the very preference three sibling tasks checked.
+        deliver_inapp_notification(user, notification_type, title, message, metadata)
     except Exception as e:
         logger.warning(f"Failed to create notification for user {user_id}: {e}")
 

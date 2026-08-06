@@ -58,6 +58,7 @@ jobs:
     name: GitHub unit tests (target=ci only)
     if: inputs.target == 'ci'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16
@@ -90,6 +91,14 @@ jobs:
           python manage.py migrate --run-syncdb
           python manage.py test tests --verbosity=2
           python manage.py validate_scenario_catalog --flagship-only --fail-on-gaps
+          # Second pass: --flagship-only and coding_mode do not overlap at all
+          # (70 flagships vs 1334 coding labs, intersection 0), so the gate above
+          # validates ZERO coding labs. --rules scopes this pass to the grading
+          # -integrity rules (entrypoint/runtime/editable-file/hidden-test
+          # quality) so it fails on a real regression without also blocking on
+          # the older copy/hint backlog those 1334 labs still carry.
+          python manage.py validate_scenario_catalog --coding-only --fail-on-gaps \
+            --rules "entrypoint,files[],tautological,preview,grader,missing slug,no server runtime,hidden tests,does not resolve to a scenario"
           python manage.py seed_tutorials
           python manage.py check_tutorial_completeness --all
       - uses: actions/setup-node@v4
@@ -104,10 +113,11 @@ jobs:
     name: Production E2E tests
     if: inputs.target == 'production'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     environment: production
     steps:
       - name: Sync test scripts on server
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2  # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_UNIT: ${{ inputs.run_unit }}

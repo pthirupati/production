@@ -79,12 +79,37 @@ _AMD_MATRIX = (
 )
 
 
+def _healthy_gpu_engine(slug):
+    """Engine for `slug` with the driver brought up, as a learner would.
+
+    GPU-track slugs now carry a deliberate driver fault (`topic_faults.GPU_KEYWORDS`),
+    so `nvidia-smi` reports "couldn't communicate with the NVIDIA driver" on a fresh
+    session. That is correct lab behaviour — it is the break the learner is there to
+    fix — but the tests below are about the *command implementations*, which need
+    working hardware to exercise.
+
+    The fault is asserted before repairing it rather than stepped around, so this
+    covers both halves: the lab really is broken at the start, and it really does
+    come back. A test that merely picked a fault-free slug would have hidden the
+    day the injection stopped firing.
+    """
+    engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type="gpu")
+    assert "couldn't communicate" in str(engine.shell.run("nvidia-smi -L")), (
+        f"{slug} was expected to start with an injected GPU driver fault; "
+        "if the injection was narrowed, this test's premise changed"
+    )
+    for cmd in ("sudo modprobe nvidia", "sudo systemctl restart nvidia-persistenced"):
+        engine.shell.run(cmd)
+    assert "couldn't communicate" not in str(engine.shell.run("nvidia-smi -L")), (
+        f"{slug} is NOT repairable by the documented driver steps — the lab is "
+        "unsolvable, which is far worse than this test failing"
+    )
+    return engine
+
+
 class AiInfraGpuCommandsTests(SimpleTestCase):
     def test_nvidia_smi_dmon_streams_lines(self):
-        engine = UnifiedSimulationEngine(
-            scenario_slug="academy-ai-infra-003-operate-dcgm",
-            simulation_type="gpu",
-        )
+        engine = _healthy_gpu_engine("academy-ai-infra-003-operate-dcgm")
         out = engine.shell.run("nvidia-smi dmon -c 3")
         self.assertIsInstance(out, StreamedCommandResult)
         self.assertGreaterEqual(len(out.lines), 4)
@@ -95,10 +120,7 @@ class AiInfraGpuCommandsTests(SimpleTestCase):
         self.assertIn("gpu", blob.lower())
 
     def test_nvidia_smi_pmon_streams(self):
-        engine = UnifiedSimulationEngine(
-            scenario_slug="ai-infra-esc-dcgm-exporter-blank",
-            simulation_type="gpu",
-        )
+        engine = _healthy_gpu_engine("ai-infra-esc-dcgm-exporter-blank")
         out = engine.shell.run("nvidia-smi pmon -c 2")
         self.assertIsInstance(out, StreamedCommandResult)
         self.assertTrue(any("pid" in ln.lower() for ln in out.lines[:2]))
@@ -106,10 +128,7 @@ class AiInfraGpuCommandsTests(SimpleTestCase):
     def test_sku_h100_thermal_hero(self):
         sku = _resolve_gpu_sku("ai-infra-dcops-h100-gpu4-thermal")
         self.assertIn("H100", sku["name"])
-        engine = UnifiedSimulationEngine(
-            scenario_slug="ai-infra-dcops-h100-gpu4-thermal",
-            simulation_type="gpu",
-        )
+        engine = _healthy_gpu_engine("ai-infra-dcops-h100-gpu4-thermal")
         out = str(engine.shell.run("nvidia-smi -L"))
         self.assertIn("H100", out)
         self.assertIn("GPU 0:", out)

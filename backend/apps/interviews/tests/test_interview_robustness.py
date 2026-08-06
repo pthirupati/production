@@ -195,11 +195,46 @@ class HumanRepliesTest(TestCase):
             )
             self.assertNotIn("good answer", reply.lower())
 
-    def test_skipped_answer_is_short_and_varied(self):
+    def test_skipped_answer_is_deterministic_for_identical_state(self):
+        """Same conversation state => same reply (audit §Y1g).
+
+        This used to call _reply 10x with IDENTICAL arguments and assert >1 distinct
+        line. That contradicted the seeding work: the reply RNG is blake2b-seeded off
+        the answer + conversation tail + quality precisely so a given state
+        reproduces across processes. With an empty tail every call is the same state,
+        so the old assertion could only pass while the engine was nondeterministic.
+        Variety is a property of a *session*, which the next test covers.
+        """
         replies = {self._reply("", quality="skipped") for _ in range(10)}
-        self.assertTrue(all(r for r in replies))
-        # Skipped acks come from a small bank but should produce >1 distinct line.
-        self.assertGreater(len(replies), 1)
+        self.assertEqual(
+            len(replies), 1,
+            "identical conversation state produced different replies — the seeded "
+            "RNG is no longer deterministic",
+        )
+        self.assertTrue(all(r for r in replies), "empty skipped acknowledgement")
+
+    def test_skipped_answers_vary_across_a_real_session(self):
+        """Consecutive skips must not read like a stuck robot.
+
+        A real session's tail grows every turn, which is what changes the seed. Six+
+        distinct lines across ten skips is the property that actually matters to a
+        candidate.
+        """
+        tail: list[dict] = []
+        seen: list[str] = []
+        for _ in range(10):
+            reply = self._reply("", tail=tail, quality="skipped")
+            seen.append(reply)
+            tail.append({"role": "interviewer", "content": reply})
+            tail.append({"role": "candidate", "content": ""})
+        self.assertTrue(all(seen), "empty skipped acknowledgement")
+        self.assertGreater(
+            len(set(seen)), 3,
+            f"only {len(set(seen))} distinct skip acknowledgements across 10 turns: {seen}",
+        )
+        # And never the same line twice in a row.
+        for a, b in zip(seen, seen[1:]):
+            self.assertNotEqual(a, b, "repeated the same acknowledgement back-to-back")
 
 
 class PracticalValidationTest(TestCase):

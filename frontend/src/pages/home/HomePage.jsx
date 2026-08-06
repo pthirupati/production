@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { FxPageChrome } from '../../components/marketing'
 import { useFxPage } from '../../hooks/useFxPage'
 import { usePageTitle } from '../../hooks/usePageTitle'
+import { useStructuredData, organizationSchema } from '../../hooks/useStructuredData'
 import { useDataStore } from '../../store/dataStore'
 import { scenarioApi } from '../../api/scenarios'
 import api from '../../api/client'
@@ -28,6 +29,7 @@ export default function HomePage() {
   const getTechnologies = useDataStore(s => s.getTechnologies)
   const [technologies, setTechnologies] = useState([])
   const [stats, setStats] = useState({})
+  const [techLoadFailed, setTechLoadFailed] = useState(false)
   const [platformConfig, setPlatformConfig] = useState(null)
   const rootRef = useRef(null)
   const { progressRef, toTopRef, navRef, spotRef, initMagnetic } = useFxPage()
@@ -38,10 +40,28 @@ export default function HomePage() {
     { canonical: `${typeof window !== 'undefined' ? window.location.origin : ''}/` },
   )
 
+  // Audit Z6-7: Organization markup on the home page is what lets Google attach
+  // the name and logo to the brand rather than guessing from page copy.
+  useStructuredData('organization', organizationSchema)
+
   useEffect(() => {
+    // Audit W5: every fetch here used to swallow its error. Technologies fall
+    // back to the static catalog (mergeTechnologies([])), so the page is never
+    // blank — but nothing downstream could tell a catalog-only render from a
+    // live one, which is why per-tech scenario counts silently vanish. Record
+    // the failure so the technology sections can degrade honestly.
     getTechnologies()
-      .then(data => setTechnologies(mergeTechnologies(data)))
-      .catch(() => setTechnologies(mergeTechnologies([])))
+      .then(data => {
+        setTechnologies(mergeTechnologies(data))
+        setTechLoadFailed(false)
+      })
+      .catch(() => {
+        setTechnologies(mergeTechnologies([]))
+        setTechLoadFailed(true)
+      })
+    // stats and /config/ stay quiet on failure by design: HeroSection has its
+    // own literal fallbacks and the config only drives optional banners, so a
+    // blip degrades to a complete page rather than an empty or wrong one.
     scenarioApi.getPlatformStats().then(setStats).catch(() => {})
     api.get('/config/', { silentError: true }).then(res => {
       setPlatformConfig(res.data)
@@ -66,6 +86,14 @@ export default function HomePage() {
       <OnboardingSection isAuthenticated={isAuthenticated} />
       <ChallengeModesSection />
       <TechnologiesSection technologies={technologies} isAuthenticated={isAuthenticated} />
+      {techLoadFailed && (
+        <p
+          data-testid="home-tech-stale"
+          className="text-center text-xs text-surface-500 px-6 -mt-6 mb-10"
+        >
+          Showing our standard technology list — live lab counts are unavailable right now.
+        </p>
+      )}
       <CertificationsSection isAuthenticated={isAuthenticated} />
       <InterviewSection isAuthenticated={isAuthenticated} />
       <VMwareSection isAuthenticated={isAuthenticated} />

@@ -322,8 +322,20 @@ class ExamStartView(APIView):
 
         # Sample scenarios per objective into the exam pool.
         snapshot = []
+        empty_objectives = []
+        covered_weight = 0
+        total_weight = 0
         for obj in track.objectives.prefetch_related("track_scenarios__scenario").all():
+            weight = obj.weight or 1
+            total_weight += weight
             pool = [ts for ts in obj.track_scenarios.all() if ts.in_exam_pool]
+            if not pool:
+                # An objective with an empty pool still counts toward
+                # weight_total at grading time (see submit below), so it silently
+                # subtracts its full weight from every achievable score.
+                empty_objectives.append(obj.code)
+                continue
+            covered_weight += weight
             picks = (
                 random.sample(pool, EXAM_SCENARIOS_PER_OBJECTIVE)
                 if len(pool) > EXAM_SCENARIOS_PER_OBJECTIVE
@@ -343,6 +355,35 @@ class ExamStartView(APIView):
 
         if not snapshot:
             return Response({"error": "This track has no exam scenarios yet."}, status=400)
+
+        # Grading divides by the FULL track weight, so an objective with no live
+        # scenarios caps the best possible score at covered_weight/total_weight.
+        # If that ceiling sits under passing_score the exam is unwinnable: the
+        # candidate would answer everything correctly and still fail with no
+        # explanation. Refuse to start it rather than sell an impossible attempt.
+        max_achievable = round(covered_weight / (total_weight or 1) * 100)
+        if max_achievable < track.passing_score:
+            logger.error(
+                "Track %s exam unwinnable: max achievable %s%% < passing %s%%; "
+                "objectives with no exam-pool scenarios: %s",
+                track.slug,
+                max_achievable,
+                track.passing_score,
+                ", ".join(empty_objectives) or "none",
+            )
+            return Response(
+                {
+                    "error": (
+                        "This track's exam is temporarily unavailable — some "
+                        "objectives have no scenarios, so a passing score is "
+                        "not reachable."
+                    ),
+                    "code": "CERT_EXAM_POOL_INCOMPLETE",
+                    "max_achievable_score": max_achievable,
+                    "passing_score": track.passing_score,
+                },
+                status=503,
+            )
 
         attempt = ExamAttempt.objects.create(
             user=request.user,
@@ -469,7 +510,19 @@ class ExamSubmitView(APIView):
             cert.holder_name = holder
             cert.issued_at = timezone.now()
             cert.expires_at = expires
-            cert.save(update_fields=["attempt", "score", "holder_name", "issued_at", "expires_at"])
+            # Re-earning clears a prior revocation. The grader-defect revocation
+            # reason tells the holder to "re-take the exam to earn it again", and
+            # there is only one row per (user, track) — so without this the holder
+            # follows those instructions, passes, gets a freshly-dated
+            # certificate, and it still verifies as invalid forever. Admin
+            # reinstate was the only way out, which is not a self-serve path.
+            cert.revoked = False
+            cert.revoked_at = None
+            cert.revoked_reason = ""
+            cert.save(update_fields=[
+                "attempt", "score", "holder_name", "issued_at", "expires_at",
+                "revoked", "revoked_at", "revoked_reason",
+            ])
 
         # Mint the verifiable Open Badge 3.0 credential from the earned cert.
         # Non-fatal: a signing/keystore failure must never block earning the
@@ -641,12 +694,17 @@ class CertVerifyView(APIView):
             )
         except CertEarnedCertificate.DoesNotExist:
             return Response({"valid": False, "error": "Certificate not found"}, status=404)
-        return Response(
-            {
-                "valid": not cert.is_expired,
-                "certificate": CertificateSerializer(cert).data,
-            }
-        )
+        # Revocation beats expiry. Report it explicitly rather than 404ing -- a
+        # "not found" is indistinguishable from a typo and invites the holder (or
+        # an employer checking it) to assume a bug rather than a withdrawal.
+        payload = {
+            "valid": cert.is_valid,
+            "certificate": CertificateSerializer(cert).data,
+        }
+        if cert.revoked:
+            payload["revoked"] = True
+            payload["error"] = "Certificate has been revoked"
+        return Response(payload)
 
 
 class OpenBadgeVerifyView(APIView):
@@ -673,9 +731,19 @@ class OpenBadgeVerifyView(APIView):
 
         verified = openbadge.verify(ob.credential, ob.public_key_b64)
         cert = ob.certificate
+        # The signature stays cryptographically valid forever -- that is the point
+        # of a signed credential, and exactly why revocation has to be reported
+        # here. `verified` answers "was this really issued by us"; `valid` answers
+        # "does it still stand". A consumer that only reads `verified` would accept
+        # a withdrawn badge, so surface both and make `valid` the one that folds in
+        # revocation and expiry.
         return Response(
             {
                 "verified": verified,
+                "valid": bool(verified) and cert.is_valid,
+                "revoked": cert.revoked,
+                "revoked_at": cert.revoked_at,
+                "revoked_reason": cert.revoked_reason,
                 "expired": cert.is_expired,
                 "credential_id": str(ob.credential_uuid),
                 "achievement": {

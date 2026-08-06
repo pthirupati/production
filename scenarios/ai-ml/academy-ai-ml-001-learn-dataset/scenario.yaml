@@ -11,111 +11,147 @@ max_score: 100
 is_free: true
 infrastructure_type: docker
 jira_priority: Low
-description: 'CONTEXT: A team operating AI/ML workflows has raised a ticket for `Ml Datasets — Learn Lab`.
-  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
-  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
+description: 'CONTEXT: This is your first ML lab, and it is deliberately not an outage. You are the ops
+  engineer for a small ML team. Before you can reason about *why a model is wrong*, you have to be able
+  to reason about *whether the thing serving it is even running* — and you have to know the vocabulary
+  the data scientists will use when they page you. This lab covers both: the vocabulary first, then a
+  real service you bring up yourself.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline ML practice workspace. The architecture is a single
-  lab-primary node exposing datasets, training scripts, metrics, and model artifacts; treat it as the
-  production host for this incident. All tools run locally — no paid APIs or external cloud calls are
-  required.
+  ENVIRONMENT: A single node, `lab-primary`, running the offline ML practice workspace. It hosts one systemd
+  unit, `model-server` (the ML Model Inference Server) — the process that loads a trained model into memory
+  and answers prediction requests. Everything runs locally; no paid APIs or cloud calls.
 
 
-  SYMPTOM / STARTING STATE: The ML practice workspace is online with a starter ML datasets setup. Some
-  pieces are intentionally incomplete so you can learn how they fit together. Nothing is on fire — focus
-  on observation.
+  CONCEPTS — read this before you touch anything, because these four words explain every dataset bug
+  you will be paged about:
+
+  • SCHEMA — the agreed shape of your data: which columns exist, their types, and their units. Training
+  and serving must use the *same* schema. A model trained on a price column in dollars, served a column
+  in cents, is silently wrong — no error, just bad predictions.
+
+  • LABEL — the answer column, the value you are teaching the model to predict. Everything else is a feature.
+  Labels are usually the expensive part of a dataset because a human had to produce them, and they are
+  where errors quietly enter.
+
+  • SPLIT — datasets are divided into train / validation / test subsets. You fit on train, tune on validation,
+  and touch test once at the end. The split exists so you can measure performance on data the model has
+  never seen.
+
+  • LEAKAGE — when information from outside the training subset sneaks into it: the same row appearing
+  in both train and test, or a feature that secretly encodes the label. Leakage is the reason for the
+  classic symptom "great validation metrics, terrible production performance". If a data scientist reports
+  that, leakage is the first hypothesis — and it is a *data* bug, not a server bug.
 
 
-  OBJECTIVE: Understand how ML datasets work in this lab environment; Identify the main status and configuration
-  signals for ML datasets; Confirm you can read the current state confidently before changing anything.
-  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active model-server``
-  returns active.
+  SYMPTOM / STARTING STATE: The workspace is online, but the model-server unit is not running. Nothing
+  is on fire and no customer is affected — this is a practice node, so read state carefully before changing
+  it.
 
 
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant datasets, training scripts, metrics, and model artifacts), changing one thing at
-  a time. Check your work continuously against the objective — success means `systemctl is-active model-server``
-  returns active.
+  OBJECTIVE: Learn the dataset vocabulary above, and learn to establish service state from evidence instead
+  of assumption. Determine what state model-server is in and why, then bring it up. Acceptance criteria:
+  the change is minimal and reversible, and `systemctl is-active model-server` returns `active`.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active model-server` returns
-  active. Capture the before/after output as evidence. Success criteria: the objective''s healthy state
-  holds on a repeat check, not just once.
+  WORK TO DO: Do not start the service first. Answer these in order: (1) Which units on this host are
+  failed? (2) Is model-server enabled to start at boot, and is it currently loaded? (3) What did the journal
+  record when it last tried to start? Only then start the unit. The habit being built is journal-before-restart:
+  restarting first destroys the evidence that explains why it stopped.
 
 
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
+  VERIFY: Re-run the check the grader uses — `systemctl is-active model-server` — and confirm it prints
+  `active`. Then re-read `journalctl -u model-server` and note that the failure lines are now followed
+  by a clean startup. Success criteria: the healthy state holds on a repeat check, not just once.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  ROLLBACK: Every action here is reversible with `systemctl stop model-server`. If you want to confirm
+  cause and effect, stop the unit, watch `systemctl is-active` flip back to inactive, and start it again.
+
+
+  WHAT TO AVOID: Do not skip straight to `systemctl start` — you will pass the checker and learn nothing
+  about why it was down. Do not edit the unit file; nothing is wrong with it. Do not fake completion with
+  marker files — the checker reads real service state.'
 objectives:
-- Understand how ML datasets work in this lab environment
-- Identify the main status and configuration signals for ML datasets
-- Confirm you can read the current state confidently before changing anything
-initial_state: The ML practice workspace is online with a starter ML datasets setup. Some pieces are intentionally
-  incomplete so you can learn how they fit together. Nothing is on fire — focus on observation.
+- Define schema, label, split, and leakage, and explain why leakage produces strong validation metrics
+  with weak production performance
+- Establish model-server's real state from systemctl and journalctl evidence before changing anything
+- Bring the inference server to active and confirm the healthy state holds on a repeat check
+initial_state: The ML practice workspace is online and reachable, but the model-server unit is not running
+  — it exited non-zero on its last start attempt and systemd left it failed. The journal still holds that
+  attempt. Nothing is on fire — focus on observation before you restart anything.
 hints:
 - order: 1
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: training metrics look great but production performance
-    collapses. This lab is about ML datasets — schema, splits, labeling quality, and leakage. Read the
-    objectives and the current state, and note precisely what looks wrong versus healthy before you form
-    any theory.'
+    Do not touch anything yet. Two things are being taught here and they are separate. First, the vocabulary
+    in the CONTEXT section — schema, label, split, leakage — which is what a data scientist means when
+    they say "training metrics look great but production performance collapsed" (that specific sentence
+    describes leakage, a dataset problem). Second, the hands-on skill: on this host the inference *service*
+    is down, and your job is to establish that from evidence rather than assumption.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For ML datasets problems the reliable method is: (1) reproduce/observe
-    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
-    change exactly one thing, (4) re-check. Make one small, reversible change toward the objective, re-reading
-    status after each step so you understand cause and effect.'
+    Read state before you change state. The order that works for any systemd service is: (1) which units
+    are failed, (2) what does this unit''s status say — loaded, enabled, and why it stopped, (3) what
+    does the journal show from the last attempt, (4) only now, act. Restarting first is the most common
+    beginner mistake: the service comes back, the evidence is gone, and it fails again that night with
+    nobody able to say why.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Start with `systemctl status model-server` and `journalctl -u model-server -n 50 --no-pager` before
-    changing anything.'
+    `systemctl --failed` lists every unit in a failed state on the host. `systemctl status model-server`
+    shows loaded/enabled/active for one unit and the reason it stopped. `journalctl -u model-server --no-pager`
+    prints that unit''s log history. `systemctl cat model-server` shows the unit file itself if you suspect
+    the definition.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Run `systemctl status model-server` — note Active/Failed and the last log lines.
+    1. `systemctl --failed` — model-server appears, so the fault is scoped to this unit, not the whole
+    host.
 
-    2. Read `journalctl -u model-server -n 50` for the root error.
+    2. `systemctl status model-server` — note three separate facts: Loaded (systemd can read the unit
+    file), enabled (it is meant to start at boot), and Active: failed with Result: exit-code (the process
+    started and then exited non-zero).
 
-    3. Form a hypothesis about the smallest config or permission fix.'
+    3. `journalctl -u model-server --no-pager` — the line "main process exited, code=exited, status=1/FAILURE"
+    is the root evidence. Enabled-but-failed is a different diagnosis from disabled-and-never-started.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Apply the minimal fix (config, unit override, or missing directory).
+    1. Start the unit: `systemctl start model-server`.
 
-    2. Run `systemctl daemon-reload` if you edited a unit file.
+    2. Confirm with `systemctl is-active model-server` — it should print `active`.
 
-    3. Run `systemctl restart model-server` and confirm `systemctl is-active model-server` succeeds.
+    3. Re-read `journalctl -u model-server --no-pager` and confirm the old failure lines are now followed
+    by "Server startup complete" and "Started ML Model Inference Server".
 
 
-    WHY: the grader checks real service state, not marker files.'
-summary: Complete the ml datasets — learn lab ai ml lab and verify success with the checker
+    WHY: the grader checks real service state, not marker files — and reading the journal after the fix
+    is how you confirm the restart actually succeeded rather than merely being requested.'
+summary: Learn the dataset vocabulary — schema, labels, splits, and leakage — then establish and restore
+  the state of an ML inference service from systemd and journal evidence
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
-- Basic ai ml literacy
+- Basic Linux command line (running commands and reading their output)
 tags:
 - ai-ml
 - do
 - hands-on
 linked_tutorial: ai-ml-fundamentals
 what_you_will_learn:
-- Understand how ML datasets work in this lab environment
-- Identify the main status and configuration signals for ML datasets
-- Confirm you can read the current state confidently before changing anything
+- What a dataset schema is, and why a train/serve schema mismatch produces wrong predictions with no error
+- What a label is and why labels are where dataset errors quietly enter
+- What train/validation/test splits are for, and how leakage between them produces great validation metrics
+  and poor production performance
+- How to establish a systemd service's real state — failed, loaded, enabled — from systemctl and journalctl
+  before restarting it
 environment:
   nodes:
   - role: primary
@@ -127,50 +163,77 @@ environment:
   - ai ml
   - bash
   - coreutils
+  - journalctl
   - pip
   - python3
+  - systemctl
   credentials:
   - user: root
     password: lab123
 tasks:
 - id: task_1
   title: Ml Datasets — Learn Lab
-  description: Restore healthy behavior for Ml Datasets — Learn Lab by investigating the failure, applying
-    the smallest safe fix, and validating the outcome.
-  background: 'This ai ml lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Learn the dataset vocabulary (schema, label, split, leakage), then establish why the model-server
+    inference unit is down from systemctl and journalctl evidence and bring it back to active.
+  background: 'This lab pairs ML vocabulary with the ops habit that supports it: read the journal before
+    you restart, because the evidence for why a service stopped disappears the moment it comes back up.'
   validation:
     type: service_active
-    command: systemctl is-active nginx
+    command: systemctl is-active model-server
     expected_status: active
-    error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
-      -u nginx -n 50`.
+    error_message: The model-server service is not active yet. Check `systemctl status model-server` and
+      `journalctl -u model-server --no-pager`.
 solution:
-  summary: The root cause is an unhealthy `nginx` service; repair it and verify active state.
+  summary: The model-server unit is enabled and loaded but exited non-zero, leaving it failed. Read the
+    journal for the exit evidence, then start the unit and confirm it reports active.
   files_changed: []
   commands_run:
-  - systemctl is-active nginx
+  - systemctl --failed
+  - systemctl status model-server
+  - journalctl -u model-server --no-pager
+  - systemctl start model-server
+  - systemctl is-active model-server
   reference_docs: ai-ml-fundamentals
 guided_mode:
   enabled: true
   steps:
   - step: 1
-    title: Inspect current state
-    instruction: Run a read-only diagnostic before changing anything.
-    command: systemctl is-active nginx
-    expected_output: Output shows the current failure mode
-    explanation: Evidence-first troubleshooting avoids guessing.
+    title: Scope the fault to one unit
+    instruction: List every failed unit on the host before looking at any single one.
+    command: systemctl --failed
+    expected_output: model-server.service listed as failed
+    explanation: Starting host-wide tells you whether this is one broken service or a wider problem. It
+      costs one command and prevents tunnel vision.
     next_on: command_success
   - step: 2
-    title: Apply the minimal fix
-    instruction: Make one reversible change aligned with the objectives.
-    command: '# your fix command here'
-    expected_output: State moves toward the objective
-    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    title: Read the unit's state
+    instruction: Inspect model-server's loaded, enabled, and active state.
+    command: systemctl status model-server
+    expected_output: 'Loaded: loaded, enabled; Active: failed (Result: exit-code)'
+    explanation: Three independent facts. Enabled means it should have started at boot; failed with exit-code
+      means it did start and then the process exited non-zero — not a missing unit file.
     next_on: command_success
   - step: 3
-    title: Verify with the grader
+    title: Read the journal before restarting
+    instruction: Print the unit's log history and find the exit evidence.
+    command: journalctl -u model-server --no-pager
+    expected_output: '"main process exited, code=exited, status=1/FAILURE"'
+    explanation: This is the habit the lab exists to build. A restart erases the running evidence; capture
+      it first or you cannot explain the failure later.
+    next_on: command_success
+  - step: 4
+    title: Bring the inference server up
+    instruction: Start the unit now that you have recorded why it was down.
+    command: systemctl start model-server
+    expected_output: No output — systemctl is silent on success
+    explanation: A minimal, reversible action. `systemctl stop model-server` undoes it if you want to
+      observe the failure state again.
+    next_on: command_success
+  - step: 5
+    title: Verify with the grader's check
     instruction: Run the same verification the checker uses.
-    command: systemctl is-active nginx
-    expected_output: '`systemctl is-active nginx`` returns active'
-    explanation: The lab passes only when real state is healthy.
+    command: systemctl is-active model-server
+    expected_output: active
+    explanation: The lab passes only when real service state is healthy. Re-read the journal too — a clean
+      "Started" line after the old failure confirms the restart actually succeeded.
     next_on: command_success

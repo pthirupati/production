@@ -1,5 +1,5 @@
-from django.db import models
-from django.db.models import Sum, Count, Avg, Min, Q
+from django.db import models, transaction, IntegrityError
+from django.db.models import Sum, Count, Avg, Min, Q, F
 from django.utils import timezone
 from .models import UserScenarioProgress, UserAchievement
 import logging
@@ -8,31 +8,56 @@ logger = logging.getLogger(__name__)
 
 
 def record_attempt(user, scenario, score, completed=False, time_seconds=None, hints_used=0):
-    """Record a lab attempt and update best records."""
-    progress, _ = UserScenarioProgress.objects.get_or_create(
-        user=user,
-        scenario=scenario,
-    )
+    """Record a lab attempt and update best records.
 
-    progress.attempts += 1
-    progress.last_attempt_at = timezone.now()
+    The whole read-modify-write runs inside ``transaction.atomic`` with the row
+    held under ``select_for_update``. Every field here is a read-modify-write on
+    the in-memory instance — ``attempts += 1``, ``score > best_score``,
+    ``time_seconds < best_time``, ``if not completed_at`` — so a plain
+    get_or_create + save() lost updates whenever two attempts for the same
+    (user, scenario) overlapped: the later save() wrote back a row snapshot taken
+    before the earlier one committed, undercounting attempts and silently
+    reverting a higher best_score / faster best_time / an already-set
+    completed_at.
 
-    if score > progress.best_score:
-        progress.best_score = score
-        # Update hints for best score attempt
-        progress.hints_used_best = hints_used
+    F("attempts") + 1 alone would NOT have been enough — it fixes the counter but
+    leaves best_score/best_time/completed_at on the same stale instance, so the
+    clobber just moves to the fields that matter more. The lock is the only thing
+    that makes the comparisons see committed state.
+    """
+    with transaction.atomic():
+        # get_or_create first: select_for_update cannot lock a row that does not
+        # exist yet. unique_together (user, scenario) makes the create side safe
+        # under a race — the loser gets IntegrityError, and the winner's row is
+        # what the locking get() below picks up.
+        try:
+            UserScenarioProgress.objects.get_or_create(user=user, scenario=scenario)
+        except IntegrityError:
+            pass
 
-    # Track best time (lower is better, only for completed attempts)
-    if completed and time_seconds is not None:
-        if progress.best_time is None or time_seconds < progress.best_time:
-            progress.best_time = time_seconds
+        progress = UserScenarioProgress.objects.select_for_update().get(
+            user=user, scenario=scenario
+        )
 
-    if completed:
-        progress.completed = True
-        if not progress.completed_at:
-            progress.completed_at = timezone.now()
+        progress.attempts += 1
+        progress.last_attempt_at = timezone.now()
 
-    progress.save()
+        if score > progress.best_score:
+            progress.best_score = score
+            # Update hints for best score attempt
+            progress.hints_used_best = hints_used
+
+        # Track best time (lower is better, only for completed attempts)
+        if completed and time_seconds is not None:
+            if progress.best_time is None or time_seconds < progress.best_time:
+                progress.best_time = time_seconds
+
+        if completed:
+            progress.completed = True
+            if not progress.completed_at:
+                progress.completed_at = timezone.now()
+
+        progress.save()
 
     # Invalidate the cached progress for this user
     from django.core.cache import cache as _cache
@@ -43,6 +68,62 @@ def record_attempt(user, scenario, score, completed=False, time_seconds=None, hi
         check_achievements(user, scenario, score, time_seconds, hints_used)
 
     return progress
+
+
+def record_attempt_started(user, scenario):
+    """Count a lab start as an attempt. Touches `attempts` and nothing else.
+
+    Companion to `record_attempt`, which runs when a lab *finishes*. Both used to
+    be `get_or_create` → mutate the instance → `save()`; both lost updates for the
+    same reason (see record_attempt's docstring). This one is fixed with a single
+    `UPDATE ... SET attempts = attempts + 1` rather than a row lock: there are no
+    comparisons here, so the database can do the whole read-modify-write in one
+    statement. That is atomic without holding a lock across a round trip — better
+    for the lab-start path, which already sits behind the global capacity
+    advisory lock. `record_attempt` needs the lock only because `score >
+    best_score` / `time_seconds < best_time` have to see committed state.
+
+    Using `.update()` also confines the write to the named columns, so a start can
+    no longer clobber a best_score / best_time / hints_used_best that a completion
+    committed in between — the old `save()` wrote back every field from a snapshot
+    that could already be stale.
+
+    Deliberately does NOT reset completed/completed_at. The old code set
+    `completed=False, completed_at=None` on every start, which silently undid a
+    prior solve: `jira_integration.completion` decides XP by checking whether a
+    `completed=True` row already exists, so wiping the flag at start time made
+    every replay look like a first solve and re-opened the XP grind faucet that
+    apps/progress/tests/test_xp_no_replay.py exists to keep shut. It also revoked
+    the completion from the leaderboard, the streak calendar, learning-path
+    progress and certification eligibility, and re-hid the solution explanation —
+    permanently, if the user abandoned the replay. Replaying a lab is not
+    un-solving it; `completed` means "has ever been solved".
+
+    `last_attempt_at` is `auto_now`, which only fires on `save()`, so the
+    `.update()` has to set it explicitly to preserve the old behaviour.
+    """
+    # select_for_update / UPDATE cannot touch a row that does not exist yet.
+    # unique_together (user, scenario) makes the create side race-safe: the loser
+    # gets IntegrityError and the UPDATE below finds the winner's row.
+    try:
+        UserScenarioProgress.objects.get_or_create(user=user, scenario=scenario)
+    except IntegrityError:
+        pass
+
+    UserScenarioProgress.objects.filter(user=user, scenario=scenario).update(
+        attempts=F("attempts") + 1,
+        last_attempt_at=timezone.now(),
+    )
+
+    # attempts feeds the cached total on UserProgressView.
+    from django.core.cache import cache as _cache
+    _cache.delete(f"user_progress:{user.id}")
+
+
+# `compute_score` = max(10, 100 + time_bonus - hint_penalty), where time_bonus is
+# `time_remaining * 100 / duration` — so 100 is the floor for a clean solve, not a
+# ceiling. "Perfect" therefore has to mean base + at least half the time bonus.
+PERFECT_SCORE_MIN = 150
 
 
 def check_achievements(user, scenario, score, time_seconds, hints_used):
@@ -95,8 +176,17 @@ def check_achievements(user, scenario, score, time_seconds, hints_used):
     if hints_used == 0:
         _award("no_hints")
 
-    # Perfect Score (100)
-    if score >= 100:
+    # Perfect Score.
+    #
+    # Was `score >= 100`, which awarded it to essentially every completion:
+    # `compute_score` returns `max(10, 100 + time_bonus - hint_penalty)`, so a
+    # hint-free solve is *always* ≥ 100 and the badge meant nothing. It also
+    # overlapped exactly with `no_hints`, which already exists.
+    #
+    # A distinct, earnable definition needs both halves of the score: solved with
+    # no hints AND with real time to spare. PERFECT_SCORE_MIN is 100 (the base)
+    # plus half the available time bonus, i.e. finished inside half the clock.
+    if hints_used == 0 and score >= PERFECT_SCORE_MIN:
         _award("perfect_score")
 
     # Difficulty mastery — completed all scenarios of a difficulty level
@@ -110,8 +200,12 @@ def check_achievements(user, scenario, score, time_seconds, hints_used):
             if achievement_key:
                 _award(achievement_key)
 
-    # Streak tracking — check consecutive days with completed labs
-    _check_streaks(user)
+    # Streak tracking — check consecutive days with completed labs.
+    # `_award` is passed in rather than `_check_streaks` calling get_or_create
+    # itself: doing it inline meant streak badges were created but never appended
+    # to `awarded`, so they were the only achievements on the platform that never
+    # notified the person who earned them.
+    _check_streaks(user, _award)
 
     # Send notification for each new achievement
     if awarded:
@@ -162,7 +256,7 @@ def compute_current_streak(user) -> int:
     return streak
 
 
-def _check_streaks(user):
+def _check_streaks(user, award=None):
     """Award streak achievements AND persist streak/XP onto the user's Profile.
 
     The Profile already carries daily_streak / longest_streak /
@@ -172,12 +266,13 @@ def _check_streaks(user):
     """
     streak = compute_current_streak(user)
 
-    if streak >= 3:
-        UserAchievement.objects.get_or_create(user=user, achievement="streak_3")
-    if streak >= 7:
-        UserAchievement.objects.get_or_create(user=user, achievement="streak_7")
-    if streak >= 30:
-        UserAchievement.objects.get_or_create(user=user, achievement="streak_30")
+    def _default_award(key):
+        UserAchievement.objects.get_or_create(user=user, achievement=key)
+
+    award = award or _default_award
+    for threshold, key in ((3, "streak_3"), (7, "streak_7"), (30, "streak_30")):
+        if streak >= threshold:
+            award(key)
 
     # Mirror streak + XP onto the Profile (dormant until now). XP is derived
     # from completions/score below in award_xp_for_completion, so here we only

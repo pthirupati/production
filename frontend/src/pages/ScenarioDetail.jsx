@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { scenarioApi } from '../api/scenarios'
 import { labApi } from '../api/labs'
 import { ratingsApi } from '../api/ratings'
+import SmallScreenLabGate, { useSmallScreenLabGate } from '../components/SmallScreenLabGate'
 import { jiraApi } from '../api/jira'
 import ScenarioIssueBar from '../components/ScenarioIssueBar'
 import JiraTeamGuide from '../components/JiraTeamGuide'
@@ -20,6 +21,7 @@ import toast from 'react-hot-toast'
 import { PageHeader } from '../components/design'
 import { ScenarioStatsChip } from '../components/engagement'
 import { usePageTitle } from '../hooks/usePageTitle'
+import { useStructuredData, scenarioCourseSchema, breadcrumbSchema } from '../hooks/useStructuredData'
 
 const typeConfig = {
   fix: { icon: Wrench, label: 'Fix', desc: 'Find and fix the broken service' },
@@ -46,7 +48,15 @@ export default function ScenarioDetail() {
   const [starting, setStarting] = useState(false)
   const [showSolution, setShowSolution] = useState(false)
   const [limitInfo, setLimitInfo] = useState(null)
+  // The API returns {average_score, has_enough_ratings, total_ratings,
+  // distribution, recent_reviews}. This page read `r.ratings || r.results` —
+  // neither key has ever existed, so the reviews list rendered "No reviews yet"
+  // and `avgRating` averaged an empty array, on every scenario, always. Found
+  // while wiring the Z3-10 small-sample suppression: the suppression had nothing
+  // to suppress because nothing was displayed.
   const [ratings, setRatings] = useState([])
+  const [ratingSummary, setRatingSummary] = useState(null)
+  const labGate = useSmallScreenLabGate()
   const [userRating, setUserRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [reviewText, setReviewText] = useState('')
@@ -60,6 +70,18 @@ export default function ScenarioDetail() {
     scenario ? `${scenario.subtitle || scenario.description?.slice(0, 155) || ''} — hands-on lab on FixitLab` : undefined,
     scenario ? { canonical: `${window.location.origin}/scenarios/${scenario.slug}` } : undefined,
   )
+
+  // Audit Z6-7: there was no structured data anywhere. A scenario IS a Course, and
+  // there are 7,280 of them — the highest-value markup on the site.
+  useStructuredData('course', scenarioCourseSchema(scenario))
+  useStructuredData('breadcrumb', breadcrumbSchema([
+    { name: 'Home', path: '/' },
+    { name: 'Scenarios', path: '/scenarios' },
+    ...(scenario?.technology_name
+      ? [{ name: scenario.technology_name, path: `/scenarios?technology=${scenario.technology_name}` }]
+      : []),
+    ...(scenario?.title ? [{ name: scenario.title }] : []),
+  ]))
 
   const loadJiraTicket = (scenarioId, accessible) => {
     if (!isAuthenticated || !scenarioId || accessible === false) {
@@ -105,7 +127,7 @@ export default function ScenarioDetail() {
         setScenario(data)
         loadJiraTicket(data?.id, data?.is_accessible)
         ratingsApi.getRatings({ type: 'scenario', scenario: data.id })
-          .then(r => setRatings(r.ratings || r.results || []))
+          .then(r => { setRatings(r.recent_reviews || []); setRatingSummary(r) })
           .catch(() => {})
       })
       .catch(() => toast.error('Scenario not found'))
@@ -128,6 +150,15 @@ export default function ScenarioDetail() {
       navigate('/pricing')
       return
     }
+    // Audit Z6-9: warn before provisioning, not after. Starting is what consumes a
+    // daily lab slot, so the interstitial has to come first — checked after the
+    // auth and subscription gates so a phone user is not warned about a lab they
+    // cannot start anyway.
+    if (!labGate.guard(() => { void startLabNow() })) return
+    await startLabNow()
+  }
+
+  const startLabNow = async () => {
     setStarting(true)
     try {
       const session = await labApi.startLab(scenario.id)
@@ -191,7 +222,8 @@ export default function ScenarioDetail() {
       toast.success('Rating submitted!')
       setReviewText('')
       const r = await ratingsApi.getRatings({ type: 'scenario', scenario: scenario.id })
-      setRatings(r.ratings || r.results || [])
+      setRatings(r.recent_reviews || [])
+      setRatingSummary(r)
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to submit rating')
     } finally {
@@ -225,9 +257,10 @@ export default function ScenarioDetail() {
   const solveRate = scenario.attempts_count > 0
     ? Math.round(scenario.completions_count / Math.max(scenario.attempts_count, 1) * 100)
     : null
-  const avgRating = ratings.length
-    ? (ratings.reduce((s, r) => s + (r.score || 0), 0) / ratings.length).toFixed(1)
-    : null
+  // Server-computed, and null below the sample floor (audit Z3-10). Averaging
+  // client-side over `ratings` would be wrong twice over: it only holds the 10
+  // most recent reviews *with text*, so it was never the scenario's average.
+  const avgRating = ratingSummary?.has_enough_ratings ? ratingSummary.average_score : null
 
   const locked = scenario.is_accessible === false
   const simInfo = getScenarioSimInfo(scenario)
@@ -271,6 +304,11 @@ export default function ScenarioDetail() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-5 animate-fade-in pb-8">
+      <SmallScreenLabGate
+        open={labGate.gateOpen}
+        onCancel={labGate.dismiss}
+        onProceed={labGate.proceed}
+      />
       <PageHeader
         eyebrow="Training"
         title={scenario.title}
@@ -554,8 +592,15 @@ export default function ScenarioDetail() {
       <div className="glass-card p-6">
         <h2 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
           <Star size={16} className="text-accent-amber" /> Ratings & Reviews
-          {ratings.length > 0 && (
-            <span className="text-xs text-surface-500 ml-auto">{ratings.length} review{ratings.length !== 1 ? 's' : ''}</span>
+          {ratingSummary?.total_ratings > 0 && (
+            <span className="text-xs text-surface-500 ml-auto flex items-center gap-2">
+              {avgRating !== null && (
+                <span className="text-accent-amber font-semibold">{avgRating} ★</span>
+              )}
+              <span>
+                {ratingSummary.total_ratings} rating{ratingSummary.total_ratings !== 1 ? 's' : ''}
+              </span>
+            </span>
           )}
         </h2>
 
@@ -595,7 +640,11 @@ export default function ScenarioDetail() {
         )}
 
         {ratings.length === 0 ? (
-          <p className="text-sm text-surface-500 text-center py-3">No reviews yet. Be the first to rate!</p>
+          <p className="text-sm text-surface-500 text-center py-3">
+            {ratingSummary?.total_ratings > 0
+              ? 'No written reviews yet.'
+              : 'No reviews yet. Be the first to rate!'}
+          </p>
         ) : (
           <div className="space-y-3 max-h-72 overflow-y-auto">
             {ratings.slice(0, 10).map((r, i) => (

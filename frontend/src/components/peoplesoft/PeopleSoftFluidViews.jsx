@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Search, Save, Plus, Minus } from 'lucide-react'
 import {
   PS_FLUID_TILES, PS_JOB_DATA, PS_BENEFITS_STEPS, PS_HEALTH_PLANS, PS_PAYCHECK, PS_PROCESS_INSTANCES,
-} from '../../mockData/peoplesoft'
+} from '../../simFixtures/peoplesoft'
 import { SimStatusBadge } from '../sim/shared'
 
 const PS_BLUE = '#1b3a5c'

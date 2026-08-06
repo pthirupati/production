@@ -6,11 +6,13 @@ starts with a clean 503 (NOT a 500 / stack trace) once the platform-wide
 ``MAX_CONCURRENT_LABS`` ceiling is reached, must free the slot when a session is
 torn down, and must not overshoot the cap under concurrent starts.
 """
+import os
+import unittest
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.db import connection
+from django.db import connection, connections
 from django.test import TestCase, TransactionTestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -24,6 +26,33 @@ from apps.labs.models import LabSession
 from apps.question_bank.models import Scenario, Technology
 
 User = get_user_model()
+
+
+def require_postgres(test_case, reason):
+    """Skip a lock-dependent test on SQLite — but never silently in CI.
+
+    These race tests are the only thing exercising the advisory-lock paths, and
+    the guard used to be purely vendor-conditional (``if vendor == "sqlite":
+    skipTest``). That is correct locally, where SQLite is intentional, but it
+    also means CI reports ``OK (skipped=1)`` if the Postgres service container
+    ever fails to come up or ``config.test_settings`` stops selecting it — the
+    exact coverage CI exists to provide would vanish and the run would still be
+    green.
+
+    So on GitHub Actions a SQLite vendor is a hard failure, not a skip: CI is
+    explicitly provisioned with postgres:16 (.github/workflows/ci.yml and the
+    ci-tests job in tests.yml), so landing on SQLite there is always a broken
+    harness rather than an expected environment.
+    """
+    if connection.vendor != "sqlite":
+        return
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        test_case.fail(
+            f"{reason}: CI must run these tests against the Postgres service "
+            f"container, but connection.vendor == 'sqlite'. The Postgres service "
+            f"or config.test_settings DB selection is broken — do not skip this."
+        )
+    test_case.skipTest(reason)
 
 
 def _make_docker_scenario(slug="cap-docker"):
@@ -183,8 +212,7 @@ class CapacityCapRaceTests(TransactionTestCase):
     @patch("celery_app.tasks.provision_docker_lab")
     @patch("apps.public_api.views.sync_lab_started", return_value={"jira_enabled": False})
     def test_concurrent_starts_do_not_exceed_cap(self, mock_jira, mock_provision):
-        if connection.vendor == "sqlite":
-            self.skipTest("Race-safety requires PostgreSQL advisory locks")
+        require_postgres(self, "Race-safety requires PostgreSQL advisory locks")
 
         results = {}
 
@@ -224,3 +252,177 @@ class CapacityCapRaceTests(TransactionTestCase):
         self.assertEqual(created, 5, f"expected to fill the cap: {results}")
         shed = sum(1 for c in results.values() if c == status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertEqual(shed, 5, f"expected 5 shed with 503: {results}")
+
+
+@override_settings(MAX_CONCURRENT_LABS=3)
+class StartLabSessionCapacityTests(TestCase):
+    """``apps.labs.sessions.start_lab_session`` must honour the global ceiling.
+
+    Audit L1506/L1511. This helper used to INSERT a PROVISIONING row without ever
+    calling ``at_global_capacity``, so every caller of it bypassed
+    ``MAX_CONCURRENT_LABS`` outright. The two known call paths were moved off it,
+    which is what makes these tests the only thing standing between a future
+    caller and the same bypass.
+
+    Gate logic only: the advisory lock is a documented no-op on SQLite, so true
+    cross-connection concurrency is covered by ``CapacityCapRaceTests`` (Postgres)
+    rather than here.
+    """
+
+    def setUp(self):
+        self.scenario = _make_docker_scenario(slug="cap-helper")
+        self.holders = [
+            User.objects.create_user(username=f"sh{i}", email=f"sh{i}@t.com", password="Pass123!x")
+            for i in range(3)
+        ]
+        self.user = User.objects.create_user(
+            username="sh-starter", email="sh-starter@t.com", password="Pass123!x",
+        )
+
+    def _fill_to_cap(self):
+        for holder in self.holders:
+            _running_docker_session(holder, self.scenario)
+        self.assertEqual(count_active_engine_labs(), 3)
+
+    @patch("apps.labs.sessions.get_provisioner")
+    def test_refuses_to_create_session_at_capacity(self, mock_get_provisioner):
+        from apps.labs.sessions import LabCapacityError, start_lab_session
+
+        self._fill_to_cap()
+        before = LabSession.objects.count()
+
+        with self.assertRaises(LabCapacityError):
+            start_lab_session(self.user, self.scenario)
+
+        # The whole point: a shed start must leave NO row behind. Pre-fix this
+        # helper had already INSERTed a PROVISIONING row before anything could
+        # object, permanently consuming a slot beyond the cap.
+        self.assertEqual(LabSession.objects.count(), before)
+        self.assertFalse(
+            LabSession.objects.filter(user=self.user).exists(),
+            "start_lab_session created a session past MAX_CONCURRENT_LABS",
+        )
+        # And it must bail out *before* touching the provisioner — an over-cap
+        # start that still provisions is exactly the engine exhaustion the cap
+        # exists to prevent.
+        mock_get_provisioner.assert_not_called()
+
+    @patch("apps.labs.sessions.get_provisioner")
+    def test_starts_normally_under_capacity(self, mock_get_provisioner):
+        """The gate must shed only at the ceiling, not break the happy path."""
+        from apps.labs.sessions import start_lab_session
+
+        _running_docker_session(self.holders[0], self.scenario)  # 1 of 3 used
+        mock_get_provisioner.return_value.provision.return_value = ("res-1", "name-1")
+
+        session = start_lab_session(self.user, self.scenario)
+
+        self.assertEqual(session.status, "RUNNING")
+        self.assertEqual(session.user, self.user)
+        mock_get_provisioner.return_value.provision.assert_called_once()
+
+    @patch("apps.labs.sessions.get_provisioner")
+    def test_cloud_start_exempt_from_global_ceiling(self, mock_get_provisioner):
+        """Per-VM cloud providers run against vendor quota, so the cap must not shed them."""
+        from apps.labs.sessions import start_lab_session
+
+        self._fill_to_cap()
+        self.scenario.infrastructure_type = "digitalocean"
+        self.scenario.lab_mode = "digitalocean"
+        self.scenario.save(update_fields=["infrastructure_type", "lab_mode"])
+        mock_get_provisioner.return_value.provision.return_value = ("droplet-1", "droplet-name")
+
+        session = start_lab_session(self.user, self.scenario)
+
+        self.assertEqual(session.provider, "digitalocean")
+        self.assertEqual(session.status, "RUNNING")
+
+    @patch("apps.labs.sessions.get_provisioner")
+    def test_failed_provision_releases_the_slot(self, mock_get_provisioner):
+        """A dead start must not hold a capacity slot forever.
+
+        FAILED is terminal, so ``count_active_engine_labs`` stops counting it —
+        that is what returns the slot. Without this, a run of provisioning
+        failures would silently eat the platform's whole ceiling.
+        """
+        from apps.labs.sessions import start_lab_session
+
+        _running_docker_session(self.holders[0], self.scenario)
+        mock_get_provisioner.return_value.provision.side_effect = RuntimeError("ssh down")
+
+        with self.assertRaises(RuntimeError):
+            start_lab_session(self.user, self.scenario)
+
+        session = LabSession.objects.get(user=self.user)
+        self.assertEqual(session.status, "FAILED")
+        self.assertEqual(count_active_engine_labs(), 1, "failed start kept its capacity slot")
+
+    def test_reserve_does_no_network_io_inside_the_lock(self):
+        """The reserve phase must stay pure-DB.
+
+        The capacity advisory lock is platform-wide and transaction-scoped: any
+        SSH/API round trip inside that block serialises *every* lab start on the
+        platform behind the slowest provision. Pinning the split here so the two
+        phases cannot be re-merged back into one atomic block.
+        """
+        from apps.labs.sessions import reserve_lab_session
+
+        with patch("apps.labs.sessions.get_provisioner") as mock_get_provisioner:
+            session = reserve_lab_session(self.user, self.scenario)
+
+        self.assertEqual(session.status, "PROVISIONING")
+        mock_get_provisioner.assert_not_called()
+
+
+class RequirePostgresGuardTests(TestCase):
+    """The CI skip-guard itself must not be able to go silent.
+
+    B8 (audit L1554) asks for the advisory-lock race tests to actually *run* in
+    CI. The infrastructure for that already exists, so the residual risk is not
+    "CI lacks Postgres" but "CI silently stops using it and nobody notices":
+    a vendor-only skip turns that regression into a green run. These tests pin
+    the guard's behaviour in both environments so the loud-in-CI property cannot
+    be quietly reverted.
+    """
+
+    def test_skips_on_sqlite_outside_ci(self):
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": ""}, clear=False), \
+                patch.object(type(connections["default"]), "vendor", "sqlite"):
+            with self.assertRaises(unittest.SkipTest):
+                require_postgres(self, "needs pg")
+
+    def test_fails_loudly_on_sqlite_inside_ci(self):
+        # The whole point: in CI a SQLite vendor must break the build instead of
+        # skipping, because CI is provisioned with postgres:16 and landing on
+        # SQLite there means the harness is broken.
+        #
+        # Caught as BaseException on purpose. SkipTest does NOT inherit from
+        # Exception, so the obvious `assertRaises(self.failureException)` lets a
+        # regressed guard raise SkipTest straight through the assertion — this
+        # very test then reports "skipped" and the suite still prints OK. That
+        # is the exact silent-skip failure mode being defended against, so the
+        # test must not be susceptible to it. Verified by mutation: reverting
+        # the guard to a vendor-only skipTest turns this into a real failure.
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}, clear=False), \
+                patch.object(type(connections["default"]), "vendor", "sqlite"):
+            try:
+                require_postgres(self, "needs pg")
+            except BaseException as exc:  # noqa: BLE001 - see rationale above
+                raised = exc
+            else:
+                raised = None
+
+        self.assertIsNotNone(raised, "guard must not pass silently on SQLite in CI")
+        self.assertNotIsInstance(
+            raised, unittest.SkipTest,
+            "guard skipped instead of failing in CI — the race tests would "
+            "vanish from CI while the run still reports OK",
+        )
+        self.assertIsInstance(raised, self.failureException)
+        self.assertIn("connection.vendor == 'sqlite'", str(raised))
+
+    def test_no_op_on_postgres_in_ci(self):
+        # Must neither skip nor fail when the vendor is correct.
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}, clear=False), \
+                patch.object(type(connections["default"]), "vendor", "postgresql"):
+            require_postgres(self, "needs pg")

@@ -31,7 +31,27 @@ upstream backend_pool {
     keepalive 32;
 }
 
-# WebSocket terminal — ip_hash sticky sessions across Daphne/uvicorn workers
+# WebSocket terminal.
+#
+# Audit Z5-16. The previous comment here claimed "ip_hash sticky sessions across
+# Daphne/uvicorn workers". That is not achievable and believing it is dangerous:
+# nginx sees ONE TCP endpoint, and uvicorn's workers share a single listening
+# socket, so nginx has no visibility into which worker accepts a connection and
+# cannot pin a client to one. `ip_hash` over a single-server upstream is also a
+# no-op — there is nothing to distribute between.
+#
+# The directive is kept because it becomes meaningful the day a second app node is
+# added (it would then give per-client NODE affinity, which is real). What it never
+# provides is per-WORKER affinity.
+#
+# The consequence is the important part: **worker affinity is impossible here, so
+# any state a WebSocket depends on must live outside process memory** — Redis or
+# the database, not a module-level dict. That is exactly the Z5-1 `_SIM_SESSIONS`
+# leak, and this comment previously implied the opposite was handled.
+#
+# Separate from `backend_pool` on purpose: that pool sets `keepalive`, which sends
+# `Connection: ""` upstream and is incompatible with the `Upgrade` handshake a
+# WebSocket needs.
 upstream backend_ws {
     ip_hash;
     server {{APP_PRIVATE_IP}}:8000;
@@ -196,7 +216,51 @@ server {
         add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lh3.googleusercontent.com; connect-src 'self' wss://fixitlab.in wss://www.fixitlab.in wss://*.fixitlab.in https://api.github.com https://accounts.google.com https://oauth2.googleapis.com https://api.razorpay.com https://lumberjack.razorpay.com; font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; frame-ancestors 'none';" always;
     }
 
+    # ── Self-hosted runtimes: Pyodide + MediaPipe selfie-segmentation ──
+    # Served same-origin because script-src above allows only 'self' and
+    # checkout.razorpay.com. `^~` keeps them out of `location /`, whose
+    # no-cache/no-store header would re-download ~28MB of immutable runtime on
+    # every page load. Headers are restated because add_header in a location
+    # drops every inherited one.
+    location ^~ /pyodide/ {
+        proxy_pass http://frontend-prod:80;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        expires 1y;
+        access_log off;
+        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    }
+
+    location ^~ /vendor/ {
+        proxy_pass http://frontend-prod:80;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        expires 1y;
+        access_log off;
+        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    }
+
     # ── FRONTEND (production build served locally on the edge node) ──
+    # Dynamic Django sitemap must win over the SPA catch-all (audit §Z6-1).
+    location ^~ /sitemap {
+        proxy_pass http://backend_pool;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 15s;
+        proxy_read_timeout 30s;
+    }
+
     location / {
         proxy_pass http://frontend-prod:80;
         proxy_http_version 1.1;
@@ -422,7 +486,12 @@ server {
     }
 
     # ── Block common exploit paths ──
-    location ~* /(\.\.env|\.env|\.git|wp-admin|phpMyAdmin|phpmyadmin|\.well-known/security\.txt) {
+    # NOTE: /.well-known/security.txt used to be in this list, alongside .env and
+    # wp-admin, as if it were a scanner probe. It is the opposite: RFC 9116 makes it
+    # the standard place a security researcher looks to find out where to report a
+    # vulnerability. 404-ing it told every researcher we had no disclosure process
+    # and sent them to social media instead. It is now served below (audit Z4-7).
+    location ~* /(\.\.env|\.env|\.git|wp-admin|phpMyAdmin|phpmyadmin) {
         return 404;
     }
 

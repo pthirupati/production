@@ -115,6 +115,43 @@ apt-get update -y >/dev/null 2>&1 || true
 if ! command -v docker >/dev/null 2>&1; then
   curl -fsSL https://get.docker.com | sh
 fi
+
+# Cap container log growth at the DAEMON level.
+#
+# No compose file set logging options, and json-file defaults to unlimited, so
+# /var/lib/docker/containers/*/*-json.log grew without bound on every droplet
+# until the 160GB disk filled. The backend logs structured JSON at INFO to stdout,
+# so this is not a slow leak.
+#
+# Deliberately daemon-level rather than per-service in compose: LAB containers are
+# created through the Docker API by apps/labs/provisioner/docker_provisioner.py,
+# not by compose, so per-service logging would have missed exactly the containers
+# that churn most. This covers every container on the host, however it was started.
+#
+# Idempotent: only writes daemon.json when the log-driver key is absent, so a
+# re-bootstrap does not clobber operator changes.
+if ! grep -q "log-driver" /etc/docker/daemon.json 2>/dev/null; then
+  mkdir -p /etc/docker
+  if [ -s /etc/docker/daemon.json ]; then
+    cp /etc/docker/daemon.json /etc/docker/daemon.json.bak.$(date +%s) 2>/dev/null || true
+    python3 - <<PYEOF 2>/dev/null || true
+import json
+p = "/etc/docker/daemon.json"
+try:
+    with open(p) as f: cfg = json.load(f)
+except Exception:
+    cfg = {}
+cfg["log-driver"] = "json-file"
+cfg["log-opts"] = {"max-size": "10m", "max-file": "3"}
+with open(p, "w") as f: json.dump(cfg, f, indent=2)
+PYEOF
+  else
+    printf "%s\n" "{" "  \"log-driver\": \"json-file\"," "  \"log-opts\": { \"max-size\": \"10m\", \"max-file\": \"3\" }" "}" > /etc/docker/daemon.json
+  fi
+  systemctl restart docker 2>/dev/null || service docker restart 2>/dev/null || true
+  echo "[docker] log rotation set: max-size=10m max-file=3 (30MB ceiling per container)"
+fi
+
 mkdir -p /opt/fixitlab
 # 4GB swap so the 8GB nodes do not OOM-kill (status 137) when the backend + 4
 # celery containers + a test/migration process run together (seen in unit tests).

@@ -50,7 +50,9 @@ services:
     restart: unless-stopped
 
   certbot:
-    image: certbot/certbot:latest
+    # Pinned by digest (certbot 5.7.0, resolved 2026-08) — same pin as edge.yml.
+    # `:latest` auto-tracked ACME changes; this does not, so bump deliberately.
+    image: certbot/certbot:latest@sha256:34ee91d2f43008eb78a007d22f23ed4b2eaa9a454cb27ca2c042b49527a695b4
     volumes:
       - certbot_www:/var/www/certbot
       - certbot_certs:/etc/letsencrypt
@@ -89,6 +91,19 @@ services:
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
+      # NOT `:ro` — deliberately. app.yml uses :ro and it reads as the hardened
+      # version, but that is cosmetic: `:ro` makes the socket FILE read-only, and
+      # the Docker API is spoken over it either way. Measured — a container given
+      # `-v /var/run/docker.sock:/var/run/docker.sock:ro` still ran `docker create`
+      # AND `docker rm` successfully. So :ro buys nothing here and would only
+      # advertise a protection that does not exist.
+      #
+      # This mount IS host root, and on this single-droplet topology it has to be:
+      # apps/labs/provisioner/docker_provisioner.py calls containers.run() against
+      # the LOCAL daemon to provision labs (unlike app.yml, where DOCKER_HOST points
+      # at the remote D4 engine and the local socket is monitoring-only). Removing
+      # or restricting it breaks lab creation at provision time, not at startup.
+      # The real fix is a socket proxy with an API allow-list, not a mount flag.
       - /var/run/docker.sock:/var/run/docker.sock
       - ./scripts:/scripts
       - ./scenarios:/scenarios:ro
@@ -170,6 +185,8 @@ services:
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
+      # Host root, same as backend above — see that comment for why `:ro` is
+      # cosmetic here (measured: writes still succeed through a :ro socket).
       - /var/run/docker.sock:/var/run/docker.sock
       - ./scripts:/scripts
       - ./scenarios:/scenarios:ro
@@ -206,6 +223,8 @@ services:
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
+      # Host root, same as backend above — see that comment for why `:ro` is
+      # cosmetic here (measured: writes still succeed through a :ro socket).
       - /var/run/docker.sock:/var/run/docker.sock
       - ./scripts:/scripts
       - ./scenarios:/scenarios:ro
@@ -242,6 +261,8 @@ services:
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
+      # Host root, same as backend above — see that comment for why `:ro` is
+      # cosmetic here (measured: writes still succeed through a :ro socket).
       - /var/run/docker.sock:/var/run/docker.sock
       - ./scripts:/scripts
       - ./scenarios:/scenarios:ro
@@ -273,8 +294,19 @@ services:
       - static_volume:/app/staticfiles
     networks:
       - fixitlab_net
+    # Audit Z5-15. The pidfile half proves the PROCESS is alive; the heartbeat half
+    # proves it is still SCHEDULING. Previously only the former was checked, so a
+    # wedged-but-running beat meant no expiry cleanup, no orphan cleanup and no
+    # retention sweep, with zero alerts.
+    #
+    # NOT the schedule-file mtime, which is the obvious alternative: measured, it
+    # does not advance when the next task is an hour away, so it would report a
+    # healthy beat as dead and restart-loop it.
+    #
+    # 200s = three missed 60s beats: quick enough to catch a wedge, loose enough
+    # that one slow tick under load does not restart a healthy scheduler.
     healthcheck:
-      test: ["CMD-SHELL", "test -f /tmp/celerybeat.pid && kill -0 $(cat /tmp/celerybeat.pid) 2>/dev/null"]
+      test: ["CMD-SHELL", "test -f /tmp/celerybeat.pid && kill -0 $$(cat /tmp/celerybeat.pid) 2>/dev/null && test -f /tmp/celerybeat-heartbeat && [ $$(( $$(date +%s) - $$(stat -c %Y /tmp/celerybeat-heartbeat) )) -lt 200 ]"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -282,7 +314,8 @@ services:
     restart: unless-stopped
 
   pgbouncer:
-    image: edoburu/pgbouncer:latest
+    # Pinned by digest (PgBouncer 1.25.2, resolved 2026-08) — same pin as data.yml.
+    image: edoburu/pgbouncer:latest@sha256:4c1ca296ef525f108f5d3552cc337c0c09587cf8dae7f0067fd93349e47dc1cd
     container_name: fixitlab_pgbouncer
     environment:
       - DB_HOST=database
@@ -316,6 +349,12 @@ services:
   database:
     build: ./database
     container_name: fixitlab_db
+    # Postgres 15 puts parallel-query segments in /dev/shm, which Docker caps at
+    # 64 MB by default. With shared_buffers raised to 2 GB (audit Z5-12) that cap
+    # produces "could not resize shared memory segment" on parallel plans — a
+    # failure that only shows up on the larger catalog queries the retune was
+    # meant to speed up.
+    shm_size: 1gb
     volumes:
       - fixitlab_db_data:/var/lib/postgresql/data
     env_file:
@@ -337,8 +376,8 @@ services:
       - .env.production
     command: >
       sh -c "redis-server
-      --maxmemory 1gb
-      --maxmemory-policy allkeys-lru
+      --maxmemory 2gb
+      --maxmemory-policy volatile-lru
       --requirepass $${REDIS_PASSWORD:-fixitlab_redis_secret}
       --tcp-backlog 511
       --timeout 300"

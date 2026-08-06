@@ -1,6 +1,14 @@
 from celery.schedules import crontab
 
 CELERY_BEAT_SCHEDULE = {
+    # Liveness heartbeat (audit Z5-15). The container healthcheck reads the file
+    # this writes; if beat stops scheduling, the file goes stale and the check
+    # fails. Every minute, because the heartbeat is the one task whose whole value
+    # is telling you quickly that the others have stopped.
+    "beat-heartbeat-every-minute": {
+        "task": "celery_app.tasks.beat_heartbeat",
+        "schedule": crontab(minute="*"),
+    },
     "cleanup-expired-labs-every-5-mins": {
         "task": "celery_app.tasks.cleanup_expired_labs",
         "schedule": crontab(minute="*/5"),
@@ -9,9 +17,28 @@ CELERY_BEAT_SCHEDULE = {
         "task": "celery_app.tasks.cleanup_orphaned_containers",
         "schedule": crontab(minute=0),
     },
-    "recalculate-leaderboard-hourly": {
+    # Docker disk reclaim (audit Z5-11). Daily rather than hourly: pruning is I/O
+    # heavy and the artifacts it removes accumulate over days, not minutes. 03:10
+    # UTC sits in the quiet window ahead of the 04:30 retention sweep.
+    "prune-docker-artifacts": {
+        "task": "celery_app.tasks.prune_docker_artifacts",
+        "schedule": crontab(hour=3, minute=10),
+    },
+    # Leaderboard snapshot: DAILY, not hourly (audit Z3-7).
+    #
+    # `LeaderboardEntry` is a cache nobody currently reads — the live endpoint
+    # (public_api.views.LeaderboardView) aggregates from UserScenarioProgress
+    # directly. Recomputing it hourly meant a full delete + re-insert of every
+    # ranked user, 24x a day, for a table with no readers: pure write
+    # amplification and dead tuples for autovacuum to chase.
+    #
+    # Kept rather than removed because the snapshot is the intended path for
+    # scaling this endpoint, and a schedule that exists (and is now atomic) is
+    # easier to raise than one someone has to rediscover. Raise the frequency when
+    # something actually reads it.
+    "recalculate-leaderboard-daily": {
         "task": "celery_app.tasks.recalculate_leaderboard",
-        "schedule": crontab(minute=30),
+        "schedule": crontab(hour=5, minute=30),
     },
     "cleanup-expired-otps-daily": {
         "task": "celery_app.tasks.cleanup_expired_otps",
@@ -54,6 +81,14 @@ CELERY_BEAT_SCHEDULE = {
     "monitor-business-signals-every-5-mins": {
         "task": "monitoring.check_business_signals",
         "schedule": crontab(minute="*/5"),
+    },
+    # Data retention for the sensitive classes — interview messages, async video,
+    # resumes, CommandHistory (audit Z4-2). Every RETENTION_*_DAYS defaults to 0,
+    # which means REPORT ONLY: this logs what it would purge so the period is
+    # chosen against real volumes, and deletes nothing until a period is set.
+    "purge-expired-personal-data-daily": {
+        "task": "celery_app.tasks.purge_expired_personal_data",
+        "schedule": crontab(hour=4, minute=30),  # 4:30 AM UTC, after the other sweeps
     },
 }
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 from django.db.models import Avg, Count, Q
@@ -9,6 +10,8 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+logger = logging.getLogger(__name__)
 
 from apps.adminpanel.permissions import IsPlatformAdmin
 from apps.interviews.models import (
@@ -390,6 +393,16 @@ class AdminInterviewEntitlementsView(APIView):
             ent.interviews_remaining = int(request.data.get("interviews_remaining", 999))
             ent.period_end = timezone.now() + timedelta(days=3650)
             ent.save()
+            _audit_entitlement_grant(
+                request, user,
+                event="interview_grant_free",
+                detail={
+                    "plan": "premium",
+                    "interviews_remaining": ent.interviews_remaining,
+                    "period_end": ent.period_end.isoformat() if ent.period_end else None,
+                    "complimentary": True,
+                },
+            )
             return Response({"ok": True, "user_id": user.id, "grant_free": True})
 
         tier_code = request.data.get("plan_code", "pro")
@@ -400,7 +413,46 @@ class AdminInterviewEntitlementsView(APIView):
         ent = InterviewEntitlement.objects.get(user=user)
         ent.is_complimentary = bool(request.data.get("complimentary", False))
         ent.save(update_fields=["is_complimentary"])
+        _audit_entitlement_grant(
+            request, user,
+            event="interview_plan_activated",
+            detail={"plan": tier_code, "complimentary": ent.is_complimentary},
+        )
         return Response({"ok": True, "user_id": user.id})
+
+
+
+def _audit_entitlement_grant(request, user, *, event: str, detail: dict) -> None:
+    """Record who granted whose interview access, and what (audit Z1-15).
+
+    The billing admin's bulk actions were audited under Z1-15; this is the same
+    class of change on a different surface. Granting a 10-year premium entitlement
+    with 999 interviews is the single most valuable thing an operator can hand out
+    here, and it left no record of who did it or for whom.
+
+    Best-effort — support must stay able to act on a live problem — but logged
+    loudly, because an unrecorded grant is the entire defect.
+    """
+    try:
+        from apps.audit.models import AuditLog
+
+        AuditLog.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            action="admin_action",
+            resource=f"/admin/interviews/entitlement/{user.id}",
+            metadata={
+                "event": event,
+                "target_user_id": user.id,
+                "target_email": getattr(user, "email", ""),
+                "target_username": getattr(user, "username", ""),
+                **detail,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Interview entitlement grant for user=%s was NOT audited (%s) — paid "
+            "access changed without a record.", getattr(user, "id", "?"), exc,
+        )
 
 
 class AdminInterviewVoicesView(APIView):

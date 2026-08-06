@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react'
 import { X, Sparkles, ArrowRight } from 'lucide-react'
 import api from '../api/client'
 import { resolveMediaUrl } from '../utils/mediaUrl'
+import { currentUserScopedKey, migrateUnscopedKey } from '../utils/userScopedStorage'
 
-const DISMISS_KEY = 'fixitlab_campaigns_dismissed'
+// Scoped per user: an unscoped key hid campaigns from every account that shared
+// the browser once any one of them dismissed them.
+const DISMISS_KEY_BASE = 'fixitlab_campaigns_dismissed'
 
 function getDismissed() {
   try {
-    return JSON.parse(localStorage.getItem(DISMISS_KEY) || '{}')
+    return JSON.parse(localStorage.getItem(migrateUnscopedKey(DISMISS_KEY_BASE)) || '{}')
   } catch {
     return {}
   }
@@ -17,7 +20,7 @@ function markDismissed(id) {
   const d = getDismissed()
   d[id] = true
   try {
-    localStorage.setItem(DISMISS_KEY, JSON.stringify(d))
+    localStorage.setItem(currentUserScopedKey(DISMISS_KEY_BASE), JSON.stringify(d))
   } catch {
     /* ignore quota / private-mode errors */
   }

@@ -50,7 +50,8 @@ def verify_gmail_credentials() -> tuple[bool, str]:
         return False, err
 
 
-def send_via_gmail_api(subject: str, to_email: str, html_content: str, text_content: str) -> None:
+def send_via_gmail_api(subject: str, to_email: str, html_content: str,
+                       text_content: str, headers: dict | None = None) -> None:
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
@@ -79,6 +80,10 @@ def send_via_gmail_api(subject: str, to_email: str, html_content: str, text_cont
     msg["Subject"] = subject
     msg["From"] = settings.DEFAULT_FROM_EMAIL or from_email
     msg["To"] = to_email
+    # Extra RFC headers (List-Unsubscribe / List-Unsubscribe-Post — audit Z6-4).
+    for key, value in (headers or {}).items():
+        if value:
+            msg[key] = value
     if text_content:
         msg.attach(MIMEText(text_content, "plain", "utf-8"))
     msg.attach(MIMEText(html_content, "html", "utf-8"))

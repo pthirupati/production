@@ -14,7 +14,7 @@ import {
   AWX_SIDEBAR, AWX_DASHBOARD_STATS, AWX_JOB_LOG, AWX_HOSTS, AWX_SCHEDULES, AWX_USERS, AWX_CREDENTIAL_TYPES,
   AWX_ACTIVITY, AWX_APPROVALS, AWX_ORGANIZATIONS, AWX_TEAMS, AWX_INSTANCE_GROUPS, AWX_EXEC_ENVS,
   AWX_NOTIFICATIONS, AWX_MGMT_JOBS, AWX_APPLICATIONS, AWX_SETTINGS_SECTIONS,
-} from '../../mockData/awx'
+} from '../../simFixtures/awx'
 import '../../styles/sim-products.css'
 
 // Lab sign-in credentials, consistent with the other simulators
@@ -95,8 +95,22 @@ export default function AwxSimulator({
   refreshRef.current = refresh
   useEffect(() => {
     if (!loggedIn || !hasLiveJob) return undefined
-    const t = setInterval(() => { refreshRef.current?.() }, 1200)
-    return () => clearInterval(t)
+    // A 1.2s poll is a network round-trip + full re-render each tick, so stop it
+    // entirely while the tab is hidden instead of burning it in the background.
+    // On becoming visible we refresh IMMEDIATELY before restarting the timer —
+    // a job can reach a terminal status while hidden, and waiting a further
+    // 1.2s would show a stale "running" badge on refocus.
+    let t = null
+    const stop = () => { if (t) { clearInterval(t); t = null } }
+    const start = () => { if (!t) t = setInterval(() => { refreshRef.current?.() }, 1200) }
+    const onVis = () => {
+      if (document.visibilityState === 'visible') { refreshRef.current?.(); start() } else stop()
+    }
+    // refreshRef (not refresh) is deliberate: the effect must not re-run — and
+    // therefore must not drop the listener — every time refresh is re-created.
+    if (document.visibilityState === 'visible') start()
+    document.addEventListener('visibilitychange', onVis)
+    return () => { stop(); document.removeEventListener('visibilitychange', onVis) }
   }, [loggedIn, hasLiveJob])
   // Companions pass onExit; primary embeds pass onToggleTerminal. Never drop
   // Back just because embedded=true — that was hiding Close on Open AWX overlays.

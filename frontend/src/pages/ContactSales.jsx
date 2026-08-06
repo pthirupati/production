@@ -10,6 +10,7 @@ import {
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../api/client'
+import { PRIMARY_EMAIL } from '../constants/contact'
 
 const TEAM_SIZES = [
   '1–10',
@@ -246,8 +247,8 @@ export default function ContactSales() {
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-surface-500 uppercase tracking-wide font-medium mb-0.5">Prefer email?</p>
-                <a href="mailto:fixitlab.admin@gmail.com" className="text-sm font-medium text-accent-purple truncate hover:underline">
-                  fixitlab.admin@gmail.com
+                <a href={`mailto:${PRIMARY_EMAIL}`} className="text-sm font-medium text-accent-purple truncate hover:underline">
+                  {PRIMARY_EMAIL}
                 </a>
               </div>
             </FixitPanel>

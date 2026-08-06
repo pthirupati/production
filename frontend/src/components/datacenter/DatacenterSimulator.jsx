@@ -1,4 +1,4 @@
-import { Component, useCallback, useMemo, useRef, useState, Suspense } from 'react'
+import { Component, useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { datacenterApi } from '../../api/datacenter'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
@@ -32,6 +32,49 @@ import { detectWebGL } from './webglSupport'
 const LazyDatacenterTwin3D = lazyWithRetry(() => import('./DatacenterTwin3D'))
 
 /**
+ * Loading surface for the 3D twin chunk (~1MB gzip — three + drei + rapier).
+ * A bare spinner gives no signal on a slow link, so this states the download size,
+ * shows elapsed time, and escalates to an explicit "still working / go 2D" offer.
+ *
+ * The bar is deliberately time-based and asymptotic, NOT a fake byte counter:
+ * `import()` exposes no download progress, and a bar that marches to 100% and then
+ * sits there is worse than no bar. It approaches ~92% and stops.
+ */
+function Twin3DLoading({ onSkipTo2D }) {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    const started = Date.now()
+    const id = setInterval(() => setElapsed((Date.now() - started) / 1000), 250)
+    return () => clearInterval(id)
+  }, [])
+  // ~4s to 63%, asymptotic to 92% — tuned so a typical broadband fetch feels
+  // proportionate without ever implying the download finished.
+  const pct = Math.min(92, 92 * (1 - Math.exp(-elapsed / 4)))
+  const slow = elapsed > 12
+  return (
+    <div className="dc-3d-loading">
+      <div className="dc-3d-loading-spin" />
+      <div className="dc-3d-loading-text">
+        Loading 3D hall · ~1 MB
+        <div className="dc-3d-loading-bar">
+          <div className="dc-3d-loading-bar-fill" style={{ width: `${pct}%` }} />
+        </div>
+        <div className="dc-3d-loading-sub">
+          {slow
+            ? `Still downloading (${Math.round(elapsed)}s) — slow connection?`
+            : 'First load only; cached afterwards'}
+        </div>
+        {slow && onSkipTo2D && (
+          <button type="button" className="dc-btn-outline dc-btn-xs" onClick={onSkipTo2D}>
+            Use the 2D floor instead
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
  * Catch R3F/WebGL crashes WITHOUT silently forcing 2D.
  * Show a dismissible banner + Retry so learners (and CI/debug) see the reason.
  */
@@ -46,7 +89,6 @@ class Twin3DSafe extends Component {
   }
 
   componentDidCatch(error, info) {
-    // eslint-disable-next-line no-console
     console.error('Datacenter 3D twin failed', error, info)
     try { this.props.onError?.(error, info) } catch { /* ignore */ }
   }
@@ -88,6 +130,28 @@ class Twin3DSafe extends Component {
    the gate is bypassed entirely once a provisioned lab session exists. Grants no
    access to anything. Secret scanners should allowlist this marker rather than
    flagging these lines. See docs/AUDIT_2026_08_TODO.md §Y2e. */
+// Shared fallbacks for absent server state. A bare `x || {}` in a render body
+// mints a new identity every pass, so a memo depending on it never hits. This
+// sim polls every 1-2s and re-derives the whole floor, so the miss was hot.
+// Frozen so an accidental in-place mutation throws instead of silently
+// corrupting the fallback for every other consumer.
+const EMPTY_OBJ = Object.freeze({})
+const EMPTY_ARR = Object.freeze([])
+// `network` is consumed as a shaped object, so its fallback needs the shape.
+const EMPTY_NETWORK = Object.freeze({ switches: EMPTY_ARR, topology: EMPTY_ARR })
+// Fallback room for a state payload that has no rooms yet; `roomRacks` memoizes
+// on it, so a fresh literal here re-filtered every rack on every poll tick.
+const EMPTY_ROOM = Object.freeze({ type: 'data_hall', racks: EMPTY_ARR })
+
+/* Lab-console flavour, not a real secret: shown to the learner on screen with an
+   autofill button so the fake console feels real, and the gate is bypassed once a
+   provisioned session exists. Grants no access to anything. See §Y2e.
+
+   The marker below must stay within 8 lines of DC_LAB_PASS — that is the window
+   the secret scanner searches upward from a hit. A refactor already moved these
+   constants away from their marker once and turned a known-safe line into a build
+   failure; keeping the annotation adjacent is what prevents the repeat.
+   SIMULATED-CREDENTIAL */
 const DC_LAB_USER = 'lab_datacenter'
 const DC_LAB_PASS = 'lab_datacenter@123'
 const ACCENT = '#f97316'
@@ -97,6 +161,45 @@ const ACCENT = '#f97316'
  * Written ONLY by an explicit "2D floor" click — never by an error path.
  */
 const PREFER_2D_KEY = 'fixitlab.dc.prefer2d.v2'
+
+/**
+ * The 2D preference lapses after this long. A version bump only releases a
+ * browser once, at deploy time, and the in-app toggle only helps a learner who
+ * knows to look for it — neither is a real expiry. Choosing 2D is nearly always
+ * a reaction to one bad session (a slow GPU, a laptop on battery), not a
+ * permanent choice, so the flag is stamped with a write time and re-checked on
+ * every mount. 30 days is long enough that someone who genuinely prefers the
+ * isometric plan is not fighting the toggle every week, short enough that a
+ * one-off bad session cannot silently cost a learner the 3D hall forever.
+ */
+const PREFER_2D_TTL_MS = 30 * 24 * 60 * 60 * 1000
+
+/**
+ * Serialize the 2D preference as a write timestamp. Exported for the tests —
+ * the expiry contract is the only thing standing between a bad session and a
+ * browser stuck in 2D, so it is asserted directly rather than through the DOM.
+ */
+export function encodePrefer2d(now = Date.now()) {
+  return String(now)
+}
+
+/**
+ * True when a stored 2D preference is still in force.
+ *
+ * Accepts the legacy bare `'1'` payload written before the flag carried a
+ * timestamp. Those are treated as EXPIRED rather than permanent: a browser
+ * holding one has been pinned since before this build shipped, which is exactly
+ * the population the expiry exists to release. A malformed or future-dated
+ * value is also treated as expired — failing open to 3D is recoverable in one
+ * click, failing closed is the trap this whole mechanism removes.
+ */
+export function isPrefer2dActive(raw, now = Date.now()) {
+  if (!raw) return false
+  const written = Number(raw)
+  if (!Number.isFinite(written) || written <= 0) return false
+  if (written > now) return false
+  return now - written < PREFER_2D_TTL_MS
+}
 
 const COMPONENT_META = {
   power: { label: 'Power Supply', icon: Power },
@@ -183,10 +286,20 @@ export default function DatacenterSimulator({
     // scenario and every future session, with no UI to clear it. Bumping the
     // key releases every already-poisoned browser back into 3D exactly once.
     // Only an explicit click on "2D floor" writes the flag now.
+    //
+    // The flag also EXPIRES (see PREFER_2D_TTL_MS). A version bump only releases
+    // a browser once at deploy time and the toggle only helps a learner who
+    // thinks to look for it, so neither is a substitute for the preference
+    // lapsing on its own. Stale entries are cleared on read so the key does not
+    // linger in storage after it stops meaning anything.
     try {
       if (typeof window !== 'undefined') {
         window.localStorage?.removeItem('fixitlab.dc.prefer2d') // retire the poisoned v1 key
-        if (window.localStorage?.getItem(PREFER_2D_KEY) === '1') return '2d'
+        const raw = window.localStorage?.getItem(PREFER_2D_KEY)
+        if (raw) {
+          if (isPrefer2dActive(raw)) return '2d'
+          window.localStorage?.removeItem(PREFER_2D_KEY)
+        }
         const saved = window.localStorage?.getItem('fixitlab.dc.floorView')
         if (saved === '3d') return '3d'
       }
@@ -197,7 +310,7 @@ export default function DatacenterSimulator({
     setFloorView(v)
     try {
       window.localStorage?.setItem('fixitlab.dc.floorView', v)
-      if (v === '2d') window.localStorage?.setItem(PREFER_2D_KEY, '1')
+      if (v === '2d') window.localStorage?.setItem(PREFER_2D_KEY, encodePrefer2d())
       else window.localStorage?.removeItem(PREFER_2D_KEY)
     } catch { /* ignore */ }
   }, [])
@@ -221,14 +334,14 @@ export default function DatacenterSimulator({
       .finally(() => { liveTickInFlight.current = false })
   }, [sessionId, setState])
 
-  const st = state?.state || {}
+  const st = state?.state || EMPTY_OBJ
   const loggedIn = st?.session?.logged_in
-  const goal = st?.goal || {}
-  const broken = st?.broken || {}
-  const racks = st.racks || []
-  const servers = st.servers || []
-  const pdus = st.pdus || []
-  const cooling = st.cooling || []
+  const goal = st?.goal || EMPTY_OBJ
+  const broken = st?.broken || EMPTY_OBJ
+  const racks = st.racks || EMPTY_ARR
+  const servers = st.servers || EMPTY_ARR
+  const pdus = st.pdus || EMPTY_ARR
+  const cooling = st.cooling || EMPTY_ARR
   const liquidCooling = st.liquid_cooling || null
   const pxeMaas = st.pxe_maas || null
   const fireSafety = st.fire_safety || null
@@ -248,18 +361,18 @@ export default function DatacenterSimulator({
   const exporters = st.exporters || null
   const docLibrary = st.doc_library || null
   const evidencePack = st.evidence_pack || null
-  const rooms = st.rooms || []
-  const network = st.network || { switches: [], topology: [] }
-  const powerChain = st.power_chain || {}
-  const facility = st.facility || {}
-  const campus = st.campus || {}
-  const hardwareCatalog = st.hardware_catalog || {}
-  const monitoring = st.monitoring || {}
-  const training = st.training || {}
-  const hypervisors = st.hypervisors || {}
-  const aiPlatform = st.ai_platform || {}
+  const rooms = st.rooms || EMPTY_ARR
+  const network = st.network || EMPTY_NETWORK
+  const powerChain = st.power_chain || EMPTY_OBJ
+  const facility = st.facility || EMPTY_OBJ
+  const campus = st.campus || EMPTY_OBJ
+  const hardwareCatalog = st.hardware_catalog || EMPTY_OBJ
+  const monitoring = st.monitoring || EMPTY_OBJ
+  const training = st.training || EMPTY_OBJ
+  const hypervisors = st.hypervisors || EMPTY_OBJ
+  const aiPlatform = st.ai_platform || EMPTY_OBJ
   const currentRoomId = st.current_room || 'data-hall-a'
-  const currentRoom = rooms.find((r) => r.id === currentRoomId) || rooms[0] || { type: 'data_hall', racks: [] }
+  const currentRoom = rooms.find((r) => r.id === currentRoomId) || rooms[0] || EMPTY_ROOM
   // Not a button dashboard: while the 3D twin is walking its own immersive game
   // view, collapse the tab bar / status strip / goal banner into its in-world HUD.
   const isDataHall3d = currentRoom.type === 'data_hall' && floorView === '3d'
@@ -273,7 +386,7 @@ export default function DatacenterSimulator({
   }, [servers])
 
   const roomRacks = useMemo(
-    () => racks.filter((r) => (currentRoom.racks || []).includes(r.id)),
+    () => racks.filter((r) => (currentRoom.racks || EMPTY_ARR).includes(r.id)),
     [racks, currentRoom],
   )
 
@@ -286,14 +399,15 @@ export default function DatacenterSimulator({
   const searchResources = useMemo(() => indexDatacenterState(st), [st])
 
   const nocWallMetrics = useMemo(() => {
-    const gpuSeries = monitoring?.series?.dcgm_gpu_utilization || []
+    const gpuSeries = monitoring?.series?.dcgm_gpu_utilization || EMPTY_ARR
     const gpuVals = gpuSeries.map((s) => s.value).filter((v) => typeof v === 'number')
-    const openTickets = (st?.tickets || [])
+    const tickets = st?.tickets || EMPTY_ARR
+    const openTickets = tickets
       .filter((t) => !['closed', 'resolved'].includes((t.status || '').toLowerCase()))
     return {
       gpuUtil: gpuVals.length ? gpuVals.reduce((a, b) => a + b, 0) / gpuVals.length : undefined,
       pue: monitoring?.pue ?? facility?.pue,
-      ticketsOpen: (st?.tickets || []).length ? openTickets.length : undefined,
+      ticketsOpen: tickets.length ? openTickets.length : undefined,
     }
   }, [monitoring, facility, st])
 
@@ -558,7 +672,7 @@ export default function DatacenterSimulator({
         // fetch surfaced as a thrown error and got treated as a permanent WebGL
         // failure. Outside, a chunk problem stays a retryable loading state and
         // only genuine R3F/WebGL crashes reach Twin3DSafe.
-        <Suspense fallback={<div className="dc-3d-loading"><div className="dc-3d-loading-spin" /> Loading 3D twin…</div>}>
+        <Suspense fallback={<Twin3DLoading onSkipTo2D={() => setFloorViewPersist('2d')} />}>
           <Twin3DSafe onFallback={() => setFloorViewPersist('2d')}>
             <LazyDatacenterTwin3D
               racks={roomRacks}
@@ -576,6 +690,12 @@ export default function DatacenterSimulator({
                   alert={Boolean(
                     (st?.tickets || []).some((t) => /thermal|overheat|hot.?aisle/i.test(`${t?.title || ''} ${t?.status || ''}`))
                     || cooling.some((c) => Number(c?.temp_c) >= 27),
+                  )}
+                  // Sustained klaxon, not the one-shot stinger: a CRAC actually
+                  // down, or supply past ASHRAE A1's 32C allowable ceiling.
+                  alarm={Boolean(
+                    cooling.some((c) => c?.status && c.status !== 'running')
+                    || cooling.some((c) => Number(c?.temp_c) >= 32),
                   )}
                 />
               )}

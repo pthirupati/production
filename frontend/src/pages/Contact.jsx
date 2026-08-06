@@ -7,6 +7,7 @@ import { Mail, Phone, MapPin, Send, Mic, Clock, Twitter, Github, ArrowRight, Che
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../api/client'
+import { PAYMENT_EMAIL, PRIMARY_EMAIL, SUPPORT_EMAIL } from '../constants/contact'
 
 const SUBJECT_PRESETS = [
   { label: 'General support',              value: 'General support' },
@@ -20,8 +21,8 @@ const CONTACT_CARDS = [
   {
     icon: Mail,
     label: 'General',
-    value: 'fixitlab.admin@gmail.com',
-    href: 'mailto:fixitlab.admin@gmail.com',
+    value: PRIMARY_EMAIL,
+    href: `mailto:${PRIMARY_EMAIL}`,
     color: 'text-accent-cyan',
     bg: 'bg-accent-cyan/10',
     border: 'border-accent-cyan/20',
@@ -29,8 +30,8 @@ const CONTACT_CARDS = [
   {
     icon: Phone,
     label: 'Tech support',
-    value: 'fixitlab.techsupport@gmail.com',
-    href: 'mailto:fixitlab.techsupport@gmail.com',
+    value: SUPPORT_EMAIL,
+    href: `mailto:${SUPPORT_EMAIL}`,
     color: 'text-accent-green',
     bg: 'bg-accent-green/10',
     border: 'border-accent-green/20',
@@ -39,7 +40,7 @@ const CONTACT_CARDS = [
     icon: Mic,
     label: 'Interview Studio',
     value: 'Interview support',
-    href: 'mailto:fixitlab.techsupport@gmail.com?subject=Interview%20Studio',
+    href: `mailto:${SUPPORT_EMAIL}?subject=Interview%20Studio`,
     color: 'text-accent-purple',
     bg: 'bg-accent-purple/10',
     border: 'border-accent-purple/20',
@@ -47,8 +48,8 @@ const CONTACT_CARDS = [
   {
     icon: MapPin,
     label: 'Payments',
-    value: 'fixitlab.payment@gmail.com',
-    href: 'mailto:fixitlab.payment@gmail.com',
+    value: PAYMENT_EMAIL,
+    href: `mailto:${PAYMENT_EMAIL}`,
     color: 'text-accent-amber',
     bg: 'bg-accent-amber/10',
     border: 'border-accent-amber/20',

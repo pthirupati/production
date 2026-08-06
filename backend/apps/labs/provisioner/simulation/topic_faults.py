@@ -27,6 +27,31 @@ OPENSTACK_KEYWORDS = ("openstack", "nova", "neutron", "keystone", "glance", "cin
 MEMCACHE_KEYWORDS = ("memcached", "memcache")
 MQ_KEYWORDS = ("rabbitmq", "amqp")
 
+# AI vertical. These are deliberately NARROW and hyphen-anchored: a bare
+# "model"/"agent"/"rag" family would hijack unrelated slugs that merely contain
+# the substring (measured: "awx-agent-node", "data-model-migration", and the
+# Jenkins "agent" labs), re-seeding the world for scenarios that are already
+# written and graded. Every keyword below was checked against the real slug
+# corpus so it only matches AI-track labs.
+GPU_KEYWORDS = (
+    "gpu", "nvidia", "cuda", "nvlink", "nccl", "rccl", "dcgm", "xid-",
+    "hbm", "mig-", "rocm", "amd-smi",
+)
+LLM_KEYWORDS = (
+    "llm-", "vllm", "inference", "triton", "tensorrt", "model-serving",
+    "text-generation", "kserve", "ollama",
+)
+TRAINING_KEYWORDS = (
+    # NOT a bare "checkpoint-": that collides with db-postgres-checkpoint-spikes,
+    # a Postgres WAL lab which must keep its DB fault (measured collision).
+    "training-job", "fine-tune", "fine-tuning", "model-checkpoint", "deepspeed",
+    "torchrun", "pytorch-", "distributed-training",
+)
+RAG_KEYWORDS = (
+    "rag-", "vector-db", "vectordb", "embedding", "pgvector", "milvus",
+    "qdrant", "weaviate", "faiss",
+)
+
 
 def apply_topic_fault(slug: str, state: Any) -> bool:
     """Apply a topic fault if the slug matches. Returns True when something changed."""
@@ -56,8 +81,28 @@ def apply_topic_fault(slug: str, state: Any) -> bool:
         return _fault_openstack(state, low)
 
     # Git / devops CI topics — plant a broken CI config + inactive runner, not nginx
+    # Deliberately BEFORE the AI families so a Jenkins "pipeline agent" lab keeps
+    # its CI break instead of being pulled into a GPU fault.
     if any(k in low for k in CI_KEYWORDS):
         return _fault_ci_git(state, low)
+
+    # AI vertical — GPU hardware faults, model serving, training, RAG/vector.
+    # Must run before K8S_KEYWORDS: "gpu-k8s-device-plugin-daemonset" and
+    # "ai-infra-k8s-gpu-operator" are GPU labs that happen to contain "k8s".
+    if any(k in low for k in GPU_KEYWORDS):
+        return _fault_gpu(state, low)
+    # academy-ai-ml-* already gets a dedicated "model-server" unit from
+    # academy_service_presets, and that unit is the one the registered E2E fix
+    # repairs. Planting a second failed unit (vllm) here left the lab failing
+    # AFTER the documented fix — i.e. unsolvable — so the academy track keeps
+    # its own break. Measured on academy-ai-ml-007/017/027.
+    if not low.startswith("academy-"):
+        if any(k in low for k in LLM_KEYWORDS):
+            return _fault_llm_serving(state, low)
+        if any(k in low for k in TRAINING_KEYWORDS):
+            return _fault_training(state, low)
+        if any(k in low for k in RAG_KEYWORDS):
+            return _fault_rag(state, low)
 
     # GitOps / Argo / Flux — OutOfSync app + missing FIXED path for marker labs
     if any(k in low for k in GITOPS_KEYWORDS):
@@ -102,6 +147,113 @@ def apply_topic_fault(slug: str, state: Any) -> bool:
         return _fault_security(state, low)
 
     return False
+
+
+def _fault_gpu(state: Any, slug: str) -> bool:
+    """Break the GPU for real: unhealthy inventory + a matching kernel log.
+
+    Previously every gpu-* slug fell through this module entirely, so the node
+    booted with gpu_healthy=True and an empty dmesg. Only a broken-config text
+    sentinel made the lab fail-closed, which meant `nvidia-smi` and
+    `dmesg | grep Xid` showed a perfectly healthy H100 while the brief claimed
+    an uncorrectable ECC error. Setting gpu_healthy=False also keeps the
+    existing validation guard ("GPU still unhealthy — load the nvidia driver
+    first") meaningful instead of vacuously satisfied.
+    """
+    # Xid codes are the real NVRM diagnostic a learner greps for; pick the one
+    # matching the scenario so the log corroborates the brief.
+    if "nvlink" in slug:
+        lines = [
+            "[  512.884] NVRM: Xid (PCI:0000:01:00): 74, pid=0, NVLink: fatal error on link 3",
+            "[  512.885] NVRM: GPU 0000:01:00.0: NVLink lane down, falling back to PCIe",
+        ]
+    elif "thermal" in slug or "overheat" in slug or "power-cap" in slug or "throttle" in slug:
+        lines = [
+            "[  733.201] NVRM: Xid (PCI:0000:01:00): 62, pid=0, HBM temperature above slowdown threshold",
+            "[  733.202] nvidia-smi: clocks throttled — SW_THERMAL_SLOWDOWN active",
+        ]
+    elif "fallen-off-bus" in slug or "pcie" in slug:
+        lines = [
+            "[  412.331] NVRM: GPU at 0000:01:00.0 has fallen off the bus.",
+            "[  412.332] NVRM: GPU 0000:01:00.0: RmInitAdapter failed! (0x26:0x65:0x1)",
+        ]
+    elif "nccl" in slug or "rccl" in slug:
+        lines = [
+            "[  901.117] NVRM: Xid (PCI:0000:01:00): 13, pid=8842, Graphics Exception on channel",
+            "[  901.118] NCCL WARN Bootstrap : allreduce timed out waiting for peer rank 3",
+        ]
+    elif "driver" in slug or "not-loaded" in slug or "mismatch" in slug:
+        lines = [
+            "[   12.004] NVRM: API mismatch: the client has version 550.54.15, but this kernel "
+            "module has version 535.161.07",
+            "[   12.005] NVRM: nvidia driver failed to initialize — module/library version mismatch",
+        ]
+    else:
+        # ECC / HBM / Xid 48 / row-remap default.
+        lines = [
+            "[  612.440] NVRM: Xid (PCI:0000:01:00): 48, pid=0, An uncorrectable double-bit ECC "
+            "error was detected on GPU 0.",
+            "[  612.441] NVRM: GPU 0000:01:00.0: row remapping pending — drain and reset required",
+        ]
+    state.dmesg_extra = list(getattr(state, "dmesg_extra", []) or []) + lines
+    state.gpu_healthy = False
+    return True
+
+
+def _fault_llm_serving(state: Any, slug: str) -> bool:
+    """Model-serving stack down: failed unit + a config the learner must repair."""
+    from .rhel_os import SimService
+
+    state._mkdir("/opt/inference")
+    state._write_file(
+        "/opt/inference/model-config.yaml",
+        "model: meta-llama/Llama-3-8B-Instruct\n"
+        "tensor_parallel_size: 8\n"  # 8-way TP on a node that has fewer GPUs
+        "gpu_memory_utilization: 0.99\n"
+        "max_model_len: 131072\n",
+    )
+    state.services["vllm"] = SimService(
+        "vllm", active="failed", enabled="enabled",
+        description="vLLM inference server", loaded="loaded", sub_state="failed",
+    )
+    return True
+
+
+def _fault_training(state: Any, slug: str) -> bool:
+    """Distributed training job wedged: failed unit + a truncated checkpoint."""
+    from .rhel_os import SimService
+
+    state._mkdir("/opt/training")
+    state._mkdir("/opt/training/checkpoints")
+    state._write_file(
+        "/opt/training/train-config.yaml",
+        "nnodes: 4\nnproc_per_node: 8\nbackend: nccl\n"
+        "checkpoint_dir: /opt/training/checkpoints\nresume: true\n",
+    )
+    # Truncated checkpoint is the actual break — resume fails on a short read.
+    state._write_file("/opt/training/checkpoints/step-4000.pt", "PK\x03\x04TRUNCATED")
+    state.services["training-job"] = SimService(
+        "training-job", active="failed", enabled="enabled",
+        description="Distributed training job", loaded="loaded", sub_state="failed",
+    )
+    return True
+
+
+def _fault_rag(state: Any, slug: str) -> bool:
+    """RAG/vector store down: failed unit + an index config pointing nowhere."""
+    from .rhel_os import SimService
+
+    state._mkdir("/opt/rag")
+    state._write_file(
+        "/opt/rag/vectorstore.yaml",
+        "provider: qdrant\nendpoint: http://127.0.0.1:6333\n"
+        "collection: docs\nvector_size: 1536\ndistance: Cosine\n",
+    )
+    state.services["qdrant"] = SimService(
+        "qdrant", active="failed", enabled="enabled",
+        description="Qdrant vector database", loaded="loaded", sub_state="failed",
+    )
+    return True
 
 
 def _fault_ci_git(state: Any, slug: str) -> bool:

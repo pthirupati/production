@@ -9,6 +9,15 @@ import LabChromeBar from '../lab/LabChromeBar'
 import { renderAimlV2Page } from '../sim/V3PlatformPanels'
 import '../../styles/sim-products.css'
 
+// Stable fallbacks for absent server state. A bare `|| []` mints a new identity
+// every render, so the `byId` node-index memo below never hit while this sim
+// polls. Frozen so an accidental in-place mutation throws rather than silently
+// corrupting the fallback for every other consumer.
+const EMPTY_OBJ = Object.freeze({})
+const EMPTY_ARR = Object.freeze([])
+// `graph` is consumed as a shaped object, so its fallback needs the shape.
+const EMPTY_GRAPH = Object.freeze({ nodes: EMPTY_ARR, edges: EMPTY_ARR })
+
 /* ── scoped, self-contained n8n-style automation chrome (no shared CSS) ── */
 const SCOPED_CSS = `
 .agent-sim {
@@ -325,13 +334,13 @@ export default function AgentWorkflowSimulator({
     return () => clearInterval(pollRef.current)
   }, [load])
 
-  const graph = state?.graph || { nodes: [], edges: [] }
-  const nodes = graph.nodes || []
-  const edges = graph.edges || []
-  const palette = state?.palette || []
-  const catalog = state?.catalog || {}
-  const goal = state?.goal || {}
-  const summary = state?.summary || {}
+  const graph = state?.graph || EMPTY_GRAPH
+  const nodes = graph.nodes || EMPTY_ARR
+  const edges = graph.edges || EMPTY_ARR
+  const palette = state?.palette || EMPTY_ARR
+  const catalog = state?.catalog || EMPTY_OBJ
+  const goal = state?.goal || EMPTY_OBJ
+  const summary = state?.summary || EMPTY_OBJ
   const lastRun = state?.last_run || null
   const selected = nodes.find(n => n.id === selectedId) || null
   const validationPassed = !!summary.validation_passed
@@ -339,10 +348,10 @@ export default function AgentWorkflowSimulator({
   // map node_id -> run status for the canvas glow
   const runStatusById = useMemo(() => {
     const m = {}
-    for (const t of (lastRun?.trace || [])) m[t.node_id] = t.status
+    for (const t of (lastRun?.trace || EMPTY_ARR)) m[t.node_id] = t.status
     return m
   }, [lastRun])
-  const traceVisited = useMemo(() => new Set((lastRun?.visited) || []), [lastRun])
+  const traceVisited = useMemo(() => new Set((lastRun?.visited) || EMPTY_ARR), [lastRun])
 
   /* ── action helpers (optimistic refresh from the action response state) ── */
   const applyResult = useCallback((res) => {

@@ -171,6 +171,61 @@ export function SearchBar({ value, onChange, placeholder }) {
   )
 }
 
+/**
+ * Schema version for the persisted column-preference payload.
+ *
+ * Bump this when the stored shape changes in a way older readers would
+ * misinterpret. `readColumnPrefs` ignores anything carrying a different version
+ * (including the unversioned legacy arrays), so a bump costs every user one
+ * re-hide of their columns and nothing worse.
+ */
+export const COLUMN_PREFS_VERSION = 2
+
+/**
+ * Parse a persisted column-preference payload, or null to mean "use defaults".
+ *
+ * Returns `{ visible, known }` where `known` is the set of columns that existed
+ * when the prefs were written. Storing `known` is what makes hiding a column
+ * durable: without it the reconcile effect cannot tell a column the user
+ * deliberately hid from one that shipped after they last saved, so it has to
+ * assume the latter and re-adds both. See the effect in DataTable.
+ *
+ * Every rejection path returns null rather than a partial value — falling back
+ * to "all columns visible" is always a legible state the user can re-narrow,
+ * whereas a half-trusted payload can hide columns nobody asked to hide.
+ *
+ * Exported for tests: the storage contract is the thing that actually breaks on
+ * a schema change, so it is asserted directly instead of through the DOM.
+ */
+export function readColumnPrefs(raw, columnKeys) {
+  if (!raw) return null
+  let parsed
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return null // malformed / truncated write — fall back to defaults
+  }
+  // Legacy unversioned payloads were a bare array with no record of which
+  // columns existed at write time, so they cannot be reconciled without
+  // guessing. Dropping them is self-correcting and costs one re-hide.
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+  if (parsed.v !== COLUMN_PREFS_VERSION) return null
+  if (!Array.isArray(parsed.keys)) return null
+
+  // Guard the element type, not just the array-ness: a persisted array of
+  // non-strings survives Array.isArray and would silently match no column.
+  const valid = new Set(columnKeys)
+  const visible = parsed.keys.filter((k) => typeof k === 'string' && valid.has(k))
+  if (!visible.length) return null
+
+  const known = Array.isArray(parsed.known)
+    ? parsed.known.filter((k) => typeof k === 'string' && valid.has(k))
+    : visible
+  // `known` must cover everything visible, otherwise a column the user kept
+  // could be mistaken for new and reordered on the next mount.
+  return { visible, known: [...new Set([...known, ...visible])] }
+}
+
 // Sortable, selectable, searchable table with pagination + right-click context menu.
 // rowActions: optional (row) => [{ label, onClick, danger }] — powers the
 // per-row context menu (right-click) matching the page's Actions dropdown.
@@ -184,28 +239,59 @@ export function DataTable({ columns, rows, getRowKey, selectable, selected, onSe
   const userId = useAuthStore((s) => s.user?.id)
   const prefKey = tableId ? userScopedKey(`aws-sim-table-columns:${tableId}`, userId) : null
   const columnKeySignature = columns.map((c) => c.key).join('|')
+  // Columns present when the prefs were saved. Seeded from storage so the
+  // reconcile effect below can tell "user hid this" from "this is new".
+  const knownKeysRef = useRef(null)
   const [visibleKeys, setVisibleKeys] = useState(() => {
-    if (!prefKey) return columns.map((c) => c.key)
+    const keys = columns.map((c) => c.key)
+    if (!prefKey) return keys
+    let stored = null
     try {
-      const saved = JSON.parse(localStorage.getItem(prefKey) || 'null')
-      return Array.isArray(saved) && saved.length ? saved : columns.map((c) => c.key)
+      stored = localStorage.getItem(prefKey)
     } catch {
-      return columns.map((c) => c.key)
+      return keys // private mode / disabled storage — prefs are best-effort
     }
+    const prefs = readColumnPrefs(stored, keys)
+    if (!prefs) return keys
+    knownKeysRef.current = prefs.known
+    return prefs.visible
   })
 
   useEffect(() => {
     const keys = columns.map((c) => c.key)
     setVisibleKeys((existing) => {
-      const next = existing.filter((k) => keys.includes(k))
-      const withNew = [...next, ...keys.filter((k) => !next.includes(k))]
-      const resolved = withNew.length ? withNew : keys
-      return resolved.join('|') === existing.join('|') ? existing : resolved
+      const kept = existing.filter((k) => keys.includes(k))
+      // Only columns that did not exist when the prefs were written count as
+      // new. Previously every key missing from `existing` was appended, which
+      // resurrected columns the user had explicitly hidden on every mount and
+      // made the picker useless across reloads.
+      const known = knownKeysRef.current
+      const isNew = (k) => (known ? !known.includes(k) : !kept.includes(k))
+      const resolved = [...kept, ...keys.filter((k) => !kept.includes(k) && isNew(k))]
+      // Never leave the table with no columns to render.
+      const safe = resolved.length ? resolved : keys
+      knownKeysRef.current = keys
+      return safe.join('|') === existing.join('|') ? existing : safe
     })
+    // Intentionally keyed on the signature string, not `columns`. Callers build
+    // the column array inline, so `columns` is a new identity every render while
+    // this effect only ever reads `c.key` — the very values the signature
+    // encodes. Depending on `columns` would re-run this setState loop on every
+    // render, which is the churn the signature exists to avoid.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columnKeySignature])
 
   useEffect(() => {
-    if (prefKey) localStorage.setItem(prefKey, JSON.stringify(visibleKeys))
+    if (!prefKey) return
+    try {
+      localStorage.setItem(prefKey, JSON.stringify({
+        v: COLUMN_PREFS_VERSION,
+        keys: visibleKeys,
+        known: knownKeysRef.current ?? visibleKeys,
+      }))
+    } catch {
+      /* quota / private mode — column prefs are a convenience, not state */
+    }
   }, [prefKey, visibleKeys])
 
   useEffect(() => {

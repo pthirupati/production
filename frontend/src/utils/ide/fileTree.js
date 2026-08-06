@@ -53,16 +53,38 @@ export function stubContentForPath(path, language = '') {
   return ''
 }
 
+/**
+ * Default filename (no directory) for a new file in a given language.
+ *
+ * Single source of truth: IdeExplorer's inline create-draft needs a bare
+ * basename (it joins it onto the right-clicked folder itself), while
+ * newFileHint below needs the same name with a src/ prefix. Previously the
+ * explorer carried its own substring-match ladder that tested `.includes('java')`
+ * before the js branch, so language 'javascript' produced Main.java, and it
+ * disagreed with this file on the html name.
+ *
+ * html → index.html, not page.html: every scenarios/html lab ships an
+ * index.html, and both preferredHtmlPath() and the preview composer in
+ * composeHtmlPreview.js prefer /index\.html?$/ when picking the primary
+ * document. A new page.html would never become the previewed file.
+ */
+export function newFileBasename(language = '') {
+  const lang = (language || '').toLowerCase()
+  if (['python', 'py'].includes(lang)) return 'module.py'
+  if (['javascript', 'js', 'node', 'nodejs'].includes(lang)) return 'module.js'
+  if (['typescript', 'ts'].includes(lang)) return 'module.ts'
+  if (lang === 'java') return 'Main.java'
+  if (['html', 'htm'].includes(lang)) return 'index.html'
+  if (['bash', 'shell', 'sh'].includes(lang)) return 'script.sh'
+  // Terraform/Packer workspaces mount IdeExplorer with language="hcl". Not
+  // main.tf — that is always present already and is in their protectedPaths,
+  // so the create-draft would open pre-filled with a name that can't be saved.
+  if (['hcl', 'terraform', 'tf'].includes(lang)) return 'module.tf'
+  return 'untitled.txt'
+}
+
 /** Guess a sensible new-file path hint from language + existing files. */
 export function newFileHint(language = '', existing = []) {
-  const lang = (language || '').toLowerCase()
-  const hasSrc = existing.some((p) => p.startsWith('src/'))
-  const prefix = hasSrc ? 'src/' : ''
-  if (lang === 'python' || lang === 'py') return `${prefix}module.py`
-  if (['javascript', 'js', 'node', 'nodejs'].includes(lang)) return `${prefix}module.js`
-  if (['typescript', 'ts'].includes(lang)) return `${prefix}module.ts`
-  if (lang === 'java') return `${prefix}Main.java`
-  if (lang === 'html' || lang === 'htm') return `${prefix}page.html`
-  if (['bash', 'shell', 'sh'].includes(lang)) return `${prefix}script.sh`
-  return `${prefix}untitled.txt`
+  const hasSrc = (existing || []).some((p) => p.startsWith('src/'))
+  return `${hasSrc ? 'src/' : ''}${newFileBasename(language)}`
 }

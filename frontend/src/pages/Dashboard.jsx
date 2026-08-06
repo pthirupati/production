@@ -5,12 +5,13 @@ import { scenarioApi } from '../api/scenarios'
 import api from '../api/client'
 import { subscriptionApi } from '../api/subscriptions'
 import { jiraApi } from '../api/jira'
+import { journeyApi } from '../api/journeys'
 import { useAuthStore } from '../store/authStore'
 import {
   Target, Trophy, Zap, Clock, TrendingUp, ArrowRight,
   CheckCircle2, Award, BookOpen, Play, Star,
   Calendar, CreditCard, Crown, Layers, ArrowUpRight, XCircle, AlertTriangle, Sparkles, Download, Ticket,
-  Bookmark, Bell, History, BarChart3, X, Mic2, ListChecks,
+  Bookmark, Bell, History, BarChart3, X, Mic2, ListChecks, Route,
 } from 'lucide-react'
 import JiraTicketLink from '../components/JiraTicketLink'
 import { SkeletonStats, SkeletonCard } from '../components/Skeleton'
@@ -22,6 +23,7 @@ import { DailyChallengeCard, StreakWidget, XpLevelCard } from '../components/eng
 import CertDashboardPanel from '../components/certifications/CertDashboardPanel'
 import { tutorialApi } from '../api/tutorials'
 import { listLocalContinue, progressPct } from '../utils/tutorialProgress'
+import MfaRecommendationBanner from '../components/MfaRecommendationBanner'
 
 function OnboardingChecklist({ subscriptions, progress, jiraTickets, interviewEntitlement }) {
   const [dismissed, setDismissed] = useState(
@@ -149,6 +151,10 @@ export default function Dashboard() {
   const [complimentaryAccess, setComplimentaryAccess] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  // Which specific fetches failed. A blanket flag is not enough: "your labs
+  // failed to load" and "you have no labs" need different copy in different
+  // places on this page, and collapsing them is what caused the bug below.
+  const [failed, setFailed] = useState({})
   const [cancelModal, setCancelModal] = useState(null)
   const [cancelling, setCancelling] = useState(false)
   const [jiraTickets, setJiraTickets] = useState([])
@@ -156,24 +162,73 @@ export default function Dashboard() {
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [interviewEntitlement, setInterviewEntitlement] = useState(null)
   const [tutorialContinue, setTutorialContinue] = useState([])
+  const [interviewAnalytics, setInterviewAnalytics] = useState(null)
+  const [journeyNext, setJourneyNext] = useState(null)
 
   useEffect(() => {
-    Promise.all([
-      labApi.getProgress().catch(() => null),
-      labApi.getAchievements().catch(() => []),
-      labApi.getActiveLabs().catch(() => []),
-      subscriptionApi.getMySubscriptions().catch(() => ({ subscriptions: [] })),
-      jiraApi.getUserTickets().catch(() => ({ data: { tickets: [] } })),
-      scenarioApi.getBookmarks().catch(() => []),
-      api.get('/notifications/', { silentError: true }).catch(() => ({ data: { notifications: [] } })),
-      import('../api/interviews').then(m => m.interviewsApi.getEntitlement()).catch(() => null),
-      tutorialApi.list().catch(() => ({ tutorials: [] })),
-      isAuthenticated ? tutorialApi.getContinue().catch(() => []) : Promise.resolve([]),
-    ]).then(([prog, ach, labs, subs, jiraRes, bms, notifRes, interviewEnt, tutListRes, tutContinue]) => {
-      if (!prog) setLoadError(true)
+    // allSettled + a per-call failure map, not Promise.all with `.catch(() => [])`.
+    // The old form resolved all ten calls to empty defaults that are byte-identical
+    // to a brand-new account, so a backend blip rendered a plausible-looking empty
+    // dashboard. The two dangerous cases: a RUNNING lab disappearing (the user
+    // starts a duplicate) and a subscription fetch degrading to "no subscription"
+    // (a paying user looks free). Only getProgress ever set loadError before.
+    let active = true
+    // One dynamic import shared by both interview calls. Kept lazy (the studio
+    // is a heavy chunk) but resolved once, so the two consumers below can't
+    // race two separate module evaluations.
+    const interviewsMod = import('../api/interviews')
+    Promise.allSettled([
+      labApi.getProgress(),
+      labApi.getAchievements(),
+      labApi.getActiveLabs(),
+      subscriptionApi.getMySubscriptions(),
+      jiraApi.getUserTickets(),
+      scenarioApi.getBookmarks(),
+      api.get('/notifications/', { silentError: true }),
+      interviewsMod.then(m => m.interviewsApi.getEntitlement()),
+      tutorialApi.list(),
+      isAuthenticated ? tutorialApi.getContinue() : Promise.resolve([]),
+      // Competency radar — the only per-skill signal the platform actually
+      // computes (interview reports). Used to name a weakest area to work on.
+      isAuthenticated
+        ? interviewsMod.then(m => m.interviewsApi.getMyAnalytics())
+        : Promise.resolve(null),
+      // Next journey step — the third thing audit L2317 wants surfaced, after
+      // the active lab and the weakest competency.
+      isAuthenticated ? journeyApi.getNext() : Promise.resolve(null),
+    ]).then(([progRes, achRes, labsRes, subsRes, jiraSettled, bmsRes, notifSettled, entRes, tutListSettled, tutContinueRes, analyticsRes, journeyRes]) => {
+      if (!active) return
+      const val = (r) => (r.status === 'fulfilled' ? r.value : null)
+      const prog = val(progRes)
+      const labs = val(labsRes)
+      const subs = val(subsRes)
+      const jiraRes = val(jiraSettled)
+      const bms = val(bmsRes)
+      const notifRes = val(notifSettled)
+      const interviewEnt = val(entRes)
+      const tutListRes = val(tutListSettled)
+      const tutContinue = val(tutContinueRes)
+
+      setFailed({
+        progress: progRes.status === 'rejected',
+        achievements: achRes.status === 'rejected',
+        activeLabs: labsRes.status === 'rejected',
+        subscriptions: subsRes.status === 'rejected',
+        jira: jiraSettled.status === 'rejected',
+        bookmarks: bmsRes.status === 'rejected',
+        // Notifications are fetched with silentError: true — a failure here is
+        // deliberately non-disruptive, so it feeds the badge but not the banner.
+        notifications: notifSettled.status === 'rejected',
+        interviewEntitlement: entRes.status === 'rejected',
+        tutorials: tutListSettled.status === 'rejected' && tutContinueRes.status === 'rejected',
+        // Same trap as subscriptions: a rejected fetch and "you haven't started
+        // a journey" both arrive as no card. Flagged so the card can say which.
+        journey: journeyRes.status === 'rejected',
+      })
+      setLoadError(progRes.status === 'rejected')
       setProgress(prog)
-      setAchievements(ach)
-      setActiveLabs(labs.filter(l => l.status === 'RUNNING'))
+      setAchievements(val(achRes) || [])
+      setActiveLabs(Array.isArray(labs) ? labs.filter(l => l.status === 'RUNNING') : [])
       setSubscriptions(subs?.subscriptions || [])
       setComplimentaryAccess(subs?.complimentary_access || false)
       setJiraTickets(jiraRes?.data?.tickets || jiraRes?.tickets || [])
@@ -181,6 +236,8 @@ export default function Dashboard() {
       const notifs = notifRes?.data?.notifications || notifRes?.data?.results || []
       setUnreadNotifications(Array.isArray(notifs) ? notifs.filter(n => !(n.read ?? n.is_read)).length : 0)
       setInterviewEntitlement(interviewEnt)
+      setInterviewAnalytics(val(analyticsRes))
+      setJourneyNext(val(journeyRes))
       const tutorialsBySlug = Object.fromEntries(
         (tutListRes?.tutorials || []).map((t) => [t.slug, t]),
       )
@@ -203,14 +260,18 @@ export default function Dashboard() {
       setTutorialContinue(
         continueItems.filter((i) => !i.completed && (i.progress_pct ?? 0) < 100).slice(0, 4),
       )
-    }).finally(() => setLoading(false))
+    }).finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [isAuthenticated])
 
   const handleCancelSubscription = async (sub) => {
     setCancelling(true)
     try {
-      await subscriptionApi.cancelSubscription(sub.subscription_id)
-      setSubscriptions(prev => prev.map(s => s.id === sub.id ? { ...s, is_active: false } : s))
+      const res = await subscriptionApi.cancelSubscription(sub.subscription_id)
+      // Still active — access runs to the end of the paid term (audit Z1-11).
+      // Marking it inactive here would grey out a subscription the customer can
+      // still use, which is the same lie the old backend told.
+      setSubscriptions(prev => prev.map(s => s.id === sub.id ? { ...s, cancelled: true } : s))
       setCancelModal(null)
     } catch (err) {
       alert(err?.response?.data?.error || 'Failed to cancel subscription. Please try again.')
@@ -260,12 +321,39 @@ export default function Dashboard() {
     hard: { bar: 'from-accent-red to-rose-400', text: 'text-accent-red' },
   }
 
+  // Notifications are excluded on purpose: that call opts into silentError, and an
+  // unread-count badge that fails is not worth a page-level banner.
+  const partialFailure = Object.entries(failed)
+    .some(([key, didFail]) => didFail && key !== 'notifications' && key !== 'progress')
+
+  // Weakest competency, from the interview radar — the only real per-skill score
+  // the platform computes. Requires at least one graded attempt, otherwise every
+  // dimension is 0 and "weakest" would be an arbitrary pick off an empty radar.
+  const weakestCompetency = (interviewAnalytics?.attempts || 0) > 0
+    ? (interviewAnalytics?.radar || [])
+        .filter(d => typeof d.score === 'number')
+        .reduce((min, d) => (min === null || d.score < min.score ? d : min), null)
+    : null
+
+  // Journey resume point. Both halves must be present: the backend returns
+  // nulls for a user who hasn't started one, and there is nothing to show
+  // without a concrete next step.
+  const journeyStep = journeyNext?.journey && journeyNext?.next_step ? journeyNext : null
+  const journeyPct = journeyStep?.journey.total_steps
+    ? Math.round((journeyStep.journey.completed_steps / journeyStep.journey.total_steps) * 100)
+    : 0
+
   return (
     <div className="flex flex-col gap-[22px] w-full relative">
       <OnboardingTour />
 
+      {/* Audit Z2-3: suggested, never required. On the dashboard rather than as a
+          login interstitial — interrupting a sign-in to sell a security feature is
+          how prompts get dismissed reflexively. */}
+      <MfaRecommendationBanner />
+
       {loadError && (
-        <div className="text-center py-8">
+        <div className="text-center py-8" data-testid="dashboard-load-error">
           <p className="text-red-400 mb-3">Failed to load dashboard data.</p>
           <button
             onClick={() => window.location.reload()}
@@ -276,12 +364,35 @@ export default function Dashboard() {
         </div>
       )}
 
-      <OnboardingChecklist
-        subscriptions={subscriptions.filter(s => s.is_active)}
-        progress={progress}
-        jiraTickets={jiraTickets}
-        interviewEntitlement={interviewEntitlement}
-      />
+      {!loadError && partialFailure && (
+        <div
+          data-testid="dashboard-partial-error"
+          className="glass-card p-4 border-accent-red/30 bg-accent-red/[0.04] flex items-start gap-3"
+        >
+          <AlertTriangle size={18} className="text-accent-red shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm text-surface-200">Some of your dashboard couldn&apos;t be loaded</p>
+            <p className="text-xs text-surface-500 mt-0.5">
+              Anything missing below is a loading problem, not lost work. Reload to try again.
+            </p>
+          </div>
+          <button onClick={() => window.location.reload()} className="btn-secondary text-xs px-3 py-1.5 shrink-0">
+            Reload
+          </button>
+        </div>
+      )}
+
+      {/* The checklist infers "new user" from empty subscriptions/progress/tickets.
+          If any of those fetches failed, that inference is wrong — it would tell a
+          paying customer to go pick a technology they already bought. */}
+      {!failed.subscriptions && !failed.progress && !failed.jira && !failed.interviewEntitlement && (
+        <OnboardingChecklist
+          subscriptions={subscriptions.filter(s => s.is_active)}
+          progress={progress}
+          jiraTickets={jiraTickets}
+          interviewEntitlement={interviewEntitlement}
+        />
+      )}
 
       {/* ═══ HERO HEADER ═══ */}
       <div className="fx-hero-panel p-6 sm:p-8 animate-fx-rise">
@@ -336,6 +447,95 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* "What should I work on?" — the dashboard previously answered this only
+          with raw counts. The radar is per-dimension, so name the lowest one and
+          link straight into practice rather than making the user infer it. */}
+      {weakestCompetency && (
+        <FixitPanel padding="p-4" className="border border-accent-purple/25 bg-accent-purple/[0.05]">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-accent-purple/15 flex items-center justify-center shrink-0">
+                <BarChart3 size={18} className="text-accent-purple" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">
+                  Weakest area: {weakestCompetency.dimension}
+                </p>
+                <p className="text-xs text-surface-400 mt-0.5">
+                  Averaging {weakestCompetency.score}/100 across {interviewAnalytics.attempts} graded
+                  {interviewAnalytics.attempts === 1 ? ' attempt' : ' attempts'}.
+                </p>
+              </div>
+            </div>
+            <Link to="/interviews" className="btn-secondary text-xs px-3 py-1.5 shrink-0">
+              Practice this
+            </Link>
+          </div>
+        </FixitPanel>
+      )}
+
+      {/* "Continue your journey" — audit L2317. A journey is a multi-week track,
+          so the useful thing is not the track name but the one step to open
+          next; the backend resolves that down to a single piece of content. */}
+      {failed.journey ? (
+        <div
+          data-testid="dashboard-journey-error"
+          className="fx-panel p-4 border-accent-red/30 bg-accent-red/[0.05]"
+        >
+          <h3 className="text-sm font-semibold text-accent-red mb-1.5 flex items-center gap-2">
+            <AlertTriangle size={14} /> Couldn&apos;t load your learning journey
+          </h3>
+          <p className="text-xs text-surface-400">
+            This is a loading problem — your progress is intact. Reload to try again.
+          </p>
+        </div>
+      ) : journeyStep && (
+        /* Plain div, not FixitPanel: that component only forwards children,
+           className and padding, so a data-testid on it would be dropped. */
+        <div
+          data-testid="dashboard-journey-card"
+          className="fx-panel p-4 border border-accent-cyan/25 bg-accent-cyan/[0.05]"
+        >
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-accent-cyan/15 flex items-center justify-center shrink-0">
+                <Route size={18} className="text-accent-cyan" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold text-accent-cyan uppercase tracking-[0.14em]">
+                  Continue your journey
+                </p>
+                <p className="text-sm font-semibold text-white truncate">
+                  {journeyStep.next_step.target_title}
+                </p>
+                <p className="text-xs text-surface-400 mt-0.5">
+                  {journeyStep.journey.title} · step {journeyStep.journey.completed_steps + 1} of{' '}
+                  {journeyStep.journey.total_steps}
+                  {journeyStep.next_step.items_total > 1 && (
+                    <> · {journeyStep.next_step.items_completed}/{journeyStep.next_step.items_total} done</>
+                  )}
+                </p>
+              </div>
+            </div>
+            {/* No link for capstone projects — the SPA has no /projects/<slug>
+                route, so the backend sends link=null rather than a dead link. */}
+            {journeyStep.next_step.link ? (
+              <Link to={journeyStep.next_step.link} className="btn-secondary text-xs px-3 py-1.5 shrink-0">
+                Resume
+              </Link>
+            ) : (
+              <span className="text-xs text-surface-500 shrink-0">Up next</span>
+            )}
+          </div>
+          <div className="h-1.5 bg-white/[0.08] rounded-full overflow-hidden mt-3.5">
+            <div
+              className="h-full bg-gradient-to-r from-accent-cyan to-accent-blue rounded-full transition-all duration-700"
+              style={{ width: `${journeyPct}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {interviewEntitlement?.platform_enabled !== false && (
         <Link
@@ -485,6 +685,26 @@ export default function Dashboard() {
         </FixitPanel>
       )}
 
+      {/* Worst case on the page: a running lab that silently vanishes. The user
+          concludes they have nothing running and starts a second one, which burns
+          quota and can collide with the still-live environment.
+          Plain div, not FixitPanel: that component only forwards children,
+          className and padding, so a data-testid on it would be dropped. */}
+      {failed.activeLabs && (
+        <div
+          data-testid="dashboard-active-labs-error"
+          className="fx-panel p-4 border-accent-red/30 bg-accent-red/[0.05]"
+        >
+          <h3 className="text-sm font-semibold text-accent-red mb-1.5 flex items-center gap-2">
+            <AlertTriangle size={14} /> Couldn&apos;t check for running labs
+          </h3>
+          <p className="text-xs text-surface-400">
+            You may still have a lab running. Don&apos;t start a new one until this loads —
+            check <Link to="/lab-history" className="text-accent-cyan hover:underline">your lab history</Link> or reload.
+          </p>
+        </div>
+      )}
+
       {activeLabs.length > 0 && (
         <FixitPanel padding="p-4" className="border-accent-amber/20 bg-accent-amber/5 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-accent-amber/[0.04] via-transparent to-transparent pointer-events-none" />
@@ -565,10 +785,30 @@ export default function Dashboard() {
             <p className="text-sm text-accent-green">You have complimentary free access to all technologies.</p>
           </div>
         )}
-        {subscriptions.filter(s => s.is_active).length === 0 && !complimentaryAccess ? (
+        {failed.subscriptions ? (
+          /* Never show "No active subscriptions" + a Subscribe CTA on a failed
+             fetch — that is the duplicate-purchase trap: the page would tell a
+             paying customer their subscription is gone and invite them to rebuy. */
+          <div
+            data-testid="dashboard-subscriptions-error"
+            className="p-4 rounded-lg bg-accent-red/[0.06] border border-accent-red/25 text-sm relative"
+          >
+            <p className="text-surface-200">Couldn&apos;t load your subscriptions</p>
+            <p className="text-xs text-surface-500 mt-1">
+              Don&apos;t purchase again — this is a loading problem, not a lapsed subscription.
+              Reload to try again.
+            </p>
+            <button onClick={() => window.location.reload()} className="btn-secondary text-xs px-3 py-1.5 mt-3">
+              Reload
+            </button>
+          </div>
+        ) : subscriptions.filter(s => s.is_active).length === 0 && !complimentaryAccess ? (
           <div className="text-center py-8 relative">
             <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-surface-800/50 flex items-center justify-center"><Layers size={28} className="text-surface-600" /></div>
             <p className="text-surface-400 text-sm mb-4">No active subscriptions</p>
+            <p className="text-xs text-surface-500 mb-4 max-w-xs mx-auto">
+              Subscribe to a technology track to unlock its hands-on labs and start building a streak.
+            </p>
             <Link to="/pricing" className="btn-primary text-sm px-6 py-2 inline-flex items-center gap-2"><CreditCard size={14} /> Subscribe to a Technology</Link>
           </div>
         ) : (
@@ -772,13 +1012,23 @@ export default function Dashboard() {
             <div className="absolute inset-0 bg-gradient-to-br from-accent-red/[0.05] via-transparent to-accent-red/[0.02] pointer-events-none" />
             <div className="flex items-center gap-3 mb-4 relative">
               <div className="w-12 h-12 rounded-xl bg-accent-red/10 flex items-center justify-center border border-accent-red/20 shadow-lg shadow-accent-red/10"><AlertTriangle size={24} className="text-accent-red" /></div>
-              <div><h3 className="text-lg font-bold text-white">Cancel Subscription</h3><p className="text-sm text-surface-400">This action cannot be undone</p></div>
+              <div><h3 className="text-lg font-bold text-white">Cancel Subscription</h3><p className="text-sm text-surface-400">You keep access until your term ends</p></div>
             </div>
             <p className="text-surface-300 text-sm mb-2 relative">Are you sure you want to cancel your <span className="font-bold text-white">{cancelModal.technology?.name}</span> subscription?</p>
+            {/* Cancellation is at period end (audit Z1-11) — this list used to say
+                access was lost immediately, which was true of the old behaviour and
+                would now be a false warning that talks people out of cancelling. */}
             <ul className="text-sm text-surface-400 space-y-1.5 mb-6 ml-4 list-disc relative">
-              <li>You will lose access to all {cancelModal.technology?.name} scenarios</li>
-              <li>Your progress will be saved but labs won&apos;t be accessible</li>
-              <li>You can re-subscribe at any time</li>
+              <li>
+                You keep full access to {cancelModal.technology?.name} until
+                {' '}<span className="font-semibold text-white">
+                  {cancelModal.expires_at
+                    ? new Date(cancelModal.expires_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+                    : 'the end of your paid term'}
+                </span> — nothing is lost today
+              </li>
+              <li>It simply will not renew after that</li>
+              <li>Your progress is kept either way</li>
             </ul>
             <div className="flex gap-3 justify-end relative">
               <button onClick={() => setCancelModal(null)} disabled={cancelling} className="btn-secondary text-sm px-5 py-2">Keep Subscription</button>

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import queue
 import logging
 import threading
@@ -275,6 +276,23 @@ _SIM_LOCK = threading.Lock()
 # genuinely must stay process-local. This bounds the damage in the meantime.
 _SIM_IDLE_TTL_SECONDS = 2 * 60 * 60  # 2x LAB_MAX_DURATION_MINUTES default (60m)
 
+# Hard ceiling on entries per process, on top of the idle TTL.
+#
+# The TTL alone bounds nothing inside its own window: sessions can accumulate for
+# two hours before anything is reclaimed, and with an engine copy living in each of
+# the ~5 processes (4 uvicorn + celery) a busy hour can exhaust memory long before
+# the first eviction fires. The cap makes worst-case footprint a function of this
+# number rather than of traffic.
+#
+# Evicting a LIVE session is safe here, which is what makes an LRU cap usable at
+# all: `ensure_sim_session()` rehydrates from `LabSession.simulation_snapshot`, and
+# the trailing-edge flush keeps that snapshot current to ~1.5s. So the cost of
+# eviction is one rebuild on next access, not lost learner work.
+#
+# Default 32 = ~2.5x MAX_CONCURRENT_LABS (12), leaving room for a session to be
+# resident in more than one process at once without the cap biting in normal use.
+_SIM_MAX_SESSIONS = int(os.environ.get("SIM_MAX_SESSIONS_PER_PROCESS", "32") or 32)
+
 
 def _touch(entry: dict) -> dict:
     entry["last_access"] = time.time()
@@ -305,6 +323,40 @@ def _evict_idle_locked() -> int:
     return len(stale)
 
 
+def _enforce_max_locked() -> int:
+    """Drop least-recently-used entries until at most _SIM_MAX_SESSIONS remain.
+
+    Caller must hold _SIM_LOCK. Streams are closed on the way out — dropping the
+    dict entry alone would leak the reader thread and its socket, which is the
+    failure this whole registry exists to bound.
+    """
+    if _SIM_MAX_SESSIONS <= 0 or len(_SIM_SESSIONS) <= _SIM_MAX_SESSIONS:
+        return 0
+    ordered = sorted(_SIM_SESSIONS.items(), key=lambda kv: kv[1].get("last_access", 0))
+    overflow = len(_SIM_SESSIONS) - _SIM_MAX_SESSIONS
+    dropped = 0
+    for sid, _entry in ordered[:overflow]:
+        entry = _SIM_SESSIONS.pop(sid, None)
+        if not entry:
+            continue
+        for stream in (entry.get("streams") or {}).values():
+            try:
+                stream.close()
+            except Exception:
+                pass
+        dropped += 1
+    if dropped:
+        # WARNING, not INFO: hitting the cap means real sessions are being rebuilt
+        # from snapshots. Harmless once, but a steady stream of these means the cap
+        # is too low for actual concurrency, and that is worth seeing.
+        logger.warning(
+            "Simulation registry at capacity (%d): evicted %d least-recently-used "
+            "session(s); they will rehydrate from their snapshot on next access.",
+            _SIM_MAX_SESSIONS, dropped,
+        )
+    return dropped
+
+
 def sim_session_count() -> int:
     """Live entries in THIS process's registry.
 
@@ -324,6 +376,9 @@ def register_sim_session(session_id: str, resource_id: str, sim_type: str, state
             "state": state,
             "streams": {},
         })
+        # After inserting, so the session just registered is the most recently used
+        # and can never be the one evicted by its own registration.
+        _enforce_max_locked()
     # Stamp the lab session id onto the OS state so the cross-technology VMware
     # bridge (keyed by session id in the shared cache) can be consulted from the
     # terminal engine — even though the two simulators run in different workers.

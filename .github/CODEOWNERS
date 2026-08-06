@@ -1,0 +1,50 @@
+# Code ownership (audit Z6-15).
+#
+# There was no CODEOWNERS, so nothing on GitHub distinguished a change to the
+# payment ledger from a change to a blog post — every PR looked the same in the
+# review queue.
+#
+# This repo currently has one maintainer, which is exactly why the file is worth
+# having rather than a reason to skip it. It does two things today:
+#
+#  1. it makes the high-consequence paths explicit, so the next contributor (or a
+#     future you at 2am) can see at a glance which directories are load-bearing;
+#  2. it means adding a second reviewer later is a one-line change per area
+#     instead of an archaeology exercise.
+#
+# GitHub applies the LAST matching pattern, so the specific rules below deliberately
+# come after the catch-all.
+
+# ── Default ──────────────────────────────────────────────────────────────────
+*                                   @pthirupati
+
+# ── Money. A mistake here is not recoverable by a redeploy. ──────────────────
+/backend/apps/billing/              @pthirupati
+/backend/apps/certifications/billing_views.py  @pthirupati
+
+# ── Authentication, sessions, MFA, and the permission layer. ────────────────
+/backend/apps/accounts/             @pthirupati
+/backend/apps/auth_app/             @pthirupati
+/backend/common/security.py         @pthirupati
+/backend/common/throttles.py        @pthirupati
+/backend/common/permissions.py      @pthirupati
+
+# ── Grading. A fail-open grader silently awards credit nobody earned, which is
+#    the failure this platform can least afford (see scripts/scan_grader_integrity.py).
+/scripts/scan_grader_integrity.py   @pthirupati
+/backend/apps/labs/completion.py    @pthirupati
+/backend/apps/progress/             @pthirupati
+
+# ── Anything that runs against production. ──────────────────────────────────
+/.github/workflows/                 @pthirupati
+/deploy/                            @pthirupati
+/gateway/                           @pthirupati
+/database/                          @pthirupati
+/docker-compose*.yml                @pthirupati
+
+# ── Migrations. Reviewed as schema changes, not as code. ────────────────────
+/backend/apps/*/migrations/         @pthirupati
+
+# ── Published legal text. Wording here is a commitment, not copy. ───────────
+/frontend/src/pages/Privacy.jsx     @pthirupati
+/frontend/src/pages/Terms.jsx       @pthirupati

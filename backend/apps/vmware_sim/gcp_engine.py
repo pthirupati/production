@@ -211,6 +211,10 @@ def _apply_preset(state: dict, slug: str) -> None:
             "objective": "Start web01 and confirm it reaches the RUNNING state.",
         }
         state["broken"] = {"vm_stopped": vm["name"]}
+    # Record whether a console objective was actually seeded. validate_gcp_lab
+    # grades "no broken markers left" as success, which is only meaningful if a
+    # marker existed to begin with — otherwise an unmatched slug auto-passes.
+    state["_preset_applied"] = bool(state.get("broken"))
 
 
 def network_or(state: dict) -> str:
@@ -647,4 +651,9 @@ def validate_gcp_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, st
     inst = state["instances"][0] if state.get("instances") else None
     if inst and inst.get("_transition"):
         return False, f"{inst['name']} is still transitioning ({inst['status']}) — wait for it to settle"
+    # Fail-CLOSED on an unseeded world — see validate_azure_lab for the full
+    # rationale. Replaying _apply_preset over the shipped academy-gcp-* slugs
+    # leaves 117 of 147 with no `broken` key, and those all auto-passed here.
+    if not state.get("_preset_applied"):
+        return False, "NO_VALIDATION_SCRIPT"
     return True, "GCP validation passed"

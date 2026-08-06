@@ -74,6 +74,17 @@ class TechnologySubscription(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True, blank=True)
     renewal_reminder_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text=(
+            "When the customer cancelled. Access continues until expires_at "
+            "(audit Z1-11); this only stops renewal."
+        ),
+    )
+
+    @property
+    def is_cancelled(self) -> bool:
+        return self.cancelled_at is not None
 
     class Meta:
         unique_together = ("user", "technology")
@@ -169,8 +180,36 @@ class SalesInquiry(models.Model):
         return self.custom_quote_amount is not None
 
 
+class LedgerIntegrityError(Exception):
+    """Raised when a financial fact on an existing transaction is altered."""
+
+
 class PaymentTransaction(models.Model):
-    """Track all payment transactions with idempotency and audit trail."""
+    """Track all payment transactions with idempotency and audit trail.
+
+    **The money is append-only** (audit Z1-15). Measured what legitimately changes
+    after creation: only lifecycle fields — ``status``, ``gateway_order_id``,
+    ``gateway_response``, ``refunded_amount``, ``error_message``. Nothing in the
+    codebase has any business rewriting *what was charged, in what currency, to
+    whom*, so those fields are frozen once the row exists.
+
+    Full immutability was the wrong shape: a transaction legitimately moves
+    pending → processing → success → refunded, and locking the whole row would have
+    broken every one of those. Freezing only the financial facts keeps the lifecycle
+    working while making the ledger mean something — a record that can be
+    retroactively edited is a record of the present, not of what happened.
+
+    Known limit: ``queryset.update()`` bypasses ``save()`` entirely, so this guards
+    ordinary object writes rather than deliberate bulk SQL. Closing that needs a
+    database trigger, which is a migration-level decision rather than a model one.
+    """
+
+    #: Fields that describe the financial fact itself. Changing one rewrites history.
+    FROZEN_FIELDS = (
+        "user_id", "amount", "taxable_amount", "currency",
+        "gst_rate", "gst_amount", "cgst_amount", "sgst_amount", "igst_amount",
+        "idempotency_key",
+    )
 
     PAYMENT_STATUS = [
         ("pending", "Pending"),
@@ -256,6 +295,31 @@ class PaymentTransaction(models.Model):
         """
         key_str = f"{user_id}-{amount}-{currency}-{scope}"
         return hashlib.sha256(key_str.encode()).hexdigest()
+
+    def save(self, *args, **kwargs):
+        """Refuse to rewrite a financial fact on an existing row."""
+        if self.pk:
+            update_fields = kwargs.get("update_fields")
+            # A targeted save that does not touch a frozen field cannot violate the
+            # invariant, and skipping the query keeps the hot lifecycle path free.
+            if update_fields is None or set(update_fields) & set(self.FROZEN_FIELDS):
+                previous = type(self).objects.filter(pk=self.pk).values(
+                    *self.FROZEN_FIELDS
+                ).first()
+                if previous:
+                    changed = [
+                        f for f in self.FROZEN_FIELDS
+                        if getattr(self, f) != previous[f]
+                    ]
+                    if changed:
+                        raise LedgerIntegrityError(
+                            f"PaymentTransaction {self.pk}: cannot modify "
+                            f"{', '.join(changed)} on an existing transaction. "
+                            "Issue a refund or a new transaction instead — the "
+                            "ledger records what happened, not what it should "
+                            "have been."
+                        )
+        return super().save(*args, **kwargs)
 
     def mark_success(self, gateway_payment_id=None, gateway_response=None):
         self.status = "success"
@@ -469,3 +533,81 @@ class UserCertificate(models.Model):
     def is_expired(self) -> bool:
         return timezone.now() > self.expires_at
 
+
+
+class InvoiceSeries(models.Model):
+    """Gapless, per-financial-year serial allocator for tax invoice numbers.
+
+    Audit Z1-13. Invoice numbers were ``INV-{today}-{first 8 hex of the row UUID}``
+    — random, not a series, and 21 characters. CGST Rule 46(b) requires a
+    **consecutive serial number**, unique for a financial year, **not exceeding 16
+    characters**. A random suffix satisfies uniqueness while failing every other
+    part of the rule, and the failure is invisible until an audit asks for invoices
+    7 through 12.
+
+    The Indian financial year runs April–March, so the series key is e.g. ``26-27``
+    for 2026-04-01 → 2027-03-31 — not the calendar year, which would reset the
+    series three months into every FY.
+
+    Allocation takes a row lock (:meth:`allocate`), because the failure mode of
+    ``max(existing) + 1`` is two concurrent payments taking the same number, and a
+    duplicate invoice number is worse than a gap: it makes two different sales
+    indistinguishable in the books.
+    """
+
+    prefix = models.CharField(max_length=12, default="FL")
+    financial_year = models.CharField(max_length=7, help_text="e.g. 26-27")
+    last_number = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [("prefix", "financial_year")]
+        verbose_name_plural = "invoice series"
+
+    def __str__(self):
+        return f"{self.prefix}/{self.financial_year} @ {self.last_number}"
+
+    @staticmethod
+    def financial_year_for(moment) -> str:
+        """``26-27`` for any moment inside FY 2026-04-01 → 2027-03-31."""
+        year = moment.year if moment.month >= 4 else moment.year - 1
+        return f"{year % 100:02d}-{(year + 1) % 100:02d}"
+
+    @classmethod
+    def allocate(cls, moment=None, prefix: str = "FL") -> str:
+        """Return the next invoice number in the series, e.g. ``FL/26-27/000001``.
+
+        Must be called inside the caller's transaction so the number is not burned
+        if the surrounding work rolls back — a gap in a "gapless" series is exactly
+        what the rule prohibits.
+        """
+        from django.db import transaction as db_transaction
+        from django.utils import timezone as dj_timezone
+
+        from django.db import connection
+
+        moment = moment or dj_timezone.now()
+        fy = cls.financial_year_for(moment)
+        with db_transaction.atomic():
+            cls.objects.get_or_create(prefix=prefix, financial_year=fy)
+            # A single `UPDATE ... RETURNING` rather than SELECT FOR UPDATE followed
+            # by a write. Both are correct on Postgres, but this is one statement
+            # instead of two, so the row is never held across a round trip — which
+            # also keeps the local SQLite test backend (whole-table write locks, no
+            # real row locking) from serialising into "database table is locked".
+            with connection.cursor() as cur:
+                cur.execute(
+                    f"UPDATE {cls._meta.db_table} "
+                    "SET last_number = last_number + 1, updated_at = %s "
+                    "WHERE prefix = %s AND financial_year = %s "
+                    "RETURNING last_number",
+                    [dj_timezone.now(), prefix, fy],
+                )
+                row = cur.fetchone()
+            if not row:
+                raise RuntimeError(
+                    f"invoice series {prefix}/{fy} vanished between creation and "
+                    "allocation"
+                )
+            # 2 + 1 + 5 + 1 + 6 = 15 chars, inside the 16-char legal ceiling.
+            return f"{prefix}/{fy}/{row[0]:06d}"

@@ -645,10 +645,25 @@
 }
 
 /* Mobile (≤640px): let the inventory table scroll instead of forcing a
-   520px floor that pushed the whole vSphere layout wider than the screen. */
+   520px floor that pushed the whole vSphere layout wider than the screen.
+
+   Dropping min-width alone is NOT enough: `.vm-table th` sets
+   white-space: nowrap, so a multi-column inventory table's min-content width
+   still exceeds 375px. Without an overflow-x ancestor that excess widens the
+   whole page — the exact failure this block claims to prevent.
+
+   `.vm-table-wrap` used to carry that overflow, but the class was never
+   applied to any JSX: all 43 `<table className="vm-table">` elements are bare
+   children of their panel div. Rather than hand-wrap 43 call sites (and rely
+   on every future one remembering), scroll the table's actual parent via
+   :has(). Parent classes vary too much (.vm-panel-body, .mt-4, tailwind
+   utility soup) to enumerate, and :has() is already used elsewhere in this
+   codebase (styles/sim-products.css:249). min-width:0 stays because a grid or
+   flex parent otherwise refuses to shrink below min-content, which would
+   defeat the overflow container. */
 @media (max-width: 640px) {
   .vm-table { min-width: 0; }
-  .vm-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  :has(> .vm-table) { overflow-x: auto; -webkit-overflow-scrolling: touch; min-width: 0; }
   .vm-table th,
   .vm-table td { padding-left: 8px; padding-right: 8px; font-size: 12px; }
 }

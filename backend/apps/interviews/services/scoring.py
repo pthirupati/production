@@ -12,6 +12,15 @@ CORRECTNESS_PARTIAL = "partial"
 CORRECTNESS_OFF_BASE = "off_base"
 CORRECTNESS_UNKNOWN = "unknown"
 
+# Minimum relevance (0-100) an answer must clear before topic_detected is allowed
+# to mean "correct" on the no-keywords path. A pure question-echo caps at exactly
+# 35 by construction: conversation/analysis._relevance scores echo at weight 0.35
+# and gives the remaining 0.65 to substance, so an answer that adds nothing of its
+# own cannot exceed 0.35. Measured on the CrashLoopBackOff question, an 8-word echo
+# lands on 35 while the tersest genuine answer ("kubectl logs --previous and
+# kubectl describe pod ...") scores 46 — the floor sits in that gap.
+CORRECTNESS_RELEVANCE_FLOOR = 40
+
 _HEDGING = re.compile(
     r"\b(i think|maybe|probably|sort of|kind of|i guess|not sure|i'm not sure|"
     r"i believe|perhaps|might have|could be)\b",
@@ -31,6 +40,7 @@ def correctness_signal(
     has_keywords: bool,
     topic_detected: str | None,
     command_validated: bool = False,
+    relevance_score: int | None = None,
 ) -> str:
     """Deterministic correctness verdict for the prior answer (WS2)."""
     if command_validated:
@@ -48,10 +58,26 @@ def correctness_signal(
             return CORRECTNESS_PARTIAL
         return CORRECTNESS_OFF_BASE
 
-    if quality == "strong":
-        return CORRECTNESS_CORRECT
-    if quality == "adequate":
-        return CORRECTNESS_CORRECT if topic_detected else CORRECTNESS_PARTIAL
+    # No expected keywords (the generated-question path): quality is length and
+    # structure driven, so "strong" alone says nothing about whether the answer was
+    # RIGHT. Requiring an on-topic signal is what stops fluent, content-free prose
+    # from grading correct. This is only meaningful because topic_detected is now
+    # derived from the answer alone (see conversation/scorer.py) — when it was
+    # detected from question+answer it was always truthy and this guard was a no-op.
+    #
+    # topic_detected on its own is still too weak, because _detect_topic() fires on
+    # the question's OWN vocabulary handed back verbatim: "kubernetes pod stuck
+    # crashloopbackoff debug how would you" detects "kubernetes" from nothing but
+    # the echoed tokens and used to grade CORRECT. Relevance is what separates an
+    # echo from an answer, so require it too — see CORRECTNESS_RELEVANCE_FLOOR.
+    # relevance_score is None for callers that cannot supply it (the
+    # interview_ai.compute_answer_scores fallback does not compute one), and those
+    # keep the topic-only behaviour rather than being graded on a missing signal.
+    on_topic = bool(topic_detected) and (
+        relevance_score is None or relevance_score >= CORRECTNESS_RELEVANCE_FLOOR
+    )
+    if quality in ("strong", "adequate"):
+        return CORRECTNESS_CORRECT if on_topic else CORRECTNESS_PARTIAL
     if quality == "brief":
         return CORRECTNESS_PARTIAL if topic_detected else CORRECTNESS_UNKNOWN
     return CORRECTNESS_PARTIAL if topic_detected else CORRECTNESS_OFF_BASE
@@ -184,6 +210,7 @@ def score_answer(question, answer_text: str, metadata: dict | None = None) -> di
         has_keywords=bool(keywords),
         topic_detected=breakdown["topic_detected"],
         command_validated=bool(meta.get("command_validated")),
+        relevance_score=breakdown.get("relevance_score"),
     )
 
     quality = _refine_quality(
@@ -206,6 +233,7 @@ def score_answer(question, answer_text: str, metadata: dict | None = None) -> di
         has_keywords=bool(keywords),
         topic_detected=breakdown["topic_detected"],
         command_validated=bool(meta.get("command_validated")),
+        relevance_score=breakdown.get("relevance_score"),
     )
 
     star_coverage = breakdown["star_coverage"]

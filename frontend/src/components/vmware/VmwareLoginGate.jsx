@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 
 const ROLES = [
   { id: 'Administrator', label: 'Administrator — full access' },
@@ -47,7 +48,7 @@ export function clearVcenterAuth() {
 /* Real vSphere SSO login: split panel, "VMware vSphere" title, domain\username
    field, password, "Use Windows session authentication" checkbox, full-width
    LOGIN button. Keeps the lab_vmware autofill + hint. */
-export default function VmwareLoginGate({ onAuthenticated }) {
+export default function VmwareLoginGate({ onAuthenticated, backTo }) {
   const [user, setUser] = useState('')
   const [pass, setPass] = useState('')
   const [role, setRole] = useState('Administrator')
@@ -159,6 +160,15 @@ export default function VmwareLoginGate({ onAuthenticated }) {
               Use lab credentials (autofill)
             </button>
           </form>
+
+          {backTo ? (
+            <Link
+              to={backTo}
+              className="block mt-4 text-center text-[#5aa3ff] text-xs hover:underline"
+            >
+              ← Back to lab
+            </Link>
+          ) : null}
 
           <p className="text-[10px] text-[#8fa5b8] text-center leading-relaxed mt-5 pt-4 border-t border-[#1f2f42]">
             Training credentials:{' '}

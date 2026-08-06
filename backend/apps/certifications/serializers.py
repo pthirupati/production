@@ -79,6 +79,7 @@ class CertificateSerializer(serializers.ModelSerializer):
     track_code = serializers.CharField(source="track.code", read_only=True)
     track_name = serializers.CharField(source="track.name", read_only=True)
     is_expired = serializers.BooleanField(read_only=True)
+    is_valid = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = CertEarnedCertificate
@@ -91,4 +92,11 @@ class CertificateSerializer(serializers.ModelSerializer):
             "issued_at",
             "expires_at",
             "is_expired",
+            # Revocation is deliberately public: anyone verifying a credential
+            # needs to see that it was withdrawn, and why. revoked_reason is
+            # operator-authored, so keep it factual -- it is shown to the holder.
+            "is_valid",
+            "revoked",
+            "revoked_at",
+            "revoked_reason",
         ]
