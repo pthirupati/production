@@ -88,7 +88,7 @@ function CameraIntro({ enabled, cinematic = false }) {
 
   useFrame(() => {
     if (!enabled || done.current || t0.current == null) return
-    const dur = cinematic ? 4200 : 2200
+    const dur = cinematic ? 2600 : 1600
     const u = Math.min(1, (performance.now() - t0.current) / dur)
     const e = 1 - (1 - u) ** 3
     if (cinematic) {
@@ -279,8 +279,8 @@ function WalkController({ enabled, paused = false, posRef }) {
     const move = (e) => {
       if (paused) return
       if (document.pointerLockElement !== gl.domElement) return
-      yaw.current -= e.movementX * 0.0022
-      pitch.current = Math.max(-1.2, Math.min(1.2, pitch.current - e.movementY * 0.0022))
+      yaw.current -= e.movementX * 0.0026
+      pitch.current = Math.max(-1.25, Math.min(1.25, pitch.current - e.movementY * 0.0026))
     }
     const click = () => { if (!paused) gl.domElement.requestPointerLock?.() }
     window.addEventListener('keydown', down)
@@ -288,7 +288,13 @@ function WalkController({ enabled, paused = false, posRef }) {
     window.addEventListener('mousemove', move)
     gl.domElement.addEventListener('click', click)
     camera.position.copy(pos.current)
+    // Auto-grab mouse look on walk start (game FPS feel); browsers may still
+    // require a click if gesture policy blocks programmatic lock.
+    const lockId = setTimeout(() => {
+      try { if (!paused) gl.domElement.requestPointerLock?.() } catch { /* */ }
+    }, 120)
     return () => {
+      clearTimeout(lockId)
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
       window.removeEventListener('mousemove', move)
@@ -301,7 +307,7 @@ function WalkController({ enabled, paused = false, posRef }) {
     if (!enabled) return
     if (paused) { keys.current = {}; return }
     const sprinting = !!keys.current.ShiftLeft
-    const speed = (sprinting ? 5.2 : 2.85) * dt
+    const speed = (sprinting ? 6.1 : 3.15) * dt
     const forward = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current))
     const right = new THREE.Vector3(Math.cos(yaw.current), 0, -Math.sin(yaw.current))
     let moving = false
@@ -314,22 +320,22 @@ function WalkController({ enabled, paused = false, posRef }) {
     pos.current.z = Math.max(-5.5, Math.min(6.5, pos.current.z))
 
     // Game-style boot-fall head-bob — stronger while sprinting.
-    const bobFreq = sprinting ? 13.5 : 8.5
-    const bobTarget = moving ? (sprinting ? 0.065 : 0.04) : 0
-    bobAmount.current += (bobTarget - bobAmount.current) * Math.min(1, dt * 10)
+    const bobFreq = sprinting ? 15.5 : 9.5
+    const bobTarget = moving ? (sprinting ? 0.09 : 0.055) : 0
+    bobAmount.current += (bobTarget - bobAmount.current) * Math.min(1, dt * 12)
     if (moving) bobPhase.current += dt * bobFreq
     const bob = Math.sin(bobPhase.current) * bobAmount.current
-    const sway = Math.cos(bobPhase.current * 0.5) * bobAmount.current * 0.55
+    const sway = Math.cos(bobPhase.current * 0.5) * bobAmount.current * 0.7
 
     camera.position.set(pos.current.x + sway, pos.current.y + bob, pos.current.z)
     pos.current.y = 1.55
     camera.rotation.order = 'YXZ'
     camera.rotation.y = yaw.current
-    camera.rotation.x = pitch.current + bob * 0.22
+    camera.rotation.x = pitch.current + bob * 0.28
     // Sprint FOV punch
-    const targetFov = sprinting && moving ? 78 : 68
+    const targetFov = sprinting && moving ? 82 : 70
     if (camera.isPerspectiveCamera) {
-      camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 6)
+      camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 7)
       camera.updateProjectionMatrix()
     }
 
@@ -1379,16 +1385,17 @@ function SceneContent({
       {!walkMode && <CameraIntro enabled={intro} cinematic />}
       <WalkController enabled={walkMode} paused={walkPaused} posRef={posRef} />
       <CrosshairInteract enabled={walkMode && !walkPaused} />
-      <color attach="background" args={['#0b0e14']} />
-      <fog attach="fog" args={['#0b0e14', 12, 32]} />
-      <ambientLight intensity={0.28} />
-      <directionalLight castShadow position={[6, 10, 4]} intensity={0.95} shadow-mapSize={[1024, 1024]} />
-      <directionalLight position={[-4, 6, -6]} intensity={0.35} color="#94a3b8" />
+      <color attach="background" args={['#070a10']} />
+      {/* Tight fog sells depth in first-person — hall falls off like a game level */}
+      <fog attach="fog" args={['#070a10', walkMode ? 5.5 : 10, walkMode ? 18 : 28]} />
+      <ambientLight intensity={0.22} />
+      <directionalLight castShadow position={[6, 10, 4]} intensity={1.05} shadow-mapSize={[1024, 1024]} />
+      <directionalLight position={[-4, 6, -6]} intensity={0.4} color="#94a3b8" />
       <PulsingLight />
       <Environment preset="warehouse" />
       <Floor />
       <CorridorShell dockBusy={dockBusy} doorOpen={doorOpen} />
-      <HallDust count={90} />
+      <HallDust count={walkMode ? 140 : 90} />
       <RoomPortal position={[-6.2, 1.05, 0.2]} label="Staging / dock" roomId="loading-dock" onEnterRoom={onEnterRoom} color="#f59e0b" />
       <RoomPortal position={[-5.2, 1.05, 3.2]} label="Reception" roomId="reception" onEnterRoom={onEnterRoom} color="#94a3b8" />
       <RoomPortal position={[5.8, 1.05, 0.4]} label="MDF" roomId="mdf" onEnterRoom={onEnterRoom} color="#38bdf8" />
@@ -1696,7 +1703,8 @@ export default function DatacenterTwin3D({
 
   useEffect(() => {
     if (!intro || walkMode) return undefined
-    const id = setTimeout(() => setIntro(false), 4400)
+    // Shorter cinematic — get into WASD walk faster (game, not flyover).
+    const id = setTimeout(() => setIntro(false), 2800)
     return () => clearTimeout(id)
   }, [intro, walkMode])
 
@@ -1707,7 +1715,7 @@ export default function DatacenterTwin3D({
     const id = setTimeout(() => {
       autoWalkStarted.current = true
       setWalkMode(true)
-    }, 500)
+    }, 180)
     return () => clearTimeout(id)
   }, [intro, walkMode, immersive])
 
@@ -1873,7 +1881,7 @@ export default function DatacenterTwin3D({
           <Canvas
             shadows
             dpr={[1, Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio : 1.5)]}
-            camera={{ position: [12, 9, 14], fov: inGame ? 68 : 42, near: 0.1, far: 80 }}
+            camera={{ position: [12, 9, 14], fov: inGame ? 70 : 42, near: 0.1, far: 80 }}
             gl={{ antialias: true, powerPreference: 'high-performance' }}
           >
             <Physics gravity={[0, -9.81, 0]} colliders={false} paused={!physicsEnabled}>

@@ -128,19 +128,25 @@ export default function DatacenterSimulator({
   // tab bar / status strip / goal banner into the twin's thin in-world HUD.
   const [twinImmersive, setTwinImmersive] = useState(true)
   const [floorView, setFloorView] = useState(() => {
-    // Always prefer immersive 3D hall. Persist user choice; never force 2D
-    // just because the viewport is narrow — 3D walk works on tablets too.
+    // Game-style default is always 3D walk. Only honor an explicit prefer2d
+    // flag (set when the learner clicks "2D floor") — legacy `floorView=2d`
+    // alone used to trap people in the isometric plan forever.
     try {
       if (typeof window !== 'undefined') {
+        if (window.localStorage?.getItem('fixitlab.dc.prefer2d') === '1') return '2d'
         const saved = window.localStorage?.getItem('fixitlab.dc.floorView')
-        if (saved === '2d' || saved === '3d') return saved
+        if (saved === '3d') return '3d'
       }
     } catch { /* ignore */ }
     return '3d'
   })
   const setFloorViewPersist = useCallback((v) => {
     setFloorView(v)
-    try { window.localStorage?.setItem('fixitlab.dc.floorView', v) } catch { /* ignore */ }
+    try {
+      window.localStorage?.setItem('fixitlab.dc.floorView', v)
+      if (v === '2d') window.localStorage?.setItem('fixitlab.dc.prefer2d', '1')
+      else window.localStorage?.removeItem('fixitlab.dc.prefer2d')
+    } catch { /* ignore */ }
   }, [])
   const dragRef = useRef(null)
   const movedRef = useRef(false)
@@ -360,39 +366,41 @@ export default function DatacenterSimulator({
   }
 
   return (
-    <div className={simPanelRoot(embedded, 'dc-shell sim-product')}>
-      <LabChromeBar title="Data Center Console" subtitle={scenario?.title || slug}
-        accent={ACCENT} className="lab-chrome-bar !bg-[#1a1d2b]" {...chromeProps}>
-        <GlobalSearch
-          services={searchServices}
-          resources={searchResources}
-          placeholder="Search racks, servers, rooms… (/)"
-          onSelect={(hit) => {
-            if (hit.navKey === 'rooms' || hit.meta?.type) {
-              const room = rooms.find((r) => r.id === hit.id) || hit.meta
-              if (room?.id) enterRoom(room)
-              return
-            }
-            if (hit.meta?.hostname || hit.navKey === 'floor') {
-              const srv = servers.find((s) => s.id === hit.id) || hit.meta
-              if (srv?.rack || srv?.rack_id) {
-                const rack = racks.find((r) => r.id === (srv.rack || srv.rack_id))
-                const room = rooms.find((r) => (r.racks || []).includes(rack?.id))
-                if (room) enterRoom(room)
+    <div className={simPanelRoot(embedded, `dc-shell sim-product${immersed3d ? ' dc-shell-game' : ''}`)}>
+      {!immersed3d && (
+        <LabChromeBar title="Data Center Console" subtitle={scenario?.title || slug}
+          accent={ACCENT} className="lab-chrome-bar !bg-[#1a1d2b]" {...chromeProps}>
+          <GlobalSearch
+            services={searchServices}
+            resources={searchResources}
+            placeholder="Search racks, servers, rooms… (/)"
+            onSelect={(hit) => {
+              if (hit.navKey === 'rooms' || hit.meta?.type) {
+                const room = rooms.find((r) => r.id === hit.id) || hit.meta
+                if (room?.id) enterRoom(room)
+                return
               }
-              if (srv?.id) {
-                setSelectedServerId(srv.id)
-                setDrawerTab('overview')
+              if (hit.meta?.hostname || hit.navKey === 'floor') {
+                const srv = servers.find((s) => s.id === hit.id) || hit.meta
+                if (srv?.rack || srv?.rack_id) {
+                  const rack = racks.find((r) => r.id === (srv.rack || srv.rack_id))
+                  const room = rooms.find((r) => (r.racks || []).includes(rack?.id))
+                  if (room) enterRoom(room)
+                }
+                if (srv?.id) {
+                  setSelectedServerId(srv.id)
+                  setDrawerTab('overview')
+                }
               }
-            }
-          }}
-        />
-        {onToggleTerminal && (
-          <button type="button" className="lab-chrome-btn flex items-center gap-1" onClick={onToggleTerminal}>
-            <Terminal size={13} /> {simTerminalOpen ? 'Hide terminal' : 'Terminal'}
-          </button>
-        )}
-      </LabChromeBar>
+            }}
+          />
+          {onToggleTerminal && (
+            <button type="button" className="lab-chrome-btn flex items-center gap-1" onClick={onToggleTerminal}>
+              <Terminal size={13} /> {simTerminalOpen ? 'Hide terminal' : 'Terminal'}
+            </button>
+          )}
+        </LabChromeBar>
+      )}
 
       {goal.objective && !immersed3d && (
         <div className="sim-goal-banner">

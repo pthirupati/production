@@ -573,7 +573,20 @@
   display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; color: #cbd3e3;
 }
 .dc-3d-canvas-wrap { flex: 1; min-height: 360px; position: relative; }
-.dc-3d-root.dc-3d-immersive .dc-3d-canvas-wrap { min-height: 520px; }
+/* Full-viewport game surface — not a 520px dashboard panel */
+.dc-shell-game {
+  position: fixed !important; inset: 0; z-index: 70;
+  width: 100vw; height: 100dvh; max-height: 100dvh;
+  border-radius: 0 !important; margin: 0 !important;
+}
+.dc-shell-game .dc-3d-root,
+.dc-shell-game .dc-3d-canvas-wrap {
+  flex: 1; min-height: 0; height: 100%;
+}
+.dc-3d-root.dc-3d-immersive .dc-3d-canvas-wrap {
+  min-height: min(100dvh, 100%);
+  height: 100%;
+}
 .dc-3d-canvas-wrap canvas { display: block; width: 100% !important; height: 100% !important; }
 .dc-3d-loading {
   flex: 1; min-height: 360px; display: flex; flex-direction: column; align-items: center; justify-content: center;

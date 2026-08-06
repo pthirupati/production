@@ -1975,13 +1975,15 @@ export default function LabRunner() {
   const yamlCompanionChips = companionChipsFromConsoles(scenario?.consoles, { techSlug: techSlugLc })
   const showVyosLink = isVyosLab || yamlCompanionChips.includes('vyos')
   const showPackerLink = isPackerLab || yamlCompanionChips.includes('packer')
-  const openCompanion = useCallback((kind) => {
+  // Plain helpers (not useCallback/useMemo): LabRunner early-returns while
+  // loading/provisioning above this block, so hooks here would violate rules-of-hooks.
+  const openCompanion = (kind) => {
     try {
       window.dispatchEvent(new CustomEvent('fixitlab:open-companion', { detail: { kind } }))
     } catch { /* ignore */ }
-  }, [])
+  }
   // Floating strip chips — always visible above fullscreen companions.
-  const floatingCompanionChips = useMemo(() => {
+  const floatingCompanionChips = (() => {
     const ordered = []
     const add = (kind, ok) => { if (ok && !ordered.includes(kind)) ordered.push(kind) }
     add('vyos', showVyosLink)
@@ -1995,12 +1997,7 @@ export default function LabRunner() {
     add('azure', showHostedAzureLink || isAzureLab)
     add('gcp', showHostedGcpLink || isGcpLab)
     return ordered
-  }, [
-    showVyosLink, showHostedBaremetalLink, isBaremetalGuiLab, showLxdLink,
-    showAwxLink, isAwxLab, showPackerLink, showDatacenterLink, isTerraformSimLab,
-    yamlCompanionChips, showHostedAwsLink, isAwsLab, showHostedAzureLink, isAzureLab,
-    showHostedGcpLink, isGcpLab,
-  ])
+  })()
   const activeCompanionKind = showVyosSim ? 'vyos'
     : showPackerSim ? 'packer'
     : showAwxSim ? 'awx'
