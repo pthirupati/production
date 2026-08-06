@@ -43,11 +43,19 @@ export default function HeroSection({ technologies, stats = {} }) {
             <span className="fx-hero-gradient-text">Fix them.</span> Get hired.
           </motion.h1>
           <motion.p className="fx-hero-lead" variants={fadeUp}>
-            Train like your whole platform team is on call — isolated break-fix labs across 30+ technologies
-            (Linux, cloud, containers, networking, databases, VMware, Ansible, security, and more).
-            Pick up a Jira incident, SSH into a real environment, fix it under time pressure, and prove it with
-            instant validation. Then sit a voice AI interview and earn verifiable certificates — all at a
-            price that makes serious hands-on practice affordable.
+            Train like your whole platform team is on call. Break-fix labs across{' '}
+            <strong>{stats.total_technologies || techCount}+ technologies</strong> — Linux, AWS, Azure,
+            GCP, Kubernetes, Docker, Terraform, VMware, Ansible, networking, databases, security &amp; SOC,
+            observability, and a deep <strong>AI infrastructure track</strong>: GPUs and NVIDIA
+            diagnostics, LLM serving, MLOps, prompt engineering and data science.
+          </motion.p>
+          <motion.p className="fx-hero-lead" variants={fadeUp}>
+            Start from zero with guided tutorials, pick up a Jira incident, SSH into a real environment,
+            fix it under time pressure, and prove it with instant validation. Walk a{' '}
+            <strong>3D datacenter</strong> to swap failed hardware, chase thermal and power faults, and trace
+            cabling. Then ship multi-stage <strong>portfolio projects</strong>, sit a{' '}
+            <strong>voice AI interview</strong>, and earn verifiable certificates — all at a price that makes
+            serious hands-on practice affordable.
           </motion.p>
           <motion.div className="fx-hero-cta-row" variants={fadeUp}>
             <Link to="/register" data-magnetic className="fx-btn-primary">
