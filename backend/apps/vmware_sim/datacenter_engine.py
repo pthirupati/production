@@ -3063,6 +3063,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if not ticket:
             return {"ok": False, "error": f"Ticket {ticket_id} not found"}
         try:
+            rack_pdus = (state.get("power_chain") or {}).get("rack_pdus") or []
+            # Dual-feed lists A then B; last-wins would hide a hot A behind idle B=0%.
+            rack_loads = {}
+            for p in rack_pdus:
+                rack = p.get("rack")
+                if not rack:
+                    continue
+                pct = int(p.get("load_pct") or 0)
+                if pct >= int(rack_loads.get(rack) or 0):
+                    rack_loads[rack] = pct
             advance_ticket(
                 ticket,
                 payload.get("advance") or "assign",
@@ -3079,10 +3089,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 # rather than being a free-text note (audit L2267).
                 facility={
                     **(state.get("facility") or {}),
-                    "rack_loads": {
-                        p.get("rack"): p.get("load_pct")
-                        for p in (state.get("power_chain") or {}).get("rack_pdus") or []
-                    },
+                    "rack_loads": rack_loads,
                 },
             )
         except ValueError as exc:

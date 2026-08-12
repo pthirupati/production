@@ -176,7 +176,7 @@ coding_spec:
   - name: lang
     code: assert(PAGE_HTML.indexOf('lang=') >= 0);
   - name: s89_case_2
-    code: assert(typeof solution === "function" || typeof solution !== "undefined");
+    code: assert(/<h1[^>]*>\s*Welcome\s*<\/h1>/i.test(PAGE_HTML), 'h1 should say Welcome');
   - name: s89_case_3
-    code: assert(true);
+    code: assert(/<!DOCTYPE\s+html>/i.test(PAGE_HTML), 'missing doctype');
   timeout: 8

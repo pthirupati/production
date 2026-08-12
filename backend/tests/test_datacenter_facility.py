@@ -310,7 +310,13 @@ class ThermalLoadCouplingTests(SimpleTestCase):
 
     def test_rack_load_varies_by_what_is_racked(self):
         state = dc.get_state(self.session_id)["state"]
-        pdus = {p["rack"]: p["load_kw"] for p in state["power_chain"]["rack_pdus"]}
+        # Dual-feed PDUs: take the busiest feed per rack (B is often idle at 0).
+        pdus = {}
+        for p in state["power_chain"]["rack_pdus"]:
+            rack = p["rack"]
+            kw = float(p.get("load_kw") or 0)
+            if kw >= float(pdus.get(rack) or 0):
+                pdus[rack] = kw
         # R03 holds the GPU node; R06 holds a single cache node.
         self.assertGreater(pdus["R03"], pdus["R06"])
         # Empty data-hall racks draw nothing at all.

@@ -87,10 +87,14 @@ class CertificationsTestCase(APITestCase):
         resp = self.client.get("/api/certifications/")
         self.assertEqual(resp.status_code, 200)
         codes = {t["code"] for t in resp.data["tracks"]}
-        # All seven seeded tracks should be active and listed.
+        # Every YAML under management/commands/data/ is seeded and listed.
         self.assertEqual(
             codes,
-            {"RHCSA", "RHCE", "CKA", "CKAD", "CKS", "LFCS", "TF-ASSOCIATE"},
+            {
+                "RHCSA", "RHCE", "CKA", "CKAD", "CKS", "LFCS", "TF-ASSOCIATE",
+                "AWS-SAA", "AZ-104", "GCP-ACE",
+                "FL-PYDEV", "FL-SEC", "FL-NET", "FL-ARCH-EXPERT",
+            },
         )
 
     def test_track_detail_anonymous_zero_progress(self):
