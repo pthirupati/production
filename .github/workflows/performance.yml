@@ -75,7 +75,7 @@ jobs:
             --assert.assertions.best-practices=warn
       - name: Upload Lighthouse results
         if: always() && steps.cfg.outputs.skip != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lighthouse-results-${{ github.run_id }}
           path: .lighthouseci/
@@ -118,7 +118,7 @@ jobs:
             --summary-trend-stats="avg,min,med,max,p(90),p(95),p(99)"
       - name: Upload k6 results
         if: always() && steps.cfg.outputs.skip != 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: k6-results-${{ github.run_id }}
           path: /tmp/k6-results.json

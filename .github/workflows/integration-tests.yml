@@ -80,7 +80,7 @@ jobs:
             --keepdb
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: integration-test-coverage
           path: backend/coverage.xml
@@ -190,7 +190,7 @@ jobs:
             --junit-xml=schemathesis-results.xml || true
       - name: Upload contract test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: api-contract-results
           path: schemathesis-results.xml
