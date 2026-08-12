@@ -298,7 +298,7 @@ def classify_coding(spec: dict) -> tuple[str, str]:
         return "CODING-NO-TESTS", "no visible_tests and no hidden_tests"
 
     verdicts = [_classify_assertion(t.get("code", "")) for t in tests]
-    names = {(t.get("name") or "").strip().lower() for t in tests}
+    names = {(str(t.get("name") if t.get("name") is not None else "")).strip().lower() for t in tests}
     placeholder = bool(names & _PLACEHOLDER_TEST_NAMES)
     detail = f"{len(tests)} test(s); " + ", ".join(sorted(set(verdicts)))
     if placeholder:

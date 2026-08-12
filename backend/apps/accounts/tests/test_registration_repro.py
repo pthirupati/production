@@ -48,6 +48,7 @@ class EmailOTPRegistrationTest(APITestCase):
                 "password": "Sup3rStr0ng!pw",
                 "first_name": "Fresh",
                 "last_name": "User",
+                "accepted_legal": True,
             },
             format="json",
         )
@@ -60,7 +61,7 @@ class EmailOTPRegistrationTest(APITestCase):
         session_token = self._verified_otp("slow@example.com", age_minutes=5)
         resp = self.client.post(
             "/api/auth/register/",
-            {"session_token": session_token, "password": "Sup3rStr0ng!pw"},
+            {"session_token": session_token, "password": "Sup3rStr0ng!pw", "accepted_legal": True},
             format="json",
         )
         assert resp.status_code == 201, (resp.status_code, dict(resp.data))
@@ -71,7 +72,7 @@ class EmailOTPRegistrationTest(APITestCase):
         session_token = self._verified_otp("stale@example.com", age_minutes=45)
         resp = self.client.post(
             "/api/auth/register/",
-            {"session_token": session_token, "password": "Sup3rStr0ng!pw"},
+            {"session_token": session_token, "password": "Sup3rStr0ng!pw", "accepted_legal": True},
             format="json",
         )
         assert resp.status_code == 400, (resp.status_code, dict(resp.data))
@@ -81,7 +82,7 @@ class EmailOTPRegistrationTest(APITestCase):
         session_token = self._verified_otp("enf@example.com")
         resp = self.client.post(
             "/api/auth/register/",
-            {"session_token": session_token, "password": "Sup3rStr0ng!pw"},
+            {"session_token": session_token, "password": "Sup3rStr0ng!pw", "accepted_legal": True},
             format="json",
         )
         assert resp.status_code == 201, (resp.status_code, dict(resp.data))
@@ -124,7 +125,7 @@ class EmailOTPRegistrationTest(APITestCase):
 
         reg = self.client.post(
             "/api/auth/register/",
-            {"session_token": session_token, "password": "Sup3rStr0ng!pw"},
+            {"session_token": session_token, "password": "Sup3rStr0ng!pw", "accepted_legal": True},
             format="json",
         )
         assert reg.status_code == 201, (reg.status_code, dict(reg.data))

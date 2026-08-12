@@ -152,7 +152,7 @@ coding_spec:
   - name: star
     code: assert(matchPath('*', '/x') === true);
   hidden_tests:
-  - name: no
+  - name: "no"
     code: assert(matchPath('/a', '/b') === false);
   - name: n
     code: assert(matchPath('/v2', '/v2') === true);

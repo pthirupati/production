@@ -170,7 +170,7 @@ coding_spec:
   hidden_tests:
   - name: media
     code: assert(/@media/i.test(PAGE_CSS));
-  - name: 600
+  - name: "600"
     code: assert(/600px/i.test(PAGE_CSS));
   - name: s89_case_2
     code: assert(typeof solution === "function" || typeof solution !== "undefined");

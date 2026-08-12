@@ -150,7 +150,7 @@ coding_spec:
   - name: 'yes'
     code: assert parse_flag(['app', '--verbose'], 'verbose') is True
   hidden_tests:
-  - name: no
+  - name: "no"
     code: assert parse_flag(['app'], 'verbose') is False
   - name: n
     code: assert parse_flag(['--v8'], 'v8') is True

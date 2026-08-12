@@ -96,10 +96,15 @@ class SimSessionEvictionTests(SimpleTestCase):
         )
 
     def test_recently_idle_session_is_not_evicted(self):
-        """Just under the TTL must survive — no off-by-one eviction."""
-        self._register("recent", idle_seconds=sim_shell._SIM_IDLE_TTL_SECONDS - 60)
-        self._register("trigger")
-        self.assertIn("recent", sim_shell._SIM_SESSIONS)
+        """Just under the hard TTL must survive — no off-by-one eviction.
+
+        Soft-evict (streamless engines idle >5m) is orthogonal and disabled here
+        so this assertion still measures the hard TTL boundary.
+        """
+        with mock.patch.object(sim_shell, "_SIM_SOFT_IDLE_SECONDS", 0):
+            self._register("recent", idle_seconds=sim_shell._SIM_IDLE_TTL_SECONDS - 60)
+            self._register("trigger")
+            self.assertIn("recent", sim_shell._SIM_SESSIONS)
 
     def test_reads_refresh_the_idle_clock(self):
         """A session being actively used must not age out mid-lab."""

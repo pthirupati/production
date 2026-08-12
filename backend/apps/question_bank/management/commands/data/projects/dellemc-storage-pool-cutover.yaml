@@ -31,3 +31,10 @@ tasks:
   hint: Use Check Solution after the change.
   order: 3
   depends_on: DEL1-2
+- jira_key: DEL1-4
+  title: Harden and document leftovers
+  description: Close residual findings and attach evidence for review.
+  acceptance_criteria: Residual checklist is empty; evidence linked in the ticket.
+  hint: Re-run Check Solution and capture the green result.
+  order: 4
+  depends_on: DEL1-3

@@ -156,10 +156,7 @@ class AiInfraGpuCommandsTests(SimpleTestCase):
         self.assertIn("GPU", rocm)
 
     def test_nvidia_smi_query_sections(self):
-        engine = UnifiedSimulationEngine(
-            scenario_slug="ai-infra-maas-commission-h100",
-            simulation_type="gpu",
-        )
+        engine = _healthy_gpu_engine("ai-infra-maas-commission-h100")
         for cmd in (
             "nvidia-smi -q -d MEMORY",
             "nvidia-smi -q -d TEMPERATURE",
@@ -186,10 +183,7 @@ class AiInfraGpuCommandsTests(SimpleTestCase):
             self.assertTrue(len(out) > 10, msg=cmd)
 
     def test_nvidia_command_matrix(self):
-        engine = UnifiedSimulationEngine(
-            scenario_slug="ai-infra-maas-commission-h100",
-            simulation_type="gpu",
-        )
+        engine = _healthy_gpu_engine("ai-infra-maas-commission-h100")
         for cmd, needles in _NVIDIA_MATRIX:
             with self.subTest(cmd=cmd):
                 out = str(engine.shell.run(cmd))
@@ -210,20 +204,14 @@ class AiInfraGpuCommandsTests(SimpleTestCase):
                     self.assertIn(needle, out, msg=f"{cmd} missing {needle!r}")
 
     def test_nvlink_covers_full_gpu_count(self):
-        engine = UnifiedSimulationEngine(
-            scenario_slug="ai-infra-maas-commission-h100",
-            simulation_type="gpu",
-        )
+        engine = _healthy_gpu_engine("ai-infra-maas-commission-h100")
         out = str(engine.shell.run("nvidia-smi nvlink --status"))
         self.assertIn("GPU 7:", out)
         topo = str(engine.shell.run("nvidia-smi topo -m"))
         self.assertIn("GPU7", topo)
 
     def test_nvidia_proc_driver_sysfs(self):
-        engine = UnifiedSimulationEngine(
-            scenario_slug="ai-infra-maas-commission-h100",
-            simulation_type="gpu",
-        )
+        engine = _healthy_gpu_engine("ai-infra-maas-commission-h100")
         ver = str(engine.shell.run("cat /proc/driver/nvidia/version"))
         self.assertIn("NVRM version", ver)
         self.assertIn("550", ver)

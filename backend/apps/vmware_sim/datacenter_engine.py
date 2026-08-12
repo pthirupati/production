@@ -333,6 +333,17 @@ def rack_load_kw(rack_id: str, servers: list[dict]) -> float:
     return round(total, 2)
 
 
+def _max_rack_loads(rack_pdus: list[dict]) -> dict:
+    """Per-rack load_pct, taking max across dual feeds (B=0 must not wipe A)."""
+    loads: dict = {}
+    for p in rack_pdus or []:
+        rack = p.get("rack")
+        if not rack:
+            continue
+        loads[rack] = max(int(loads.get(rack) or 0), int(p.get("load_pct") or 0))
+    return loads
+
+
 def _rack_pdus(servers: list[dict] | None = None) -> list[dict]:
     """Build A/B dual-feed PDUs per rack (audit D14).
 
@@ -3079,10 +3090,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 # rather than being a free-text note (audit L2267).
                 facility={
                     **(state.get("facility") or {}),
-                    "rack_loads": {
-                        p.get("rack"): p.get("load_pct")
-                        for p in (state.get("power_chain") or {}).get("rack_pdus") or []
-                    },
+                    # Dual-feed racks list A then B (B often 0 until failover).
+                    # Keep the max load per rack so B=0 does not erase A's reading.
+                    "rack_loads": _max_rack_loads(
+                        (state.get("power_chain") or {}).get("rack_pdus") or []
+                    ),
                 },
             )
         except ValueError as exc:

@@ -28,8 +28,21 @@ from django.test import Client, SimpleTestCase
 
 
 class _Base(SimpleTestCase):
+    # Dead-database tests must not mock ensure_connection as succeeding.
+    _mock_db_ok = True
+
     def setUp(self):
         self.client = Client()
+        # SimpleTestCase forbids DB access; readiness probes Postgres first and
+        # would otherwise force overall status to "error"/503 and mask the
+        # Redis/broker/docker assertions these tests are actually about.
+        if self._mock_db_ok:
+            self._db_ok = mock.patch(
+                "django.db.backends.base.base.BaseDatabaseWrapper.ensure_connection",
+                return_value=None,
+            )
+            self._db_ok.start()
+            self.addCleanup(self._db_ok.stop)
 
     def _ready(self):
         resp = self.client.get("/api/health/ready/")
@@ -133,6 +146,8 @@ class DockerIsNotApplicableOffTheLabHostTests(_Base):
 class ADeadDatabaseStillFailsTests(_Base):
     """Guard the guard: if everything merely 'degrades', readiness stops being a
     probe at all. The database is the one hard dependency."""
+
+    _mock_db_ok = False
 
     def test_a_dead_database_is_a_503(self):
         with mock.patch(

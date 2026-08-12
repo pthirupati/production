@@ -22,7 +22,11 @@ from django.test import SimpleTestCase
 from apps.vmware_sim import aws_engine as ae
 from apps.vmware_sim.aws_v2_facades import ensure_v2
 
-SCENARIO_DIR = "/Users/tponguluri/fixitlab/scenarios/aws"
+SCENARIO_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "scenarios",
+    "aws",
+)
 
 
 def _academy_slugs() -> list[str]:

@@ -53,7 +53,7 @@ def _is_empty_coding_lab(data):
     tests = list(spec.get("visible_tests") or []) + list(spec.get("hidden_tests") or [])
     if not tests:
         return True
-    if not any((t.get("name") or "").lower().startswith("placeholder") for t in tests):
+    if not any(str(t.get("name") or "").lower().startswith("placeholder") for t in tests):
         return False
     body = "\n".join(f.get("content", "") for f in (spec.get("files") or []))
     return "NotImplementedError" in body
