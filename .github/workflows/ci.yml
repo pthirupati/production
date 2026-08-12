@@ -30,8 +30,7 @@ jobs:
 
   backend:
     runs-on: ubuntu-latest
-    # Suite grew past the old 45m wall (canceled at timeout); 75 gives headroom.
-    timeout-minutes: 75
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16

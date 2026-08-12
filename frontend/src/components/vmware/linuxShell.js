@@ -1269,7 +1269,7 @@ function dnfProgressChunks(pkgs, action = 'install') {
   const all = []
   if (action === 'remove') {
     const chunks = [['Running transaction check', 'Running transaction test', 'Transaction test succeeded', 'Running transaction']]
-    pkgs.forEach((p, i) => chunks.push([`  Erasing          : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${pkgs.length}`,
+    pkgs.forEach((p, _i) => chunks.push([`  Erasing          : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${pkgs.length}`,
       `  Verifying        : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${pkgs.length}`]))
     chunks.push(['', 'Removed:', ...pkgs.map(p => `  ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64`), '', 'Complete!'])
     return chunks
@@ -1280,8 +1280,8 @@ function dnfProgressChunks(pkgs, action = 'install') {
   chunks.push(['--------------------------------------------------------------------------------',
     `Total                                           ${all.reduce((s, p) => s + pkgInfo(p).sizeK, 0)} kB/s | ${all.reduce((s, p) => s + pkgInfo(p).sizeK, 0)} kB     00:01`,
     'Running transaction check', 'Transaction check succeeded.', 'Running transaction test', 'Transaction test succeeded.', 'Running transaction'])
-  all.forEach((p, i) => chunks.push([`  Installing       : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${all.length}`]))
-  all.forEach((p, i) => chunks.push([`  Verifying        : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${all.length}`]))
+  all.forEach((p, _i) => chunks.push([`  Installing       : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${all.length}`]))
+  all.forEach((p, _i) => chunks.push([`  Verifying        : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${all.length}`]))
   chunks.push(['', 'Installed:', ...all.map(p => `  ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64`), '', 'Complete!'])
   return chunks
 }
@@ -1316,7 +1316,7 @@ function aptProgressChunks(pkgs, action = 'install') {
     return chunks
   }
   const chunks = []
-  all.forEach((p, i) => chunks.push([`Get:${i + 1} http://archive.ubuntu.com/ubuntu jammy/main amd64 ${p} amd64 ${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1 [${pkgInfo(p).sizeK} kB]`]))
+  all.forEach((p, _i) => chunks.push([`Get:${i + 1} http://archive.ubuntu.com/ubuntu jammy/main amd64 ${p} amd64 ${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1 [${pkgInfo(p).sizeK} kB]`]))
   chunks.push([`Fetched ${all.reduce((s, p) => s + pkgInfo(p).sizeK, 0)} kB in 1s (${all.reduce((s, p) => s + pkgInfo(p).sizeK, 0)} kB/s)`,
     '(Reading database ... 184221 files and directories currently installed.)'])
   all.forEach((p, _i) => chunks.push([`Selecting previously unselected package ${p}.`, `Unpacking ${p} (${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1) ...`]))

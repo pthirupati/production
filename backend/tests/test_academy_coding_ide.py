@@ -83,9 +83,6 @@ class AcademyCodingIdeTests(SimpleTestCase):
             "<title>Lab</title></head><body><main><h1>Welcome</h1></main></body></html>"
         )
         fixed_code = compose_user_code_from_files(files, "solution.js")
-        # Session-89 decorative cases expect a `solution` binding; HTML labs grade
-        # via PAGE_HTML, so expose a no-op function that keeps those asserts green.
-        fixed_code = fixed_code + "\nfunction solution() { return PAGE_HTML; }\n"
         ok = grade_submission("javascript", fixed_code, tests, timeout=8)
         self.assertTrue(ok.all_passed, ok.error or ok.outcomes)
 

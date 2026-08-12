@@ -65,10 +65,8 @@ export function applyAuthHeaders(headers = {}, auth = { type: 'none' }) {
   } else if (type === 'basic' && (auth.username || auth.password) && !hasAuth) {
     const raw = `${auth.username || ''}:${auth.password || ''}`
     const b64 = typeof btoa === 'function'
-      ? btoa(unescape(encodeURIComponent(raw)))
-      : (typeof globalThis !== 'undefined' && globalThis.Buffer
-        ? globalThis.Buffer.from(raw, 'utf8').toString('base64')
-        : btoa(raw))
+      ? btoa(raw)
+      : Buffer.from(raw, 'utf8').toString('base64')
     out.Authorization = `Basic ${b64}`
   } else if (type === 'apikey' && auth.key && auth.value) {
     const hk = auth.key

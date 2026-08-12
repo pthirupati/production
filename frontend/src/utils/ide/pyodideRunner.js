@@ -84,7 +84,7 @@ export async function getPyodide() {
         // its .wasm and stdlib relative to it, so a mismatch would fetch the
         // runtime from somewhere other than the copy we actually shipped.
         return await window.loadPyodide({ indexURL: base })
-      } catch (err) {
+      } catch {
         lastErr = err
       }
     }
@@ -126,7 +126,7 @@ export async function runPython(source) {
     pyodide.setStderr({ batched: (s) => { captured.err += s + '\n' } })
     await pyodide.runPythonAsync(source)
     return { ok: true, stdout: captured.out, stderr: captured.err, error: '' }
-  } catch (err) {
+  } catch {
     return {
       ok: false,
       stdout: captured.out,
@@ -195,7 +195,7 @@ json.dumps({'compile_error': _compile_error, 'results': _results, 'stdout': _out
       stdout: verdict.stdout || '',
       error: verdict.compile_error || '',
     }
-  } catch (err) {
+  } catch {
     return { ok: false, results: [], stdout: '', error: String(err && err.message ? err.message : err) }
   }
 }

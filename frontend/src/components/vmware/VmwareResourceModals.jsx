@@ -1,15 +1,40 @@
 import { cloneElement, isValidElement, useId, useState } from 'react'
-import VmModal from './VmModal'
+import { useModalA11y } from '../ConfirmModal'
 
 /* Shared modal chrome matching the dark vSphere theme. All text uses the
    light --vm-text / explicit hex tokens so nothing renders white-on-white. */
 function Modal({ title, onClose, children, footer, width = 'w-[440px]' }) {
-  // Prefer the shared VmModal shell (a11y trap + overlay) so orphanModules
-  // stays green and every vSphere modal shares one chrome implementation.
+  // Keep vSphere chrome; borrow focus trap / Escape / focus restore from the
+  // shared hook (same pattern as MachinesTable / OnboardingTour).
+  const dialogRef = useModalA11y(true, onClose)
   return (
-    <VmModal title={title} onClose={onClose} footer={footer} width={`${width} max-w-[95vw]`}>
-      <div className="space-y-3">{children}</div>
-    </VmModal>
+    <div
+      className="vm-modal-overlay"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.() }}
+    >
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className={`vm-modal ${width} max-w-[95vw] outline-none`}
+      >
+        <div className="vm-modal-header">
+          <span>{title}</span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close dialog"
+            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="vm-modal-body space-y-3">{children}</div>
+        <div className="vm-modal-footer">{footer}</div>
+      </div>
+    </div>
   )
 }
 

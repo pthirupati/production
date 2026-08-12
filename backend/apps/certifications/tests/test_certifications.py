@@ -87,11 +87,10 @@ class CertificationsTestCase(APITestCase):
         resp = self.client.get("/api/certifications/")
         self.assertEqual(resp.status_code, 200)
         codes = {t["code"] for t in resp.data["tracks"]}
-        # All original seven seeded tracks should be active and listed; newer
-        # cloud tracks may also appear without failing this contract.
-        self.assertTrue(
-            {"RHCSA", "RHCE", "CKA", "CKAD", "CKS", "LFCS", "TF-ASSOCIATE"}.issubset(codes),
-            f"missing core tracks; got {codes}",
+        # All seven seeded tracks should be active and listed.
+        self.assertEqual(
+            codes,
+            {"RHCSA", "RHCE", "CKA", "CKAD", "CKS", "LFCS", "TF-ASSOCIATE"},
         )
 
     def test_track_detail_anonymous_zero_progress(self):
