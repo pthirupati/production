@@ -1986,8 +1986,16 @@ export default function LabRunner() {
     || scenario?.aws_link === true
     || consolesInclude(scenario?.consoles, 'aws')
   )
-  // Terraform / ai-infra / VyOS apply can enlist MAAS / create LXD — surface companion.
-  const showHostedBaremetalLink = !isBaremetalGuiLab && (
+  // Companion MAAS/LXD only when entitled to baremetal OR to the owning lab tech
+  // (ai-infra / terraform / vyos). Scenario flags alone used to open unpaid consoles.
+  const canBaremetalCompanion = userHasTechAccess(techSubs, 'baremetal')
+    || userHasTechAccess(techSubs, 'ai-infra')
+    || techSlugLc === 'ai-infra'
+    || userHasTechAccess(techSubs, 'terraform')
+    || techSlugLc === 'terraform'
+    || isTerraformSimLab
+    || (isVyosLab && (userHasTechAccess(techSubs, 'vyos') || techSlugLc === 'vyos'))
+  const showHostedBaremetalLink = !isBaremetalGuiLab && canBaremetalCompanion && (
     techSlugLc === 'terraform'
     || isTerraformSimLab
     || techSlugLc === 'ai-infra'
@@ -4003,7 +4011,9 @@ export default function LabRunner() {
             label="AWX"
             sessionId={sessionId}
             scenario={scenario}
-            embedded={false}
+            // Fill the overlay flex column — nested `fixed` inside MAAS/lab chrome
+            // was clipping Lab buttons to half the viewport on companion open.
+            embedded
             onExit={() => setShowAwxSim(false)}
             onToggleTerminal={() => setShowAwxSim(false)}
             {...simChromeProps}

@@ -370,6 +370,7 @@ BASE_BINARIES: dict[str, str] = {
     "ip": "/usr/sbin/ip", "ss": "/usr/sbin/ss", "mount": "/usr/bin/mount",
     "umount": "/usr/bin/umount", "lsblk": "/usr/bin/lsblk", "blkid": "/usr/sbin/blkid",
     "dmesg": "/usr/bin/dmesg", "uptime": "/usr/bin/uptime",
+    "dmidecode": "/usr/sbin/dmidecode",
     # util-linux / procps-ng / coreutils tools present on a stock RHEL box.
     "top": "/usr/bin/top", "pidof": "/usr/sbin/pidof", "pgrep": "/usr/bin/pgrep",
     "pkill": "/usr/bin/pkill", "killall": "/usr/bin/killall", "pstree": "/usr/bin/pstree",

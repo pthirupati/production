@@ -3139,16 +3139,16 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
                 )
             return f"ipmitool: executed ({' '.join(parts[1:]) or 'ok'})"
         if "dmidecode" in low:
-            # Persona-aware DMI: AWS Nitro / Azure / GCE / VMware / HPE bare metal.
-            # Generic labs used to always answer HPE even on EC2 guests.
+            # Persona-aware DMI with -t TYPE support (bios/system/baseboard).
             mfr = getattr(shell.state, "dmi_manufacturer", None) or "Dell Inc."
             prod = getattr(shell.state, "dmi_product", None) or "PowerEdge XE9680"
             platform = getattr(shell.state, "host_platform", "") or ""
-            # Only claim HPE ProLiant when this Lab Server is actually bare metal /
-            # datacenter — otherwise prefer the hosting persona already applied.
             if platform and platform not in ("baremetal", "datacenter", "linux"):
                 mfr = getattr(shell.state, "dmi_manufacturer", mfr) or mfr
                 prod = getattr(shell.state, "dmi_product", prod) or prod
+            # Prefer the richer RHELShell handler when present.
+            if hasattr(shell, "_cmd_dmidecode"):
+                return shell._cmd_dmidecode(parts)
             return f"Manufacturer: {mfr}\nProduct Name: {prod}"
         if "esxcli" in low:
             return "Host CPU: Intel Xeon Gold 6248R\nMemory: 256 GB"

@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { useThemeStore } from '../../store/themeStore'
 import {
-  LayoutDashboard, Target, Trophy, User, LogOut, Shield, Menu, X, Bookmark, Layers, Sun, Moon, History, Award, MessageSquare, Search, Mic2, CreditCard, Bot, MonitorPlay, Route, FolderKanban,
+  LayoutDashboard, Target, Trophy, User, LogOut, Shield, Menu, X, Bookmark, Layers, Sun, Moon, History, Award, MessageSquare, Search, Mic2, CreditCard, Bot, FolderKanban,
 } from '../../ui/eagerIcons'
 import { useState, useEffect, useRef } from 'react'
 import NotificationBell from './NotificationBell'
@@ -18,12 +18,9 @@ import { useModalA11y } from '../ConfirmModal'
 const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/technologies', icon: Layers, label: 'Technologies' },
-  // /simulators is an authenticated route whose only inbound link used to be the
-  // anonymous public nav ("Lab Consoles"), so logged-out users bounced to /login
-  // and logged-in users never saw it. Sits next to Technologies because every
-  // card on the page links to /technologies/:slug.
-  { path: '/simulators', icon: MonitorPlay, label: 'Lab Consoles' },
-  { path: '/journeys', icon: Route, label: 'Journeys' },
+  // Journeys stay on the public marketing nav (pre-login). Authenticated users
+  // discover paths via Dashboard / Onboarding — not a duplicate sidebar entry.
+  // Lab Consoles (/simulators) removed: every card linked to /technologies/:slug.
   { path: '/projects', icon: FolderKanban, label: 'Projects' },
   { path: '/scenarios', icon: Target, label: 'All Scenarios' },
   { path: '/interviews', icon: Mic2, label: 'Interviews' },

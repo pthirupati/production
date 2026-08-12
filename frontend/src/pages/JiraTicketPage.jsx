@@ -301,7 +301,13 @@ export default function JiraTicketPage() {
 
                     {pending?.author && (
                       <div className="mb-4 text-sm text-amber-300/90 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
-                        {pending.author} is responding… (~{pending.delaySeconds}s)
+                        {pending.author} is responding…
+                        {' '}
+                        <span className="tabular-nums font-semibold">
+                          {typeof pending.remainingSeconds === 'number'
+                            ? `${pending.remainingSeconds}s`
+                            : `~${pending.delaySeconds || 30}s`}
+                        </span>
                       </div>
                     )}
 

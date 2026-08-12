@@ -326,10 +326,13 @@ export default function Dashboard() {
     hard: { bar: 'from-accent-red to-rose-400', text: 'text-accent-red' },
   }
 
-  // Notifications are excluded on purpose: that call opts into silentError, and an
-  // unread-count badge that fails is not worth a page-level banner.
+  // Only surface the scary banner for loads that blank primary dashboard cards.
+  // Flaky interview/journey/tutorial endpoints used to force a full-page reload
+  // prompt even when progress + labs rendered fine.
   const partialFailure = Object.entries(failed)
-    .some(([key, didFail]) => didFail && key !== 'notifications' && key !== 'progress')
+    .some(([key, didFail]) => didFail && [
+      'achievements', 'activeLabs', 'subscriptions', 'jira', 'bookmarks',
+    ].includes(key))
 
   // Weakest competency, from the interview radar — the only real per-skill score
   // the platform computes. Requires at least one graded attempt, otherwise every

@@ -3265,6 +3265,24 @@ class ProjectStartView(APIView):
 
     def post(self, request, project_id):
         project = get_object_or_404(Project, id=project_id, is_active=True)
+        # Revenue lock: starting a project requires access to its technology.
+        tech = project.technology
+        if tech is not None and not getattr(tech, "is_free", False):
+            from apps.billing.subscription_utils import (
+                user_has_complimentary_access,
+                user_has_technology_access,
+            )
+            if not user_has_complimentary_access(request.user) and not user_has_technology_access(
+                request.user, tech.id
+            ):
+                return Response(
+                    {
+                        "error": "An active subscription for this technology is required to start the project.",
+                        "error_code": "subscription_required",
+                        "technology_slug": getattr(tech, "slug", None),
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
         progress, _ = UserProjectProgress.objects.get_or_create(
             user=request.user, project=project,
             defaults={"status": "in_progress"},
