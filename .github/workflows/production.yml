@@ -1197,9 +1197,9 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: cluster-edge-host, path: _cluster }
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: cluster-env-enc, path: _cluster }
         continue-on-error: true   # absent only on legacy reruns; bootstrap still proceeds
       - name: Load edge host
@@ -1256,7 +1256,7 @@ jobs:
       vault_unseal_key: ${{ steps.vault.outputs.vault_unseal_key }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
         run: |
@@ -1305,7 +1305,7 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
         run: |
@@ -1356,7 +1356,7 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
         run: |
@@ -1404,7 +1404,7 @@ jobs:
     timeout-minutes: 15
     environment: production
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
         run: |
@@ -1444,7 +1444,7 @@ jobs:
     timeout-minutes: 20
     environment: production
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
         run: |
@@ -1488,7 +1488,7 @@ jobs:
     timeout-minutes: 10
     environment: production
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
         run: |
@@ -1522,7 +1522,7 @@ jobs:
     timeout-minutes: 30
     environment: production
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
         run: |
@@ -1563,7 +1563,7 @@ jobs:
     timeout-minutes: 45
     environment: production
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
         run: |
@@ -1622,7 +1622,7 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
         run: |
@@ -1667,7 +1667,7 @@ jobs:
       # Never fail the whole pipeline on a missing artifact (e.g. concurrent
       # queued deploy, expired artifact, or create-cluster skipped). Deploy may
       # already have succeeded — summary is informational only.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         continue-on-error: true
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
