@@ -86,6 +86,82 @@ _ACTION_RE = re.compile(
     re.I,
 )
 
+# Real mechanism / reasoning phrases — NOT bare English like "because" alone.
+# Audit I1: stuffing "because/specifically/second/request" used to hit 100 depth.
+_MECHANISM_PHRASES = (
+    "root cause", "under the hood", "the way it works", "race condition",
+    "eventual consistency", "circuit breaker", "exponential backoff", "backpressure",
+    "idempotent", "cap theorem", "postmortem", "runbook", "bottleneck",
+    "retry logic", "compared to", "instead of", "rather than", "we considered",
+    "tradeoff", "trade-off", "alternative", "blast radius", "failure mode",
+)
+
+_CAUSAL_RE = re.compile(
+    r"\b(because|the reason|underlying|specifically|technically|internally)\b",
+    re.I,
+)
+_STEP_RE = re.compile(
+    r"\b(first|then|next|finally|after that|followed by)\b",
+    re.I,
+)
+
+# Concrete nouns with word boundaries. Deliberately excludes ambiguous everyday
+# tokens ("second", "request", "when") that the old substring list rewarded.
+_CONCRETE_NOUNS = frozenset("""
+pod pods node nodes container containers replica replicas namespace cluster
+endpoint instance region zone cidr cpu memory disk latency throughput
+percentile p99 p95 p50 tps rps qps gb mb tb kib mib gib
+configmap secret secrets probe probes cgroup oom oomkilled crashloopbackoff
+""".split())
+
+
+def _sentence_has_domain(sentence: str) -> bool:
+    tokens = set(_content_tokens(sentence))
+    return bool(tokens & _DOMAIN_TERMS) or bool(_SPECIFIC_RE.search(sentence)) or bool(
+        _COMMANDS.search(sentence)
+    )
+
+
+def score_technical_depth(answer: str) -> int:
+    """0..100 depth from mechanism, causal+domain, multi-step structure — not English filler."""
+    text = (answer or "").strip()
+    if not text:
+        return 0
+    low = text.lower()
+    mechanism = sum(1 for p in _MECHANISM_PHRASES if p in low)
+    domain_unique = len(set(_content_tokens(text)) & _DOMAIN_TERMS)
+    # Causal connectors only count inside a sentence that already has domain substance.
+    causal = 0
+    for sent in re.split(r"[.!?\n]+", text):
+        if not sent.strip():
+            continue
+        if _CAUSAL_RE.search(sent) and _sentence_has_domain(sent):
+            causal += 1
+    steps = len(_STEP_RE.findall(low)) if domain_unique >= 2 else 0
+    commands = len(_COMMANDS.findall(text))
+    raw = (
+        mechanism * 14
+        + min(causal, 3) * 12
+        + min(steps, 3) * 10
+        + min(domain_unique, 8) * 6
+        + min(commands, 3) * 10
+    )
+    return int(min(100, raw))
+
+
+def score_concrete_evidence(answer: str) -> int:
+    """0..100 concrete evidence from quantities, commands, and domain nouns."""
+    text = (answer or "").strip()
+    if not text:
+        return 0
+    quantities = len(_SPECIFIC_RE.findall(text)) + len(_NUMBERS.findall(text))
+    # Deduplicate overlapping number matches roughly by capping.
+    quantities = min(quantities, 8)
+    commands = len(_COMMANDS.findall(text))
+    nouns = len(set(_content_tokens(text)) & _CONCRETE_NOUNS)
+    raw = quantities * 18 + min(commands, 4) * 14 + min(nouns, 8) * 10
+    return int(min(100, raw))
+
 
 def _get_nlp():
     global _NLP
@@ -210,7 +286,7 @@ def analyze_answer(
     relevance = _tfidf_relevance(normalized, question_text, reference_text)
     hedges = len(_HEDGING.findall(low))
     vagueness = min(1.0, hedges / max(wc / 8, 1))
-    depth = min(1.0, (len(evidence) * 0.15) + (len(numbers) * 0.12) + min(wc / 80, 0.5))
+    depth = round(score_technical_depth(normalized) / 100.0, 3)
     confidence = max(0.0, 1.0 - vagueness - (0.1 if wc < 12 else 0))
     stress = min(1.0, hedges * 0.2 + (0.3 if wc < 8 else 0))
 

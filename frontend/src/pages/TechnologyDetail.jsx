@@ -18,6 +18,7 @@ import { useAuthStore } from '../store/authStore'
 import { usePageTitle } from '../hooks/usePageTitle'
 import LimitReachedModal from '../components/LimitReachedModal'
 import SmallScreenLabGate, { useSmallScreenLabGate } from '../components/SmallScreenLabGate'
+import PageBreadcrumbs from '../components/PageBreadcrumbs'
 
 const difficultyConfig = {
   easy:   { label: 'Easy',   color: '#56e0b0', bg: 'rgba(86,224,176,.12)' },
@@ -45,37 +46,44 @@ const TECH_TUTORIAL_TOPICS = {
   linux: ['Linux'],
   'rhel-linux': ['RHEL', 'RHEL Linux'],
   'shell-script': ['Bash', 'Shell Scripting'],
-  docker: ['Docker'],
-  kubernetes: ['Kubernetes'],
-  terraform: ['Terraform'],
+  docker: ['Docker', 'Containerd', 'Podman'],
+  kubernetes: ['Kubernetes', 'Helm', 'OpenShift', 'ArgoCD'],
+  terraform: ['Terraform', 'Pulumi'],
   ansible: ['Ansible'],
-  networking: ['Networking'],
+  networking: ['Networking', 'Cisco', 'VyOS', 'pfSense', 'MikroTik'],
   vmware: ['VMware'],
   windows: ['Windows'],
-  python: ['Python'],
+  python: ['Python', 'Django', 'FastAPI', 'Backend'],
   java: ['Java'],
-  javascript: ['JavaScript'],
+  javascript: ['JavaScript', 'TypeScript', 'Frontend', 'Express.js', 'Next.js'],
   react: ['React'],
   nodejs: ['Node.js'],
-  html: ['HTML'],
-  devops: ['DevOps'],
-  security: ['Security', 'Cybersecurity'],
-  grafana: ['Grafana'],
+  html: ['HTML', 'CSS'],
+  // §C6 — join courses whose playground_slug diverges from Technology.slug
+  // (github/gitlab/git → devops; aiml → ai-ml; monitoring → prometheus/grafana).
+  devops: ['DevOps', 'Jenkins', 'Packer', 'GitHub', 'GitLab', 'Bitbucket', 'Git'],
+  security: ['Security', 'Cybersecurity', 'DevSecOps', 'IAM'],
+  grafana: ['Grafana', 'Loki'],
   prometheus: ['Prometheus', 'Monitoring'],
-  postgresql: ['PostgreSQL'],
+  postgresql: ['PostgreSQL', 'Database'],
   mysql: ['MySQL'],
   sqlite: ['SQLite'],
-  database: ['Database'],
+  database: ['Database', 'MongoDB', 'PostgreSQL', 'MySQL'],
   gpu: ['GPU'],
-  'ai-infra': ['AI Infrastructure', 'AI Infra', 'MAAS', 'GPU'],
-  baremetal: ['Bare Metal'],
-  'ai-ml': ['AI', 'AI / ML'],
+  'ai-infra': ['AI Infrastructure', 'AI Infra', 'MAAS', 'GPU', 'Bare Metal'],
+  baremetal: ['Bare Metal', 'MAAS'],
+  'ai-ml': ['AI', 'AI / ML', 'AI Engineering', 'AI Infrastructure'],
   'data-science': ['Data Science'],
   'prompt-engineering': ['Prompt Engineering'],
   nmap: ['Nmap'],
   wireshark: ['Wireshark'],
   peoplesoft: ['PeopleSoft'],
-  simulation: ['Lab environment'],
+  simulation: ['Lab environment', 'Simulation'],
+  opentelemetry: ['Jaeger', 'Tempo', 'ELK', 'OpenTelemetry', 'Loki'],
+  soc: ['SOC', 'SIEM'],
+  gitops: ['ArgoCD', 'GitOps'],
+  'devsecops-supplychain': ['DevSecOps'],
+  'service-mesh': ['Kubernetes', 'Service Mesh'],
 }
 
 const DIFF_RANK = { easy: 0, medium: 1, hard: 2 }
@@ -375,6 +383,19 @@ export default function TechnologyDetail() {
     })
   }, [techDetail])
 
+  const difficultyCounts = useMemo(() => {
+    const counts = techDetail?.technology?.difficulty_counts || {}
+    return ['easy', 'medium', 'hard', 'expert']
+      .map((key) => ({ key, count: Number(counts[key]) || 0 }))
+      .filter((row) => row.count > 0)
+  }, [techDetail])
+
+  const topicCount = useMemo(() => {
+    const cats = techDetail?.technology?.categories
+    if (Array.isArray(cats) && cats.length) return cats.length
+    return modules.length
+  }, [techDetail, modules])
+
   const skills = useMemo(() => {
     const cats = techDetail?.technology?.categories || []
     const tags = new Set(cats.filter(Boolean))
@@ -480,9 +501,13 @@ export default function TechnologyDetail() {
       <LimitReachedModal info={limitInfo} onClose={() => setLimitInfo(null)} />
       {/* Page header row */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <Link to="/technologies" className="flex items-center gap-1.5 text-[13px] font-semibold text-white/60 hover:text-white transition-colors">
-          <ChevronLeft size={15} /> All technologies
-        </Link>
+        <PageBreadcrumbs
+          items={[
+            { label: 'Home', to: '/dashboard' },
+            { label: 'Technologies', to: '/technologies' },
+            { label: tech.name },
+          ]}
+        />
         {isAuthenticated && isSubscribed && (
           <span className="text-[11.5px] font-semibold px-3 py-1.5 rounded-lg bg-accent-green/12 text-accent-green border border-accent-green/20">
             Subscribed
@@ -542,13 +567,29 @@ export default function TechnologyDetail() {
         </div>
       </ScrollReveal>
 
-      {/* Stats */}
+      {/* Stats — depth (topics + difficulty mix) instead of duplicate catalog counts */}
       {hasScenarios && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-          <FxStatCard value={stats?.total || 0} label="Total labs" color="#fff" delay={0} />
-          <FxStatCard value={stats?.completed || 0} label="Solved" color="#56e0b0" delay={0.05} />
-          <FxStatCard value={stats?.avg || '—'} label="Avg score" color="#49b5ff" delay={0.1} />
-          <FxStatCard value={tech.scenario_count || stats?.total || 0} label="In catalog" color="#b266e0" delay={0.15} />
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <FxStatCard value={stats?.total || 0} label="Total labs" color="#fff" delay={0} />
+            <FxStatCard value={stats?.completed || 0} label="Solved" color="#56e0b0" delay={0.05} />
+            <FxStatCard value={stats?.avg || '—'} label="Avg score" color="#49b5ff" delay={0.1} />
+            <FxStatCard value={topicCount} label="Topics covered" color="#b266e0" delay={0.15} />
+          </div>
+          {difficultyCounts.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2" aria-label="Difficulty mix">
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-white/40">Depth</span>
+              {difficultyCounts.map(({ key, count }) => (
+                <span
+                  key={key}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-white/75 capitalize"
+                >
+                  {key}
+                  <span className="text-white/40 font-medium">({count})</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

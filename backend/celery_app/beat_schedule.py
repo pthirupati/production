@@ -9,6 +9,12 @@ CELERY_BEAT_SCHEDULE = {
         "task": "celery_app.tasks.beat_heartbeat",
         "schedule": crontab(minute="*"),
     },
+    # Durable Jira @team reply sweeper (audit X2b). Celery countdown can drop on
+    # worker restart; pending rows in cache are re-delivered here every minute.
+    "sweep-pending-team-replies-every-minute": {
+        "task": "celery_app.tasks.sweep_pending_team_replies",
+        "schedule": crontab(minute="*"),
+    },
     "cleanup-expired-labs-every-5-mins": {
         "task": "celery_app.tasks.cleanup_expired_labs",
         "schedule": crontab(minute="*/5"),

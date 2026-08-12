@@ -1,0 +1,112 @@
+# FixitLab Certified Python Developer track definition.
+#
+# A track is a weighted, ordered VIEW over scenarios that already exist in the
+# library — the `scenarios:` lists below reference existing FixitLab scenario
+# slugs grouped by skill area. Weights are relative and sum to 100.
+#
+# Unlike the vendor tracks, this is a FixitLab-original certification: there is
+# no external exam blueprint to mirror, so objectives follow the shape of the
+# scenarios/python/ library — debugging existing code (py-fix-*), reading a
+# traceback back to its root cause (py-logfix-*), implementing from a spec
+# (py-impl-*), code review and refactoring (py-review-*), and operating a real
+# Python application (packaging, venv, Django/Flask runtime faults).
+
+track:
+  slug: python-developer
+  code: FL-PYDEV
+  name: FixitLab Certified Python Developer
+  vendor: FixitLab
+  description: >
+    Hands-on preparation for professional Python work. Every objective maps to
+    live coding labs across bug fixing, traceback diagnosis, implementing
+    functions and classes from a specification, code review and refactoring,
+    and troubleshooting real application and packaging failures.
+  technology_slug: python
+  exam_duration_minutes: 120
+  passing_score: 70
+  validity_months: 24
+  order: 8
+
+objectives:
+  - code: python-dev.debug-logic
+    title: Diagnose and fix logic defects
+    weight: 22
+    order: 1
+    scenarios:
+      - py-fix-off-by-one-sum-range
+      - py-fix-binary-search-bounds
+      - py-fix-grade-boundaries
+      - py-fix-fibonacci-base-case
+      - py-fix-clamp-bounds
+      - py-fix-average-empty-divzero
+
+  - code: python-dev.data-structures
+    title: Work correctly with Python data structures
+    weight: 16
+    order: 2
+    scenarios:
+      - py-fix-merge-dicts-overwrite
+      - py-fix-dedupe-preserve-order
+      - py-fix-group-by-key
+      - py-fix-flatten-shallow-vs-deep
+      - py-fix-chunk-list
+      - py-fix-rotate-list-modulo
+
+  - code: python-dev.tracebacks
+    title: Read a traceback back to its root cause
+    weight: 16
+    order: 3
+    scenarios:
+      - py-logfix-keyerror-config
+      - py-logfix-indexerror-last
+      - py-logfix-typeerror-none-len
+      - py-logfix-valueerror-int-parse
+      - py-logfix-attributeerror-strip
+      - py-logfix-recursion-depth
+
+  - code: python-dev.implement-from-spec
+    title: Implement functions and classes from a specification
+    weight: 18
+    order: 4
+    scenarios:
+      - py-impl-valid-parentheses
+      - py-impl-merge-intervals
+      - py-impl-lru-cache-class
+      - py-impl-bank-account-class
+      - py-impl-anagram-groups
+      - py-impl-json-flatten-keys
+
+  - code: python-dev.code-review
+    title: Review and refactor Python for clarity
+    weight: 12
+    order: 5
+    scenarios:
+      - py-review-extract-guard-clause
+      - py-review-early-return-find-first
+      - py-review-replace-loop-with-comprehension
+      - py-review-default-dict-count
+      - py-review-pure-no-mutate
+
+  - code: python-dev.correctness-security
+    title: Avoid common correctness and security pitfalls
+    weight: 8
+    order: 6
+    scenarios:
+      - py-fix-mutable-default-arg
+      - py-fix-sql-injection-param
+      - py-fix-percentage-int-division
+      - py-fix-parse-int-base-error
+
+  - code: python-dev.application-runtime
+    title: Troubleshoot application, packaging, and runtime failures
+    weight: 8
+    order: 7
+    scenarios:
+      # Declared slugs, not directory names: these scenarios set an explicit
+      # `slug:` in scenario.yaml (sim-python-*) and the seeder resolves by that.
+      - sim-python-venv-broken
+      - sim-python-pip-missing
+      - sim-python-circular-import
+      - sim-python-env-missing
+      - sim-python-flask-500
+      - sim-python-django-migration

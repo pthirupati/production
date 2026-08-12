@@ -43,7 +43,7 @@ export default function TerraformCloudShell({
   const [selectedRun, setSelectedRun] = useState(null)
   const [showNewWs, setShowNewWs] = useState(false)
   const [newWsName, setNewWsName] = useState('lab-workspace')
-  const [extraWorkspaces, setExtraWorkspaces] = useState([])
+  const [extraWorkspaces] = useState([])
   const tfc = state?.state?.tfc || {}
   const serverWorkspaces = tfc.workspaces || []
   const serverRuns = tfc.runs || []

@@ -180,8 +180,9 @@ export default function IdeExplorer({
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onRenameFile(f) }}
-                  className="p-1 text-[var(--vsc-muted)] hover:text-[var(--vsc-text)]"
+                  className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[var(--vsc-muted)] hover:text-[var(--vsc-text)]"
                   title="Rename"
+                  aria-label={`Rename ${f}`}
                 >
                   <Pencil size={11} />
                 </button>
@@ -190,8 +191,9 @@ export default function IdeExplorer({
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onDeleteFile(f) }}
-                  className="p-1 text-red-400 hover:text-red-300"
+                  className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-red-400 hover:text-red-300"
                   title="Delete"
+                  aria-label={`Delete ${f}`}
                 >
                   <Trash2 size={11} />
                 </button>

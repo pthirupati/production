@@ -350,3 +350,49 @@ class AntiGamingMultiplierTest(SimpleTestCase):
             scored["relevance_score"], 35,
             "a genuine on-topic answer must clear the anti-gaming relevance floor",
         )
+
+
+class DepthConcreteSignalTest(SimpleTestCase):
+    """I1 — depth/concrete must not reward generic English stuffing."""
+
+    def test_english_filler_does_not_max_depth(self):
+        from apps.interviews.services.conversation.analysis import score_technical_depth
+
+        stuffed = (
+            "because specifically technically the reason second request when "
+            "because specifically the reason underlying"
+        )
+        genuine_depth = score_technical_depth(GENUINE_PARAPHRASE)
+        stuffed_depth = score_technical_depth(stuffed)
+        self.assertGreater(
+            genuine_depth, stuffed_depth,
+            f"real explanation depth ({genuine_depth}) must beat English stuffing ({stuffed_depth})",
+        )
+        self.assertLess(stuffed_depth, 25)
+
+    def test_bare_second_request_does_not_buy_concrete(self):
+        from apps.interviews.services.conversation.analysis import score_concrete_evidence
+
+        stuffed = "in a second the request when the second request when second"
+        self.assertEqual(score_concrete_evidence(stuffed), 0)
+        self.assertGreater(score_concrete_evidence(GENUINE_PARAPHRASE), 40)
+
+    def test_composite_prefers_explanation_over_english_stuffing(self):
+        stuffed = (
+            "because specifically technically the reason second request when "
+            "because specifically the reason underlying"
+        )
+        genuine = compute_semantic_scores(
+            candidate_answer=GENUINE_PARAPHRASE,
+            question_text=QUESTION,
+            round_type="technical",
+        )["composite_score"]
+        fake = compute_semantic_scores(
+            candidate_answer=stuffed,
+            question_text=QUESTION,
+            round_type="technical",
+        )["composite_score"]
+        self.assertGreater(
+            genuine, fake,
+            f"genuine composite ({genuine}) must beat English stuffing ({fake})",
+        )

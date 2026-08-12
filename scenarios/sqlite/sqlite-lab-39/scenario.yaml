@@ -11,36 +11,29 @@ description: 'CONTEXT: A team operating SQLite has raised a ticket for `Migrate 
   39)`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline SQLite database file. The architecture is a single
   lab-primary node exposing sqlite3 CLI, schema, WAL mode, and pragmas; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Hands-on sqlite scenario: migrate replication on this host.
-
 
   OBJECTIVE: Understand the current failure mode affecting Migrate sqlite replication (lab 39); Restore
   expected service behavior with a minimal, documented change; Verify the fix holds under a realistic
   smoke test. Acceptance criteria: the change is minimal and reversible, and success means all hidden
   tests pass.
 
-
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant sqlite3 CLI, schema, WAL mode, and pragmas), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -105,7 +98,6 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
@@ -132,7 +124,7 @@ tags:
 - fix
 - hands-on
 - sqlite
-linked_tutorial: sqlite-fundamentals
+linked_tutorial: sqlite-embedded-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Migrate sqlite replication (lab 39)
 - Restore expected service behavior with a minimal, documented change

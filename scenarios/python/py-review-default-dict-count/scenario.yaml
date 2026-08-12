@@ -6,37 +6,30 @@ description: 'CONTEXT: A team operating Python development has raised a ticket f
   and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline Python project workspace. The architecture is a
   single lab-primary node exposing source files, venv, tests, and CLI entrypoints; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: char_counts(s) should return a dict of character -> count, but the hand-rolled
   version forgets to initialize new keys, raising KeyError on the first occurrence of each character.
   Refactor it to count safely (collections.Counter or dict.get) and return the frequency map.
 
-
   OBJECTIVE: Reproduce the KeyError on the first character; Initialize counts safely; Return correct character
   frequencies. Acceptance criteria: the change is minimal and reversible, and success means all hidden
   tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant source files, venv, tests, and CLI entrypoints), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -143,7 +136,6 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 technology: python
 summary: 'Complete the refactor: simplify and fix char_counts python lab and verify success with the checker'
@@ -155,7 +147,7 @@ tags:
 - fix
 - hands-on
 - python
-linked_tutorial: python-fundamentals
+linked_tutorial: python-devops-zero-hero
 what_you_will_learn:
 - Reproduce the KeyError on the first character
 - Initialize counts safely

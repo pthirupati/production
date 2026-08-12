@@ -348,7 +348,6 @@ export default function Leaderboard() {
                   <tbody>
                     {tableRows.map((entry, i) => {
                       const isUser = entry.username === user?.username
-                      const isTopThree = entry.rank <= 3
 
                       return (
                         <tr

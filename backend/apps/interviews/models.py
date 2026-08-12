@@ -221,6 +221,13 @@ class InterviewRound(models.Model):
         default="live",
         choices=[("live", "Live"), ("async_video", "One-way async video")],
     )
+    # Candidate interview language for ASR/TTS (audit L5221). Maps to BCP-47
+    # locales in the client: en→en-US, hi→hi-IN, te→te-IN.
+    language = models.CharField(
+        max_length=8,
+        default="en",
+        choices=[("en", "English"), ("hi", "Hindi"), ("te", "Telugu")],
+    )
     metadata = models.JSONField(default=dict, blank=True)
     # WS7: the most recent PASSED inline practical submission (command/code text +
     # detected topic). The conversation brain quotes this in the next generated

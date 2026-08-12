@@ -15,14 +15,11 @@ description: 'CONTEXT: Bare Metal / AI Infra — gpu-node-01 is Deployed and ser
   needs to inspect disk and network state without disturbing the running OS, so MAAS Rescue mode is used
   to network-boot an ephemeral, in-memory diagnostic environment on top of the existing deployment.
 
-
   ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin (rack LED reflects power/boot state).
-
 
   SYMPTOM: Node is Deployed; the on-call engineer must enter Rescue mode, confirm the ephemeral rescue
   shell (not the deployed root filesystem), then exit Rescue and return the node to Deployed without losing
   the workload.
-
 
   OBJECTIVE: Release gpu-node-01 into Rescue mode from Bare Metal; on Lab Terminal confirm the ephemeral
   rescue environment rather than the live deployed root; Exit Rescue and confirm status returns to Deployed;

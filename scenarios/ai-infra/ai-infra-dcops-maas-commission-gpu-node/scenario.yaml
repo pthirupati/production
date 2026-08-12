@@ -16,14 +16,11 @@ description: 'CONTEXT: DCOps / Bare Metal ticket (PSINFRA board) — gpu-node-02
   blocked until the node reaches Deployed. AI Infra Engineering owns this MAAS enlist/commission
   path for GPU SKUs.
 
-
   ENVIRONMENT: Bare Metal (MAAS) console + Lab Terminal + Datacenter twin for rack/BMC context.
   Treat gpu-node-02 as the production canary for this incident.
 
-
   SYMPTOM / STARTING STATE: MAAS shows gpu-node-02 stuck in Failed commissioning with BMC
   unreachable; the DCOps runbook step to re-power via IPMI has not been run yet.
-
 
   OBJECTIVE: Open Bare Metal from the lab toolbar; restore BMC/IPMI reachability so gpu-node-02
   can recommission; commission the node in MAAS; Deploy it and confirm status is Deployed; leave

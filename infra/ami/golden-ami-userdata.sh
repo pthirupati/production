@@ -2,7 +2,7 @@
 ###############################################################################
 # FixitLab Golden AMI — user-data setup script
 #
-# Despite the infra/packer/ path, this is not a Packer provisioner. It is the
+# Despite the infra/ami/ path, this is not a Packer provisioner. It is the
 # EC2 user-data payload uploaded by build-ami.sh in this directory.
 #
 # Pre-installs everything a lab instance needs so cloud-init on actual labs

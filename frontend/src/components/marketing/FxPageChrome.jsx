@@ -1,4 +1,4 @@
-import { ArrowUp } from 'lucide-react'
+import { ArrowUp } from '../../ui/eagerIcons'
 
 /** Scroll progress, cursor spotlight, back-to-top — shared across marketing pages. */
 export default function FxPageChrome({ progressRef, toTopRef, spotRef, showSpotlight = true }) {

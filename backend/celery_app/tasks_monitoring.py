@@ -142,7 +142,12 @@ _PROBE_NAMES = (
 )
 
 
-@shared_task(name="monitoring.check_business_signals")
+@shared_task(
+    name="monitoring.check_business_signals",
+    autoretry_for=(Exception,),
+    retry_backoff=20,
+    retry_kwargs={"max_retries": 2},
+)
 def check_business_signals():
     """Evaluate business-critical signals and alert on threshold breaches.
 

@@ -205,10 +205,10 @@ function StateBadge({ state }) {
 function NmapModal({ title, children, onClose }) {
   return (
     <div className="nm-modal-backdrop" onMouseDown={onClose}>
-      <div className="nm-modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="nm-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
         <div className="nm-modal-head">
           <div className="font-semibold">{title}</div>
-          <button type="button" className="p-1 rounded hover:bg-green-100" onClick={onClose}><X size={16} /></button>
+          <button type="button" className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-green-100" onClick={onClose} aria-label="Close dialog"><X size={16} /></button>
         </div>
         <div className="nm-modal-body">{children}</div>
       </div>

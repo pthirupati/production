@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import PublicLayout from '../components/layout/PublicLayout'
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
@@ -51,7 +52,18 @@ const FAQ_ITEMS = [
         // actually does since RazorpayRefundView started revoking entitlement —
         // previously a refunded user silently kept a year of paid access.
         q: 'Can I get a refund?',
-        a: `Yes — within 7 days of purchase. Email ${PAYMENT_EMAIL} with your subscription ID and we will process it manually, usually within two business days. Refunds are returned to the original payment method by the payment gateway. Note that a full refund ends access to that technology; a partial refund does not.`,
+        a: (
+          <>
+            Yes — within 7 days of purchase. Email {PAYMENT_EMAIL} with your subscription ID
+            and we will process it manually, usually within two business days. Refunds are
+            returned to the original payment method by the payment gateway. A full refund
+            ends access to that technology; a partial refund does not.{' '}
+            <Link to="/refunds" className="text-accent-cyan hover:underline">
+              Full refunds &amp; cancellation policy
+            </Link>
+            .
+          </>
+        ),
       },
       {
         q: 'Do you offer student discounts?',
@@ -215,8 +227,10 @@ export default function FAQ() {
           />
           {search && (
             <button
+              type="button"
               onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-md text-surface-400 hover:text-white hover:bg-surface-700 transition-colors"
+              aria-label="Clear search"
+              className="absolute right-3 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-surface-400 hover:text-white hover:bg-surface-700 transition-colors"
             >
               <X size={14} />
             </button>

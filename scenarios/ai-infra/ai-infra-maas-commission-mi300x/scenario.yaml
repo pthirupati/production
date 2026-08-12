@@ -15,13 +15,10 @@ description: 'CONTEXT: PSINFRA / Bare Metal ticket — commission an AMD Instinc
   node into the ROCm training rack via MAAS. AI Infra Engineering owns MAAS enlist /
   commission / deploy for AMD GPU SKUs; this is not the application GPU course.
 
-
   ENVIRONMENT: Bare Metal (MAAS) console + Lab Terminal. Use rocm-smi / amd-smi (not nvidia-smi)
   after Deploy. Datacenter twin for rack / BMC context.
 
-
   SYMPTOM: Node is New; BMC reachable; PXE path ready. Commission and verify MI300X visibility.
-
 
   OBJECTIVE: Commission in MAAS; Deploy ROCm-capable image; confirm MI300X via rocm-smi;
   mark FIXED-OK.'

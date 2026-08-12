@@ -49,6 +49,11 @@ def _seed_minimal_catalog():
         ("Kubernetes", "kubernetes"),
         ("DevSecOps Supply Chain", "devsecops-supplychain"),
         ("Prometheus", "prometheus"),
+        ("AWS Cloud", "aws"),
+        ("Python Development", "python"),
+        ("Docker & Containers", "docker"),
+        ("Security", "security"),
+        ("AI & Machine Learning", "ai-ml"),
     ]:
         Technology.objects.create(name=name, slug=slug)
 
@@ -78,9 +83,9 @@ class LearningJourneySeedTests(TestCase):
         _seed_minimal_catalog()
         call_command("seed_learning_journeys")
 
-    def test_seeds_exactly_five_active_journeys(self):
-        self.assertEqual(LearningJourney.objects.count(), 5)
-        self.assertEqual(LearningJourney.objects.filter(is_active=True).count(), 5)
+    def test_seeds_exactly_ten_active_journeys(self):
+        self.assertEqual(LearningJourney.objects.count(), 10)
+        self.assertEqual(LearningJourney.objects.filter(is_active=True).count(), 10)
         slugs = set(LearningJourney.objects.values_list("slug", flat=True))
         self.assertEqual(
             slugs,
@@ -90,12 +95,17 @@ class LearningJourneySeedTests(TestCase):
                 "kubernetes-sre-cka",
                 "devsecops-engineer-supply-chain",
                 "sre-incident-responder",
+                "aws-cloud-beginner",
+                "python-devops-beginner",
+                "docker-containers-beginner",
+                "security-hardening-beginner",
+                "ai-data-beginner",
             },
         )
 
     def test_seed_is_idempotent(self):
         call_command("seed_learning_journeys")  # second run
-        self.assertEqual(LearningJourney.objects.count(), 5)
+        self.assertEqual(LearningJourney.objects.count(), 10)
         # Steps rebuilt, not duplicated.
         journey = LearningJourney.objects.get(slug="junior-linux-admin-rhcsa")
         self.assertEqual(journey.steps.count(), 7)
@@ -141,6 +151,47 @@ class LearningJourneySeedTests(TestCase):
                     f"cert {step.ref_slug} missing",
                 )
 
+    def test_all_journey_cert_refs_have_seed_yaml(self):
+        """Audit C4: journey cert steps are not 'broken' — YAML catalog exists.
+
+        Runtime resolution needs ``seed_certifications``; this pins the catalog
+        half so a deleted YAML cannot silently reopen the dead-first-step claim.
+        """
+        from pathlib import Path
+
+        seed_path = (
+            Path(__file__).resolve().parents[1]
+            / "management"
+            / "commands"
+            / "seed_learning_journeys.py"
+        )
+        text = seed_path.read_text(encoding="utf-8")
+        # Each certification step dict has "ref": "<slug>" nearby.
+        import re
+
+        refs = re.findall(
+            r'"kind":\s*"certification"[^}]*?"ref":\s*"([^"]+)"',
+            text,
+            flags=re.DOTALL,
+        )
+        self.assertEqual(
+            sorted(refs),
+            ["cka", "rhcsa", "terraform-associate"],
+            f"unexpected journey cert refs: {refs}",
+        )
+        cert_data = (
+            Path(__file__).resolve().parents[2]
+            / "certifications"
+            / "management"
+            / "commands"
+            / "data"
+        )
+        for slug in refs:
+            self.assertTrue(
+                (cert_data / f"{slug}.yaml").is_file(),
+                f"missing cert YAML for journey ref {slug}",
+            )
+
     def test_missing_reference_does_not_break_the_journey(self):
         """A dangling ref renders as unresolved rather than 404-ing the journey."""
         journey = LearningJourney.objects.get(slug="junior-linux-admin-rhcsa")
@@ -167,12 +218,23 @@ class LearningJourneyAPITests(TestCase):
         resp = self.client.get("/api/journeys/")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
-        self.assertEqual(len(data), 5)
+        self.assertEqual(len(data), 10)
         first = data[0]
         for field in ("slug", "title", "role_label", "level", "step_count", "steps"):
             self.assertIn(field, first)
         self.assertEqual(first["slug"], "junior-linux-admin-rhcsa")  # order=0
         self.assertEqual(first["step_count"], 7)
+        beginner = [j for j in data if j.get("level") == "beginner"]
+        self.assertGreaterEqual(len(beginner), 6)  # linux + 5 new on-ramps
+        beginner_slugs = {j["slug"] for j in beginner}
+        for slug in (
+            "aws-cloud-beginner",
+            "python-devops-beginner",
+            "docker-containers-beginner",
+            "security-hardening-beginner",
+            "ai-data-beginner",
+        ):
+            self.assertIn(slug, beginner_slugs)
 
     def test_list_is_public_allowany(self):
         resp = APIClient().get("/api/journeys/")  # no auth
@@ -474,14 +536,13 @@ class JourneyNextStepTests(TestCase):
         self.assertEqual(step["link"], "/certifications/rhcsa")
         self.assertEqual(step["target_title"], "Red Hat Certified System Administrator")
 
-    def test_project_step_has_no_link_because_the_spa_has_no_project_route(self):
-        """Honest null beats a dead link. Revisit if /projects/<slug> lands."""
+    def test_project_step_links_to_the_projects_page(self):
+        """§C3 landed /projects/<slug>; next-step must deep-link the capstone."""
         self._complete_scenarios(*LINUX_SCENARIO_SLUGS)
         step = self._next()["next_step"]
         self.assertEqual(step["kind"], "project")
-        self.assertIsNone(step["link"])
         self.assertEqual(step["slug"], "linux-fundamentals-first-server")
-        # Still names the capstone so the card can say what is next.
+        self.assertEqual(step["link"], "/projects/linux-fundamentals-first-server")
         self.assertTrue(step["target_title"])
 
     def test_tutorial_course_step_links_to_the_first_unread_module(self):

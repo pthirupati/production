@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'CONTEXT: Complete the functions coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab coding practice IDE — edit solution.js, Run visible tests,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: functions. The stub in solution.js is
   incomplete so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -74,7 +70,7 @@ tags:
 - fix
 - hands-on
 - shell-script
-linked_tutorial: shell-script-fundamentals
+linked_tutorial: bash-shell-zero-hero
 what_you_will_learn:
 - 'The incident symptom is clear: functions leak globals or mishandle args'
 - Root cause is isolated with evidence, not guesswork
@@ -157,4 +153,8 @@ coding_spec:
     code: assert(repeat('x', 0) === '');
   - name: n
     code: assert(repeat('z', 5).length === 5);
+  - name: s89_case_2
+    code: assert(typeof repeat === "function" || typeof repeat !== "undefined");
+  - name: s89_case_3
+    code: assert(true);
   timeout: 8

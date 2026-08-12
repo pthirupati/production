@@ -1,11 +1,13 @@
 """Health and readiness probes — minimal public liveness; richer internal readiness."""
 
+import hmac
 import logging
 import os
+import time
 
 from django.conf import settings
 from django.db import connection
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.urls import path
 
 logger = logging.getLogger(__name__)
@@ -199,7 +201,171 @@ def readiness_check(request):
     return JsonResponse({"status": overall, "checks": checks}, status=code)
 
 
+# ── Prometheus exposition (audit L1696 / Z5-17) ───────────────────────────────
+#
+# Why hand-rolled instead of django-prometheus. Three reasons, in order of weight:
+#
+#  1. Cardinality. django-prometheus labels its per-view series by view name, and
+#     this project's public catalog routes carry a scenario slug — 7,280 distinct
+#     values. A per-slug label set OOMs the scraper, and there is no supported way
+#     to drop a label from its built-in middleware without forking it.
+#  2. Middleware ordering. Its DB wrapper sits between Django and psycopg2; slotted
+#     wrongly relative to AuditMiddleware / JWTSessionValidationMiddleware it can
+#     swallow connection errors, i.e. the observability tool hides the outage it
+#     was installed to reveal.
+#  3. It is a request-path dependency for a build that currently has none.
+#
+# What this exports instead is the set of gauges that already exist and are already
+# trusted by readiness: worker-local sim sessions (the Z5-1 leak), lab capacity and
+# shed count, and dependency up/down. Those are the numbers an on-call person needs
+# and none of them require touching the request path. Per-endpoint latency
+# histograms are deliberately NOT here — they need middleware, which is a separate,
+# larger decision than exposing gauges we already compute.
+#
+# Auth: closed by default. Without METRICS_TOKEN in the environment this returns
+# 404, so a node that was never configured for scraping does not silently publish
+# traffic shape and user counts to the internet. 404 rather than 401 so the
+# endpoint's existence is not confirmed to an unauthenticated caller.
+
+_METRICS_PREFIX = "fixitlab"
+
+
+def _metrics_token() -> str:
+    return (
+        getattr(settings, "METRICS_TOKEN", "")
+        or os.environ.get("METRICS_TOKEN", "")
+        or ""
+    ).strip()
+
+
+def _metrics_authorized(request) -> bool:
+    """Constant-time bearer check against METRICS_TOKEN, or an authenticated superuser."""
+    token = _metrics_token()
+    if token:
+        header = request.META.get("HTTP_AUTHORIZATION", "") or ""
+        presented = header[7:].strip() if header[:7].lower() == "bearer " else ""
+        if presented and hmac.compare_digest(presented, token):
+            return True
+    user = getattr(request, "user", None)
+    return bool(getattr(user, "is_authenticated", False) and getattr(user, "is_superuser", False))
+
+
+def _fmt(name: str, value, *, help_text: str, kind: str = "gauge", labels: str = "") -> list[str]:
+    full = f"{_METRICS_PREFIX}_{name}"
+    return [
+        f"# HELP {full} {help_text}",
+        f"# TYPE {full} {kind}",
+        f"{full}{labels} {value}",
+    ]
+
+
+def collect_metrics() -> list[str]:
+    """Prometheus text-format lines for the gauges this node can report.
+
+    Every probe is individually guarded: a scrape must never 500, because a
+    failing scrape reads as "the app is down" on the dashboard and would page for
+    a broken metrics collector. A source that cannot be read is simply omitted —
+    Prometheus renders an absent series as a gap, which is honest, whereas
+    emitting 0 would look like a real measured zero.
+    """
+    lines: list[str] = []
+
+    try:
+        connection.ensure_connection()
+        db_up = 1
+    except Exception:
+        db_up = 0
+    lines += _fmt("database_up", db_up, help_text="1 if the primary database connection is usable.")
+
+    try:
+        from django.core.cache import cache
+
+        probe = "fixitlab:metrics:probe"
+        cache.set(probe, "1", timeout=10)
+        redis_up = 1 if cache.get(probe) == "1" else 0
+    except Exception:
+        redis_up = 0
+    lines += _fmt("redis_up", redis_up, help_text="1 if the Redis cache round-trips a write/read.")
+
+    vault = _vault_status()
+    if vault.get("enabled"):
+        lines += _fmt(
+            "vault_up",
+            1 if vault.get("status") == "ok" else 0,
+            help_text="1 if the Vault API is reachable and secrets loaded on this node.",
+        )
+
+    # Worker-local, by design: each uvicorn worker holds its own _SIM_SESSIONS
+    # registry, so the scraper sees one series per worker instance and the SUM
+    # across them is the platform total. This is the gauge that makes the Z5-1
+    # leak visible as a ratchet rather than as a random OOM.
+    try:
+        from apps.labs.provisioner.simulation.shell import sim_session_count
+
+        lines += _fmt(
+            "sim_sessions",
+            sim_session_count(),
+            help_text="Live simulation engines held by THIS worker process.",
+        )
+    except Exception:
+        pass
+
+    try:
+        from apps.labs.capacity import count_active_engine_labs, get_max_concurrent_labs
+        from django.core.cache import cache
+
+        lines += _fmt(
+            "labs_active",
+            count_active_engine_labs(),
+            help_text="Lab sessions currently counted against the concurrency cap.",
+        )
+        lines += _fmt(
+            "labs_capacity",
+            get_max_concurrent_labs(),
+            help_text="Configured ceiling on concurrent engine-backed labs.",
+        )
+        lines += _fmt(
+            "labs_shed_total",
+            int(cache.get("fixitlab:capacity_shed_count") or 0),
+            kind="counter",
+            help_text="Lab starts refused because the concurrency cap was reached.",
+        )
+    except Exception:
+        pass
+
+    lines += _fmt(
+        "build_info",
+        1,
+        help_text="Build and role labels for this process; value is always 1.",
+        labels=(
+            '{role="%s",version="%s"}'
+            % (
+                str(getattr(settings, "CLUSTER_ROLE", "") or os.environ.get("CLUSTER_ROLE", "") or "app"),
+                str(os.environ.get("IMAGE_TAG", "") or "unknown"),
+            )
+        ),
+    )
+    lines += _fmt(
+        "metrics_scrape_timestamp_seconds",
+        int(time.time()),
+        help_text="Unix time this exposition was generated.",
+    )
+    return lines
+
+
+def metrics_view(request):
+    """Prometheus scrape target. Gated by METRICS_TOKEN; 404 when unconfigured."""
+    if not _metrics_authorized(request):
+        # Deliberately indistinguishable from an unrouted path — see the module
+        # note above on not confirming the endpoint exists.
+        return HttpResponse(status=404)
+
+    body = "\n".join(collect_metrics()) + "\n"
+    return HttpResponse(body, content_type="text/plain; version=0.0.4; charset=utf-8")
+
+
 urlpatterns = [
     path("", health_check, name="health"),
     path("ready/", readiness_check, name="health-ready"),
+    path("metrics/", metrics_view, name="metrics"),
 ]

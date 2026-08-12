@@ -1,8 +1,4 @@
-# Unpublished: this lab ships a bare `raise NotImplementedError` stub with no
-# starter code, no seeded fault and only a `placeholder` grader, so there is
-# nothing to diagnose and any trivial return earns XP. Set is_active: true
-# once it has real content and a grader that checks it (audit §G1).
-is_active: false
+is_active: true
 title: Fix connection pool exhaustion
 slug: pg-connection-pool
 technology: postgresql
@@ -11,35 +7,28 @@ description: 'CONTEXT: A team operating PostgreSQL has raised a ticket for `Fix 
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline PostgreSQL cluster. The architecture is a single
   lab-primary node exposing psql, pg_hba.conf, roles, and WAL; treat it as the production host for this
   incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: App hits max_connections during traffic spikes.
-
 
   OBJECTIVE: Understand the current failure mode affecting Fix connection pool exhaustion; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant psql, pg_hba.conf, roles, and WAL), changing one thing at a time. Check your work
   continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -102,23 +91,58 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: App hits max_connections during traffic spikes.
+  instructions: 'The app exhausts max_connections during spikes. Fix solution(conn) so it returns the
+    pool size each app should get, as a dict of {app_name: size}. Divide the budget argument evenly (integer
+    division) across the apps in `apps`, but never give an app more than its declared peak_need, and never
+    less than 1. Any capacity freed by capping an app stays unused — do not redistribute it.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn, budget):\n    # BUG: hands every app the full even share, ignoring peak_need,\
+      \ so a\n    # low-traffic app reserves connections it never uses.\n    names = [r[0] for r in conn.execute(\"\
+      SELECT app_name FROM apps ORDER BY app_name\")]\n    share = budget // len(names)\n    return {n:\
+      \ share for n in names}\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert solution() is not None
+  - name: even split respects each app's peak
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE apps (app_name TEXT, peak_need INTEGER);\")\n    conn.executemany(\"INSERT INTO apps\
+      \ VALUES (?,?)\", rows)\n    return conn\nconn = _seed([('api',50),('cron',2)])\nassert solution(conn,\
+      \ 20) == {'api':10,'cron':2}, solution(conn, 20)\n"
+  - name: uncapped apps get the plain share
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE apps (app_name TEXT, peak_need INTEGER);\")\n    conn.executemany(\"INSERT INTO apps\
+      \ VALUES (?,?)\", rows)\n    return conn\nconn = _seed([('api',100),('web',100)])\nassert solution(conn,\
+      \ 30) == {'api':15,'web':15}, solution(conn, 30)\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert solution() is not None
+  - name: freed capacity is not redistributed
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE apps (app_name TEXT, peak_need INTEGER);\")\n    conn.executemany(\"INSERT INTO apps\
+      \ VALUES (?,?)\", rows)\n    return conn\nconn = _seed([('api',100),('cron',1)])\nassert solution(conn,\
+      \ 20) == {'api':10,'cron':1}, solution(conn, 20)\n"
+  - name: every app keeps at least one connection
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE apps (app_name TEXT, peak_need INTEGER);\")\n    conn.executemany(\"INSERT INTO apps\
+      \ VALUES (?,?)\", rows)\n    return conn\nconn = _seed([('a',9),('b',9),('c',9),('d',9)])\nassert\
+      \ solution(conn, 2) == {'a':1,'b':1,'c':1,'d':1}, solution(conn, 2)\n"
+  - name: single app takes the whole budget up to its peak
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE apps (app_name TEXT, peak_need INTEGER);\")\n    conn.executemany(\"INSERT INTO apps\
+      \ VALUES (?,?)\", rows)\n    return conn\nconn = _seed([('solo',5)])\nassert solution(conn, 40)\
+      \ == {'solo':5}, solution(conn, 40)\n"
+  - name: share is floor division
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE apps (app_name TEXT, peak_need INTEGER);\")\n    conn.executemany(\"INSERT INTO apps\
+      \ VALUES (?,?)\", rows)\n    return conn\nconn = _seed([('a',100),('b',100),('c',100)])\nassert\
+      \ solution(conn, 10) == {'a':3,'b':3,'c':3}, solution(conn, 10)\n"
   timeout: 8
 summary: Complete the fix connection pool exhaustion postgresql lab and verify success with the checker
 estimated_minutes: 20
@@ -129,7 +153,7 @@ tags:
 - fix
 - hands-on
 - postgresql
-linked_tutorial: postgresql-fundamentals
+linked_tutorial: postgresql-dba-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Fix connection pool exhaustion
 - Restore expected service behavior with a minimal, documented change

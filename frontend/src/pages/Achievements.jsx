@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { labApi } from '../api/labs'
-import { useAuthStore } from '../store/authStore'
 import {
-  Trophy, Star, Award, Flame, CheckCircle2,
+  Star, Award, CheckCircle2,
   Download, Shield, Clock, FileText, Server, Monitor, Globe,
   Database, Cpu, Loader2, Lock, ExternalLink, AlertTriangle
 } from 'lucide-react'
@@ -15,7 +14,6 @@ import { PageHeader, FixitPanel } from '../components/design'
 const techIcons = { Linux: Server, Docker: Monitor, Networking: Globe, 'Web Servers': Globe, Databases: Database, AWS: Cpu, Kubernetes: Cpu, Security: Shield }
 
 export default function Achievements() {
-  const { user } = useAuthStore()
   const [achievements, setAchievements] = useState([])
   const [eligibleTechs, setEligibleTechs] = useState([])
   const [loading, setLoading] = useState(true)

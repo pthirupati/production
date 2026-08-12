@@ -77,6 +77,7 @@ class Scenario(models.Model):
         ("easy", "Easy"),
         ("medium", "Medium"),
         ("hard", "Hard"),
+        ("expert", "Expert"),
     ]
 
     TYPE_CHOICES = [

@@ -1,11 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
-import { Search, UserPlus, Ban, Trash2, Shield, X, Save, Key, Eye, Phone, Mail, Activity, Download, CheckSquare, Square, MinusSquare, Users, ShieldOff, UserCheck, UserX, Crown, MapPin, AlertTriangle } from 'lucide-react'
+import { Search, UserPlus, Ban, Trash2, Shield, X, Save, Key, Eye, Phone, Mail, Download, CheckSquare, Square, MinusSquare, ShieldOff, UserCheck, UserX, Crown, MapPin, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { SkeletonTable } from '../../components/Skeleton'
-import { ConfirmDialog } from '../../components/ConfirmModal'
-import ConfirmModal from '../../components/ConfirmModal'
+import { ConfirmDialog, useModalA11y } from '../../components/ConfirmModal'
 import { validators } from '../../utils/validators'
 import JiraTicketLink from '../../components/JiraTicketLink'
 
@@ -23,6 +22,13 @@ export default function AdminUsers() {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkConfirm, setBulkConfirm] = useState(null)
   const [bulkProcessing, setBulkProcessing] = useState(false)
+
+  const closeForm = () => setShowForm(false)
+  const closePasswordReset = () => { setShowPasswordReset(null); setNewPassword('') }
+  const closeDetail = () => setShowDetail(null)
+  const formDialogRef = useModalA11y(showForm, closeForm)
+  const passwordDialogRef = useModalA11y(!!showPasswordReset, closePasswordReset)
+  const detailDialogRef = useModalA11y(!!showDetail, closeDetail)
 
   useEffect(() => { loadData() }, [search])
 
@@ -236,11 +242,21 @@ export default function AdminUsers() {
 
       {/* Create User Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="glass-card p-6 w-full max-w-md mx-4">
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) closeForm() }}
+        >
+          <div
+            ref={formDialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Create User"
+            className="glass-card p-6 w-full max-w-md mx-4 outline-none"
+          >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-white">Create User</h2>
-              <button onClick={() => setShowForm(false)} className="text-surface-500 hover:text-white"><X size={20} /></button>
+              <button type="button" onClick={closeForm} aria-label="Close create user form" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-white"><X size={20} /></button>
             </div>
             <div className="space-y-4">
               <div>
@@ -264,8 +280,8 @@ export default function AdminUsers() {
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
-              <button onClick={handleCreate} className="btn-primary flex items-center gap-2">
+              <button type="button" onClick={closeForm} className="btn-secondary">Cancel</button>
+              <button type="button" onClick={handleCreate} className="btn-primary flex items-center gap-2">
                 <Save size={16} /> Create
               </button>
             </div>
@@ -275,11 +291,21 @@ export default function AdminUsers() {
 
       {/* Password Reset Modal */}
       {showPasswordReset && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="glass-card p-6 w-full max-w-md mx-4">
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) closePasswordReset() }}
+        >
+          <div
+            ref={passwordDialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Reset Password"
+            className="glass-card p-6 w-full max-w-md mx-4 outline-none"
+          >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-white">Reset Password</h2>
-              <button onClick={() => { setShowPasswordReset(null); setNewPassword('') }} className="text-surface-500 hover:text-white"><X size={20} /></button>
+              <button type="button" onClick={closePasswordReset} aria-label="Close password reset" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-white"><X size={20} /></button>
             </div>
             <p className="text-sm text-surface-400 mb-4">
               Reset password for <strong className="text-white">{showPasswordReset.email}</strong>
@@ -290,8 +316,8 @@ export default function AdminUsers() {
                 className="input-field" placeholder="Min. 8 characters" />
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => { setShowPasswordReset(null); setNewPassword('') }} className="btn-secondary">Cancel</button>
-              <button onClick={handleResetPassword} className="btn-primary flex items-center gap-2">
+              <button type="button" onClick={closePasswordReset} className="btn-secondary">Cancel</button>
+              <button type="button" onClick={handleResetPassword} className="btn-primary flex items-center gap-2">
                 <Key size={16} /> Reset Password
               </button>
             </div>
@@ -301,11 +327,21 @@ export default function AdminUsers() {
 
       {/* User Detail Modal */}
       {showDetail && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="glass-card p-6 w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) closeDetail() }}
+        >
+          <div
+            ref={detailDialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label="User Details"
+            className="glass-card p-6 w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto outline-none"
+          >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-white">User Details</h2>
-              <button onClick={() => setShowDetail(null)} className="text-surface-500 hover:text-white"><X size={20} /></button>
+              <button type="button" onClick={closeDetail} aria-label="Close user details" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-white"><X size={20} /></button>
             </div>
 
             <div className="space-y-4">

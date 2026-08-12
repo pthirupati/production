@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
+import { useModalA11y } from '../../components/ConfirmModal'
 import {
   LifeBuoy, Search, User, Target, X, AlertTriangle, Clock, GitBranch,
   ArrowRightLeft, Plus, Send, MessageSquare, ChevronRight, Loader2, CheckCircle2,
@@ -234,6 +235,7 @@ function CreateTicketModal({ meta, onClose, onCreated }) {
     assignment_group: teams[0]?.value || 'service_desk',
   })
   const [busy, setBusy] = useState(false)
+  const dialogRef = useModalA11y(true, onClose)
 
   const update = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
 
@@ -261,13 +263,21 @@ function CreateTicketModal({ meta, onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="glass-card w-full max-w-lg max-h-[88vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Create ITSM ticket"
+        className="glass-card w-full max-w-lg max-h-[88vh] overflow-y-auto outline-none"
+        onClick={e => e.stopPropagation()}
+      >
         <form onSubmit={submit} className="p-6 space-y-4">
           <div className="flex items-start justify-between gap-4">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
               <Plus size={18} className="text-accent-cyan" /> Create ITSM ticket
             </h2>
-            <button type="button" onClick={onClose} className="text-surface-400 hover:text-white p-1 rounded-md hover:bg-surface-800/60 shrink-0">
+            <button type="button" onClick={onClose} aria-label="Close create ticket" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400 hover:text-white p-1 rounded-md hover:bg-surface-800/60 shrink-0">
               <X size={20} />
             </button>
           </div>
@@ -335,6 +345,7 @@ function TicketDetailModal({ ticketId, meta, onClose, onChanged }) {
   const [busy, setBusy] = useState(false)
   const [panel, setPanel] = useState(null) // 'transfer' | 'sub_ticket' | null
   const [comment, setComment] = useState('')
+  const dialogRef = useModalA11y(true, onClose)
 
   const load = useCallback(async () => {
     try {
@@ -378,7 +389,15 @@ function TicketDetailModal({ ticketId, meta, onClose, onChanged }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="glass-card w-full max-w-2xl max-h-[88vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label={ticket ? `ITSM ticket ${ticket.number}` : 'ITSM ticket details'}
+        className="glass-card w-full max-w-2xl max-h-[88vh] overflow-y-auto outline-none"
+        onClick={e => e.stopPropagation()}
+      >
         {loading || !ticket ? (
           <div className="flex items-center justify-center h-48">
             <div className="w-7 h-7 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin" />
@@ -407,7 +426,7 @@ function TicketDetailModal({ ticketId, meta, onClose, onChanged }) {
                   {ticket.is_sub_ticket && ticket.parent_number && <span> · sub-ticket of {ticket.parent_number}</span>}
                 </p>
               </div>
-              <button type="button" onClick={onClose} className="text-surface-400 hover:text-white p-1 rounded-md hover:bg-surface-800/60 shrink-0">
+              <button type="button" onClick={onClose} aria-label="Close ticket details" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400 hover:text-white p-1 rounded-md hover:bg-surface-800/60 shrink-0">
                 <X size={20} />
               </button>
             </div>

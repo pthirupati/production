@@ -104,6 +104,11 @@ services:
         reservations:
           memory: 512M
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   celery_worker:
     build: ./backend
@@ -137,6 +142,11 @@ services:
         limits:
           memory: 1G
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   celery_provisioning:
     build: ./backend
@@ -170,6 +180,11 @@ services:
         limits:
           memory: 1G
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   celery_maintenance:
     build: ./backend
@@ -203,6 +218,11 @@ services:
         limits:
           memory: 512M
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   celery_beat:
     build: ./backend
@@ -232,6 +252,11 @@ services:
       retries: 3
       start_period: 30s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   static_volume:

@@ -16,12 +16,10 @@ description: 'CONTEXT: A team operating AI infrastructure engineering has raised
   diagnose and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline GPU bare-metal lab (MAAS + node + Datacenter twin
   + AWX). The architecture is a single lab-primary node exposing MAAS commissioning, LXD, PXE/BMC, nvidia-smi/DCGM/rocm-smi,
   AWX jobs, and Datacenter twin; treat it as the production host for this incident. All tools run locally
   — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: Node is New in MAAS; not yet commissioned. PSINFRA-style task — commission
   a bare-metal H100 node via MAAS, validate 14-testing health, release to production.
@@ -30,11 +28,9 @@ description: 'CONTEXT: A team operating AI infrastructure engineering has raised
 
   Commission, deploy, verify nvidia-smi sees 8 GPUs, leave FIXED-OK marker.
 
-
   OBJECTIVE: Commission the node in MAAS; Verify PXE/deploy completes; Confirm 8x H100 via nvidia-smi
   -L. Acceptance criteria: the change is minimal and reversible, and success means `nvidia-smi` includes
   `NVIDIA-SMI`.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
@@ -42,16 +38,13 @@ description: 'CONTEXT: A team operating AI infrastructure engineering has raised
   twin), changing one thing at a time. Check your work continuously against the objective — success means
   `nvidia-smi` includes `NVIDIA-SMI`.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
   the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -101,7 +94,6 @@ hints:
     2. Re-run `nvidia-smi`.
 
     3. Confirm GPU name and memory report without errors.
-
 
     WHY: workloads need the driver to see the device.'
 consoles:

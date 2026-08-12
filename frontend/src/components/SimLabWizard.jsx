@@ -2,24 +2,7 @@ import { useState } from 'react'
 import { HardDrive, Network, Wand2, Play, X, ChevronRight } from 'lucide-react'
 import ConfirmModal from './ConfirmModal'
 
-const DISK_STEPS = [
-  { title: 'Inspect block devices', detail: 'Confirm /dev/sdb is visible and unused.', cmd: 'fdisk -l /dev/sdb', host: 'primary' },
-  { title: 'Create physical volume', detail: 'Initialize the new disk for LVM.', cmd: 'pvcreate /dev/sdb', host: 'primary' },
-  { title: 'Extend volume group', detail: 'Add /dev/sdb to the rhel volume group.', cmd: 'vgextend rhel /dev/sdb', host: 'primary' },
-  { title: 'Extend logical volume', detail: 'Grow root LV by 5G (adjust size as needed).', cmd: 'lvextend -L +5G /dev/rhel/root', host: 'primary' },
-  { title: 'Verify filesystem', detail: 'Confirm root filesystem reflects the new size.', cmd: 'df -h /', host: 'primary' },
-]
-
-function nicSteps(suggestedIp) {
-  return [
-    { title: 'Show interfaces', detail: 'Review eth0 and current addresses.', cmd: 'ip addr show dev eth0', host: 'primary' },
-    { title: 'Assign IP address', detail: `Suggested address for this lab subnet: ${suggestedIp}/24`, cmd: `ip addr add ${suggestedIp}/24 dev eth0`, host: 'primary' },
-    { title: 'Bring interface up', detail: 'Ensure eth0 is administratively up.', cmd: 'ip link set dev eth0 up', host: 'primary' },
-    { title: 'Verify routing', detail: 'Check default route and connectivity.', cmd: 'ip route show', host: 'primary' },
-  ]
-}
-
-function scenarioWizards(scenario, labHosts, suggestedIp) {
+function scenarioWizards(scenario, labHosts) {
   const slug = (scenario?.slug || '').toLowerCase()
   const primary = labHosts.find(h => h.name === 'primary') || { ip: '10.0.0.10' }
   const wizards = []
@@ -75,9 +58,7 @@ function scenarioWizards(scenario, labHosts, suggestedIp) {
 }
 
 export default function SimLabWizard({ open, onClose, scenario, labHosts = [], onSendCommand }) {
-  const primary = labHosts.find(h => h.name === 'primary') || { ip: '10.0.0.10' }
-  const suggestedIp = primary.ip?.replace(/\.\d+$/, '.20') || '10.0.0.20'
-  const wizards = scenarioWizards(scenario, labHosts, suggestedIp)
+  const wizards = scenarioWizards(scenario, labHosts)
   const [activeWizard, setActiveWizard] = useState(wizards[0]?.id || '')
   const [stepIdx, setStepIdx] = useState(0)
 

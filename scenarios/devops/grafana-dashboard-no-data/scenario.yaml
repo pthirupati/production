@@ -13,11 +13,9 @@ description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for 
   resolve it. Business impact: reduced service reliability and blocked users until the underlying state
   is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab. The architecture is a single lab-primary
   node exposing git repos, pipelines, artifacts, and runbooks; treat it as the production host for this
   incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: Ubuntu server running Grafana. The Prometheus datasource is configured with
 
@@ -25,12 +23,10 @@ description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for 
 
   URL is http://prometheus:9090. Fix the datasource config.
 
-
   OBJECTIVE: Identify the misconfigured Prometheus datasource in Grafana; Update the datasource URL to
   the correct Prometheus endpoint; Verify dashboards display data after the fix. Acceptance criteria:
   the change is minimal and reversible, and success means `systemctl is-active grafana-server``` returns
   active.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
@@ -38,16 +34,13 @@ description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for 
   your work continuously against the objective — success means `systemctl is-active grafana-server```
   returns active.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active grafana-server`` returns
   active. Capture the before/after output as evidence. Success criteria: the objective''s healthy state
   holds on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -105,7 +98,6 @@ hints:
 
     3. Run `systemctl restart grafana-server` and confirm `systemctl is-active grafana-server` succeeds.
 
-
     WHY: the grader checks real service state, not marker files.'
 summary: Complete the fix grafana datasource with no data devops lab and verify success
   with the checker
@@ -117,7 +109,7 @@ tags:
 - devops
 - fix
 - hands-on
-linked_tutorial: devops-fundamentals
+linked_tutorial: devops-engineering-zero-hero
 what_you_will_learn:
 - Identify the misconfigured Prometheus datasource in Grafana
 - Update the datasource URL to the correct Prometheus endpoint

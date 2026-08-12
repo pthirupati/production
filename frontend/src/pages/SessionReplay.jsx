@@ -210,15 +210,15 @@ export default function SessionReplay() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {playing ? (
-                      <button onClick={handlePause} className="p-2 rounded-lg bg-surface-800 text-white hover:bg-surface-700" title="Pause">
+                      <button type="button" onClick={handlePause} className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg bg-surface-800 text-white hover:bg-surface-700" title="Pause" aria-label="Pause">
                         <Pause size={16} />
                       </button>
                     ) : (
-                      <button onClick={handlePlay} className="p-2 rounded-lg bg-accent-cyan text-surface-950 hover:bg-accent-cyan/80" title="Play">
+                      <button type="button" onClick={handlePlay} className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg bg-accent-cyan text-surface-950 hover:bg-accent-cyan/80" title="Play" aria-label="Play">
                         <Play size={16} />
                       </button>
                     )}
-                    <button onClick={handleReset} className="p-2 rounded-lg bg-surface-800 text-surface-400 hover:text-white" title="Reset">
+                    <button type="button" onClick={handleReset} className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg bg-surface-800 text-surface-400 hover:text-white" title="Reset" aria-label="Reset">
                       <RotateCcw size={16} />
                     </button>
 

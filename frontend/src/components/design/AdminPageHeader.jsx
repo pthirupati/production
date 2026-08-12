@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw } from '../../ui/eagerIcons'
 
 /** Admin panel page header — FixitLab Admin.dc.html style. */
 export default function AdminPageHeader({

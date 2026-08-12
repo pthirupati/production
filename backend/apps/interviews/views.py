@@ -645,6 +645,29 @@ class InterviewRoundStartView(APIView):
         if round_obj.status not in ("scheduled", "ready", "schedulable", "in_progress"):
             return Response({"error": "Round not ready to start"}, status=400)
 
+        # DPDP §6(4) — honour profile-level withdrawal of interview processing.
+        try:
+            profile = getattr(request.user, "profile", None)
+            if profile is not None and not profile.interview_processing_consent:
+                return Response(
+                    {
+                        "error": "interview_processing_withdrawn",
+                        "message": (
+                            "You withdrew consent to process interview data. "
+                            "Re-enable it under Profile → Privacy, or delete existing "
+                            "interview history from Interview Studio."
+                        ),
+                    },
+                    status=403,
+                )
+        except Exception:
+            pass
+
+        lang = (request.data.get("language") or "").strip().lower()
+        if lang in ("en", "hi", "te") and lang != (round_obj.language or "en"):
+            round_obj.language = lang
+            round_obj.save(update_fields=["language"])
+
         # Record camera/mic/transcript consent (audit Z4-5). The UI has always
         # required the checkbox before enabling this call, but nothing persisted it,
         # so we had no evidence consent was given for biometric-adjacent processing.
@@ -954,6 +977,24 @@ class InterviewRoundResumeView(APIView):
         return Response(safe_round_data(round_obj))
 
 
+class InterviewRoundPasteView(APIView):
+    """Record paste-into-answer for proctoring (report-only; never blocks)."""
+
+    permission_classes = [IsAuthenticated]
+    # Same automatic-fire bucket as pause/resume — must not share start/message.
+    throttle_classes = [InterviewTimerRateThrottle]
+
+    def post(self, request, round_id):
+        round_obj = get_object_or_404(
+            InterviewRound.objects.select_related("campaign"),
+            id=round_id,
+            campaign__user=request.user,
+        )
+        source = str(request.data.get("source") or "answer")[:40]
+        state = engine.record_paste(round_obj, source=source)
+        return Response({"paste_events": state["count"]})
+
+
 class InterviewRoundEndView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1029,6 +1070,22 @@ class InterviewRoundDetailView(APIView):
                 },
                 status=200,
             )
+
+    def patch(self, request, round_id):
+        """Allow pre-start language selection (en|hi|te) for ASR/TTS."""
+        round_obj = get_object_or_404(
+            InterviewRound.objects.select_related("campaign"),
+            id=round_id,
+            campaign__user=request.user,
+        )
+        lang = (request.data.get("language") or "").strip().lower()
+        if lang not in ("en", "hi", "te"):
+            return Response({"error": "language must be en, hi, or te"}, status=400)
+        if round_obj.status in ("completed", "passed", "failed", "abandoned"):
+            return Response({"error": "Round is finished"}, status=400)
+        round_obj.language = lang
+        round_obj.save(update_fields=["language"])
+        return Response(InterviewRoundSerializer(round_obj).data)
 
     def delete(self, request, round_id):
         round_obj = get_object_or_404(

@@ -2,7 +2,7 @@
 
 export function createWindowsShell(vm) {
   const hostname = vm?.hostname || vm?.name || 'WIN-GUEST'
-  const cwd = { path: 'C:\\Users\\Administrator' }
+  const _cwd = { path: 'C:\\Users\\Administrator' }
   const history = []
 
   const prompt = () => `PS ${hostname}>`
@@ -24,7 +24,14 @@ export function createWindowsShell(vm) {
     } else if (lower === 'hostname') {
       out.push(hostname)
     } else if (lower.startsWith('get-service')) {
-      out.push('Status   Name               DisplayName', '------   ----               -----------', 'Running  W32Time            Windows Time', 'Running  TermService        Remote Desktop Services', 'Stopped  Spooler            Print Spooler')
+      // This guest shell is client-side and has no view of windows_engine's
+      // service table, so it cannot answer Get-Service truthfully. The previous
+      // hardcoded rows ("Stopped Spooler") contradicted the Services console
+      // and the grader as soon as a learner started or stopped anything.
+      out.push(
+        'Get-Service: service state is managed by the Windows Server console for this lab.',
+        'Open the Services console in the lab UI to view or change service state.',
+      )
     } else if (lower.startsWith('get-process')) {
       out.push('Handles  NPM(K)    PM(K) WS(K) CPU(s)   Id ProcessName', '    120      12     3456  8901   0.12 1234 svchost', '     45       5     1234  4567   0.01 5678 csrss')
     } else if (lower.startsWith('ipconfig')) {

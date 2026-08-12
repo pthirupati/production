@@ -271,7 +271,7 @@ class ScenarioAdmin(admin.ModelAdmin):
 
     @admin.display(description="Difficulty")
     def difficulty_badge(self, obj):
-        colors = {"easy": "green", "medium": "orange", "hard": "red"}
+        colors = {"easy": "green", "medium": "orange", "hard": "red", "expert": "purple"}
         return format_html(
             '<span style="color:{};font-weight:bold;">{}</span>',
             colors.get(obj.difficulty, "black"),

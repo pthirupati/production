@@ -179,3 +179,40 @@ describe('linuxShell journalctl -u derives messages from state', () => {
     expect(j).not.toContain('[emerg]')
   })
 })
+
+describe('linuxShell exit codes (§F4)', () => {
+  let sh
+  beforeEach(() => { sh = mkShell() })
+
+  it('systemctl is-active: inactive → exit 3, unknown → 4', () => {
+    out(sh, 'systemctl stop nginx')
+    const inactive = sh.run('systemctl is-active nginx')
+    expect(inactive.lines.join('\n')).toBe('inactive')
+    expect(inactive.exitCode).toBe(3)
+
+    const unknown = sh.run('systemctl is-active nosuchunit')
+    expect(unknown.lines.join('\n')).toBe('unknown')
+    expect(unknown.exitCode).toBe(4)
+  })
+
+  it('nginx -t failure leaves a non-zero exit code', () => {
+    sh.saveFile('/etc/nginx/conf.d/default.conf', 'server {\n    listn 80;\n}\n')
+    const t = sh.run('nginx -t')
+    expect(t.lines.join('\n')).toContain('test failed')
+    expect(t.exitCode).toBe(1)
+  })
+
+  it('echo $? reports the previous command exit status', () => {
+    sh.saveFile('/etc/nginx/conf.d/default.conf', 'server {\n    listn 80;\n}\n')
+    expect(sh.run('nginx -t').exitCode).toBe(1)
+    expect(sh.run('echo $?').lines.join('\n')).toBe('1')
+    expect(sh.run('true').exitCode).toBe(0)
+    expect(sh.run('echo $?').lines.join('\n')).toBe('0')
+  })
+
+  it('false && chain skips the right-hand side', () => {
+    const res = sh.run('false && echo ran')
+    expect(res.lines.join('\n')).not.toContain('ran')
+    expect(res.exitCode).toBe(1)
+  })
+})

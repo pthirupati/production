@@ -71,14 +71,25 @@ export const interviewsApi = {
   getCampaign(id) {
     return api.get(`/interviews/campaigns/${id}/`).then(r => r.data)
   },
-  getRound(id, { silent = false } = {}) {
-    return api.get(`/interviews/rounds/${id}/`, silent ? { silentError: true } : undefined).then(r => r.data)
+  getRound(id, { silent = false, signal } = {}) {
+    const opts = {}
+    if (silent) opts.silentError = true
+    if (signal) opts.signal = signal
+    return api.get(
+      `/interviews/rounds/${id}/`,
+      Object.keys(opts).length ? opts : undefined,
+    ).then(r => r.data)
   },
   scheduleRound(id, scheduledAt) {
     return api.post(`/interviews/rounds/${id}/schedule/`, { scheduled_at: scheduledAt }).then(r => r.data)
   },
-  startRound(id) {
-    return api.post(`/interviews/rounds/${id}/start/`).then(r => r.data)
+  startRound(id, { language } = {}) {
+    const body = {}
+    if (language) body.language = language
+    return api.post(`/interviews/rounds/${id}/start/`, body).then(r => r.data)
+  },
+  setRoundLanguage(id, language) {
+    return api.patch(`/interviews/rounds/${id}/`, { language }).then(r => r.data)
   },
   sendMessage(id, answer, extra = {}) {
     return api.post(`/interviews/rounds/${id}/message/`, { answer, ...extra }).then(r => r.data)
@@ -94,6 +105,9 @@ export const interviewsApi = {
   },
   resumeRound(id) {
     return api.post(`/interviews/rounds/${id}/resume/`).then(r => r.data)
+  },
+  recordPaste(id, source = 'answer') {
+    return api.post(`/interviews/rounds/${id}/paste/`, { source }).then(r => r.data)
   },
   endRound(id, reason = 'completed') {
     return api.post(`/interviews/rounds/${id}/end/`, { reason }).then(r => r.data)

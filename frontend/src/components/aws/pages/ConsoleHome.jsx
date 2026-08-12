@@ -79,7 +79,7 @@ export default function ConsoleHome() {
       <div className="aws-card aws-home-widget">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <SectionLabel>{title}</SectionLabel>
-          <button className="aws-copy-btn aws-widget-remove" title="Remove widget" onClick={() => removeWidget(wkey)}><X size={15} /></button>
+          <button type="button" className="aws-copy-btn aws-widget-remove" title="Remove widget" aria-label={`Remove ${title} widget`} onClick={() => removeWidget(wkey)}><X size={15} /></button>
         </div>
         {children}
       </div>

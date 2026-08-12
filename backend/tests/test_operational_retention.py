@@ -221,9 +221,45 @@ class IncidentRunTests(_Base):
 
 class ThePrivacySweepStillWorksTests(_Base):
     """The operational sweeps were appended to the Z4-2 task; adding them must not
-    have disturbed the four classes already there."""
+    have disturbed the privacy classes already there."""
 
     def test_the_original_classes_are_still_reported(self):
         report = purge_expired_personal_data()
-        for label in ("interview_message", "async_video", "command_history", "resume"):
+        for label in (
+            "interview_message", "async_video", "command_history", "resume",
+            "account_lifecycle",
+        ):
             self.assertIn(label, report, f"{label} stopped being swept")
+
+
+class AccountLifecycleRetentionTests(_Base):
+    """Audit Z4-12 leftover — post-deletion email has a stated TTL path."""
+
+    def test_report_only_by_default(self):
+        from apps.accounts.models import AccountLifecycleEvent
+
+        ev = AccountLifecycleEvent.objects.create(
+            user=None, email="gone@example.com", event_type="deleted",
+            metadata={"user_id": 1},
+        )
+        self._age(AccountLifecycleEvent, ev.pk)
+        report = purge_expired_personal_data()
+        self.assertTrue(AccountLifecycleEvent.objects.filter(pk=ev.pk).exists())
+        self.assertFalse(report["account_lifecycle"]["enabled"])
+        self.assertEqual(report["account_lifecycle"]["purged"], 0)
+        self.assertGreaterEqual(report["account_lifecycle"]["matched"], 1)
+
+    @override_settings(RETENTION_ACCOUNT_LIFECYCLE_DAYS=30)
+    def test_old_events_are_purged_when_enabled(self):
+        from apps.accounts.models import AccountLifecycleEvent
+
+        old = AccountLifecycleEvent.objects.create(
+            user=None, email="old@example.com", event_type="deleted",
+        )
+        recent = AccountLifecycleEvent.objects.create(
+            user=None, email="new@example.com", event_type="deleted",
+        )
+        self._age(AccountLifecycleEvent, old.pk)
+        purge_expired_personal_data()
+        self.assertFalse(AccountLifecycleEvent.objects.filter(pk=old.pk).exists())
+        self.assertTrue(AccountLifecycleEvent.objects.filter(pk=recent.pk).exists())

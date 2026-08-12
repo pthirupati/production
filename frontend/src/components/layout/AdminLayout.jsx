@@ -1,11 +1,11 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useThemeStore } from '../../store/themeStore'
 import { useState } from 'react'
 import {
   LayoutDashboard, Target, Cpu, Users, MonitorPlay, ArrowLeft, Shield, Menu, X, Ticket, Activity, ScrollText, FileText, Tag, ShieldAlert,
   BarChart3, Building2, Mic2, Award, CreditCard, MessageSquare, Wrench, Megaphone, Briefcase, Boxes, LifeBuoy, Filter,
-} from 'lucide-react'
+} from '../../ui/eagerIcons'
 import AdminTopbar from './AdminTopbar'
+import { useModalA11y } from '../ConfirmModal'
 
 const NAV_GROUPS = [
   {
@@ -54,7 +54,7 @@ const NAV_GROUPS = [
   },
 ]
 
-function SidebarContent({ location, theme, toggleTheme, onNav, navigate }) {
+function SidebarContent({ location, onNav, navigate }) {
   return (
     <>
       <div className="shrink-0 px-3 pt-[18px] pb-3">
@@ -116,8 +116,8 @@ function SidebarContent({ location, theme, toggleTheme, onNav, navigate }) {
 export default function AdminLayout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { theme, toggleTheme } = useThemeStore()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const mobileNavRef = useModalA11y(mobileOpen, () => setMobileOpen(false))
 
   return (
     <div className="h-screen flex overflow-hidden bg-[#080a16] relative">
@@ -135,18 +135,26 @@ export default function AdminLayout() {
       </div>
 
       <aside className="hidden lg:flex lg:flex-col w-[236px] shrink-0 h-screen fx-admin-sidebar relative z-10">
-        <SidebarContent location={location} theme={theme} toggleTheme={toggleTheme} onNav={() => {}} navigate={navigate} />
+        <SidebarContent location={location} onNav={() => {}} navigate={navigate} />
       </aside>
 
-      <aside className={`lg:hidden fixed inset-y-0 left-0 z-50 w-[236px] flex flex-col h-screen fx-admin-sidebar transform transition-transform duration-300 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <SidebarContent location={location} theme={theme} toggleTheme={toggleTheme} onNav={() => setMobileOpen(false)} navigate={navigate} />
+      <aside
+        ref={mobileNavRef}
+        tabIndex={mobileOpen ? -1 : undefined}
+        role={mobileOpen ? 'dialog' : undefined}
+        aria-modal={mobileOpen ? 'true' : undefined}
+        aria-label={mobileOpen ? 'Admin navigation' : undefined}
+        aria-hidden={!mobileOpen}
+        className={`lg:hidden fixed inset-y-0 left-0 z-50 w-[236px] flex flex-col h-screen fx-admin-sidebar outline-none transform transition-transform duration-300 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <SidebarContent location={location} onNav={() => setMobileOpen(false)} navigate={navigate} />
       </aside>
 
       {mobileOpen && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setMobileOpen(false)} />}
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0 relative z-10">
         <div className="lg:hidden shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] bg-[#0b0e1d]/90">
-          <button type="button" onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-white/50">
+          <button type="button" onClick={() => setMobileOpen(!mobileOpen)} className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-white/50" aria-label={mobileOpen ? 'Close admin menu' : 'Open admin menu'}>
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <Shield size={16} className="text-accent-purple" />

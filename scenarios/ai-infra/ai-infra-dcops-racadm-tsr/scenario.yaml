@@ -15,12 +15,9 @@ description: 'CONTEXT: BM / DCOps ticket — GPU node thermal/fan event. Vendor 
   Report (TSR) from iDRAC before parts ship. Collect via racadm on the crash-cart / BMC path, then attach
   evidence for the ticket.
 
-
   ENVIRONMENT: Lab Terminal (racadm / ipmitool) + Bare Metal + Datacenter twin.
 
-
   SYMPTOM: Thermal warning on GPU.Slot; no TSR attached to the RMA case.
-
 
   OBJECTIVE: racadm getsysinfo; collect techsupreport / TSR; confirm bundle path; leave FIXED-OK on the
   ops marker after upload evidence is recorded.'

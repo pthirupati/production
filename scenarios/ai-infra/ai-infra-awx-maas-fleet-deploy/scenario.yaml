@@ -16,14 +16,11 @@ description: 'CONTEXT: Bare Metal / AWX integration ticket — Automation Contro
   Ready nodes instead of the full rack. AI Infra Engineering owns this AWX↔MAAS inventory sync
   and job template path for fleet bring-up.
 
-
   ENVIRONMENT: AWX console + Bare Metal (MAAS) + Lab Terminal. Companion chrome (Hints/Check/+30m/Stop)
   stays usable while AWX is open.
 
-
   SYMPTOM / STARTING STATE: MAAS inventory source in AWX has not synced recently; the fleet
   deploy job template inventory is missing several Ready nodes that MAAS already shows.
-
 
   OBJECTIVE: Sync the MAAS inventory source in AWX; confirm the missing Ready nodes now appear
   in the inventory; launch the fleet deploy job template against the full inventory; confirm

@@ -1,10 +1,16 @@
 # performance.yml — Weekly performance benchmarks
 # Covers: Lighthouse CI on key SPA routes, k6 load test on critical APIs,
 #         DB query count regression check
+#
+# Audit Z5-20: schedule was removed and left the suite dormant. Weekly cron is
+# restored; jobs no-op cleanly when staging URLs are unset so a missing secret
+# does not red-fail every Sunday. k6 remains anonymous-read-only — it cannot
+# detect Z5-1…Z5-7 (see scripts/k6/anonymous-read-apis.js).
 name: Performance
 
 on:
-  # schedule removed — all runs are manual only
+  schedule:
+    - cron: "0 5 * * 0" # Sundays 05:00 UTC (before Monday dependency/security scans)
   workflow_dispatch:
     inputs:
       base_url:
@@ -28,15 +34,33 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve site URL
+        id: cfg
+        env:
+          INPUT_SITE: ${{ github.event.inputs.site_url }}
+          SECRET_SITE: ${{ secrets.STAGING_SITE_URL }}
+        run: |
+          SITE="${INPUT_SITE:-$SECRET_SITE}"
+          if [ -z "$SITE" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "STAGING_SITE_URL / site_url unset — skipping Lighthouse"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "site=$SITE" >> "$GITHUB_OUTPUT"
+          fi
       - uses: ./.github/actions/setup-node-frontend
+        if: steps.cfg.outputs.skip != 'true'
       - name: Install Lighthouse CI
+        if: steps.cfg.outputs.skip != 'true'
         run: npm install -g @lhci/cli
       - name: Build frontend
+        if: steps.cfg.outputs.skip != 'true'
         working-directory: frontend
         run: npm run build
       - name: Run Lighthouse CI
+        if: steps.cfg.outputs.skip != 'true'
         env:
-          SITE_URL: ${{ github.event.inputs.site_url || secrets.STAGING_SITE_URL }}
+          SITE_URL: ${{ steps.cfg.outputs.site }}
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
         run: |
           lhci autorun \
@@ -50,7 +74,7 @@ jobs:
             --assert.assertions.accessibility=error \
             --assert.assertions.best-practices=warn
       - name: Upload Lighthouse results
-        if: always()
+        if: always() && steps.cfg.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-results-${{ github.run_id }}
@@ -64,58 +88,36 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve API base URL
+        id: cfg
+        env:
+          INPUT_BASE: ${{ github.event.inputs.base_url }}
+          SECRET_BASE: ${{ secrets.STAGING_BASE_URL }}
+        run: |
+          BASE="${INPUT_BASE:-$SECRET_BASE}"
+          if [ -z "$BASE" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "STAGING_BASE_URL / base_url unset — skipping k6"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "base=$BASE" >> "$GITHUB_OUTPUT"
+          fi
       - name: Install k6
+        if: steps.cfg.outputs.skip != 'true'
         run: |
           curl https://github.com/grafana/k6/releases/download/v0.54.0/k6-v0.54.0-linux-amd64.tar.gz -L | tar xvz
           sudo mv k6-v0.54.0-linux-amd64/k6 /usr/local/bin/k6
-      - name: Write k6 load test script
-        env:
-          BASE_URL: ${{ github.event.inputs.base_url || secrets.STAGING_BASE_URL }}
-        run: |
-          cat > /tmp/k6-load.js <<'EOF'
-          import http from 'k6/http';
-          import { check, sleep } from 'k6';
-
-          const BASE = __ENV.BASE_URL || 'http://localhost:8000';
-
-          export const options = {
-            stages: [
-              { duration: '30s', target: 20 },   // ramp up
-              { duration: '1m',  target: 20 },   // steady
-              { duration: '30s', target: 0 },    // ramp down
-            ],
-            thresholds: {
-              http_req_duration: ['p(95)<500'],    // 95th percentile < 500ms
-              http_req_failed: ['rate<0.01'],      // <1% errors
-            },
-          };
-
-          export default function () {
-            const endpoints = [
-              '/api/health/',
-              '/api/stats/',
-              '/api/technologies/',
-              '/api/scenarios/',
-              '/api/leaderboard/',
-              '/api/config/',
-            ];
-            for (const path of endpoints) {
-              const res = http.get(`${BASE}${path}`);
-              check(res, { 'status 200': (r) => r.status === 200 });
-            }
-            sleep(1);
-          }
-          EOF
       - name: Run k6 load test
+        if: steps.cfg.outputs.skip != 'true'
         env:
-          BASE_URL: ${{ github.event.inputs.base_url || secrets.STAGING_BASE_URL }}
+          BASE_URL: ${{ steps.cfg.outputs.base }}
         run: |
-          k6 run /tmp/k6-load.js \
+          k6 run scripts/k6/anonymous-read-apis.js \
             -e BASE_URL="${BASE_URL}" \
             --out json=/tmp/k6-results.json \
             --summary-trend-stats="avg,min,med,max,p(90),p(95),p(99)"
       - name: Upload k6 results
-        if: always()
+        if: always() && steps.cfg.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: k6-results-${{ github.run_id }}

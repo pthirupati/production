@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X, ArrowRight, ArrowLeft, Terminal, Target, Trophy, Layers, Sparkles } from 'lucide-react'
 import { currentUserScopedKey, migrateUnscopedKey } from '../utils/userScopedStorage'
+import { useModalA11y } from './ConfirmModal'
 
 const TOUR_STEPS = [
   {
@@ -82,19 +83,25 @@ export default function OnboardingTour() {
     }
   }
 
-  if (!show) return null
-
+  const dialogRef = useModalA11y(show, handleClose)
   const current = TOUR_STEPS[step]
   const Icon = current.icon
 
-  return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] animate-fade-in" onClick={handleClose} />
+  if (!show) return null
 
-      {/* Tour card */}
-      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4">
-        <div className="glass-card w-full max-w-md p-0 overflow-hidden animate-slide-up shadow-2xl">
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={current.title}
+    >
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="glass-card w-full max-w-md p-0 overflow-hidden animate-slide-up shadow-2xl relative outline-none"
+      >
           {/* Progress bar */}
           <div className="h-1 bg-surface-800">
             <div
@@ -105,7 +112,12 @@ export default function OnboardingTour() {
 
           <div className="p-8">
             {/* Close button */}
-            <button onClick={handleClose} className="absolute top-4 right-4 text-surface-500 hover:text-white transition-colors">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="absolute top-4 right-4 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-white transition-colors"
+              aria-label="Close tour"
+            >
               <X size={18} />
             </button>
 
@@ -119,7 +131,7 @@ export default function OnboardingTour() {
             <p className="text-sm text-surface-400 text-center leading-relaxed mb-6">{current.description}</p>
 
             {/* Step dots */}
-            <div className="flex items-center justify-center gap-2 mb-6">
+            <div className="flex items-center justify-center gap-2 mb-6" aria-hidden="true">
               {TOUR_STEPS.map((_, i) => (
                 <div
                   key={i}
@@ -133,30 +145,29 @@ export default function OnboardingTour() {
             {/* Navigation */}
             <div className="flex items-center justify-between gap-3">
               {step > 0 ? (
-                <button onClick={handlePrev} className="btn-secondary text-sm px-4 py-2 flex items-center gap-1.5">
+                <button type="button" onClick={handlePrev} className="btn-secondary text-sm px-4 py-2 flex items-center gap-1.5">
                   <ArrowLeft size={14} /> Back
                 </button>
               ) : (
-                <button onClick={handleClose} className="text-sm text-surface-500 hover:text-surface-300 px-3 py-2">
+                <button type="button" onClick={handleClose} className="text-sm text-surface-500 hover:text-surface-300 px-3 py-2">
                   Skip tour
                 </button>
               )}
 
               <div className="flex items-center gap-2">
                 {current.action && (
-                  <button onClick={handleAction} className="btn-secondary text-sm px-4 py-2">
+                  <button type="button" onClick={handleAction} className="btn-secondary text-sm px-4 py-2">
                     Go there →
                   </button>
                 )}
-                <button onClick={handleNext} className="btn-primary text-sm px-6 py-2 flex items-center gap-1.5">
+                <button type="button" onClick={handleNext} className="btn-primary text-sm px-6 py-2 flex items-center gap-1.5">
                   {step === TOUR_STEPS.length - 1 ? 'Get Started' : 'Next'}
                   {step < TOUR_STEPS.length - 1 && <ArrowRight size={14} />}
                 </button>
               </div>
             </div>
           </div>
-        </div>
       </div>
-    </>
+    </div>
   )
 }

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
-import { Plus, Edit2, Trash2, Search, X, Save, Tag, Eye, ShieldAlert } from 'lucide-react'
+import { useModalA11y } from '../../components/ConfirmModal'
+import { Plus, Edit2, Trash2, Search, X, Save, Tag, ShieldAlert } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const SCENARIO_TYPES = [
@@ -49,6 +50,7 @@ export default function AdminScenarios() {
   const [scenarios, setScenarios] = useState([])
   const [technologies, setTechnologies] = useState([])
   const [tags, setTags] = useState([])
+  const [tagsFailed, setTagsFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -68,19 +70,30 @@ export default function AdminScenarios() {
   const [hints, setHints] = useState([])
   const [newHint, setNewHint] = useState({ content: '', penalty: 10 })
 
+  const closeForm = () => setShowForm(false)
+  const formDialogRef = useModalA11y(showForm, closeForm)
+
   useEffect(() => { loadData() }, [search])
 
   const loadData = async () => {
     setLoading(true)
     try {
-      const [s, t, tg] = await Promise.all([
+      const [sSettled, tSettled, tgSettled] = await Promise.allSettled([
         adminApi.getScenarios(search ? { search } : {}),
         adminApi.getTechnologies(),
-        adminApi.getTags().catch(() => []),
+        adminApi.getTags(),
       ])
-      setScenarios(s)
-      setTechnologies(t)
-      setTags(tg)
+      if (sSettled.status === 'fulfilled') setScenarios(sSettled.value)
+      else console.error(sSettled.reason)
+      if (tSettled.status === 'fulfilled') setTechnologies(tSettled.value)
+      else console.error(tSettled.reason)
+      if (tgSettled.status === 'fulfilled') {
+        setTags(tgSettled.value || [])
+        setTagsFailed(false)
+      } else {
+        setTags([])
+        setTagsFailed(true)
+      }
     } catch (err) { console.error(err) }
     finally { setLoading(false) }
   }
@@ -241,52 +254,62 @@ export default function AdminScenarios() {
       {/* Search */}
       <div className="relative max-w-md">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-500" />
-        <input type="text" placeholder="Search scenarios..." value={search}
+        <input type="text" aria-label="Search scenarios" placeholder="Search scenarios..." value={search}
           onChange={(e) => setSearch(e.target.value)} className="input-field pl-10" />
       </div>
 
       {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center pt-10 overflow-y-auto">
-          <div className="glass-card p-6 w-full max-w-3xl mx-4 mb-8">
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center pt-10 overflow-y-auto"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) closeForm() }}
+        >
+          <div
+            ref={formDialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label={editingId ? 'Edit Scenario' : 'New Scenario'}
+            className="glass-card p-6 w-full max-w-3xl mx-4 mb-8 outline-none"
+          >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold text-white">
                 {editingId ? 'Edit Scenario' : 'New Scenario'}
               </h2>
-              <button onClick={() => setShowForm(false)} className="text-surface-500 hover:text-white">
+              <button type="button" onClick={closeForm} aria-label="Close scenario form" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-white">
                 <X size={20} />
               </button>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
               <div className="col-span-2">
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Title</label>
-                <input value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} className="input-field" />
+                <label htmlFor="scn-title" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Title</label>
+                <input id="scn-title" value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} className="input-field" />
               </div>
               <div>
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Slug</label>
-                <input value={form.slug} onChange={(e) => setForm(f => ({ ...f, slug: e.target.value }))} className="input-field" placeholder="broken-nginx" />
+                <label htmlFor="scn-slug" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Slug</label>
+                <input id="scn-slug" value={form.slug} onChange={(e) => setForm(f => ({ ...f, slug: e.target.value }))} className="input-field" placeholder="broken-nginx" />
               </div>
               <div className="col-span-3">
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Subtitle</label>
-                <input value={form.subtitle} onChange={(e) => setForm(f => ({ ...f, subtitle: e.target.value }))} className="input-field" placeholder="A brief subtitle shown in listings" />
+                <label htmlFor="scn-subtitle" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Subtitle</label>
+                <input id="scn-subtitle" value={form.subtitle} onChange={(e) => setForm(f => ({ ...f, subtitle: e.target.value }))} className="input-field" placeholder="A brief subtitle shown in listings" />
               </div>
               <div>
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Technology</label>
-                <select value={form.technology_id} onChange={(e) => setForm(f => ({ ...f, technology_id: e.target.value }))} className="input-field">
+                <label htmlFor="scn-technology" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Technology</label>
+                <select id="scn-technology" value={form.technology_id} onChange={(e) => setForm(f => ({ ...f, technology_id: e.target.value }))} className="input-field">
                   <option value="">Select...</option>
                   {technologies.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Type</label>
-                <select value={form.scenario_type} onChange={(e) => setForm(f => ({ ...f, scenario_type: e.target.value }))} className="input-field">
+                <label htmlFor="scn-type" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Type</label>
+                <select id="scn-type" value={form.scenario_type} onChange={(e) => setForm(f => ({ ...f, scenario_type: e.target.value }))} className="input-field">
                   {SCENARIO_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Infrastructure</label>
-                <select value={form.infrastructure_type} disabled={form.lab_mode === 'simulation'}
+                <label htmlFor="scn-infrastructure" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Infrastructure</label>
+                <select id="scn-infrastructure" value={form.infrastructure_type} disabled={form.lab_mode === 'simulation'}
                   onChange={(e) => setForm(f => ({ ...f, infrastructure_type: e.target.value, lab_mode: e.target.value }))} className="input-field disabled:opacity-50">
                   {INFRA_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
@@ -295,8 +318,8 @@ export default function AdminScenarios() {
                 )}
               </div>
               <div>
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Lab mode</label>
-                <select value={form.lab_mode} onChange={(e) => {
+                <label htmlFor="scn-lab-mode" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Lab mode</label>
+                <select id="scn-lab-mode" value={form.lab_mode} onChange={(e) => {
                   const mode = e.target.value
                   const meta = LAB_MODES.find(m => m.value === mode)
                   setForm(f => ({
@@ -316,8 +339,8 @@ export default function AdminScenarios() {
                 )}
               </div>
               <div>
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Lab persona</label>
-                <select value={form.simulation_type} onChange={(e) => setForm(f => ({ ...f, lab_mode: 'simulation', simulation_type: e.target.value }))} className="input-field" disabled={form.lab_mode !== 'simulation'}>
+                <label htmlFor="scn-lab-persona" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Lab persona</label>
+                <select id="scn-lab-persona" value={form.simulation_type} onChange={(e) => setForm(f => ({ ...f, lab_mode: 'simulation', simulation_type: e.target.value }))} className="input-field" disabled={form.lab_mode !== 'simulation'}>
                   {SIMULATION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
                 <p className="text-xs text-surface-500 mt-1">One engine — scenario YAML + slug define the broken state</p>
@@ -337,28 +360,33 @@ export default function AdminScenarios() {
                 </label>
               </div>
               <div>
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Category</label>
-                <input value={form.category} onChange={(e) => setForm(f => ({ ...f, category: e.target.value }))} className="input-field" placeholder="Web Server" />
+                <label htmlFor="scn-category" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Category</label>
+                <input id="scn-category" value={form.category} onChange={(e) => setForm(f => ({ ...f, category: e.target.value }))} className="input-field" placeholder="Web Server" />
               </div>
               <div>
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Difficulty</label>
-                <select value={form.difficulty} onChange={(e) => setForm(f => ({ ...f, difficulty: e.target.value }))} className="input-field">
+                <label htmlFor="scn-difficulty" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Difficulty</label>
+                <select id="scn-difficulty" value={form.difficulty} onChange={(e) => setForm(f => ({ ...f, difficulty: e.target.value }))} className="input-field">
                   <option value="easy">Easy</option>
                   <option value="medium">Medium</option>
                   <option value="hard">Hard</option>
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Time Limit (sec)</label>
-                <input type="number" value={form.time_limit} onChange={(e) => setForm(f => ({ ...f, time_limit: Number(e.target.value) }))} className="input-field" />
+                <label htmlFor="scn-time-limit" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Time Limit (sec)</label>
+                <input id="scn-time-limit" type="number" value={form.time_limit} onChange={(e) => setForm(f => ({ ...f, time_limit: Number(e.target.value) }))} className="input-field" />
                 <p className="text-xs text-surface-500 mt-1">Default 600s (10 min). Lab auto-expires and redirects learner to scenario page.</p>
               </div>
               <div>
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Max Score</label>
-                <input type="number" value={form.max_score} onChange={(e) => setForm(f => ({ ...f, max_score: Number(e.target.value) }))} className="input-field" />
+                <label htmlFor="scn-max-score" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Max Score</label>
+                <input id="scn-max-score" type="number" value={form.max_score} onChange={(e) => setForm(f => ({ ...f, max_score: Number(e.target.value) }))} className="input-field" />
               </div>
 
               {/* Tags */}
+              {tagsFailed && (
+                <div className="col-span-3">
+                  <p className="text-xs text-amber-300/90">Couldn&apos;t load tags — you can still save the scenario without them.</p>
+                </div>
+              )}
               {tags.length > 0 && (
                 <div className="col-span-3">
                   <label className="block text-xs text-surface-400 mb-2 uppercase tracking-wider">Tags</label>
@@ -378,32 +406,32 @@ export default function AdminScenarios() {
               )}
 
               <div className="col-span-3">
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Description</label>
-                <textarea value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} className="input-field h-24 resize-y" />
+                <label htmlFor="scn-description" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Description</label>
+                <textarea id="scn-description" value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} className="input-field h-24 resize-y" />
               </div>
               <div className="col-span-3">
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Objectives (one per line)</label>
-                <textarea value={form.objectives} onChange={(e) => setForm(f => ({ ...f, objectives: e.target.value }))} className="input-field h-20 resize-y" placeholder="Objective 1&#10;Objective 2" />
+                <label htmlFor="scn-objectives" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Objectives (one per line)</label>
+                <textarea id="scn-objectives" value={form.objectives} onChange={(e) => setForm(f => ({ ...f, objectives: e.target.value }))} className="input-field h-20 resize-y" placeholder="Objective 1&#10;Objective 2" />
               </div>
               <div className="col-span-3">
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Validation Script (bash)</label>
-                <textarea value={form.validation_script} onChange={(e) => setForm(f => ({ ...f, validation_script: e.target.value }))} className="input-field h-20 resize-y font-mono text-sm" placeholder="#!/bin/bash&#10;curl -s http://localhost | grep -q 'Welcome'" />
+                <label htmlFor="scn-validation-script" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Validation Script (bash)</label>
+                <textarea id="scn-validation-script" value={form.validation_script} onChange={(e) => setForm(f => ({ ...f, validation_script: e.target.value }))} className="input-field h-20 resize-y font-mono text-sm" placeholder="#!/bin/bash&#10;curl -s http://localhost | grep -q 'Welcome'" />
               </div>
               {form.infrastructure_type !== 'docker' && (
                 <div className="col-span-3">
-                  <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Cloud Setup Script (bash — creates the broken state on the server)</label>
-                  <textarea value={form.cloud_setup_script} onChange={(e) => setForm(f => ({ ...f, cloud_setup_script: e.target.value }))} className="input-field h-24 resize-y font-mono text-sm" placeholder="#!/bin/bash&#10;# Commands to set up the broken state on the cloud instance" />
+                  <label htmlFor="scn-cloud-setup-script" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Cloud Setup Script (bash — creates the broken state on the server)</label>
+                  <textarea id="scn-cloud-setup-script" value={form.cloud_setup_script} onChange={(e) => setForm(f => ({ ...f, cloud_setup_script: e.target.value }))} className="input-field h-24 resize-y font-mono text-sm" placeholder="#!/bin/bash&#10;# Commands to set up the broken state on the cloud instance" />
                 </div>
               )}
               <div className="col-span-3">
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Solution Explanation (shown after solving)</label>
-                <textarea value={form.solution_explanation} onChange={(e) => setForm(f => ({ ...f, solution_explanation: e.target.value }))} className="input-field h-20 resize-y" placeholder="Explain the solution step by step..." />
+                <label htmlFor="scn-solution-explanation" className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Solution Explanation (shown after solving)</label>
+                <textarea id="scn-solution-explanation" value={form.solution_explanation} onChange={(e) => setForm(f => ({ ...f, solution_explanation: e.target.value }))} className="input-field h-20 resize-y" placeholder="Explain the solution step by step..." />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-surface-400 mb-1 block">Jira Priority</label>
-                  <select value={form.jira_priority} onChange={(e) => setForm(f => ({ ...f, jira_priority: e.target.value }))} className="input-field w-full">
+                  <label htmlFor="scn-jira-priority" className="text-xs text-surface-400 mb-1 block">Jira Priority</label>
+                  <select id="scn-jira-priority" value={form.jira_priority} onChange={(e) => setForm(f => ({ ...f, jira_priority: e.target.value }))} className="input-field w-full">
                     <option value="Highest">Highest</option>
                     <option value="High">High</option>
                     <option value="Medium">Medium</option>
@@ -413,8 +441,9 @@ export default function AdminScenarios() {
                 </div>
               </div>
               <div>
-                <label className="text-xs text-surface-400 mb-1 block">Jira Issue Template (optional)</label>
+                <label htmlFor="scn-jira-template" className="text-xs text-surface-400 mb-1 block">Jira Issue Template (optional)</label>
                 <textarea
+                  id="scn-jira-template"
                   value={form.jira_issue_template}
                   onChange={(e) => setForm(f => ({ ...f, jira_issue_template: e.target.value }))}
                   className="input-field h-24 resize-y font-mono text-xs"
@@ -430,6 +459,7 @@ export default function AdminScenarios() {
                 <p className="text-xs text-surface-500 mb-2">Commands users cannot run in this scenario. Plain text matches as substring, patterns starting with ^ are treated as regex.</p>
                 <div className="flex gap-2 mb-2">
                   <input
+                    aria-label="Blocked command to add"
                     value={newBlockedCmd}
                     onChange={(e) => setNewBlockedCmd(e.target.value)}
                     onKeyDown={(e) => {
@@ -484,15 +514,15 @@ export default function AdminScenarios() {
                       <div key={h.id} className="flex items-start gap-2 p-2 rounded-lg bg-surface-800/40 text-sm">
                         <span className="text-accent-amber text-xs font-mono shrink-0">-{h.penalty}pts</span>
                         <span className="text-surface-300 flex-1 whitespace-pre-wrap">{h.content}</span>
-                        <button type="button" onClick={() => handleDeleteHint(h.id)} className="text-surface-500 hover:text-red-400"><Trash2 size={14} /></button>
+                        <button type="button" onClick={() => handleDeleteHint(h.id)} aria-label={`Delete hint: ${h.content}`} className="text-surface-500 hover:text-red-400"><Trash2 size={14} /></button>
                       </div>
                     ))}
                     {hints.length === 0 && <p className="text-xs text-surface-600">No hints — add one below or re-seed from YAML.</p>}
                   </div>
                   <div className="flex gap-2">
-                    <input value={newHint.content} onChange={e => setNewHint(h => ({ ...h, content: e.target.value }))}
+                    <input aria-label="Hint text" value={newHint.content} onChange={e => setNewHint(h => ({ ...h, content: e.target.value }))}
                       className="input-field flex-1 text-sm" placeholder="Hint text..." />
-                    <input type="number" value={newHint.penalty} onChange={e => setNewHint(h => ({ ...h, penalty: Number(e.target.value) }))}
+                    <input type="number" aria-label="Hint penalty in points" value={newHint.penalty} onChange={e => setNewHint(h => ({ ...h, penalty: Number(e.target.value) }))}
                       className="input-field w-20 text-sm" min={0} title="Score penalty" />
                     <button type="button" onClick={handleAddHint} className="btn-secondary px-3 text-xs">Add Hint</button>
                   </div>
@@ -516,7 +546,7 @@ export default function AdminScenarios() {
             </div>
 
             <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-surface-800">
-              <button onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
+              <button type="button" onClick={closeForm} className="btn-secondary">Cancel</button>
               <button onClick={handleSave} className="btn-primary flex items-center gap-2">
                 <Save size={16} /> {editingId ? 'Update' : 'Create'}
               </button>
@@ -582,10 +612,10 @@ export default function AdminScenarios() {
                   <td className="px-4 py-3 text-sm text-surface-400 text-right">{s.total_attempts}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => handleEdit(s)} className="p-1.5 text-surface-500 hover:text-accent-cyan transition-colors" title="Edit">
+                      <button onClick={() => handleEdit(s)} aria-label={`Edit ${s.title}`} className="p-1.5 text-surface-500 hover:text-accent-cyan transition-colors" title="Edit">
                         <Edit2 size={14} />
                       </button>
-                      <button onClick={() => handleDelete(s.id)} className="p-1.5 text-surface-500 hover:text-accent-red transition-colors" title="Deactivate">
+                      <button onClick={() => handleDelete(s.id)} aria-label={`Deactivate ${s.title}`} className="p-1.5 text-surface-500 hover:text-accent-red transition-colors" title="Deactivate">
                         <Trash2 size={14} />
                       </button>
                     </div>

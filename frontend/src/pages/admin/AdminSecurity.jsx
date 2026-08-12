@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
+import { useModalA11y } from '../../components/ConfirmModal'
 import { Shield, AlertTriangle, Lock, CreditCard, RotateCcw, Mail, KeyRound, Ban, Globe, X, ChevronRight, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -28,6 +29,9 @@ export default function AdminSecurity() {
   const [blockIp, setBlockIp] = useState('')
   const [blockUserEmail, setBlockUserEmail] = useState('')
   const [blockCountry, setBlockCountry] = useState('')
+
+  const closeDetail = () => setDetail(null)
+  const detailDialogRef = useModalA11y(!!detail, closeDetail)
 
   const loadData = async () => {
     setLoading(true)
@@ -293,11 +297,21 @@ export default function AdminSecurity() {
 
       {/* Detail modal */}
       {detail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) closeDetail() }}
+        >
+          <div
+            ref={detailDialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${detail.metric?.replace(/_/g, ' ')} — details`}
+            className="glass-card w-full max-w-2xl max-h-[80vh] flex flex-col outline-none"
+          >
             <div className="flex items-center justify-between p-4 border-b border-surface-700">
               <h3 className="font-semibold text-white capitalize">{detail.metric?.replace(/_/g, ' ')} — details</h3>
-              <button type="button" onClick={() => setDetail(null)} className="p-1 text-surface-400 hover:text-white"><X size={18} /></button>
+              <button type="button" onClick={closeDetail} aria-label="Close security details" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center p-1 text-surface-400 hover:text-white"><X size={18} /></button>
             </div>
             <div className="overflow-y-auto p-4 space-y-2 flex-1">
               {detailLoading ? (

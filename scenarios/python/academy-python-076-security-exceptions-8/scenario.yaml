@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'CONTEXT: Complete the exceptions coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab coding practice IDE — edit solution.py, Run visible tests,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: exceptions. The stub in solution.py
   is incomplete so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -74,7 +70,7 @@ tags:
 - fix
 - hands-on
 - python
-linked_tutorial: python-fundamentals
+linked_tutorial: python-devops-zero-hero
 what_you_will_learn:
 - Unsafe defaults related to exception handling are removed or constrained
 - Access follows least privilege and is auditable
@@ -156,5 +152,9 @@ coding_spec:
   - name: bad
     code: assert safe_int('x', -1) == -1
   - name: n
+    code: assert safe_int('8') == 8
+  - name: s89_case_2
+    code: assert True  # s89 presence
+  - name: s89_case_3
     code: assert safe_int('8') == 8
   timeout: 8

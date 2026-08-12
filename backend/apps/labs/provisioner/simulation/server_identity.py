@@ -153,6 +153,7 @@ def upsert_server(session_id: str, patch: dict, *, source: str = "api", trace_id
         "hostname", "fqdn", "primary_ip", "cpu", "mem_mb", "power", "os",
         "install_state", "physical_location", "bmc", "network_port", "gpu",
         "serial", "asset_tag", "owner", "firmware", "raid", "thermal",
+        "image_manifest", "ssh_user",
     ):
         if key in patch and patch[key] is not None:
             server[key] = patch[key]
@@ -1194,18 +1195,57 @@ def sync_aws_instance(session_id: str, instance: dict | None, *, instance_types:
             "instance_type": itype,
             "az": instance.get("az") or "",
             "appears_in": ["aws", "terminal"],
+            # §X3 — AMI identity for guest seed / graders (empty when catalog AMI)
+            "ami_id": instance.get("amiId") or instance.get("ami_id") or "",
+            "ami_digest": instance.get("amiDigest") or "",
         },
     }
+    # Carry the Packer/ImportImage content manifest onto the LabServer so a
+    # terminal seed can derive packages/kernel/user without re-querying AWS state.
+    manifest = instance.get("manifest")
+    if isinstance(manifest, dict) and manifest:
+        patch["image_manifest"] = manifest
+        if manifest.get("default_user"):
+            # Prefer the image's default login over the generic ec2-user guess.
+            patch.setdefault("ssh_user", manifest.get("default_user"))
     server = upsert_server(session_id, patch, source="aws")
     if (private_ip or public_ip) and power_on:
+        ssh_user = (
+            (manifest or {}).get("default_user")
+            if isinstance(manifest, dict)
+            else None
+        ) or "ec2-user"
         register_terminal_ssh_host(
             session_id,
             hostname=patch["hostname"],
             ip=private_ip or public_ip,
-            ssh_user="ec2-user",
+            ssh_user=ssh_user,
             source="aws",
         )
+    # Bridge AMI content into the live guest shell (§X3 guest seed).
+    if isinstance(manifest, dict) and manifest:
+        _apply_manifest_to_session_shell(session_id, manifest)
     return server
+
+
+def _apply_manifest_to_session_shell(session_id: str, manifest: dict) -> None:
+    """Apply Packer/AMI manifest onto the session engine's RHEL state when present."""
+    try:
+        from .shell import get_sim_session
+        entry = get_sim_session(str(session_id))
+    except Exception:
+        return
+    if not entry:
+        return
+    engine = (entry.get("state") or {}).get("engine")
+    shell = getattr(engine, "shell", None) if engine is not None else None
+    state = getattr(shell, "state", None)
+    if state is None or not hasattr(state, "apply_image_manifest"):
+        return
+    try:
+        state.apply_image_manifest(manifest)
+    except Exception:
+        logger.debug("apply_image_manifest failed for session %s", session_id, exc_info=True)
 
 
 def sync_k8s_nodes(session_id: str, nodes: list[dict] | None) -> None:

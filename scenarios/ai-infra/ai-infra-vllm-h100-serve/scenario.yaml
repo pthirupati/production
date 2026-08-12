@@ -15,12 +15,9 @@ description: 'CONTEXT: AI Infra Engineering brings up inference infra — not th
   course. After MAAS deploy of an ImageDev H100 image, start vLLM with tensor parallel across
   the node GPUs and verify OpenAI-compatible serving on :8000.
 
-
   ENVIRONMENT: Lab Terminal on a Deployed H100 node + Bare Metal. Optional Datacenter twin for rack.
 
-
   SYMPTOM: Node Deployed with healthy nvidia-smi; vLLM not serving; no /v1 endpoint.
-
 
   OBJECTIVE: Confirm GPUs; start `vllm serve` with tensor parallel; verify READY on :8000;
   optional bench; FIXED-OK.'

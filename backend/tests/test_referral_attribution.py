@@ -33,7 +33,11 @@ PASSWORD = "Str0ng-Pass-1"
 
 
 def _register(**extra):
-    data = {"email": f"u{extra.pop('n', 1)}@example.com", "password": PASSWORD}
+    data = {
+        "email": f"u{extra.pop('n', 1)}@example.com",
+        "password": PASSWORD,
+        "accepted_legal": True,
+    }
     data.update(extra)
     s = RegisterSerializer(data=data)
     assert s.is_valid(), s.errors
@@ -95,8 +99,12 @@ class ABadCodeNeverCostsASignupTests(TestCase):
     def test_a_junk_code_does_not_raise(self):
         for junk in ("'; DROP TABLE--", "x" * 20, "!!!"):
             s = RegisterSerializer(
-                data={"email": f"j{hash(junk) % 9999}@example.com",
-                      "password": PASSWORD, "referral_code": junk}
+                data={
+                    "email": f"j{hash(junk) % 9999}@example.com",
+                    "password": PASSWORD,
+                    "referral_code": junk,
+                    "accepted_legal": True,
+                }
             )
             self.assertTrue(s.is_valid(), s.errors)
             self.assertIsNotNone(s.save())

@@ -755,7 +755,7 @@ export function SubnetsPage({ state, busy, sessionId, run }) {
           const subs = (typeof v === 'object' && v.subnets)
             ? v.subnets
             : spaces.flatMap((s) => (s.subnets || []).map((cidr) => ({ cidr, space: s.name, vlan: vlanName })))
-              .filter((s) => !vlanName || true)
+              .filter((_s) => !vlanName || true)
           return { name: vlanName, subnets: subs }
         }),
       }))

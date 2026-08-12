@@ -172,6 +172,9 @@ def _base_state() -> dict:
         ],
         "snapshots": [],
         "operations": [],
+        "images": [],
+        "instance_templates": [],
+        "migs": [],
         "goal": {"title": "GCP lab", "objective": "Resolve the flagged GCP issue."},
         "broken": {},
         "events": [],
@@ -301,6 +304,29 @@ def check_port_reachable(session_id: str, port: str = "22") -> bool:
     return _fw_allows(state, port)
 
 
+def _resolve_image(state: dict, *, image: str | None = None, family: str | None = None) -> dict | None:
+    images = state.get("images") or []
+    if image:
+        return next((i for i in images if i.get("name") == image or i.get("id") == image), None)
+    if family:
+        family_imgs = [i for i in images if i.get("family") == family and not i.get("deprecated")]
+        if not family_imgs:
+            return None
+        family_imgs.sort(key=lambda i: i.get("created") or "", reverse=True)
+        return family_imgs[0]
+    return None
+
+
+def _import_gcp_manifest_error(manifest: object) -> str | None:
+    if not isinstance(manifest, dict):
+        return "ERROR: Disk validation failed. Artifact manifest required."
+    if int(manifest.get("schema_version") or 0) < 1:
+        return "ERROR: Disk validation failed. Unsupported manifest schema."
+    if not manifest.get("digest"):
+        return "ERROR: Disk validation failed. Manifest digest missing."
+    return None
+
+
 def apply_action(session_id: str, action: str, payload: dict | None = None) -> dict:
     payload = payload or {}
     entry = _load(session_id)
@@ -324,6 +350,147 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     if not state.get("session", {}).get("logged_in"):
         return {"ok": False, "error": "Sign in to the Google Cloud Console first"}
 
+    if action == "import_image":
+        manifest = payload.get("manifest")
+        if not manifest:
+            try:
+                from apps.vmware_sim import packer_factory as pf
+                mres = pf.get_manifest(state)
+                if mres.get("ok"):
+                    manifest = mres["manifest"]
+            except Exception:
+                manifest = None
+        err = _import_gcp_manifest_error(manifest)
+        if err:
+            return {"ok": False, "error": err}
+        expected = str(payload.get("digest") or "").strip()
+        if expected and expected != manifest.get("digest"):
+            return {"ok": False, "error": "ERROR: Disk validation failed. Manifest digest mismatch."}
+        name = (payload.get("name") or f"imported-{manifest.get('sku') or 'image'}").strip()
+        family = (payload.get("family") or "fixitlab-golden").strip()
+        signed = bool(payload.get("signed", True))
+        img = {
+            "id": f"img-{_hex(8)}",
+            "name": name,
+            "family": family,
+            "digest": manifest.get("digest"),
+            "manifest": manifest,
+            "signed": signed,
+            "source": "import",
+            "deprecated": False,
+            "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "status": "READY",
+        }
+        state.setdefault("images", []).append(img)
+        _event(state, f"Imported image {name} (family={family})", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Created image [{name}].", "image": img}
+
+    if action == "create_image":
+        name = (payload.get("name") or f"img-{_hex(4)}").strip()
+        family = (payload.get("family") or "").strip() or None
+        img = {
+            "id": f"img-{_hex(8)}",
+            "name": name,
+            "family": family,
+            "digest": payload.get("digest") or f"sha256:{_hex(32)}",
+            "signed": bool(payload.get("signed", False)),
+            "source": payload.get("source") or "disk",
+            "deprecated": False,
+            "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "status": "READY",
+        }
+        state.setdefault("images", []).append(img)
+        _event(state, f"Created image {name}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Created image [{name}].", "image": img}
+
+    if action == "list_images":
+        family = payload.get("family")
+        imgs = list(state.get("images") or [])
+        if family:
+            imgs = [i for i in imgs if i.get("family") == family]
+        return {"ok": True, "images": imgs}
+
+    if action == "create_instance_template":
+        name = (payload.get("name") or f"tmpl-{_hex(4)}").strip()
+        image = payload.get("image")
+        family = payload.get("image_family") or payload.get("family")
+        resolved = _resolve_image(state, image=image, family=family)
+        if not resolved and (image or family):
+            return {"ok": False, "error": f"Image '{image or family}' was not found"}
+        tmpl = {
+            "name": name,
+            "machine_type": payload.get("machine_type") or "e2-medium",
+            "source_image": (resolved or {}).get("name"),
+            "image_family": (resolved or {}).get("family") or family,
+            "image_digest": (resolved or {}).get("digest"),
+            "signed": bool((resolved or {}).get("signed")),
+            "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        state.setdefault("instance_templates", []).append(tmpl)
+        _event(state, f"Created instance template {name}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Created instance template [{name}].", "template": tmpl}
+
+    if action == "create_mig":
+        name = (payload.get("name") or f"mig-{_hex(4)}").strip()
+        tmpl_name = payload.get("template") or payload.get("instance_template")
+        tmpl = next(
+            (t for t in state.get("instance_templates") or [] if t.get("name") == tmpl_name),
+            None,
+        )
+        if not tmpl:
+            return {"ok": False, "error": "Instance template required"}
+        size = int(payload.get("size") or payload.get("target_size") or 2)
+        instances = []
+        for i in range(size):
+            instances.append({
+                "name": f"{name}-{i + 1}",
+                "source_image": tmpl.get("source_image"),
+                "image_digest": tmpl.get("image_digest"),
+                "status": "RUNNING",
+            })
+        mig = {
+            "name": name,
+            "instance_template": tmpl["name"],
+            "target_size": size,
+            "instances": instances,
+            "updated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        state.setdefault("migs", []).append(mig)
+        _event(state, f"Created MIG {name}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Created MIG [{name}].", "mig": mig}
+
+    if action == "rolling_update_mig":
+        name = payload.get("name") or payload.get("mig") or ""
+        mig = next((m for m in state.get("migs") or [] if m.get("name") == name), None)
+        if not mig:
+            return {"ok": False, "error": f"MIG '{name}' not found"}
+        tmpl_name = payload.get("template") or payload.get("instance_template")
+        tmpl = next(
+            (t for t in state.get("instance_templates") or [] if t.get("name") == tmpl_name),
+            None,
+        )
+        if not tmpl:
+            return {"ok": False, "error": "New instance template required"}
+        batch = int(payload.get("batch") or payload.get("max_surge") or len(mig.get("instances") or []))
+        updated = 0
+        for inst in mig.get("instances") or []:
+            if updated >= batch:
+                break
+            if inst.get("image_digest") == tmpl.get("image_digest"):
+                continue
+            inst["source_image"] = tmpl.get("source_image")
+            inst["image_digest"] = tmpl.get("image_digest")
+            updated += 1
+        mig["instance_template"] = tmpl["name"]
+        mig["updated"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        _event(state, f"MIG {name} rolling update: {updated} instance(s)", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Updated {updated} instance(s)", "mig": mig, "updated": updated}
+
     if action == "create_instance":
         name = (payload.get("name") or f"vm-{_hex(4)}").strip()
         if any(i.get("name") == name for i in state.get("instances") or []):
@@ -335,6 +502,27 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         zone = payload.get("zone") or "us-central1-a"
         network = (state.get("networks") or [{}])[0].get("name") or "default"
         subnet = ((state.get("networks") or [{}])[0].get("subnets") or [{}])[0].get("name") or "default"
+        image_name = payload.get("image")
+        image_family = payload.get("image_family") or payload.get("family")
+        resolved = _resolve_image(state, image=image_name, family=image_family)
+        secure_boot = bool(
+            payload.get("shielded_secure_boot")
+            or (payload.get("shielded_vm") or {}).get("secure_boot")
+            or payload.get("secure_boot")
+        )
+        if secure_boot and resolved is not None and not resolved.get("signed"):
+            return {
+                "ok": False,
+                "error": (
+                    "ERROR: Secure Boot is enabled but the selected image is not signed. "
+                    "Use a signed image or disable --shielded-secure-boot."
+                ),
+            }
+        if (image_name or image_family) and resolved is None:
+            return {
+                "ok": False,
+                "error": f"The resource 'images/{image_name or image_family}' was not found",
+            }
         inst = {
             "id": f"vm-{_hex(8)}", "name": name, "zone": zone,
             "machine_type": machine_type, "os": payload.get("os") or "Debian GNU/Linux 12",
@@ -344,6 +532,9 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             "network": network, "subnet": subnet, "tags": payload.get("tags") or ["web"],
             "boot_disk": name, "extra_disks": [], "_transition": None,
             "lab_managed": True,
+            "source_image": (resolved or {}).get("name"),
+            "image_digest": (resolved or {}).get("digest"),
+            "shielded_secure_boot": secure_boot,
         }
         state.setdefault("disks", []).append({
             "id": f"disk-{_hex(8)}", "name": name, "zone": zone,
@@ -657,3 +848,367 @@ def validate_gcp_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, st
     if not state.get("_preset_applied"):
         return False, "NO_VALIDATION_SCRIPT"
     return True, "GCP validation passed"
+
+
+# ---------------------------------------------------------------------------
+# `gcloud` / `gsutil` CLI surface
+#
+# Write commands delegate to apply_action so `broken` flags, guest bridges and
+# trace ids behave identically whether the learner clicked the Cloud Console or
+# typed the command. Unknown commands return rc!=0 with a gcloud-shaped error;
+# a silent no-op would strand a learner on a lab whose flag never cleared.
+# ---------------------------------------------------------------------------
+
+_GCLOUD_HINT = "Run 'gcloud help' to see the supported command groups."
+
+
+def _gc_error(message: str, *, rc: int = 1) -> dict:
+    return {"ok": False, "rc": rc, "error": message, "stdout": "", "stderr": f"ERROR: {message}"}
+
+
+def _gc_ok(stdout: str, *, message: str = "") -> dict:
+    return {"ok": True, "rc": 0, "stdout": stdout, "stderr": "", "message": message or stdout}
+
+
+def _gc_parse(tokens: list[str]) -> tuple[list[str], dict[str, str]]:
+    """Split gcloud `--flag[=value]` pairs from positionals, underscoring keys."""
+    positionals: list[str] = []
+    opts: dict[str, str] = {}
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok.startswith("--"):
+            raw = tok[2:]
+            if "=" in raw:
+                key, value = raw.split("=", 1)
+            else:
+                key = raw
+                if i + 1 < len(tokens) and not tokens[i + 1].startswith("--"):
+                    value = tokens[i + 1]
+                    i += 1
+                else:
+                    value = "true"
+            opts[key.replace("-", "_")] = value
+        else:
+            positionals.append(tok)
+        i += 1
+    return positionals, opts
+
+
+def _gc_table(headers: list[str], rows: list[list[str]]) -> str:
+    """gcloud-style whitespace-aligned output (no box drawing, like the real CLI)."""
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for idx, cell in enumerate(row):
+            widths[idx] = max(widths[idx], len(str(cell)))
+    lines = ["  ".join(h.ljust(widths[i]) for i, h in enumerate(headers)).rstrip()]
+    for row in rows:
+        lines.append("  ".join(str(c).ljust(widths[i]) for i, c in enumerate(row)).rstrip())
+    return "\n".join(lines)
+
+
+_GCLOUD_HELP = """Available command groups:
+  gcloud compute instances list|describe|create|delete|start|stop|reset
+  gcloud compute instances set-machine-type NAME --machine-type=TYPE
+  gcloud compute instances attach-disk NAME --disk=DISK
+  gcloud compute instances detach-disk NAME --disk=DISK
+  gcloud compute disks list|create|snapshot
+  gcloud compute snapshots list
+  gcloud compute firewall-rules list|create|delete
+  gcloud compute networks list  |  gcloud compute networks subnets list|create
+  gcloud projects get-iam-policy|add-iam-policy-binding|remove-iam-policy-binding
+  gsutil ls  |  gsutil mb gs://NAME  |  gsutil rb gs://NAME
+"""
+
+
+def _gc_instances(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    verb = args[0] if args else ""
+    rest = args[1:]
+    name = opts.get("name") or (rest[0] if rest else "")
+
+    if verb == "list":
+        rows = [
+            [i.get("name", ""), i.get("zone", ""), i.get("machine_type", ""),
+             i.get("internal_ip", ""), i.get("external_ip") or "", i.get("status", "")]
+            for i in state.get("instances") or []
+        ]
+        return _gc_ok(_gc_table(["NAME", "ZONE", "MACHINE_TYPE", "INTERNAL_IP", "EXTERNAL_IP", "STATUS"], rows))
+
+    if verb == "describe":
+        if not name:
+            return _gc_error("argument INSTANCE_NAME: Must be specified.")
+        inst = _find_instance(state, name)
+        if not inst:
+            return _gc_error(f"The resource 'instances/{name}' was not found")
+        return _gc_ok("\n".join(f"{k}: {v}" for k, v in inst.items() if not k.startswith("_")))
+
+    if verb == "create":
+        if not name:
+            return _gc_error("argument INSTANCE_NAMES: Must be specified.")
+        payload = {"name": name}
+        if opts.get("machine_type"):
+            payload["machine_type"] = opts["machine_type"]
+        if opts.get("zone"):
+            payload["zone"] = opts["zone"]
+        if opts.get("tags"):
+            payload["tags"] = [t for t in opts["tags"].split(",") if t]
+        if opts.get("boot_disk_size"):
+            payload["boot_disk_gb"] = opts["boot_disk_size"].rstrip("GBgb") or "20"
+        return apply_action(session_id, "create_instance", payload)
+
+    if verb in ("delete", "start", "stop", "reset"):
+        if not name:
+            return _gc_error("argument INSTANCE_NAMES: Must be specified.")
+        action = {"delete": "delete_instance", "start": "start_instance",
+                  "stop": "stop_instance", "reset": "reset_instance"}[verb]
+        return apply_action(session_id, action, {"instance_name": name})
+
+    if verb == "set-machine-type":
+        if not name:
+            return _gc_error("argument INSTANCE_NAME: Must be specified.")
+        machine_type = opts.get("machine_type") or ""
+        if not machine_type:
+            return _gc_error("argument --machine-type: Must be specified.")
+        return apply_action(session_id, "set_machine_type",
+                            {"instance_name": name, "machine_type": machine_type})
+
+    if verb in ("attach-disk", "detach-disk"):
+        if not name:
+            return _gc_error("argument INSTANCE_NAME: Must be specified.")
+        disk = opts.get("disk") or ""
+        if not disk:
+            return _gc_error("argument --disk: Must be specified.")
+        action = "attach_disk" if verb == "attach-disk" else "detach_disk"
+        return apply_action(session_id, action, {"instance_name": name, "disk_name": disk})
+
+    return _gc_error(f"Invalid choice: '{verb}'. {_GCLOUD_HINT}")
+
+
+def _gc_disks(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    verb = args[0] if args else ""
+    rest = args[1:]
+    if verb == "list":
+        rows = [
+            [d.get("name", ""), d.get("zone", ""), str(d.get("size_gb", "")),
+             d.get("type", ""), d.get("attached_to") or "", d.get("state", "")]
+            for d in state.get("disks") or []
+        ]
+        return _gc_ok(_gc_table(["NAME", "ZONE", "SIZE_GB", "TYPE", "ATTACHED_TO", "STATUS"], rows))
+    if verb == "create":
+        name = opts.get("name") or (rest[0] if rest else "")
+        if not name:
+            return _gc_error("argument DISK_NAME: Must be specified.")
+        payload = {"name": name}
+        if opts.get("size"):
+            payload["size_gb"] = opts["size"].rstrip("GBgb") or "100"
+        if opts.get("type"):
+            payload["type"] = opts["type"]
+        if opts.get("zone"):
+            payload["zone"] = opts["zone"]
+        return apply_action(session_id, "create_disk", payload)
+    if verb == "snapshot":
+        disk = rest[0] if rest else opts.get("disk", "")
+        if not disk:
+            return _gc_error("argument DISK_NAME: Must be specified.")
+        payload = {"disk_name": disk}
+        if opts.get("snapshot_names"):
+            payload["name"] = opts["snapshot_names"]
+        return apply_action(session_id, "create_snapshot", payload)
+    return _gc_error(f"Invalid choice: '{verb}'. {_GCLOUD_HINT}")
+
+
+def _gc_firewall_rules(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    verb = args[0] if args else ""
+    rest = args[1:]
+    if verb == "list":
+        rows = [
+            [r.get("name", ""), r.get("network", ""), r.get("direction", ""),
+             str(r.get("priority", "")), r.get("action", ""), r.get("protocols", "")]
+            for r in state.get("firewall_rules") or []
+        ]
+        return _gc_ok(_gc_table(["NAME", "NETWORK", "DIRECTION", "PRIORITY", "ACTION", "ALLOW"], rows))
+    if verb == "create":
+        name = opts.get("name") or (rest[0] if rest else "")
+        if not name:
+            return _gc_error("argument NAME: Must be specified.")
+        payload = {"name": name}
+        # `--allow tcp:22` is the ALLOW form; `--rules` pairs with `--action`.
+        if opts.get("allow"):
+            payload["protocols"] = opts["allow"]
+            payload["action"] = "ALLOW"
+        elif opts.get("rules"):
+            payload["protocols"] = opts["rules"]
+            payload["action"] = (opts.get("action") or "ALLOW").upper()
+        if opts.get("source_ranges"):
+            payload["source_ranges"] = [r for r in opts["source_ranges"].split(",") if r]
+        if opts.get("target_tags"):
+            payload["target_tags"] = [t for t in opts["target_tags"].split(",") if t]
+        if opts.get("network"):
+            payload["network"] = opts["network"]
+        if opts.get("priority"):
+            payload["priority"] = opts["priority"]
+        if opts.get("direction"):
+            payload["direction"] = opts["direction"].upper()
+        return apply_action(session_id, "create_firewall_rule", payload)
+    if verb == "delete":
+        name = opts.get("name") or (rest[0] if rest else "")
+        if not name:
+            return _gc_error("argument NAME: Must be specified.")
+        return apply_action(session_id, "delete_firewall_rule", {"name": name})
+    return _gc_error(f"Invalid choice: '{verb}'. {_GCLOUD_HINT}")
+
+
+def _gc_networks(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    if args and args[0] == "subnets":
+        rest = args[1:]
+        verb = rest[0] if rest else ""
+        if verb == "list":
+            rows = []
+            for net in state.get("networks") or []:
+                for sub in net.get("subnets") or []:
+                    rows.append([sub.get("name", ""), net.get("name", ""),
+                                 sub.get("region", ""), sub.get("range", "")])
+            return _gc_ok(_gc_table(["NAME", "NETWORK", "REGION", "RANGE"], rows))
+        if verb == "create":
+            name = rest[1] if len(rest) > 1 else opts.get("name", "")
+            if not name:
+                return _gc_error("argument NAME: Must be specified.")
+            payload = {"name": name}
+            for flag in ("network", "region", "range"):
+                if opts.get(flag):
+                    payload[flag] = opts[flag]
+            return apply_action(session_id, "create_subnet", payload)
+        return _gc_error(f"Invalid choice: '{verb}'. {_GCLOUD_HINT}")
+
+    verb = args[0] if args else ""
+    if verb == "list":
+        rows = [[n.get("name", ""), n.get("mode", ""), str(len(n.get("subnets") or []))]
+                for n in state.get("networks") or []]
+        return _gc_ok(_gc_table(["NAME", "SUBNET_MODE", "SUBNETS"], rows))
+    return _gc_error(f"Invalid choice: '{verb}'. {_GCLOUD_HINT}")
+
+
+def _gc_projects(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    verb = args[0] if args else ""
+    if verb == "get-iam-policy":
+        rows = [[b.get("member", ""), b.get("role", "")] for b in state.get("iam_bindings") or []]
+        return _gc_ok(_gc_table(["MEMBER", "ROLE"], rows))
+    if verb in ("add-iam-policy-binding", "remove-iam-policy-binding"):
+        member = opts.get("member") or ""
+        role = opts.get("role") or ""
+        if not member or not role:
+            return _gc_error("arguments --member and --role: Must be specified.")
+        action = "add_iam_binding" if verb == "add-iam-policy-binding" else "remove_iam_binding"
+        return apply_action(session_id, action, {"member": member, "role": role})
+    return _gc_error(f"Invalid choice: '{verb}'. {_GCLOUD_HINT}")
+
+
+def _gsutil(state: dict, session_id: str, tokens: list[str]) -> dict:
+    verb = tokens[0] if tokens else ""
+    rest = tokens[1:]
+
+    def _strip(uri: str) -> str:
+        return uri[len("gs://"):].rstrip("/") if uri.startswith("gs://") else uri.rstrip("/")
+
+    if verb == "ls":
+        if rest:
+            bucket_name = _strip(rest[0])
+            bucket = next((b for b in state.get("buckets") or [] if b.get("name") == bucket_name), None)
+            if not bucket:
+                return _gc_error(f"BucketNotFoundException: 404 gs://{bucket_name} bucket does not exist.")
+            return _gc_ok("\n".join(f"gs://{bucket_name}/{o['name']}" for o in bucket.get("objects") or []))
+        return _gc_ok("\n".join(f"gs://{b['name']}/" for b in state.get("buckets") or []))
+    if verb == "mb":
+        if not rest:
+            return _gc_error("CommandException: The mb command requires a bucket URL.")
+        return apply_action(session_id, "create_bucket", {"name": _strip(rest[0])})
+    if verb == "rb":
+        if not rest:
+            return _gc_error("CommandException: The rb command requires a bucket URL.")
+        return apply_action(session_id, "delete_bucket", {"name": _strip(rest[0])})
+    return _gc_error(f"CommandException: Invalid command '{verb}'.")
+
+
+def run_command(session_id: str, command: str) -> dict:
+    """Execute one `gcloud ...` or `gsutil ...` line against the session state.
+
+    Returns a shell-shaped dict ({ok, rc, stdout, stderr}). Unrecognized
+    commands always come back rc!=0.
+    """
+    import shlex
+
+    raw = (command or "").strip()
+    if not raw:
+        return _gc_error("Command name argument expected. " + _GCLOUD_HINT)
+
+    try:
+        tokens = shlex.split(raw)
+    except ValueError as exc:
+        return _gc_error(f"Could not parse command ({exc})")
+
+    if not tokens:
+        return _gc_error("Command name argument expected. " + _GCLOUD_HINT)
+
+    binary = tokens[0]
+    if binary not in ("gcloud", "gsutil"):
+        return _gc_error(f"'{binary}' is not a recognized command. {_GCLOUD_HINT}")
+    tokens = tokens[1:]
+    if not tokens:
+        return _gc_error("Command name argument expected. " + _GCLOUD_HINT)
+
+    if tokens[0] in ("help", "--help", "-h"):
+        return _gc_ok(_GCLOUD_HELP)
+
+    entry = _ensure(session_id)
+    state = entry["state"]
+    _advance_lifecycle(state)
+
+    if not state.get("session", {}).get("logged_in"):
+        return _gc_error(
+            "(gcloud.auth) You do not currently have an active account selected. "
+            "Run 'gcloud auth login' (or sign in to the Cloud Console) first.",
+        )
+
+    if binary == "gsutil":
+        return _gsutil(state, session_id, tokens)
+
+    positionals, opts = _gc_parse(tokens)
+    if not positionals:
+        return _gc_error("Command name argument expected. " + _GCLOUD_HINT)
+
+    group = positionals[0]
+    args = positionals[1:]
+
+    if group == "auth":
+        # Past the sign-in gate above, `gcloud auth login` is a successful no-op.
+        if args and args[0] == "login":
+            return _gc_ok(f"Already authenticated as {state['session'].get('user', '')}.")
+        return _gc_error(f"Invalid choice: '{args[0] if args else ''}'. {_GCLOUD_HINT}")
+
+    if group == "compute":
+        if not args:
+            return _gc_error("Command name argument expected. " + _GCLOUD_HINT)
+        sub, rest = args[0], args[1:]
+        if sub == "instances":
+            return _gc_instances(state, session_id, rest, opts)
+        if sub == "disks":
+            return _gc_disks(state, session_id, rest, opts)
+        if sub == "firewall-rules":
+            return _gc_firewall_rules(state, session_id, rest, opts)
+        if sub == "networks":
+            return _gc_networks(state, session_id, rest, opts)
+        if sub == "snapshots" and rest and rest[0] == "list":
+            rows = [[s.get("name", ""), str(s.get("size_gb", "")), s.get("source_disk", ""), s.get("status", "")]
+                    for s in state.get("snapshots") or []]
+            return _gc_ok(_gc_table(["NAME", "DISK_SIZE_GB", "SRC_DISK", "STATUS"], rows))
+        if sub == "forwarding-rules" and rest and rest[0] == "list":
+            rows = [[f.get("name", ""), f.get("region", ""), f.get("ip", ""),
+                     str(f.get("port", "")), f.get("target", "")]
+                    for f in state.get("forwarding_rules") or []]
+            return _gc_ok(_gc_table(["NAME", "REGION", "IP_ADDRESS", "PORT", "TARGET"], rows))
+        return _gc_error(f"Invalid choice: '{sub}'. {_GCLOUD_HINT}")
+
+    if group == "projects":
+        return _gc_projects(state, session_id, args, opts)
+
+    return _gc_error(f"Invalid choice: '{group}'. {_GCLOUD_HINT}")

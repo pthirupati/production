@@ -223,23 +223,28 @@ class UserAchievementTest(TestCase, AuthMixin):
 # ═════════════════════════════════════════════
 class RegisterSerializerTest(TestCase):
     def test_valid_data(self):
-        data = {"email": "new@test.com", "password": "Test123!@"}
+        data = {"email": "new@test.com", "password": "Test123!@", "accepted_legal": True}
         s = RegisterSerializer(data=data)
         self.assertTrue(s.is_valid(), s.errors)
 
     def test_short_password(self):
-        data = {"email": "new@test.com", "password": "short"}
+        data = {"email": "new@test.com", "password": "short", "accepted_legal": True}
         s = RegisterSerializer(data=data)
         self.assertFalse(s.is_valid())
 
     def test_duplicate_email(self):
         User.objects.create_user(username="x@test.com", email="x@test.com", password="Test123!")
-        data = {"email": "x@test.com", "password": "Test123!@"}
+        data = {"email": "x@test.com", "password": "Test123!@", "accepted_legal": True}
         s = RegisterSerializer(data=data)
         self.assertFalse(s.is_valid())
 
     def test_create_user(self):
-        data = {"email": "new@test.com", "password": "Test123!@", "phone_number": "+1234567890"}
+        data = {
+            "email": "new@test.com",
+            "password": "Test123!@",
+            "phone_number": "+1234567890",
+            "accepted_legal": True,
+        }
         s = RegisterSerializer(data=data)
         s.is_valid(raise_exception=True)
         user = s.save()
@@ -266,6 +271,7 @@ class RegisterAPITest(APITestCase, AuthMixin):
             "email": "newuser@test.com",
             "password": "GoodP@ss99!",
             "session_token": "test-session-token-abc",
+            "accepted_legal": True,
         })
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertIn("access", resp.data)

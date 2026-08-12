@@ -121,11 +121,6 @@ function scsiUnitToDevLetter(scsiUnit) {
   return String.fromCharCode(96 + unit + 1)
 }
 
-function scsiUnitToDevPath(scsiUnit) {
-  const letter = scsiUnitToDevLetter(scsiUnit)
-  return letter ? `/dev/sd${letter}` : null
-}
-
 /** Extra (non-boot) disks visible in the guest — mirrors vm.disks[] + hot-add pending state. */
 function guestExtraDisks(vm, shared) {
   if (!shared.diskRescanned && vm?.guest_disk_hidden) {
@@ -332,7 +327,6 @@ function createVFS(seedFn) {
     if (path === '/') return root
     const parts = path.split('/').filter(Boolean)
     let node = root
-    let curPath = ''
     for (let i = 0; i < parts.length; i++) {
       if (node.type === 'link' && followLink) {
         const tgt = resolveNode(node.target)
@@ -340,7 +334,6 @@ function createVFS(seedFn) {
         node = tgt
       }
       if (node.type !== 'dir') return null
-      curPath += '/' + parts[i]
       const child = node.children[parts[i]]
       if (!child) return null
       node = child
@@ -1276,7 +1269,7 @@ function dnfProgressChunks(pkgs, action = 'install') {
   const all = []
   if (action === 'remove') {
     const chunks = [['Running transaction check', 'Running transaction test', 'Transaction test succeeded', 'Running transaction']]
-    pkgs.forEach((p, i) => chunks.push([`  Erasing          : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${pkgs.length}`,
+    pkgs.forEach((p, _i) => chunks.push([`  Erasing          : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${pkgs.length}`,
       `  Verifying        : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${pkgs.length}`]))
     chunks.push(['', 'Removed:', ...pkgs.map(p => `  ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64`), '', 'Complete!'])
     return chunks
@@ -1287,8 +1280,8 @@ function dnfProgressChunks(pkgs, action = 'install') {
   chunks.push(['--------------------------------------------------------------------------------',
     `Total                                           ${all.reduce((s, p) => s + pkgInfo(p).sizeK, 0)} kB/s | ${all.reduce((s, p) => s + pkgInfo(p).sizeK, 0)} kB     00:01`,
     'Running transaction check', 'Transaction check succeeded.', 'Running transaction test', 'Transaction test succeeded.', 'Running transaction'])
-  all.forEach((p, i) => chunks.push([`  Installing       : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${all.length}`]))
-  all.forEach((p, i) => chunks.push([`  Verifying        : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${all.length}`]))
+  all.forEach((p, _i) => chunks.push([`  Installing       : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${all.length}`]))
+  all.forEach((p, _i) => chunks.push([`  Verifying        : ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64    ${i + 1}/${all.length}`]))
   chunks.push(['', 'Installed:', ...all.map(p => `  ${p}-${pkgInfo(p).ver}-${pkgInfo(p).rel}.x86_64`), '', 'Complete!'])
   return chunks
 }
@@ -1323,10 +1316,10 @@ function aptProgressChunks(pkgs, action = 'install') {
     return chunks
   }
   const chunks = []
-  all.forEach((p, i) => chunks.push([`Get:${i + 1} http://archive.ubuntu.com/ubuntu jammy/main amd64 ${p} amd64 ${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1 [${pkgInfo(p).sizeK} kB]`]))
+  all.forEach((p, _i) => chunks.push([`Get:${i + 1} http://archive.ubuntu.com/ubuntu jammy/main amd64 ${p} amd64 ${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1 [${pkgInfo(p).sizeK} kB]`]))
   chunks.push([`Fetched ${all.reduce((s, p) => s + pkgInfo(p).sizeK, 0)} kB in 1s (${all.reduce((s, p) => s + pkgInfo(p).sizeK, 0)} kB/s)`,
     '(Reading database ... 184221 files and directories currently installed.)'])
-  all.forEach((p, i) => chunks.push([`Selecting previously unselected package ${p}.`, `Unpacking ${p} (${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1) ...`]))
+  all.forEach((p, _i) => chunks.push([`Selecting previously unselected package ${p}.`, `Unpacking ${p} (${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1) ...`]))
   all.forEach(p => chunks.push([`Setting up ${p} (${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1) ...`]))
   chunks.push(['Processing triggers for man-db (2.10.2-1) ...', 'Processing triggers for libc-bin (2.35-0ubuntu3) ...'])
   return chunks
@@ -1349,6 +1342,8 @@ export function createLinuxShell(vm, opts = {}) {
   const { vfs, services, pkgs } = shared
   const lvm = shared.lvm || (shared.lvm = createLvmState(diskGb))
   let selinuxMode = shared.selinuxMode
+  // $? / last pipeline status — mirrors backend rhel_shell exit codes (audit §F4).
+  let lastExitCode = 0
 
   const sessionUser = opts.user || 'root'
   let home = sessionUser === 'root' ? '/root' : `/home/${sessionUser}`
@@ -1367,14 +1362,6 @@ export function createLinuxShell(vm, opts = {}) {
     VISUAL: 'vim',
     HISTSIZE: '1000',
     HISTFILESIZE: '2000',
-  }
-  const aliases = {
-    ll: 'ls -alF',
-    la: 'ls -A',
-    l: 'ls -CF',
-    grep: 'grep --color=auto',
-    fgrep: 'fgrep --color=auto',
-    egrep: 'egrep --color=auto',
   }
   const history = []
   let nextPid = 19000
@@ -1492,7 +1479,7 @@ export function createLinuxShell(vm, opts = {}) {
   // The single reason a unit cannot start, or null when it may. Every
   // activating verb routes through this so a learner cannot bypass the gate by
   // reaching for a different verb (start / restart / reload / enable --now).
-  const unitStartFailure = (unit, s) => {
+  const unitStartFailure = (unit, _s) => {
     const file = findUnitFile(unit)
     if (file) {
       const { error } = parseUnitFile(file.src)
@@ -1685,7 +1672,12 @@ export function createLinuxShell(vm, opts = {}) {
         const res = run(trimmed, { noHistory: true })
         if (res.editor || res.confirm || res.stream || res.reboot || res.poweroff || res.exit || res.clear) return res
         collected = collected.concat(res.lines || [])
-        lastHadError = (res.lines || []).some(l => /No such file|not found|failed|error/i.test(l))
+        // Prefer real exitCode when present; fall back to text heuristics for
+        // older call paths that omit it.
+        lastHadError = typeof res.exitCode === 'number'
+          ? res.exitCode !== 0
+          : (res.lines || []).some(l => /No such file|not found|failed|error/i.test(l))
+        if (typeof res.exitCode === 'number') lastExitCode = res.exitCode
       }
       if (redirect) {
         const target = abs(redirect.path)
@@ -1695,7 +1687,7 @@ export function createLinuxShell(vm, opts = {}) {
         vfs.writeFile(target, redirect.append ? existing + payload + '\n' : payload + (payload ? '\n' : ''))
         collected = ['']
       }
-      return { lines: collected.length ? collected : [''], prompt: prompt() }
+      return { lines: collected.length ? collected : [''], prompt: prompt(), exitCode: lastExitCode }
     }
 
     if (hasPipeline) {
@@ -1712,7 +1704,7 @@ export function createLinuxShell(vm, opts = {}) {
         vfs.writeFile(target, redirect.append ? existing + payload + '\n' : payload + (payload ? '\n' : ''))
         pipeOut = ['']
       }
-      return { lines: pipeOut.length ? pipeOut : [''], prompt: prompt(), sideEffect: first.sideEffect }
+      return { lines: pipeOut.length ? pipeOut : [''], prompt: prompt(), sideEffect: first.sideEffect, exitCode: typeof first.exitCode === 'number' ? first.exitCode : lastExitCode }
     }
 
     const parts = work.split(/\s+/)
@@ -1722,23 +1714,26 @@ export function createLinuxShell(vm, opts = {}) {
     if (!['awk', 'gawk', 'sed'].includes(lc)) {
       args = args.map(a => a.replace(/\$\{?(\w+)\}?/g, (m, k) => (env[k] !== undefined ? env[k] : m)))
     }
-    const { flags, positional, has } = parseArgs(args)
+    const { positional, has } = parseArgs(args)
     const out = []
     let sideEffect = null
     let editor = null
+    // Default success; specific handlers override via setExit / fail paths.
+    let cmdExit = 0
+    const setExit = (code) => { cmdExit = code }
 
-    const notFound = () => out.push(`bash: ${cmd}: command not found`)
+    const notFound = () => { out.push(`bash: ${cmd}: command not found`); setExit(127) }
     const emit = (s) => { if (Array.isArray(s)) out.push(...s); else String(s).split('\n').forEach(l => out.push(l)) }
 
     /* =================== file system =================== */
-    if (!isRhel && ['dnf', 'yum', 'rpm', 'firewall-cmd'].includes(lc)) emit(`bash: ${cmd}: command not found`)
-    else if (isRhel && ['apt', 'apt-get', 'apt-cache', 'dpkg', 'dpkg-query', 'ufw'].includes(lc)) emit(`bash: ${cmd}: command not found`)
+    if (!isRhel && ['dnf', 'yum', 'rpm', 'firewall-cmd'].includes(lc)) { emit(`bash: ${cmd}: command not found`); setExit(127) }
+    else if (isRhel && ['apt', 'apt-get', 'apt-cache', 'dpkg', 'dpkg-query', 'ufw'].includes(lc)) { emit(`bash: ${cmd}: command not found`); setExit(127) }
     else if (lc === 'pwd') emit(cwd.path)
     else if (lc === 'cd') {
       const dest = abs(positional[0] || env.HOME)
       const node = vfs.resolveNode(dest)
-      if (!node) emit(`bash: cd: ${positional[0]}: No such file or directory`)
-      else if (node.type !== 'dir') emit(`bash: cd: ${positional[0]}: Not a directory`)
+      if (!node) { emit(`bash: cd: ${positional[0]}: No such file or directory`); setExit(1) }
+      else if (node.type !== 'dir') { emit(`bash: cd: ${positional[0]}: Not a directory`); setExit(1) }
       else { cwd.path = dest; env.PWD = dest }
     }
     else if (lc === 'ls' || lc === 'll' || lc === 'dir' || lc === 'vdir') {
@@ -1829,10 +1824,17 @@ export function createLinuxShell(vm, opts = {}) {
         const interpret = has('-e')
         const noNl = has('-n')
         let text = args.filter(a => a !== '-e' && a !== '-n').join(' ').replace(/^["']|["']$/g, '')
-        if (interpret) text = text.replace(/\\n/g, '\n').replace(/\\t/g, '\t')
-        // simple $VAR / ${VAR} expansion
-        text = text.replace(/\$\{?(\w+)\}?/g, (m, k) => (env[k] !== undefined ? env[k] : m))
-        emit(noNl && !text.includes('\n') ? text : text)
+        // `echo $?` — report the previous command's exit status (§F4).
+        if (text === '$?' || text === '${?}') {
+          emit(String(lastExitCode))
+        } else {
+          if (interpret) text = text.replace(/\\n/g, '\n').replace(/\\t/g, '\t')
+          // simple $VAR / ${VAR} expansion (including $? inside longer strings)
+          text = text
+            .replace(/\$\?/g, String(lastExitCode))
+            .replace(/\$\{?(\w+)\}?/g, (m, k) => (env[k] !== undefined ? env[k] : m))
+          emit(noNl && !text.includes('\n') ? text : text)
+        }
       }
     }
     else if (lc === 'touch') {
@@ -2442,7 +2444,7 @@ export function createLinuxShell(vm, opts = {}) {
         emit(['  UNIT                LOAD   ACTIVE   SUB     DESCRIPTION',
           ...Object.entries(services).map(([n, v]) => `  ${(n + '.service').padEnd(20)}loaded ${v.active.padEnd(8)}${v.active === 'active' ? 'running' : 'dead   '} ${v.desc}`)])
       } else if (sub === 'status') {
-        if (!s) emit(`Unit ${rawSvc || svc}.service could not be found.`)
+        if (!s) { emit(`Unit ${rawSvc || svc}.service could not be found.`); setExit(4) }
         else {
           const dot = s.active === 'active' ? '●' : s.active === 'failed' ? '×' : '○'
           const unitFile = findUnitFile(svc)
@@ -2480,6 +2482,7 @@ export function createLinuxShell(vm, opts = {}) {
           if (sub === 'reload' && s.active !== 'active') {
             // reload on a stopped unit is not a valid job for systemd.
             emit(`Failed to reload ${svc}.service: Job type reload is not applicable for unit ${svc}.service.`)
+            setExit(5)
           } else if (sub === 'reload' && activating) {
             // A failed reload leaves the master process serving the OLD config:
             // the command fails, but the running unit keeps going.
@@ -2489,8 +2492,11 @@ export function createLinuxShell(vm, opts = {}) {
                 `See "systemctl status ${svc}.service" and "journalctl -xeu ${svc}.service" for details.`,
                 ...failure.lines.slice(2)]
               : '')
+            if (failure) setExit(1)
           } else if (activating && sub !== 'enable' && sub !== 'unmask') {
-            emit(bringUp())
+            const lines = bringUp()
+            emit(lines)
+            if (s.active === 'failed') setExit(1)
           } else if (sub === 'stop') { s.active = 'inactive'; s.pid = null; s.since = 'now'; emit('') }
           else if (sub === 'enable') {
             // `enable` honours [Install]: a unit with no WantedBy cannot be
@@ -2553,9 +2559,21 @@ export function createLinuxShell(vm, opts = {}) {
         }
         if (wanted.length) emit(wanted.map((p) => `${p}=${props[p] ?? ''}`))
         else emit(Object.entries(props).map(([k, v]) => `${k}=${v}`))
-      } else if (sub === 'is-active') emit(s ? s.active : 'unknown')
-      else if (sub === 'is-enabled') emit(s ? s.enabled : 'unknown')
-      else if (sub === 'is-failed') emit(s && s.active === 'failed' ? 'failed' : 'active')
+      } else if (sub === 'is-active') {
+        // Real systemctl: active→0, inactive→3, unknown→4 (rhel_shell parity).
+        if (!s) { emit('unknown'); setExit(4) }
+        else if (s.active === 'active') emit('active')
+        else { emit(s.active); setExit(3) }
+      }
+      else if (sub === 'is-enabled') {
+        if (!s) { emit('unknown'); setExit(1) }
+        else if (s.enabled === 'enabled') emit('enabled')
+        else { emit(s.enabled); setExit(1) }
+      }
+      else if (sub === 'is-failed') {
+        if (s && s.active === 'failed') emit('failed')
+        else { emit('active'); setExit(1) }
+      }
       else if (sub === 'daemon-reload' || sub === 'reset-failed') emit('')
       else if (sub === 'list-unit-files') emit(['UNIT FILE              STATE', ...Object.entries(services).map(([n, v]) => `${(n + '.service').padEnd(22)} ${v.enabled}`)])
       else if (sub === 'get-default') emit('multi-user.target')
@@ -2614,24 +2632,25 @@ export function createLinuxShell(vm, opts = {}) {
       // service entry counts as evidence of an install too; gating on the
       // package alone would make `nginx -t` unavailable in every nginx lab
       // (and deleting nginx.conf must yield an [emerg], not "command not found").
-      if (!pkgs.has('nginx') && !services.nginx) emit(`bash: nginx: command not found`)
+      if (!pkgs.has('nginx') && !services.nginx) { emit(`bash: nginx: command not found`); setExit(127) }
       else if (has('-t') || has('-T')) {
         const t = nginxTest()
         emit(has('-T') && t.ok
           ? [...t.output.split('\n'), ...(readFile(NGINX_MAIN) || '').replace(/\n$/, '').split('\n')]
           : t.output.split('\n'))
+        if (!t.ok) setExit(1)
       }
       else if (has('-v') || has('-V')) emit('nginx version: nginx/1.20.1')
       else if (has('-s')) {
         const signal = args[args.indexOf('-s') + 1] || ''
         const t = nginxTest()
-        if (!t.ok) emit(t.output.split('\n'))
+        if (!t.ok) { emit(t.output.split('\n')); setExit(1) }
         else if (signal === 'reload' || signal === 'reopen') emit('')
         else if (signal === 'stop' || signal === 'quit') {
           const s = services.nginx
           if (s) { s.active = 'inactive'; s.pid = null; s.since = 'now' }
           emit('')
-        } else emit(`nginx: invalid option: "-s ${signal}"`)
+        } else { emit(`nginx: invalid option: "-s ${signal}"`); setExit(1) }
       }
       else emit('')
     }
@@ -3129,7 +3148,7 @@ export function createLinuxShell(vm, opts = {}) {
     else if (lc === 'man' || lc === 'info' || lc === 'apropos') emit(`What manual page do you want?\n(try '${positional[0] || 'command'} --help')`)
     else if (lc === 'tldr') emit(`# ${positional[0] || 'command'}\n(tldr page)`)
     else if (lc === 'sleep' || lc === 'true' || lc === ':' ) emit('')
-    else if (lc === 'false') return { lines: [''], prompt: prompt() }
+    else if (lc === 'false') { setExit(1); return { lines: [''], prompt: prompt(), exitCode: 1 } }
     else if (lc === 'test' || lc === '[') emit('')
     else if (lc === 'seq') { const n = parseInt(positional[0], 10) || 5; emit(Array.from({ length: Math.min(n, 50) }, (_, i) => String(i + 1))) }
     else if (lc === 'yes') emit('y')
@@ -3345,8 +3364,14 @@ export function createLinuxShell(vm, opts = {}) {
       out.push('')
     }
 
-    if (editor) return { lines: [], prompt: prompt(), editor }
-    return { lines: out.length ? out : [''], prompt: prompt(), sideEffect }
+    if (editor) return { lines: [], prompt: prompt(), editor, exitCode: 0 }
+    // Heuristic catch-all: command-not-found / explicit Failed lines that
+    // handlers forgot to setExit on still surface a non-zero status.
+    if (cmdExit === 0 && out.some((l) => /command not found|No such file or directory|Unit .+ could not be found|Failed to /i.test(l))) {
+      cmdExit = out.some((l) => /command not found/i.test(l)) ? 127 : 1
+    }
+    lastExitCode = cmdExit
+    return { lines: out.length ? out : [''], prompt: prompt(), sideEffect, exitCode: cmdExit }
   }
 
   return {
@@ -3445,7 +3470,6 @@ export const BOOT_SEQUENCE = [] // superseded by buildBootStages(); kept so old 
 // `single` => single-user / rescue mode (drops to a maintenance shell, no graphical login).
 export function buildBootStages(vm, { single = false } = {}) {
   const isRhel = guestOsFamily(vm) === 'rhel'
-  const hostname = (vm?.hostname || vm?.name || (isRhel ? 'rhel-app01' : 'ubuntu-app01')).split('.')[0]
   const memMb = vm?.memory_mb || 4096
   const cpu = vm?.cpu || 2
   const kver = isRhel ? '5.14.0-362.el9.x86_64' : KERNEL_PRIMARY

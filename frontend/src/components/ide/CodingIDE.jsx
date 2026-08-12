@@ -3,7 +3,7 @@ import {
   Play, CheckCircle2, XCircle, FileCode, Loader2, Terminal as TerminalIcon,
   ListChecks, FileText, Lightbulb, Lock, EyeOff, AlertTriangle, Trophy,
   Sparkles, Search, Sun, Moon, ZoomIn, ZoomOut, Bug, ScrollText, Save, Eye,
-  Plus, Folder, RefreshCw, X, Files, Settings2,
+  Plus, Folder, RefreshCw, X, Files, Settings2, Send,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import CodeEditor, { computeDiagnostics } from './CodeEditor'
@@ -14,10 +14,14 @@ import VsCodeWorkbench, { VscEditorTab, VscPanelTab, VscActivityButton } from '.
 import '../../styles/vscode-workbench.css'
 import { runPython, runPythonTests } from '../../utils/ide/pyodideRunner'
 import { runJavaScript, runJavaScriptTests } from '../../utils/ide/jsRunner'
-import { hasHtmlPreview, editorLanguageForPath, listHtmlPaths, preferredHtmlPath } from '../../utils/ide/composeHtmlPreview'
+import { hasHtmlPreview, editorLanguageForPath, listHtmlPaths, preferredHtmlPath, resolvePreviewRef } from '../../utils/ide/composeHtmlPreview'
 import {
   parentDirs, fileBasename, stubContentForPath, newFileHint,
+  searchAcrossFiles, findDefinitions, wordAtOffset,
 } from '../../utils/ide/fileTree'
+import CommandPalette from './CommandPalette'
+import IdeLocalTerminal from './IdeLocalTerminal'
+import IdeApiClientPanel from './IdeApiClientPanel'
 import { labApi } from '../../api/labs'
 import { useThemeStore } from '../../store/themeStore'
 import { currentUserScopedKey } from '../../utils/userScopedStorage'
@@ -188,6 +192,8 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   // user has typed anything.
   const hydratedRef = useRef(false)
   const dirtyRef = useRef(false)
+  const serverDraftRef = useRef(null)
+  const ideTermRef = useRef(null)
 
   // Right panel: 'instructions' | 'mentor' | 'preview'
   const [rightTab, setRightTab] = useState('instructions')
@@ -196,6 +202,11 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   const [mentorLoading, setMentorLoading] = useState(false)
   // Latest run/grade context the mentor analyzes.
   const lastCtx = useRef({ output: '', error: '', tests: [] })
+
+  // Command palette + workspace search (find-across-files / go-to-definition).
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchHits, setSearchHits] = useState(null)  // null = never searched
 
   const [fontSize, setFontSize] = useState(13)
   const [vimMode, setVimMode] = useState(false)
@@ -228,7 +239,9 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   }, [showHtmlPreview, htmlPaths.join('|')])
 
   const appendTerminal = useCallback((line) => {
-    setTerminalText((prev) => (prev ? prev + '\n' : '') + tsLine(line))
+    const stamped = tsLine(line)
+    setTerminalText((prev) => (prev ? prev + '\n' : '') + stamped)
+    try { ideTermRef.current?.writeln(stamped) } catch { /* ignore */ }
   }, [])
 
   // console.* and uncaught errors forwarded from the sandboxed preview iframe.
@@ -255,7 +268,17 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     seedReadonlyRef.current = new Set(ro)
 
     if (mergeDraft) {
-      const draft = loadDraft(sessionId)
+      const local = loadDraft(sessionId)
+      // Prefer server draft when newer (survives cleared site data / other browser).
+      const server = serverDraftRef.current
+      let draft = local
+      if (server?.files) {
+        const serverTs = Number(server.ts) || 0
+        const localTs = Number(local?.ts) || 0
+        if (!local?.files || serverTs >= localTs) {
+          draft = server
+        }
+      }
       if (draft?.files) {
         let restored = false
         Object.entries(draft.files).forEach(([path, content]) => {
@@ -268,7 +291,13 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         })
         if (restored) {
           setSavedAt(draft.ts || Date.now())
-          if (announce) appendTerminal('restored your autosaved work from this browser')
+          if (announce) {
+            appendTerminal(
+              server && draft === server
+                ? 'restored your server-saved work'
+                : 'restored your autosaved work from this browser',
+            )
+          }
         }
       }
     }
@@ -308,6 +337,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         if (cancelled) return
         const s = data.spec || {}
         setSpec(s)
+        serverDraftRef.current = data.ide_draft || null
         const n = applySpecFiles(s, { mergeDraft: true, announce: true })
         if (n === 0) {
           appendTerminal('warning: this lab has no starter files — use New File to begin')
@@ -323,7 +353,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per session
   }, [sessionId])
 
-  // ── Autosave editable files to localStorage (debounced) ──
+  // ── Autosave editable files to localStorage + server (debounced) ──
   useEffect(() => {
     if (!hydratedRef.current || loading || !dirtyRef.current) return
     const editable = {}
@@ -336,6 +366,9 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         setSavedAt(Date.now())
         setDirtyPaths(new Set())
       }
+      labApi.saveIdeDraft(sessionId, editable).then((data) => {
+        if (data?.draft) serverDraftRef.current = data.draft
+      }).catch(() => {})
     }, 600)
     return () => clearTimeout(id)
   }, [files, readonlyPaths, sessionId, loading])
@@ -369,12 +402,15 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     return Object.keys(files)[0] || ''
   }, [spec, files])
 
-  // Build a single source string from all files for execution (non-entry files
-  // first so their definitions are in scope, entrypoint last).
+  // Build the browser-run source from the entrypoint only.
+  // Concatenating every file (audit §Y2e) invents a module system that does not
+  // exist — duplicate `const`/`function` across files became SyntaxErrors, and
+  // harness files polluted the learner's Run output. Server Check already sends
+  // structured `files` + `entrypoint` and is unaffected.
   const composedSource = useCallback(() => {
+    if (entrypoint && files[entrypoint] !== undefined) return files[entrypoint]
     const paths = Object.keys(files)
-    const ordered = [...paths.filter((p) => p !== entrypoint), entrypoint].filter(Boolean)
-    return ordered.map((p) => files[p]).join('\n\n')
+    return paths.length ? files[paths[0]] : ''
   }, [files, entrypoint])
 
   const handleEditorChange = useCallback((text) => {
@@ -554,7 +590,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         return data
       })
       if (data?.summary) setDebugText((p) => (p ? p + '\n' : '') + tsLine(`Mentor: ${data.summary}`))
-    } catch (err) {
+    } catch {
       if (mountedRef.current) {
         setMentor({
           summary: 'The mentor is offline right now.',
@@ -580,8 +616,11 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       setSavedAt(Date.now())
       setDirtyPaths(new Set())
       dirtyRef.current = false
-      appendTerminal('saved to browser storage')
-      toast.success('Saved in this browser', { duration: 1400 })
+      appendTerminal('saved to browser + server')
+      toast.success('Saved', { duration: 1400 })
+      labApi.saveIdeDraft(sessionId, editable).then((data) => {
+        if (data?.draft) serverDraftRef.current = data.draft
+      }).catch(() => {})
     } else {
       toast.error('Could not save (storage unavailable)')
     }
@@ -601,6 +640,14 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     setActivePath(path)
     setOpenTabs((prev) => (prev.includes(path) ? prev : [...prev, path]))
   }, [])
+
+  const navigatePreviewHtml = useCallback((href) => {
+    const from = /\.html?$/i.test(activePath || '') ? activePath : ''
+    const resolved = resolvePreviewRef(files, href, from)
+    if (!resolved || files[resolved] === undefined) return
+    openFile(resolved)
+    setRightTab('preview')
+  }, [activePath, files, openFile])
 
   const closeTab = useCallback((path, e) => {
     e?.stopPropagation?.()
@@ -775,6 +822,95 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     }
   }, [solved, loading, sessionId, applySpecFiles, appendTerminal])
 
+  // ── Find across files / go to definition (read-only navigation) ──
+  //
+  // Both recompute from the live `files` map on demand rather than caching an
+  // index: a stale index would jump the learner to a line that has since moved.
+  const runWorkspaceSearch = useCallback((q) => {
+    const query = String(q ?? '')
+    setSearchQuery(query)
+    if (!query.trim()) { setSearchHits(null); return }
+    setSearchHits(searchAcrossFiles(files, query))
+    setBottomTab('search')
+  }, [files])
+
+  /** Open a path and place the cursor at line/column. */
+  const gotoLocation = useCallback((path, line, column = 1) => {
+    if (files[path] === undefined) return
+    openFile(path)
+    // The editor may need a frame to swap documents before the position exists.
+    setTimeout(() => editorRef.current?.revealPosition?.(line, column), 0)
+  }, [files, openFile])
+
+  const goToDefinition = useCallback(() => {
+    const src = files[activePath]
+    if (typeof src !== 'string') return
+    const offset = editorRef.current?.getCursorOffset?.() ?? 0
+    const word = wordAtOffset(src, offset)
+    if (!word) { toast('Put the cursor on a symbol first', { icon: '🔎' }); return }
+    const defs = findDefinitions(files, word, { preferPath: activePath })
+    if (!defs.length) { toast(`No definition found for "${word}"`, { icon: '🔎' }); return }
+    if (defs.length > 1) {
+      // Ambiguous: show every site in the Search panel instead of guessing,
+      // which would silently send the learner to the wrong file.
+      setSearchQuery(word)
+      setSearchHits(defs.map((d) => ({ path: d.path, line: d.line, column: 1, preview: d.text })))
+      setBottomTab('search')
+      return
+    }
+    gotoLocation(defs[0].path, defs[0].line, 1)
+  }, [files, activePath, gotoLocation])
+
+  // ── Command palette (Ctrl/Cmd+Shift+P) ──
+  //
+  // Every entry mirrors a toolbar button INCLUDING its disabled guard, so the
+  // palette can never perform an action the toolbar forbids (e.g. editing files
+  // after the lab is solved).
+  const commands = useMemo(() => [
+    { id: 'run', group: 'Run', label: 'Run', hint: 'Ctrl+Enter', disabled: running || checking || solved || !activePath, run: handleRun },
+    { id: 'check', group: 'Run', label: 'Check Solution (grade on server)', disabled: checking || running || solved, run: handleCheck },
+    { id: 'save', group: 'File', label: 'Save draft to this browser', hint: 'Ctrl+S', disabled: solved, run: handleSave },
+    { id: 'refresh', group: 'File', label: 'Reload starter files (discards edits)', disabled: solved || loading, run: handleRefresh },
+    { id: 'newfile', group: 'File', label: 'New File', disabled: solved, run: () => createFileAt(newFileHint(language, Object.keys(files))) },
+    { id: 'newfolder', group: 'File', label: 'New Folder', disabled: solved, run: () => createFolderAt(`folder-${Date.now().toString(36).slice(-4)}`) },
+    { id: 'find', group: 'Go', label: 'Find in current file', hint: 'Ctrl+F', run: () => editorRef.current?.openSearch() },
+    { id: 'findall', group: 'Go', label: 'Find across all files', run: () => { setBottomTab('search'); setTimeout(() => document.getElementById('ide-workspace-search')?.focus(), 0) } },
+    { id: 'gotodef', group: 'Go', label: 'Go to Definition', hint: 'F12', disabled: !activePath, run: goToDefinition },
+    { id: 'format', group: 'Edit', label: 'Format Document', disabled: solved, run: () => editorRef.current?.formatDocument?.() },
+    { id: 'fos', group: 'Edit', label: `Format on Save: ${formatOnSave ? 'on' : 'off'}`, run: () => setFormatOnSave((v) => !v) },
+    { id: 'vim', group: 'Edit', label: `Vim keybindings: ${vimMode ? 'on' : 'off'}`, run: () => setVimMode((v) => !v) },
+    { id: 'zoomin', group: 'View', label: 'Zoom In (font size)', run: () => setFontSize((f) => Math.min(22, f + 1)) },
+    { id: 'zoomout', group: 'View', label: 'Zoom Out (font size)', run: () => setFontSize((f) => Math.max(10, f - 1)) },
+    { id: 'explorer', group: 'View', label: `${showExplorer ? 'Hide' : 'Show'} Explorer`, run: () => setShowExplorer((v) => !v) },
+    { id: 'theme', group: 'View', label: 'Toggle app theme', run: toggleTheme },
+    { id: 'closeothers', group: 'View', label: 'Close Other Tabs', disabled: !activePath || openTabs.length < 2, run: closeOtherTabs },
+    { id: 'closeall', group: 'View', label: 'Close All Tabs', disabled: !openTabs.length, run: closeAllTabs },
+    { id: 'mentor', group: 'Help', label: 'Ask the AI Mentor', run: () => { setRightTab('mentor'); if (!mentor) askMentor('all') } },
+    { id: 'problems', group: 'View', label: 'Show Problems panel', run: () => setBottomTab('problems') },
+    { id: 'tests', group: 'View', label: 'Show Test Results', run: () => setBottomTab('tests') },
+    { id: 'preview', group: 'View', label: 'Open HTML Preview', hidden: !showHtmlPreview, run: () => { setRightTab('preview'); setPreviewKey((k) => k + 1) } },
+  ], [
+    running, checking, solved, activePath, loading, language, files, formatOnSave, vimMode,
+    showExplorer, openTabs.length, mentor, showHtmlPreview, handleRun, handleCheck, handleSave,
+    handleRefresh, createFileAt, createFolderAt, goToDefinition, toggleTheme, closeOtherTabs,
+    closeAllTabs, askMentor,
+  ])
+
+  useEffect(() => {
+    const onKey = (e) => {
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+        e.preventDefault()
+        setPaletteOpen((v) => !v)
+      } else if (e.key === 'F12') {
+        e.preventDefault()
+        goToDefinition()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [goToDefinition])
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-surface-950">
@@ -808,7 +944,9 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
 
   const BOTTOM_TABS = [
     { key: 'problems', label: 'Problems', icon: AlertTriangle },
+    { key: 'search', label: 'Search', icon: Search },
     { key: 'terminal', label: 'Terminal', icon: TerminalIcon },
+    { key: 'api', label: 'API', icon: Send },
     { key: 'output', label: 'Output', icon: ScrollText },
     { key: 'logs', label: 'Logs', icon: FileText },
     { key: 'tests', label: 'Test Results', icon: ListChecks },
@@ -843,7 +981,8 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           <button type="button" onClick={() => createFolderAt(`folder-${Date.now().toString(36).slice(-4)}`)} disabled={solved} className="vsc-btn" title="New folder">
             <Folder size={13} /> New Folder
           </button>
-          <button type="button" onClick={() => editorRef.current?.openSearch()} className="vsc-btn" title="Find (Ctrl/Cmd+F)"><Search size={13} /></button>
+          <button type="button" onClick={() => editorRef.current?.openSearch()} className="vsc-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" title="Find (Ctrl/Cmd+F)" aria-label="Find"><Search size={13} /></button>
+          <button type="button" onClick={() => setPaletteOpen(true)} className="vsc-btn" title="Command Palette (Ctrl/Cmd+Shift+P)">⌘P</button>
           <button type="button" onClick={() => setVimMode((v) => !v)} className={`vsc-btn ${vimMode ? 'vsc-btn-primary' : ''}`} title="Toggle Vim keybindings (jj = Esc, :w = Save)">
             Vim
           </button>
@@ -856,9 +995,9 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           >
             <Settings2 size={13} /> FoS
           </button>
-          <button type="button" onClick={() => setFontSize((f) => Math.max(10, f - 1))} className="vsc-btn" title="Zoom out"><ZoomOut size={13} /></button>
-          <button type="button" onClick={() => setFontSize((f) => Math.min(22, f + 1))} className="vsc-btn" title="Zoom in"><ZoomIn size={13} /></button>
-          <button type="button" onClick={toggleTheme} className="vsc-btn" title="Toggle theme">{isDark ? <Sun size={13} /> : <Moon size={13} />}</button>
+          <button type="button" onClick={() => setFontSize((f) => Math.max(10, f - 1))} className="vsc-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" title="Zoom out" aria-label="Zoom out"><ZoomOut size={13} /></button>
+          <button type="button" onClick={() => setFontSize((f) => Math.min(22, f + 1))} className="vsc-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" title="Zoom in" aria-label="Zoom in"><ZoomIn size={13} /></button>
+          <button type="button" onClick={toggleTheme} className="vsc-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" title="Toggle theme" aria-label="Toggle theme">{isDark ? <Sun size={13} /> : <Moon size={13} />}</button>
           <button type="button" onClick={closeOtherTabs} disabled={!activePath || openTabs.length < 2} className="vsc-btn" title="Close other tabs">Close Others</button>
           <button type="button" onClick={closeAllTabs} disabled={!openTabs.length} className="vsc-btn" title="Close all tabs">Close All</button>
           <button type="button" onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }} className="vsc-btn"><Sparkles size={13} /> Mentor</button>
@@ -909,9 +1048,9 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         <div className="flex items-center justify-between gap-1 w-full">
           <span>EXPLORER</span>
           <div className="flex items-center gap-0.5">
-            <button type="button" onClick={createFolder} disabled={solved} className="p-0.5 text-[var(--vsc-accent)]" title="New folder"><Folder size={12} /></button>
-            <button type="button" onClick={createFile} disabled={solved} className="p-0.5 text-[var(--vsc-accent)]" title="New file"><Plus size={12} /></button>
-            <button type="button" onClick={handleRefresh} disabled={solved} className="p-0.5 text-[var(--vsc-muted)]" title="Refresh"><RefreshCw size={12} /></button>
+            <button type="button" onClick={createFolder} disabled={solved} className="p-0.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[var(--vsc-accent)]" title="New folder" aria-label="New folder"><Folder size={12} /></button>
+            <button type="button" onClick={createFile} disabled={solved} className="p-0.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[var(--vsc-accent)]" title="New file" aria-label="New file"><Plus size={12} /></button>
+            <button type="button" onClick={handleRefresh} disabled={solved} className="p-0.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[var(--vsc-muted)]" title="Refresh" aria-label="Refresh explorer"><RefreshCw size={12} /></button>
           </div>
         </div>
       )}
@@ -1032,10 +1171,56 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
                 )}
               </div>
             )}
+            {bottomTab === 'search' && (
+              <div className="space-y-1 font-sans">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Search size={12} className="text-[var(--vsc-muted)] shrink-0" />
+                  <input
+                    id="ide-workspace-search"
+                    value={searchQuery}
+                    onChange={(e) => runWorkspaceSearch(e.target.value)}
+                    placeholder="Search across all files…"
+                    aria-label="Search across all files"
+                    className="flex-1 bg-transparent border border-surface-800 rounded px-2 py-1 text-xs outline-none focus:border-cyan-500/50 text-[var(--vsc-text)]"
+                  />
+                  {searchHits && (
+                    <span className="text-[10px] text-[var(--vsc-muted)] shrink-0">
+                      {searchHits.length} result{searchHits.length === 1 ? '' : 's'}
+                    </span>
+                  )}
+                </div>
+                {searchHits === null ? (
+                  <p className="text-xs text-[var(--vsc-muted)]">
+                    Type to search every file. F12 jumps to a symbol&apos;s definition.
+                  </p>
+                ) : !searchHits.length ? (
+                  <p className="text-xs text-[var(--vsc-muted)]">No matches for “{searchQuery}”.</p>
+                ) : (
+                  searchHits.map((h, i) => (
+                    <button
+                      key={`${h.path}:${h.line}:${h.column}:${i}`}
+                      type="button"
+                      onClick={() => gotoLocation(h.path, h.line, h.column)}
+                      className="w-full flex items-baseline gap-2 text-left text-xs px-2 py-1 rounded border border-surface-800 bg-surface-900/60 hover:border-cyan-500/40"
+                    >
+                      <span className="font-mono text-[var(--vsc-muted)] shrink-0">
+                        {fileName(h.path)}:{h.line}
+                      </span>
+                      <span className="font-mono text-[var(--vsc-text)] truncate">{h.preview}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
             {bottomTab === 'terminal' && (
-              <pre className="text-[var(--vsc-text)] whitespace-pre-wrap break-words m-0">
-                {terminalText || 'Run or Check Solution to see a session transcript here.'}
-              </pre>
+              <IdeLocalTerminal
+                ref={ideTermRef}
+                initialText={terminalText}
+                className="h-full min-h-[140px]"
+              />
+            )}
+            {bottomTab === 'api' && (
+              <IdeApiClientPanel sessionId={sessionId} disabled={solved} />
             )}
             {bottomTab === 'output' && (
               <pre className="text-[var(--vsc-text)] whitespace-pre-wrap break-words m-0">
@@ -1111,6 +1296,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
             htmlPath={/\.html?$/i.test(activePath || '') ? activePath : undefined}
             onRefresh={() => setPreviewKey((k) => k + 1)}
             onLog={handlePreviewLog}
+            onNavigate={navigatePreviewHtml}
           />
         ) : (
           <div className="p-4 space-y-4 text-sm">
@@ -1164,6 +1350,8 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           </>
         ),
       }}
-    />
+    >
+      <CommandPalette open={paletteOpen} commands={commands} onClose={() => setPaletteOpen(false)} />
+    </VsCodeWorkbench>
   )
 }

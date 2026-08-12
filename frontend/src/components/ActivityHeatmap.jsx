@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { Flame } from 'lucide-react'
 
 /**
@@ -103,7 +103,7 @@ export default function ActivityHeatmap({ recentActivity = [] }) {
         <div className="flex gap-[2px] overflow-x-auto">
           {weeks.map((week, wi) => (
             <div key={wi} className="flex flex-col gap-[2px]">
-              {week.map((day, di) => (
+              {week.map((day) => (
                 <div
                   key={day.date}
                   className={`w-[11px] h-[11px] rounded-sm ${getColor(day.count, day.future)} transition-colors`}

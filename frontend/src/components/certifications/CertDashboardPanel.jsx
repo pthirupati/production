@@ -44,7 +44,7 @@ export default function CertDashboardPanel() {
     }
   }
 
-  const submitExam = async (attemptId, slug) => {
+  const submitExam = async (attemptId, _slug) => {
     setBusyId(attemptId)
     try {
       const result = await certApi.submitExam(attemptId)

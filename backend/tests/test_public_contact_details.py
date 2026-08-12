@@ -83,6 +83,21 @@ class ThePrivacyPagePublishesItTests(SimpleTestCase):
             "shared constant so the policy and the contact page cannot disagree",
         )
 
+    def test_international_transfer_mechanism_is_named(self):
+        """Z4-6 remainder: publish SCCs (or equivalent), not only 'may leave India'."""
+        source = PRIVACY_JSX.read_text()
+        self.assertTrue(
+            "Standard Contractual Clauses" in source or "SCCs" in source,
+            "privacy page must name SCCs / Standard Contractual Clauses as the "
+            "cross-border transfer safeguard",
+        )
+        self.assertIn("DigitalOcean", source)
+
+    def test_lifecycle_email_retention_basis_is_disclosed(self):
+        """Z4-12 leftover: post-deletion email must not be unbounded *and* silent."""
+        source = PRIVACY_JSX.read_text()
+        self.assertIn("anti-abuse", source)
+        self.assertIn("RETENTION_ACCOUNT_LIFECYCLE_DAYS", source)
 
 class NoFrontendPageHardcodesAContactAddressTests(SimpleTestCase):
     """Guard the guard: centralising one page while five others keep literals just
@@ -158,3 +173,37 @@ class TheLegalTemplatesHaveNoUnfilledContactPlaceholdersTests(SimpleTestCase):
         path = REPO / "docs" / "private" / "PRIVACY_POLICY.md"
         if path.exists():
             self.assertIn(settings.PRIVACY_EMAIL, path.read_text())
+
+
+class RefundAndAttributionSurfaceTests(SimpleTestCase):
+    """Audit Z4-12 leftovers — linkable refund page + third-party attribution."""
+
+    def test_refund_page_exists_and_matches_measured_policy(self):
+        path = REPO / "frontend" / "src" / "pages" / "RefundCancellation.jsx"
+        self.assertTrue(path.exists(), "standalone /refunds page is missing")
+        source = path.read_text()
+        self.assertIn("PAYMENT_EMAIL", source)
+        self.assertIn("7 days", source)
+        self.assertIn("period", source.lower())
+        self.assertIn("full refund ends access", source.lower())
+
+    def test_refunds_route_is_declared(self):
+        router = (REPO / "frontend" / "src" / "router" / "AppRouter.jsx").read_text()
+        self.assertIn('path="/refunds"', router)
+
+    def test_third_party_notices_file_exists(self):
+        path = REPO / "THIRD_PARTY_NOTICES.md"
+        self.assertTrue(path.exists(), "THIRD_PARTY_NOTICES.md missing at repo root")
+        text = path.read_text()
+        self.assertIn("Frontend (npm direct dependencies)", text)
+        self.assertIn("Backend (pip direct dependencies", text)
+        self.assertIn("LICENSE", text)
+
+    def test_acceptable_use_page_exists(self):
+        path = REPO / "frontend" / "src" / "pages" / "AcceptableUse.jsx"
+        self.assertTrue(path.exists(), "standalone /acceptable-use page is missing")
+        source = path.read_text()
+        self.assertIn("educational purpose", source.lower())
+        self.assertIn("sandbox", source.lower())
+        router = (REPO / "frontend" / "src" / "router" / "AppRouter.jsx").read_text()
+        self.assertIn('path="/acceptable-use"', router)

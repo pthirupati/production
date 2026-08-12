@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Check, CheckCheck, Award, Zap, AlertCircle, MessageCircle, Trash2, CreditCard, X } from 'lucide-react'
+import { Bell, CheckCheck, Award, Zap, AlertCircle, MessageCircle, Trash2, CreditCard, X } from '../../ui/eagerIcons'
 import { useNotificationStore } from '../../store/notificationStore'
 
 const TYPE_CONFIG = {
@@ -211,7 +211,7 @@ export default function NotificationBell({ variant = 'default' }) {
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); dismiss(n.id) }}
-                  className="p-1 text-surface-500 hover:text-surface-200 shrink-0"
+                  className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-surface-200 shrink-0"
                   aria-label="Dismiss notification"
                 >
                   <X size={14} />

@@ -406,7 +406,65 @@ class ExamStartView(APIView):
             "seconds_remaining": max(0, remaining),
             "score": attempt.score,
             "scenarios": attempt.results.get("scenarios", []),
+            "proctoring": attempt.results.get("proctoring") or {
+                "tab_switches": 0,
+                "paste_events": 0,
+            },
         }
+
+
+class ExamProctoringView(APIView):
+    """POST /api/certifications/exam/<uuid>/proctoring/ — report-only integrity signals.
+
+    Mirrors interview paste/tab-switch recording: never blocks the attempt.
+    Signals live under ``attempt.results['proctoring']`` (no migration).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, attempt_id):
+        try:
+            attempt = ExamAttempt.objects.get(id=attempt_id, user=request.user)
+        except ExamAttempt.DoesNotExist:
+            return Response({"error": "Attempt not found"}, status=404)
+        if attempt.status != "in_progress":
+            return Response({"error": "Attempt is not in progress"}, status=400)
+
+        event = (request.data.get("event") or "").strip().lower()
+        proctor = attempt.results.setdefault(
+            "proctoring",
+            {"tab_switches": 0, "paste_events": 0, "events": []},
+        )
+        proctor.setdefault("events", [])
+        now = timezone.now().isoformat()
+        if event in ("tab_switch", "visibility_hidden", "blur"):
+            proctor["tab_switches"] = int(proctor.get("tab_switches") or 0) + 1
+            proctor["events"].append({"type": "tab_switch", "at": now})
+        elif event in ("paste", "paste_into_page"):
+            proctor["paste_events"] = int(proctor.get("paste_events") or 0) + 1
+            proctor["events"].append({
+                "type": "paste",
+                "at": now,
+                "source": request.data.get("source") or "page",
+            })
+        elif event in ("fullscreen_entered", "fullscreen_denied"):
+            proctor["events"].append({"type": event, "at": now})
+        else:
+            return Response(
+                {"error": "Unknown event. Use tab_switch, paste, fullscreen_entered, or fullscreen_denied."},
+                status=400,
+            )
+        # Bound the log so a noisy client cannot grow results unboundedly.
+        if len(proctor["events"]) > 200:
+            proctor["events"] = proctor["events"][-200:]
+        attempt.save(update_fields=["results"])
+        return Response({
+            "ok": True,
+            "proctoring": {
+                "tab_switches": proctor.get("tab_switches", 0),
+                "paste_events": proctor.get("paste_events", 0),
+            },
+        })
 
 
 class ExamDetailView(APIView):
@@ -549,6 +607,10 @@ class ExamSubmitView(APIView):
             "passed": attempt.status == "passed",
             "expired": attempt.status == "expired",
             "objective_breakdown": attempt.results.get("objective_breakdown", {}),
+            "proctoring": attempt.results.get("proctoring") or {
+                "tab_switches": 0,
+                "paste_events": 0,
+            },
             "certificate": CertificateSerializer(certificate).data if certificate else None,
         }
 

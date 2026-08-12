@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Layers, ArrowRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useDataStore } from '../store/dataStore'
 import { mergeTechnologies } from '../constants/techCatalog'

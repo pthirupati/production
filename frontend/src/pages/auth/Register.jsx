@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { authApi } from '../../api/auth'
 import { scenarioApi } from '../../api/scenarios'
-import { Mail, Lock, ArrowRight, AlertCircle, Phone, Eye, EyeOff, Check, X, ShieldCheck, ArrowLeft, Terminal, Server, Cloud, Activity, Shield } from 'lucide-react'
+import { Mail, Lock, ArrowRight, AlertCircle, Phone, Eye, EyeOff, Check, X, ShieldCheck, ArrowLeft, Terminal, Server, Cloud, Activity, Shield } from '../../ui/eagerIcons'
 import toast from 'react-hot-toast'
 import { startOAuth } from '../../utils/oauth'
 import { AuthShell } from '../../components/design'
@@ -261,6 +261,7 @@ export default function Register() {
   const [resendTimer, setResendTimer] = useState(0)
   const [otpExpiryTimer, setOtpExpiryTimer] = useState(0)
   const [socialConfig, setSocialConfig] = useState(null)
+  const [acceptedLegal, setAcceptedLegal] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -290,7 +291,6 @@ export default function Register() {
     }
   }
 
-  const otpExpired = otpExpiryTimer <= 0 && step === 'otp'
 
   // Resend countdown timer
   useEffect(() => {
@@ -382,15 +382,21 @@ export default function Register() {
     if (!firstName.trim()) { setError('First name is required'); return }
     if (!lastName.trim()) { setError('Last name is required'); return }
     if (!phoneNumber.trim()) { setError('Phone number is required'); return }
+    if (!acceptedLegal) {
+      setError('Please accept the Terms of Service and Privacy Policy to continue.')
+      return
+    }
     setLoading(true)
     try {
-      await authApi.register(email, password, phoneNumber, sessionToken, firstName, lastName)
+      await authApi.register(email, password, phoneNumber, sessionToken, firstName, lastName, true)
       toast.success('Account created!')
       navigate('/dashboard')
     } catch (err) {
       const data = err.response?.data
       if (data) {
-        const msg = data.error || data.detail || data.email?.[0] || data.password?.[0] || data.phone_number?.[0] || 'Registration failed. Please try again.'
+        const msg = data.error || data.detail || data.accepted_legal?.[0]
+          || data.email?.[0] || data.password?.[0] || data.phone_number?.[0]
+          || 'Registration failed. Please try again.'
         setError(msg)
       } else {
         setError('Network error. Please check your connection.')
@@ -639,7 +645,28 @@ export default function Register() {
                 )}
               </div>
 
-              <button type="submit" disabled={loading || (confirm.length > 0 && !passwordsMatch)}
+              <label className="flex items-start gap-2 text-xs text-surface-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={acceptedLegal}
+                  onChange={(e) => { setAcceptedLegal(e.target.checked); setError('') }}
+                  className="mt-0.5 rounded"
+                  required
+                />
+                <span>
+                  I agree to the{' '}
+                  <Link to="/terms" target="_blank" rel="noreferrer" className="text-accent-cyan hover:underline">
+                    Terms of Service
+                  </Link>
+                  {' '}and{' '}
+                  <Link to="/privacy" target="_blank" rel="noreferrer" className="text-accent-cyan hover:underline">
+                    Privacy Policy
+                  </Link>
+                  .
+                </span>
+              </label>
+
+              <button type="submit" disabled={loading || !acceptedLegal || (confirm.length > 0 && !passwordsMatch)}
                 className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 {loading ? (
                   <><span className="w-4 h-4 border-2 border-surface-950/30 border-t-surface-950 rounded-full animate-spin" /> Creating account...</>

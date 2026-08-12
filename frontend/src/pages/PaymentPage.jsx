@@ -20,12 +20,13 @@ import { PlatformBanners } from '../components/PlatformBanners'
 import {
   ArrowLeft, ShieldCheck, Lock, CheckCircle2, Loader2, AlertTriangle,
   Sun, Moon, Terminal, CreditCard, Smartphone, Building2, BadgeCheck,
-  IndianRupee, Globe, Clock, Wallet, Fingerprint, Sparkles,
+  IndianRupee, Clock, Wallet, Fingerprint, Sparkles,
   Star, Award, ChevronRight, ArrowRight, Zap, Shield
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { resolveChargeAmountPaise, isOrderUsable, hasDisplayableGst } from '../utils/checkoutAmount'
+import { resolveChargeAmountPaise, isOrderUsable, hasDisplayableGst, resolveDisplayAmountInr } from '../utils/checkoutAmount'
 import { SUPPORT_EMAIL } from '../constants/contact'
+import { useFetch } from '../hooks/useFetch'
 
 /* ──────── PAYMENT METHODS ──────── */
 const paymentMethods = [
@@ -199,10 +200,25 @@ export default function PaymentPage() {
   const [certBootstrap, setCertBootstrap] = useState(null)
   const [certLoading, setCertLoading] = useState(isCertProduct)
 
+  const [gstBreakup, setGstBreakup] = useState(null)
+  // Server-authoritative INR total once create-order returns (audit Z1-14).
+  // Until then we may show bootstrap/URL hints, but URL never outranks the server.
+  const [serverAmountINR, setServerAmountINR] = useState(null)
+  // Double-submit guard (audit Z1-14). `step` was doing this job, but it is set
+  // back to 'summary' before Razorpay's modal opens, so a second click in that
+  // window created a second order — two Razorpay orders and two pending
+  // PaymentTransaction rows for one purchase. A ref, not state: two clicks in the
+  // same tick would both read a stale `false` from state.
+  const checkoutInFlight = useRef(false)
+  const cardRef = useRef(null)
+
   const techName = techNameParam || renewBootstrap?.techName || certBootstrap?.trackName
-  const amountINR = amountINRParam || renewBootstrap?.amountINR || certBootstrap?.amountINR
+  const amountINR = resolveDisplayAmountInr({
+    serverTotalInr: serverAmountINR ?? gstBreakup?.total_inr,
+    bootstrapAmountInr: renewBootstrap?.amountINR || certBootstrap?.amountINR,
+    urlAmountInr: amountINRParam,
+  })
   const techId = techIdParam || renewBootstrap?.techId || certBootstrap?.techId
-  const paymentTokenResolved = paymentToken || renewBootstrap?.orderId || certBootstrap?.orderId
   const orderIdResolved = existingOrderId || renewBootstrap?.orderId || certBootstrap?.orderId
   const razorpayKeyResolved = existingRazorpayKey || renewBootstrap?.razorpayKey || certBootstrap?.razorpayKey
 
@@ -214,23 +230,15 @@ export default function PaymentPage() {
   const [error, setError] = useState('')
   const [gatewayDown, setGatewayDown] = useState(false)
   const [gatewayChecked, setGatewayChecked] = useState(false)
-  const [platformConfig, setPlatformConfig] = useState(null)
+  const { data: platformConfig } = useFetch('/config/', {
+    config: { silentError: true },
+    initialData: null,
+  })
   const [upiId, setUpiId] = useState('')
   const [couponCode, setCouponCode] = useState(searchParams.get('coupon') || '')
   const [appliedCoupon, setAppliedCoupon] = useState(null)
   const [couponLoading, setCouponLoading] = useState(false)
   const [hoveredMethod, setHoveredMethod] = useState(null)
-  // Server-computed GST breakup, populated from the create-order response. Null
-  // until an order exists, because until then we genuinely do not know the tax
-  // (audit Z1-14 — this line used to print a hardcoded "GST (included) ₹0").
-  const [gstBreakup, setGstBreakup] = useState(null)
-  // Double-submit guard (audit Z1-14). `step` was doing this job, but it is set
-  // back to 'summary' before Razorpay's modal opens, so a second click in that
-  // window created a second order — two Razorpay orders and two pending
-  // PaymentTransaction rows for one purchase. A ref, not state: two clicks in the
-  // same tick would both read a stale `false` from state.
-  const checkoutInFlight = useRef(false)
-  const cardRef = useRef(null)
 
   // Display amounts (coupon may override URL amount)
   const baseAmount = parseInt(amountINR) || 0
@@ -273,11 +281,6 @@ export default function PaymentPage() {
     applyCoupon(urlCoupon)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [techId, searchParams])
-
-  // Load Razorpay SDK
-  useEffect(() => {
-    api.get('/config/').then(res => setPlatformConfig(res.data)).catch(() => {})
-  }, [])
 
   useRazorpaySdk(setRazorpayReady, setRazorpayFailed)
 
@@ -478,6 +481,14 @@ export default function PaymentPage() {
           baseAmountInr: amountNum,
         })
         if (orderData.gst) setGstBreakup(orderData.gst)
+        // Prefer server INR total for display over any editable ?amount= hint.
+        if (Number(orderData.amount_paise) > 0) {
+          setServerAmountINR(Math.round(Number(orderData.amount_paise) / 100))
+        } else if (orderData.gst?.total_inr != null) {
+          setServerAmountINR(Number(orderData.gst.total_inr))
+        } else if (orderData.amount_inr != null) {
+          setServerAmountINR(Number(orderData.amount_inr))
+        }
       }
 
       if (!orderId) {
@@ -630,7 +641,7 @@ export default function PaymentPage() {
               <Lock size={12} className="text-accent-green" />
               <span>256-bit SSL</span>
             </div>
-            <button onClick={toggleTheme} className="p-2 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800/50 transition-all">
+            <button type="button" onClick={toggleTheme} className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-surface-400 hover:text-white hover:bg-surface-800/50 transition-all" aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}>
               {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
           </div>

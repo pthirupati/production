@@ -1,8 +1,4 @@
-# Unpublished: this lab ships a bare `raise NotImplementedError` stub with no
-# starter code, no seeded fault and only a `placeholder` grader, so there is
-# nothing to diagnose and any trivial return earns XP. Set is_active: true
-# once it has real content and a grader that checks it (audit §G1).
-is_active: false
+is_active: true
 title: Apply schema migration safely
 slug: sqlite-migration
 technology: sqlite
@@ -11,35 +7,28 @@ description: 'CONTEXT: A team operating SQLite has raised a ticket for `Apply sc
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline SQLite database file. The architecture is a single
   lab-primary node exposing sqlite3 CLI, schema, WAL mode, and pragmas; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: ALTER TABLE fails on live embedded DB.
-
 
   OBJECTIVE: Understand the current failure mode affecting Apply schema migration safely; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant sqlite3 CLI, schema, WAL mode, and pragmas), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -102,23 +91,60 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: ALTER TABLE fails on live embedded DB.
+  instructions: 'A migration must add a NOT NULL column to a live table, which plain ALTER TABLE refuses
+    without a default. Fix solution(conn) so it adds a ''status'' TEXT column to `accounts` that is NOT
+    NULL with default ''active'', backfilling existing rows. Return the number of rows that now have status=''active''.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn):\n    # BUG: adds a NOT NULL column with no DEFAULT, which SQLite rejects\n\
+      \    # outright on a table that already has rows.\n    conn.execute(\"ALTER TABLE accounts ADD COLUMN\
+      \ status TEXT NOT NULL\")\n    return conn.execute(\"SELECT COUNT(*) FROM accounts WHERE status='active'\"\
+      ).fetchone()[0]\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert solution() is not None
+  - name: existing rows are backfilled
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE accounts (id INTEGER PRIMARY KEY, name TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ accounts VALUES (?,?)\", rows)\n    return conn\nconn = _seed([(1,'ann'),(2,'bob')])\nassert solution(conn)\
+      \ == 2, solution(conn)\n"
+  - name: column really exists
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE accounts (id INTEGER PRIMARY KEY, name TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ accounts VALUES (?,?)\", rows)\n    return conn\nconn = _seed([(1,'ann')])\nsolution(conn)\ncols\
+      \ = [r[1] for r in conn.execute('PRAGMA table_info(accounts)')]\nassert 'status' in cols, cols\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert solution() is not None
+  - name: empty table migrates cleanly
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE accounts (id INTEGER PRIMARY KEY, name TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ accounts VALUES (?,?)\", rows)\n    return conn\nconn = _seed([])\nassert solution(conn) == 0,\
+      \ solution(conn)\n"
+  - name: new insert defaults to active
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE accounts (id INTEGER PRIMARY KEY, name TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ accounts VALUES (?,?)\", rows)\n    return conn\nconn = _seed([])\nsolution(conn)\nconn.execute(\"\
+      INSERT INTO accounts (id, name) VALUES (5,'new')\")\nv = conn.execute('SELECT status FROM accounts\
+      \ WHERE id=5').fetchone()[0]\nassert v == 'active', v\n"
+  - name: column is NOT NULL
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE accounts (id INTEGER PRIMARY KEY, name TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ accounts VALUES (?,?)\", rows)\n    return conn\nconn = _seed([(1,'ann')])\nsolution(conn)\nnotnull\
+      \ = [r[3] for r in conn.execute('PRAGMA table_info(accounts)') if r[1]=='status']\nassert notnull\
+      \ == [1], notnull\n"
+  - name: original data is preserved
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE accounts (id INTEGER PRIMARY KEY, name TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ accounts VALUES (?,?)\", rows)\n    return conn\nconn = _seed([(1,'ann'),(2,'bob')])\nsolution(conn)\n\
+      names = [r[0] for r in conn.execute('SELECT name FROM accounts ORDER BY id')]\nassert names == ['ann','bob'],\
+      \ names\n"
   timeout: 8
 summary: Complete the apply schema migration safely sqlite lab and verify success with the checker
 estimated_minutes: 20
@@ -129,7 +155,7 @@ tags:
 - fix
 - hands-on
 - sqlite
-linked_tutorial: sqlite-fundamentals
+linked_tutorial: sqlite-embedded-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Apply schema migration safely
 - Restore expected service behavior with a minimal, documented change

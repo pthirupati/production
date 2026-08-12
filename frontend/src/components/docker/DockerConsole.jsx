@@ -6,7 +6,7 @@ import {
   Play, Square, Trash2, RotateCw, Plus, Download, Hexagon, KeyRound, Archive, Terminal, Info, Eraser, Activity,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
-import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession, SimLoginGateCard } from '../sim/shared'
 import { renderDockerV2Page } from './DockerV2Panels'
 import '../../styles/sim-products.css'
 import './docker.css'
@@ -185,7 +185,7 @@ export default function DockerConsole({
       <div className={simPanelRoot(embedded, 'bg-[#0d1117]')}>
         <LabChromeBar title="Docker Host Console" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <SimLoginGateCard title="Sign in to Docker" onClose={onExit} className="bg-white rounded shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold flex items-center gap-2" style={{ background: ACCENT }}>
               <Container size={18} /> Sign in to Docker Host
             </div>
@@ -211,7 +211,7 @@ export default function DockerConsole({
                 Use lab credentials (autofill)
               </button>
             </form>
-          </div>
+          </SimLoginGateCard>
         </div>
       </div>
     )
@@ -280,31 +280,31 @@ export default function DockerConsole({
                 key: 'actions', label: 'Actions',
                 render: (r) => (
                   <div className="flex gap-1 flex-wrap">
-                    <button type="button" title="Start" className="p-1 rounded hover:bg-slate-100" disabled={busy || r.state === 'running'}
+                    <button type="button" title="Start" aria-label="Start container" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy || r.state === 'running'}
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.startContainer(sessionId, r.shortName), 'Started') }}>
                       <Play size={14} />
                     </button>
-                    <button type="button" title="Stop" className="p-1 rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
+                    <button type="button" title="Stop" aria-label="Stop container" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.stopContainer(sessionId, r.shortName), 'Stopped') }}>
                       <Square size={14} />
                     </button>
-                    <button type="button" title="Restart" className="p-1 rounded hover:bg-slate-100" disabled={busy}
+                    <button type="button" title="Restart" aria-label="Restart container" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy}
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.restartContainer(sessionId, r.shortName), 'Restarted') }}>
                       <RotateCw size={14} />
                     </button>
-                    <button type="button" title="Exec" className="p-1 rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
+                    <button type="button" title="Exec" aria-label="Exec into container" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.execContainer(sessionId, r.shortName, 'sh'), 'Exec OK') }}>
                       <Terminal size={14} />
                     </button>
-                    <button type="button" title="Inspect" className="p-1 rounded hover:bg-slate-100" disabled={busy}
+                    <button type="button" title="Inspect" aria-label="Inspect container" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy}
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.inspectContainer(sessionId, r.shortName), 'Inspected') }}>
                       <Info size={14} />
                     </button>
-                    <button type="button" title="Stats" className="p-1 rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
+                    <button type="button" title="Stats" aria-label="Container stats" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.statsContainer(sessionId, r.shortName), 'Stats OK') }}>
                       <Activity size={14} />
                     </button>
-                    <button type="button" title="Connect network" className="p-1 rounded hover:bg-slate-100" disabled={busy}
+                    <button type="button" title="Connect network" aria-label="Connect network" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy}
                       onClick={(e) => {
                         e.stopPropagation()
                         setConnectOpen(r.shortName)
@@ -312,7 +312,7 @@ export default function DockerConsole({
                       }}>
                       <Network size={14} />
                     </button>
-                    <button type="button" title="Remove" className="p-1 rounded hover:bg-slate-100" disabled={busy}
+                    <button type="button" title="Remove" aria-label={`Remove container ${r.shortName}`} className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy}
                       onClick={(e) => {
                         e.stopPropagation()
                         run(() => dockerApi.removeContainer(sessionId, r.shortName, r.state === 'running'), 'Removed')

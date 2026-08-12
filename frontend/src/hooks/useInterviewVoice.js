@@ -3,14 +3,12 @@
  *
  * Unified voice hook for FixitLab interview room.
  *
- * TTS:  Browser SpeechSynthesis ONLY. There is no server TTS path — the
- *       backend's synthesize() always returns audio_b64=None / use_browser=true
- *       (tts_service.py), and tts_config_for_frontend() never sets
- *       uses_server_tts, so the server-audio branch in speak() is dead code
- *       kept only as a seam for a future provider. No ElevenLabs/Polly.
- * STT:  Vosk (optional server, chunked) → Browser SpeechRecognition (fallback).
- *       The server leg is live only when Vosk is enabled — stt_config_for_frontend()
- *       sets uses_server_stt accordingly. There is no Whisper API integration.
+ * TTS:  Browser SpeechSynthesis by default. When the backend reports
+ *       uses_server_tts (Piper / IndicF5 via FIXITLAB_* env), speak() POSTs to
+ *       /api/interviews/tts/synthesize/ and plays the returned audio.
+ * STT:  Browser SpeechRecognition by default. When uses_server_stt is set
+ *       (faster-whisper / IndicWhisper / vosk), listen() can POST recorded
+ *       blobs to /api/interviews/stt/transcribe/.
  *
  * Both paths are transparent to callers — the same speak() / listen() API
  * works regardless of which backend is active.
@@ -541,7 +539,9 @@ function speakBrowserUtterance(seg, { voice, locale, rate, pitch }) {
     u.lang = (voice && voice.lang) || locale || 'en-US'
     u.rate = rate
     u.pitch = pitch
-    u.volume = 1
+    // Soft AEC half: slightly below unity reduces speaker→mic bleed into STT
+    // without muting the track (barge-in VAD needs the mic open).
+    u.volume = 0.82
     if (voice) u.voice = voice
     u.onstart = () => { started = true }
     u.onend = done
@@ -1133,11 +1133,11 @@ export function useInterviewVoice() {
     const {
       locale = 'en-US',
       maxDuration = 90000,        // hard safety cap
-      silenceMs = 2800,           // BASE trailing quiet after speech → auto-submit
-      minSpeechMs = 1200,         // require this much speech before we arm silence
-      maxSilenceMs = 4500,        // upper bound on the dynamic window
-      perSentenceMs = 400,        // window growth per sentence boundary
-      minWordsForSilence = 3,     // minimum words before trailing silence auto-submits
+      silenceMs = 550,            // BASE trailing quiet after speech → auto-submit (Silero target 400–700)
+      minSpeechMs = 400,          // require this much speech before we arm silence
+      maxSilenceMs = 3200,        // upper bound on the dynamic window
+      perSentenceMs = 350,        // window growth per sentence boundary
+      minWordsForSilence = 2,     // minimum words before trailing silence auto-submits
       onInterim = null,
       onSilenceCountdown = null,  // (remainingMs|null, totalMs) for the affordance
     } = options

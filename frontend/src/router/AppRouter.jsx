@@ -41,6 +41,8 @@ const CertificateVerify = lazyWithRetry(() => import('../pages/CertificateVerify
 const PaymentPage = lazyWithRetry(() => import('../pages/PaymentPage'))
 const Privacy = lazyWithRetry(() => import('../pages/Privacy'))
 const Terms = lazyWithRetry(() => import('../pages/Terms'))
+const RefundCancellation = lazyWithRetry(() => import('../pages/RefundCancellation'))
+const AcceptableUse = lazyWithRetry(() => import('../pages/AcceptableUse'))
 const Contact = lazyWithRetry(() => import('../pages/Contact'))
 const ContactSales = lazyWithRetry(() => import('../pages/ContactSales'))
 const FAQ = lazyWithRetry(() => import('../pages/FAQ'))
@@ -90,6 +92,10 @@ const Certifications = lazyWithRetry(() => import('../pages/certifications/Certi
 const CertificationDetail = lazyWithRetry(() => import('../pages/certifications/CertificationDetail'))
 const Playgrounds = lazyWithRetry(() => import('../pages/playgrounds/Playgrounds'))
 const PlaygroundDetail = lazyWithRetry(() => import('../pages/playgrounds/PlaygroundDetail'))
+const Journeys = lazyWithRetry(() => import('../pages/journeys/Journeys'))
+const JourneyDetail = lazyWithRetry(() => import('../pages/journeys/JourneyDetail'))
+const Projects = lazyWithRetry(() => import('../pages/projects/Projects'))
+const ProjectDetail = lazyWithRetry(() => import('../pages/projects/ProjectDetail'))
 const SimulatorLauncher = lazyWithRetry(() => import('../pages/SimulatorLauncher'))
 
 function PageLoader() {
@@ -165,6 +171,8 @@ export default function AppRouter() {
         <Route path="/blog/:slug" element={<PublicLayout><BlogPost /></PublicLayout>} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/refunds" element={<RefundCancellation />} />
+        <Route path="/acceptable-use" element={<AcceptableUse />} />
         {/* DO NOT delete for having zero in-app links — that is by design. The only
             producer is backend marketing_unsubscribe_url() (apps/notifications/
             unsubscribe.py:29), i.e. a link inside an email. Removing this page
@@ -187,6 +195,13 @@ export default function AppRouter() {
         <Route path="/certifications/:slug" element={<CertificationDetail />} />
         <Route path="/playgrounds" element={<Playgrounds />} />
         <Route path="/playgrounds/:slug" element={<PlaygroundDetail />} />
+        {/* §C4 — Learning Journeys. API + seed + Dashboard next-step already
+            existed; these routes were the missing browse surface. */}
+        <Route path="/journeys" element={<Journeys />} />
+        <Route path="/journeys/:slug" element={<JourneyDetail />} />
+        {/* §C3 — Capstone projects catalog (was technology-tab only). */}
+        <Route path="/projects" element={<Projects />} />
+        <Route path="/projects/:slug" element={<ProjectDetail />} />
         <Route path="/interviews/invite/:token" element={<InterviewInvite />} />
         <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
         <Route path="/jira/:issueKey" element={<ProtectedRoute><JiraTicketPage /></ProtectedRoute>} />

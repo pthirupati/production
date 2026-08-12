@@ -14,13 +14,10 @@ jira_priority: High
 description: 'CONTEXT: ImageDev / Bare Metal — Terraform manages the MAAS machine inventory export
   that AWX consumes for GPU fleet jobs. AI Infra Engineering owns this Terraform→MAAS→AWX path.
 
-
   ENVIRONMENT: Terraform IDE + Bare Metal + Lab Terminal. Offline; no external cloud provider required
   for the inventory module.
 
-
   SYMPTOM: inventory.tf / outputs missing GPU host groups; AWX inventory empty for H100 canaries.
-
 
   OBJECTIVE: Fix Terraform so plan/apply emits MAAS GPU inventory; confirm outputs list nodes;
   FIXED-OK.'

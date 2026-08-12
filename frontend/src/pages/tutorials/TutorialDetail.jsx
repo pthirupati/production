@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import {
   Clock, Layers, ChevronLeft, ChevronRight, FlaskConical,
   Copy, Check, BookOpen, ListTree, GraduationCap, Terminal, Download,
@@ -13,6 +13,7 @@ import TutorialQuiz from '../../components/tutorials/TutorialQuiz'
 import TutorialMermaid from '../../components/tutorials/TutorialMermaid'
 import { tutorialPlaygroundHref } from '../../utils/playgroundLinks'
 import { getLocalTutorialProgress, markLocalSection, progressPct, setLocalTutorialProgress } from '../../utils/tutorialProgress'
+import PageBreadcrumbs from '../../components/PageBreadcrumbs'
 
 const DIFFICULTY_CLASS = {
   beginner: 'text-accent-green bg-accent-green/10 border-accent-green/20',
@@ -441,7 +442,6 @@ function SectionNav({ sections, activeOrder }) {
 
 export default function TutorialDetail() {
   const { slug } = useParams()
-  const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
   const [tutorial, setTutorial] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -599,7 +599,7 @@ export default function TutorialDetail() {
         <div className="tutorial-page max-w-2xl mx-auto px-4 py-24 text-center">
           <BookOpen size={36} className="mx-auto mb-4 text-surface-500" />
           <h1 className="font-display text-2xl font-bold text-white mb-2">Tutorial not found</h1>
-          <Link to="/tutorials" className="btn-primary text-sm">Back to all tutorials</Link>
+          <Link to="/tutorials" className="btn-secondary text-sm">Back to all tutorials</Link>
         </div>
       </PublicLayout>
     )
@@ -631,24 +631,19 @@ export default function TutorialDetail() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-accent-cyan/[0.04] blur-[100px] pointer-events-none" />
 
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-10">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-surface-500 mb-6">
-            <Link to="/tutorials" className="hover:text-accent-cyan transition-colors">Tutorials</Link>
-            <span>/</span>
-            {tutorial.course_slug ? (
-              <>
-                <span className="text-surface-400">{tutorial.course_title || tutorial.course_slug}</span>
-                <span>/</span>
-              </>
-            ) : (
-              <>
-                <Link to={`/tutorials?topic=${encodeURIComponent(tutorial.topic)}`} className="hover:text-accent-cyan transition-colors">
-                  {tutorial.topic}
-                </Link>
-                <span>/</span>
-              </>
-            )}
-            <span className="text-surface-300 truncate max-w-[200px]">{tutorial.title}</span>
-          </div>
+          <PageBreadcrumbs
+            className="mb-6"
+            items={[
+              { label: 'Home', to: '/' },
+              { label: 'Tutorials', to: '/tutorials' },
+              ...(tutorial.course_slug
+                ? [{ label: tutorial.course_title || tutorial.course_slug }]
+                : tutorial.topic
+                  ? [{ label: tutorial.topic, to: `/tutorials?topic=${encodeURIComponent(tutorial.topic)}` }]
+                  : []),
+              { label: tutorial.title },
+            ]}
+          />
 
           <div className="grid lg:grid-cols-[260px_minmax(0,1fr)] gap-8 items-start">
             <aside className="hidden lg:block sticky top-24 space-y-6">

@@ -1,0 +1,24 @@
+# Reusable frontend gate extracted from production.yml (audit Z6 / production split half).
+name: Reusable — test frontend
+
+on:
+  workflow_call:
+
+jobs:
+  test-frontend:
+    name: Test frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install, lint, and build
+        # `npm run lint` (eslint) fails the build on no-undef ReferenceErrors —
+        # the class of bug (e.g. useLocation used but not imported) that crashes
+        # a page at runtime yet slips past a vite build and the E2E smoke tests.
+        run: npm ci && npm run build
+        working-directory: frontend

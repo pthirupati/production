@@ -15,14 +15,11 @@ description: 'CONTEXT: Bare Metal ticket — the batch-job LXD container on gpu-
   Stopped with no IPv4 assigned, so the scheduled batch inference run never started. AI Infra
   Engineering owns LXD on MAAS-deployed GPU hosts.
 
-
   ENVIRONMENT: LXD console + Bare Metal + Lab Terminal on gpu-node-01. Treat the container as
   the production batch worker for this incident.
 
-
   SYMPTOM / STARTING STATE: LXD container batch-job is Stopped with no IPv4 assigned; the batch
   inference schedule is blocked behind it.
-
 
   OBJECTIVE: Open the LXD console (or Bare Metal LXD tab); inspect the batch-job container;
   start it and confirm it gets an IPv4 address; leave FIXED-OK once it is RUNNING.'

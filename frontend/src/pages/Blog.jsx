@@ -1,15 +1,15 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Terminal, Clock, ArrowRight, Tag, User, ChevronRight, BookOpen, Sparkles, TrendingUp,
   Search,
 } from 'lucide-react'
-import api from '../api/client'
 import { BLOG_FALLBACK_POSTS, BLOG_CATEGORIES, getCategoryClass } from '../data/blogFallback'
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
 import { useRevealOnScroll } from '../hooks/useRevealOnScroll'
 import { usePageTitle } from '../hooks/usePageTitle'
+import { useFetch } from '../hooks/useFetch'
 
 function mergePosts(apiPosts) {
   const bySlug = new Map()
@@ -62,17 +62,17 @@ function PostCardSkeleton() {
 
 export default function Blog() {
   usePageTitle('Blog', 'Practical write-ups on troubleshooting, infrastructure and interview preparation from the FixitLab team.')
-  const [posts, setPosts] = useState(BLOG_FALLBACK_POSTS)
-  const [loading, setLoading] = useState(true)
+  const { data: apiPosts, loading, error } = useFetch('/blog/', {
+    config: { silentError: true },
+    initialData: null,
+  })
+  // Keep fallbacks painted while loading / on error; merge API rows when ready.
+  const posts = useMemo(() => {
+    if (error || apiPosts == null) return mergePosts(BLOG_FALLBACK_POSTS)
+    return mergePosts(apiPosts)
+  }, [apiPosts, error])
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
-
-  useEffect(() => {
-    api.get('/blog/', { silentError: true })
-      .then(res => setPosts(mergePosts(res.data)))
-      .catch(() => setPosts(BLOG_FALLBACK_POSTS))
-      .finally(() => setLoading(false))
-  }, [])
 
   const categories = useMemo(() => {
     const fromPosts = [...new Set(posts.map(p => p.category).filter(Boolean))]

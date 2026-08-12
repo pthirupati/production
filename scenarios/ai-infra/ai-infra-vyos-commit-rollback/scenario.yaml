@@ -15,12 +15,9 @@ description: 'CONTEXT: Networking / Bare Metal — an engineer committed a bad V
   change and broke BGP/PXE reachability. AI Infra Engineering must use compare / commit /
   rollback safely (same workflow as production VyOS).
 
-
   ENVIRONMENT: Lab Terminal VyOS CLI. Bare Metal for verifying MAAS reachability after restore.
 
-
   SYMPTOM: After a bad commit, neighbors Idle and PXE helper unreachable.
-
 
   OBJECTIVE: Inspect show system commit; rollback the bad revision; re-apply a safe change;
   commit; verify; FIXED-OK.'

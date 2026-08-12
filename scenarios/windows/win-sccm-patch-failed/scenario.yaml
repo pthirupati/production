@@ -17,13 +17,11 @@ description: 'CONTEXT: A team operating Windows Server has raised a ticket for `
   the server is missing a critical security update, patch compliance reporting to the security team is
   wrong, and the change window for this deployment is about to close.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline Windows Server host. The architecture is a single
   lab-primary node acting as a Configuration Manager (ConfigMgr) client enrolled in site FIX (FixItLab
   Primary Site), targeted by deployments through the "Servers - Production" collection; treat it as the
   production host for this incident. All tools run locally — no paid APIs or external cloud calls are
   required.
-
 
   SYMPTOM / STARTING STATE: A domain-joined Windows Server 2022 with the Configuration Manager client
   installed and active. In Software Center, a Required deployment for the 2025-02 Cumulative Update for
@@ -31,16 +29,13 @@ description: 'CONTEXT: A team operating Windows Server has raised a ticket for `
   entry in Windows Update history is also Failed. The deployment deadline has passed and the device is
   reporting non-compliant to the site.
 
-
   IMPACT: The server is missing a critical security patch, monthly compliance reporting is inaccurate,
   and repeated failed retries from the site server continue to fail until the underlying client-side issue
   is cleared through Software Center.
 
-
   OBJECTIVE: Open Software Center, locate the Required deployment that shows Failed with error 0x87D00664,
   and install/retry it so it reaches Installed and the matching Windows Update entry reconciles to installed.
   Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
@@ -48,16 +43,13 @@ description: 'CONTEXT: A team operating Windows Server has raised a ticket for `
   changing one thing at a time. Check your work continuously against the objective — success means `check.sh`
   exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fabricated completion
   with marker files — the checker validates real system state.'
@@ -124,7 +116,6 @@ hints:
 
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 summary: 'Complete the windows gui: recover a failed sccm/mecm patch deployment windows lab and verify
@@ -141,7 +132,7 @@ tags:
 - sccm
 - mecm
 - patch-management
-linked_tutorial: windows-fundamentals
+linked_tutorial: windows-server-zero-hero
 what_you_will_learn:
 - Open Software Center and review the deployment list
 - Identify the Required deployment showing Failed with error 0x87D00664

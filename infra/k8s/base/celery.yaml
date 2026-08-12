@@ -14,10 +14,18 @@ spec:
     metadata:
       labels: { app: celery-worker }
     spec:
+      # Same backend image, so the same root-owned /app constraint applies —
+      # see the note in backend.yaml for why runAsNonRoot is not set.
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: worker
           image: fixitlab/fixitlab-backend:latest
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           command: ["celery", "-A", "config", "worker", "-l", "info", "--concurrency=4"]
           envFrom:
             - configMapRef: { name: fixitlab-config }
@@ -59,10 +67,16 @@ spec:
     metadata:
       labels: { app: celery-beat }
     spec:
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: beat
           image: fixitlab/fixitlab-backend:latest
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           command: ["celery", "-A", "config", "beat", "-l", "info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
           envFrom:
             - configMapRef: { name: fixitlab-config }
@@ -70,3 +84,34 @@ spec:
           resources:
             requests: { memory: "128Mi", cpu: "100m" }
             limits: { memory: "256Mi", cpu: "250m" }
+---
+# Worker only. celery-beat deliberately has NO PodDisruptionBudget: it is a
+# single-replica `Recreate` singleton, so minAvailable: 1 would permanently
+# block node drains (the eviction can never satisfy the budget). Beat is
+# restart-tolerant — the DatabaseScheduler persists the schedule.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: celery-worker
+  namespace: fixitlab
+  labels: { app: celery-worker }
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: celery-worker }
+---
+# Celery pods serve no inbound traffic — they only dial out to the broker and
+# database. An empty `ingress:` list is therefore a true deny-all for inbound
+# while leaving egress untouched (policyTypes omits Egress).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: celery-deny-ingress
+  namespace: fixitlab
+  labels: { app.kubernetes.io/part-of: fixitlab }
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app, operator: In, values: [celery-worker, celery-beat] }
+  policyTypes: [Ingress]
+  ingress: []

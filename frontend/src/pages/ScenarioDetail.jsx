@@ -15,13 +15,14 @@ import { getScenarioSimInfo } from '../utils/simScenario'
 import {
   Clock, Target, Lightbulb, Play, CheckCircle2,
   Wrench, Skull, ArrowLeft, BookmarkPlus, Bookmark,
-  Users, BarChart3, Hash, Award, Lock, Eye, Zap, Star, Send, Monitor, BookOpen,
+  Users, BarChart3, Hash, Lock, Eye, Zap, Star, Send, Monitor, BookOpen,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageHeader } from '../components/design'
 import { ScenarioStatsChip } from '../components/engagement'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { useStructuredData, scenarioCourseSchema, breadcrumbSchema } from '../hooks/useStructuredData'
+import PageBreadcrumbs from '../components/PageBreadcrumbs'
 
 const typeConfig = {
   fix: { icon: Wrench, label: 'Fix', desc: 'Find and fix the broken service' },
@@ -252,6 +253,12 @@ export default function ScenarioDetail() {
   const TypeIcon = typeConfig[scenario.scenario_type]?.icon || Wrench
   const typeInfo = typeConfig[scenario.scenario_type] || typeConfig.fix
   const timeMinutes = Math.floor((scenario.time_limit || 900) / 60)
+  // Learner avg from finalize_lab_completion_if_ready rolling average. Hide
+  // until we have a few samples so a single outlier doesn't look authoritative.
+  const avgSolveMinutes = scenario.avg_completion_time > 0
+    && (scenario.completions_count || 0) >= 3
+    ? Math.max(1, Math.round(scenario.avg_completion_time / 60))
+    : null
   const userCompleted = scenario.user_progress?.completed
   const objectives = Array.isArray(scenario.objectives) ? scenario.objectives : []
   const solveRate = scenario.attempts_count > 0
@@ -352,6 +359,17 @@ export default function ScenarioDetail() {
         isAuthenticated={isAuthenticated}
       />
 
+      <PageBreadcrumbs
+        items={[
+          { label: 'Home', to: '/dashboard' },
+          { label: 'Scenarios', to: '/scenarios' },
+          ...(scenario.technology?.slug
+            ? [{ label: scenario.technology.name, to: `/technologies/${scenario.technology.slug}` }]
+            : []),
+          { label: scenario.title },
+        ]}
+      />
+
       {(scenario.lab_mode === 'simulation' || scenario.slug?.startsWith('sim-')) && (
         <JiraTeamGuide scenarioSlug={scenario.slug} />
       )}
@@ -394,7 +412,7 @@ export default function ScenarioDetail() {
               <CheckCircle2 size={13} /> Solved
             </span>
           )}
-          <button onClick={handleBookmark} className="text-surface-500 hover:text-accent-amber transition-colors p-1 ml-auto sm:ml-0">
+          <button type="button" onClick={handleBookmark} className="text-surface-500 hover:text-accent-amber transition-colors p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center ml-auto sm:ml-0" aria-label={scenario.is_bookmarked ? 'Remove bookmark' : 'Bookmark scenario'}>
             {scenario.is_bookmarked
               ? <Bookmark size={18} className="text-accent-amber fill-accent-amber" />
               : <BookmarkPlus size={18} />}
@@ -405,7 +423,11 @@ export default function ScenarioDetail() {
 
         {/* Stats row — matches reference layout */}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 py-3 border-y border-surface-800/80">
-          <StatPill icon={Clock}>{timeMinutes} min</StatPill>
+          <StatPill icon={Clock}>
+            {avgSolveMinutes != null
+              ? `Est. ${timeMinutes} min · learners avg ${avgSolveMinutes} min`
+              : `${timeMinutes} min`}
+          </StatPill>
           <StatPill icon={Target}>{scenario.max_score} pts max</StatPill>
           <StatPill icon={Lightbulb}>{scenario.hints_count || 0} hints</StatPill>
           {scenario.attempts_count > 0 && (
@@ -481,6 +503,32 @@ export default function ScenarioDetail() {
       )}
 
       <ScenarioNarrative scenario={scenario} />
+
+      {scenario.linked_tutorial && (
+        <div className="glass-card p-5 border-accent-cyan/20 bg-accent-cyan/5">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
+                <BookOpen size={16} className="text-accent-cyan" /> Continue the course
+              </h2>
+              <p className="text-sm text-surface-400">
+                This lab is part of{' '}
+                <span className="text-surface-200 font-medium">
+                  {scenario.related_tutorials?.[0]?.course_title
+                    || scenario.linked_tutorial}
+                </span>
+                . Work through the modules for the full learning path.
+              </p>
+            </div>
+            <Link
+              to={`/tutorials?course=${encodeURIComponent(scenario.linked_tutorial)}`}
+              className="btn-secondary text-sm px-4 py-2 inline-flex items-center gap-1.5 shrink-0"
+            >
+              Open course
+            </Link>
+          </div>
+        </div>
+      )}
 
       {scenario.related_tutorials?.length > 0 && (
         <div className="glass-card p-6 border-accent-purple/15">

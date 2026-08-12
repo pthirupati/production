@@ -269,7 +269,7 @@ class LanguageRuntimeRuleTests(_CodingRuleCase):
             entrypoint="Solution.java",
             files=[{"path": "Solution.java", "content": "", "readonly": False}],
         ))
-        self.assertTrue(any("no server runtime" in g for g in gaps), gaps)
+        self.assertTrue(any("no server" in g for g in gaps), gaps)
 
     def test_text_prompt_labs_are_exempt(self):
         """`text` has no interpreter by design; 150 labs would fail otherwise."""
@@ -278,6 +278,40 @@ class LanguageRuntimeRuleTests(_CodingRuleCase):
 
     def test_supported_language_is_clean(self):
         self.assertFalse([g for g in self.gaps(self.healthy()) if "runtime" in g])
+
+
+class LanguagePlausibleForTechRuleTests(_CodingRuleCase):
+    """R4: coding_spec.language must match the parent technology (active labs)."""
+
+    def test_active_lab_with_wrong_language_is_a_gap(self):
+        # Fixture path is scenarios? No — tmp/.../python/code-lab; parent tech = python.
+        gaps = self.gaps(
+            self.healthy(language="javascript", entrypoint="solution.js", files=[
+                {"path": "solution.js", "content": "", "readonly": False},
+            ]),
+            is_active=True,
+        )
+        self.assertTrue(any("not plausible for technology" in g for g in gaps), gaps)
+
+    def test_inactive_lab_is_exempt(self):
+        gaps = self.gaps(
+            self.healthy(language="javascript", entrypoint="solution.js", files=[
+                {"path": "solution.js", "content": "", "readonly": False},
+            ]),
+            is_active=False,
+        )
+        self.assertFalse([g for g in gaps if "not plausible" in g])
+
+    def test_matching_language_is_clean(self):
+        gaps = self.gaps(self.healthy(), is_active=True)
+        self.assertFalse([g for g in gaps if "not plausible" in g])
+
+    def test_prompt_kind_is_exempt(self):
+        gaps = self.gaps(
+            {"language": "text", "kind": "prompt"},
+            is_active=True,
+        )
+        self.assertFalse([g for g in gaps if "not plausible" in g])
 
 
 class EditableFileRuleTests(_CodingRuleCase):

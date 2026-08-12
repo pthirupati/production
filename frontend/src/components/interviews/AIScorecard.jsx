@@ -82,7 +82,7 @@ function ScoreBar({ label, score, benchmark }) {
 
 function StarBadge({ starData }) {
   if (!starData) return null
-  const { star_score = 0, missing_components = [], coaching_note } = starData
+  const { star_score = 0, missing_components = [] } = starData
   const labels = { 0: 'No STAR', 1: 'Weak', 2: 'Partial', 3: 'Good STAR', 4: 'Full STAR' }
   const colors = {
     0: 'bg-red-900 text-red-300',
@@ -154,7 +154,6 @@ export default function AIScorecard({ report, round, extras = {} }) {
     benchmark_comparison = '',
   } = extras
 
-  const passColor = passed ? 'text-green-400' : 'text-red-400'
   const passBg = passed ? 'bg-green-950 border-green-700' : 'bg-red-950 border-red-700'
 
   return (

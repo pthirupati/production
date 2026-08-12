@@ -16,36 +16,29 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   resolve it. Business impact: reduced service reliability and blocked users until the underlying state
   is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
   lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Backup jobs exist but reliability is uncertain for package patching. Leadership
   wants proof that restore works — not just that scripts exit zero.
-
 
   OBJECTIVE: Backup coverage for package patching is complete and restorable; Retention and encryption
   meet the stated policy; A restore drill proves data integrity. Acceptance criteria: the change is minimal
   and reversible, and success means `systemctl is-active nginx` returns active.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
   your work continuously against the objective — success means `systemctl is-active nginx` returns active.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active nginx` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -97,7 +90,6 @@ hints:
 
     3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
 
-
     WHY: systemd will not start nginx until `nginx -t` passes.'
 summary: Complete the package patching — backup lab linux lab and verify success with the checker
 estimated_minutes: 20
@@ -108,7 +100,7 @@ tags:
 - do
 - hands-on
 - linux
-linked_tutorial: linux-fundamentals
+linked_tutorial: linux-sysadmin-zero-hero
 what_you_will_learn:
 - Backup coverage for package patching is complete and restorable
 - Retention and encryption meet the stated policy

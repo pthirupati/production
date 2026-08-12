@@ -432,7 +432,7 @@ function SidePanel({ title, children, onClose }) {
     <div className="vm-drawer">
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#2d3a4a] bg-[#243447]">
         <h3 className="font-bold text-sm text-white">{title}</h3>
-        <button type="button" onClick={onClose} className="p-1 text-[#8fa5b8] hover:text-white rounded">
+        <button type="button" onClick={onClose} className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white rounded" aria-label="Close panel">
           <X size={18} />
         </button>
       </div>

@@ -246,13 +246,14 @@ class StripeWebhookView(APIView):
 
         try:
             subscription = Subscription.objects.get(stripe_subscription_id=stripe_sub_id)
-            if sub_status in ("past_due", "unpaid", "cancelled"):
-                subscription.is_active = False
-                subscription.save()
-                logger.info(f"Subscription {stripe_sub_id} marked inactive: {sub_status}")
-            elif sub_status == "active":
-                subscription.is_active = True
-                subscription.save()
+            from apps.billing.subscription_utils import apply_dunning_status
+
+            result = apply_dunning_status(subscription, sub_status)
+            logger.info(
+                "Subscription %s dunning apply: %s",
+                stripe_sub_id,
+                result,
+            )
         except Subscription.DoesNotExist:
             pass
 

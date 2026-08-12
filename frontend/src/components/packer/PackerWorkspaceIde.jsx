@@ -9,7 +9,7 @@ import { baremetalApi } from '../../api/baremetal'
 import { packerApi } from '../../api/packer'
 import PackerCiPipelinePanel from './PackerCiPipelinePanel'
 import {
-  FileCode, FolderOpen, Play, Plus, Trash2, RefreshCw, Terminal, Files, ExternalLink, Upload,
+  FileCode, FolderOpen, Play, RefreshCw, Terminal, Files, ExternalLink, Upload,
   GitBranch, Workflow,
 } from 'lucide-react'
 import { parentDirs } from '../../utils/ide/fileTree'

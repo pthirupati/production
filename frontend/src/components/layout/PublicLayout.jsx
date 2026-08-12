@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useThemeStore } from '../../store/themeStore'
 import { useAuthStore } from '../../store/authStore'
-import { Sun, Moon, Menu, X, Bot } from 'lucide-react'
+import { Sun, Moon, Menu, X, Bot } from '../../ui/eagerIcons'
 import { useState, useEffect } from 'react'
 import SupportBotWidget from '../SupportBotWidget'
 import { PlatformBanners } from '../PlatformBanners'
@@ -9,6 +9,7 @@ import api from '../../api/client'
 import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_LINKS } from '../../constants/publicNav'
 import BubbleNavLink from '../BubbleNavLink'
 import { FixitLogo } from '../design'
+import { useModalA11y } from '../ConfirmModal'
 
 const navLinkClass = (active) =>
   active
@@ -45,6 +46,8 @@ const FOOTER_SECTIONS = [
     links: [
       { to: '/privacy', label: 'Privacy' },
       { to: '/terms', label: 'Terms' },
+      { to: '/refunds', label: 'Refunds' },
+      { to: '/acceptable-use', label: 'Acceptable use' },
     ],
   },
 ]
@@ -53,6 +56,7 @@ export default function PublicLayout({ children }) {
   const { theme, toggleTheme } = useThemeStore()
   const { isAuthenticated } = useAuthStore()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const mobileNavRef = useModalA11y(mobileMenuOpen, () => setMobileMenuOpen(false))
   const [platformConfig, setPlatformConfig] = useState(null)
   const { pathname } = useLocation()
 
@@ -101,14 +105,21 @@ export default function PublicLayout({ children }) {
                 <Link to="/register" className="btn-primary text-sm">Sign Up</Link>
               </div>
             )}
-            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 text-surface-400" aria-label="Toggle menu">
+            <button type="button" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400" aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}>
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
         </div>
 
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-surface-700/50 bg-surface-950/95 backdrop-blur-xl max-h-[70vh] overflow-y-auto">
+          <div
+            ref={mobileNavRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Site navigation"
+            className="lg:hidden border-t border-surface-700/50 bg-surface-950/95 backdrop-blur-xl max-h-[70vh] overflow-y-auto outline-none"
+          >
             <div className="px-4 py-4 space-y-1">
               {PUBLIC_NAV_LINKS.map(({ to, label }) => (
                 <Link

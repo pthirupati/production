@@ -27,6 +27,18 @@ OPENSTACK_KEYWORDS = ("openstack", "nova", "neutron", "keystone", "glance", "cin
 MEMCACHE_KEYWORDS = ("memcached", "memcache")
 MQ_KEYWORDS = ("rabbitmq", "amqp")
 
+# Storage / DC / SOC / mesh / OTel — the G3 "9 worst" academy families that
+# previously recycled nginx breaks. Narrow prefixes so we do not steal
+# unrelated slugs (e.g. bare "mesh" in hostnames).
+NETAPP_KEYWORDS = ("academy-netapp-", "netapp-", "-ontap-", "snapmirror")
+DELL_KEYWORDS = ("academy-dellemc-", "dellemc-", "powermax", "unisphere")
+DATACENTER_KEYWORDS = ("academy-datacenter-", "datacenter-", "dcim-")
+SOC_KEYWORDS = ("academy-soc-", "soc-", "-siem-", "wazuh", "suricata")
+OTEL_KEYWORDS = ("academy-opentelemetry-", "opentelemetry-", "otel-", "otelcol")
+MESH_KEYWORDS = ("academy-service-mesh-", "service-mesh-", "istio-", "linkerd-")
+COMMVAULT_KEYWORDS = ("academy-commvault-", "commvault-", "cvlt-", "simpana")
+AI_INFRA_KEYWORDS = ("academy-ai-infra-", "ai-infra-", "gpu-operator", "dcgm-exporter")
+
 # AI vertical. These are deliberately NARROW and hyphen-anchored: a bare
 # "model"/"agent"/"rag" family would hijack unrelated slugs that merely contain
 # the substring (measured: "awx-agent-node", "data-model-migration", and the
@@ -35,7 +47,7 @@ MQ_KEYWORDS = ("rabbitmq", "amqp")
 # corpus so it only matches AI-track labs.
 GPU_KEYWORDS = (
     "gpu", "nvidia", "cuda", "nvlink", "nccl", "rccl", "dcgm", "xid-",
-    "hbm", "mig-", "rocm", "amd-smi",
+    "hbm", "mig-", "rocm", "amd-smi", "cuda-oom", "out-of-memory", "-oom-",
 )
 LLM_KEYWORDS = (
     "llm-", "vllm", "inference", "triton", "tensorrt", "model-serving",
@@ -79,6 +91,26 @@ def apply_topic_fault(slug: str, state: Any) -> bool:
         k in low for k in OPENSTACK_KEYWORDS
     ):
         return _fault_openstack(state, low)
+
+    # G3 worst-tech families — plant tech-native breaks BEFORE CI/AI keyword
+    # families so "academy-soc-*-security-*" is not stolen by SEC_KEYWORDS into
+    # a vault/tls break that still looks like a Linux daemon incident.
+    if low.startswith("academy-netapp-") or any(k in low for k in NETAPP_KEYWORDS):
+        return _fault_netapp(state, low)
+    if low.startswith("academy-dellemc-") or any(k in low for k in DELL_KEYWORDS):
+        return _fault_dellemc(state, low)
+    if low.startswith("academy-datacenter-") or any(k in low for k in DATACENTER_KEYWORDS):
+        return _fault_datacenter(state, low)
+    if low.startswith("academy-soc-") or any(k in low for k in SOC_KEYWORDS):
+        return _fault_soc(state, low)
+    if low.startswith("academy-opentelemetry-") or any(k in low for k in OTEL_KEYWORDS):
+        return _fault_otel(state, low)
+    if low.startswith("academy-service-mesh-") or any(k in low for k in MESH_KEYWORDS):
+        return _fault_service_mesh(state, low)
+    if low.startswith("academy-commvault-") or any(k in low for k in COMMVAULT_KEYWORDS):
+        return _fault_commvault(state, low)
+    if low.startswith("academy-ai-infra-") or any(k in low for k in AI_INFRA_KEYWORDS):
+        return _fault_ai_infra(state, low)
 
     # Git / devops CI topics — plant a broken CI config + inactive runner, not nginx
     # Deliberately BEFORE the AI families so a Jenkins "pipeline agent" lab keeps
@@ -159,7 +191,26 @@ def _fault_gpu(state: Any, slug: str) -> bool:
     an uncorrectable ECC error. Setting gpu_healthy=False also keeps the
     existing validation guard ("GPU still unhealthy — load the nvidia driver
     first") meaningful instead of vacuously satisfied.
+
+    Specific narratives also plant residual SimGPU counters (audit §A1) so that
+    after the learner reloads the driver, `dcgmi diag` / `nvidia-smi nvlink`
+    still reflect the break instead of randomly green numbers.
     """
+    # Seed inventory from SKU before planting per-GPU counters.
+    try:
+        from .simulation_modules import _resolve_gpu_sku
+        sku = _resolve_gpu_sku(slug)
+        if hasattr(state, "ensure_gpu_inventory"):
+            state.ensure_gpu_inventory(
+                count=int(sku.get("count") or 1),
+                name=sku.get("name") or "NVIDIA H100 80GB HBM3",
+                mem_mib=int(sku.get("mem_mib") or 81559),
+                power_cap_w=int(sku.get("pwr_cap") or 700),
+                sku=str(sku.get("arch") or "gpu"),
+            )
+    except Exception:
+        pass
+
     # Xid codes are the real NVRM diagnostic a learner greps for; pick the one
     # matching the scenario so the log corroborates the brief.
     if "nvlink" in slug:
@@ -182,11 +233,22 @@ def _fault_gpu(state: Any, slug: str) -> bool:
             "[  901.117] NVRM: Xid (PCI:0000:01:00): 13, pid=8842, Graphics Exception on channel",
             "[  901.118] NCCL WARN Bootstrap : allreduce timed out waiting for peer rank 3",
         ]
+        state.nccl_hang = True
+    elif "fp16" in slug or ("nan" in slug and "training" in slug):
+        lines = [
+            "[  512.001] CUDA: loss became NaN under float16 — check GradScaler / bf16",
+        ]
+        state.training_fp16_nan = True
     elif "driver" in slug or "not-loaded" in slug or "mismatch" in slug:
         lines = [
             "[   12.004] NVRM: API mismatch: the client has version 550.54.15, but this kernel "
             "module has version 535.161.07",
             "[   12.005] NVRM: nvidia driver failed to initialize — module/library version mismatch",
+        ]
+    elif "cuda-oom" in slug or "out-of-memory" in slug or "-oom-" in slug or slug.endswith("-oom"):
+        lines = [
+            "[  901.440] NVRM: Xid (PCI:0000:01:00): 13, pid=0, Graphics Exception on channel",
+            "[  901.441] CUDA out of memory — device 0 exhausted HBM",
         ]
     else:
         # ECC / HBM / Xid 48 / row-remap default.
@@ -197,6 +259,47 @@ def _fault_gpu(state: Any, slug: str) -> bool:
         ]
     state.dmesg_extra = list(getattr(state, "dmesg_extra", []) or []) + lines
     state.gpu_healthy = False
+
+    gpus = list(getattr(state, "gpus", None) or [])
+    if not gpus:
+        return True
+
+    if "nvlink" in slug:
+        for g in gpus:
+            g.ensure_default_nvlink(dense=len(gpus) >= 8)
+            if g.nvlink_links:
+                g.nvlink_links[0] = {
+                    **g.nvlink_links[0],
+                    "width_gbps": 13.281,
+                    "active": False,
+                    "replay_errors": 42,
+                }
+            g.diag_pcie_fail = True
+    elif "thermal" in slug or "overheat" in slug or "power-cap" in slug or "throttle" in slug:
+        for g in gpus:
+            g.temp_c = 89
+            g.mem_temp_c = 95
+            g.power_w = float(g.power_cap_w)
+            g.throttle_reasons = ["SW_THERMAL_SLOWDOWN"]
+            g.diag_power_fail = True
+    elif "fallen-off-bus" in slug or ("pcie" in slug and "nvlink" not in slug):
+        for g in gpus:
+            g.diag_pcie_fail = True
+    elif any(k in slug for k in ("ecc", "xid", "hbm", "row-remap", "remap", "double-bit")):
+        g = gpus[0]
+        g.ecc_volatile_uncorrected = 1
+        g.ecc_aggregate_uncorrected = 3
+        g.retired_pages_dbe = 2
+        g.retired_pages_pending = True
+        g.remap_pending = True
+        g.diag_memory_fail = True
+        g.xid_events = list(g.xid_events or []) + ["48"]
+    elif "cuda-oom" in slug or "out-of-memory" in slug or "-oom-" in slug or slug.endswith("-oom"):
+        g = gpus[0]
+        g.oom = True
+        g.memory_used_mib = int(g.memory_total_mib)
+        g.util_gpu = 99
+        g.util_mem = 99
     return True
 
 
@@ -216,6 +319,14 @@ def _fault_llm_serving(state: Any, slug: str) -> bool:
         "vllm", active="failed", enabled="enabled",
         description="vLLM inference server", loaded="loaded", sub_state="failed",
     )
+    # OOM / oversubscribed TP labs also plant GPU memory pressure so `vllm serve`
+    # fails with a real CUDA OOM once the unit is restarted (§A1/A2).
+    if "oom" in slug or "memory" in slug or "tp-" in slug or "tensor-parallel" in slug:
+        gpus = list(getattr(state, "gpus", None) or [])
+        if gpus:
+            g = gpus[0]
+            g.oom = True
+            g.memory_used_mib = int(g.memory_total_mib)
     return True
 
 
@@ -498,6 +609,191 @@ def _fault_cloud_cli(state: Any, slug: str, cloud: str) -> bool:
         f"/opt/{cloud}/config",
         f"# broken {cloud} CLI profile — subscription/project not set\n",
     )
+    from .scenario_presets import _plant_broken_config_sentinel
+    _plant_broken_config_sentinel(slug, state)
+    return True
+
+
+def _fault_netapp(state: Any, slug: str) -> bool:
+    """Stop svm-prod / strip NFS — matches state_assertions for academy-netapp-001."""
+    from .rhel_os import SimService
+
+    state._mkdir("/opt/netapp")
+    state._write_file(
+        "/opt/netapp/lab-state.json",
+        '{"svm-prod":"stopped","protocols":["cifs"],"status":"broken"}\n',
+    )
+    state.services["netapp-ontap"] = SimService(
+        "netapp-ontap", active="failed", enabled="enabled",
+        description="NetApp ONTAP management agent", loaded="loaded", sub_state="failed",
+    )
+    sid = getattr(state, "session_id", None)
+    if sid:
+        try:
+            from apps.vmware_sim import netapp_engine as ne
+
+            entry = ne._ensure(str(sid), slug)
+            st = entry["state"]
+            for svm in st.get("svms") or []:
+                if svm.get("name") == "svm-prod":
+                    svm["state"] = "stopped"
+                    prots = [p for p in (svm.get("protocols") or []) if p != "nfs"]
+                    svm["protocols"] = prots or ["cifs"]
+            st["broken"] = {"svm_stopped": "svm-prod", "needs_nfs": "svm-prod"}
+            st["goal"] = {
+                "title": "Bring SVM online",
+                "objective": "Start svm-prod and restore the NFS protocol.",
+            }
+            ne._save(str(sid), entry)
+        except Exception:
+            pass
+    from .scenario_presets import _plant_broken_config_sentinel
+    _plant_broken_config_sentinel(slug, state)
+    return True
+
+
+def _fault_dellemc(state: Any, slug: str) -> bool:
+    from .rhel_os import SimService
+
+    state._mkdir("/opt/dellemc")
+    state._write_file(
+        "/opt/dellemc/lab-state.json",
+        '{"storage_pool":"degraded","volume":"unmapped","status":"broken"}\n',
+    )
+    state.services["unisphere"] = SimService(
+        "unisphere", active="failed", enabled="enabled",
+        description="Dell EMC Unisphere", loaded="loaded", sub_state="failed",
+    )
+    sid = getattr(state, "session_id", None)
+    if sid:
+        try:
+            from apps.vmware_sim import dellemc_engine as de
+
+            entry = de._ensure(str(sid), slug)
+            st = entry["state"]
+            st["broken"] = {"unmapped_volume": "0004", "pool_degraded": True}
+            de._save(str(sid), entry)
+        except Exception:
+            pass
+    from .scenario_presets import _plant_broken_config_sentinel
+    _plant_broken_config_sentinel(slug, state)
+    return True
+
+
+def _fault_datacenter(state: Any, slug: str) -> bool:
+    from .rhel_os import SimService
+
+    state._mkdir("/opt/datacenter")
+    narrative = "cooling" if "cool" in slug else ("pdu" if "pdu" in slug else "racks")
+    state._write_file(
+        "/opt/datacenter/lab-state.json",
+        f'{{"subsystem":"{narrative}","status":"alarm","dcim":"degraded"}}\n',
+    )
+    unit = "dcim-agent"
+    if "pdu" in slug:
+        unit = "pdu-monitor"
+    elif "cool" in slug or "hvac" in slug:
+        unit = "cooling-controller"
+    elif "ups" in slug:
+        unit = "ups-agent"
+    state.services[unit] = SimService(
+        unit, active="failed", enabled="enabled",
+        description=f"Datacenter {unit}", loaded="loaded", sub_state="failed",
+    )
+    from .scenario_presets import _plant_broken_config_sentinel
+    _plant_broken_config_sentinel(slug, state)
+    return True
+
+
+def _fault_soc(state: Any, slug: str) -> bool:
+    from .rhel_os import SimService
+
+    state._mkdir("/opt/soc")
+    state._write_file(
+        "/opt/soc/lab-state.json",
+        '{"siem":"disconnected","sensor":"silent","status":"broken"}\n',
+    )
+    state.services["wazuh-agent"] = SimService(
+        "wazuh-agent", active="failed", enabled="enabled",
+        description="Wazuh SIEM agent", loaded="loaded", sub_state="failed",
+    )
+    from .scenario_presets import _plant_broken_config_sentinel
+    _plant_broken_config_sentinel(slug, state)
+    return True
+
+
+def _fault_otel(state: Any, slug: str) -> bool:
+    from .rhel_os import SimService
+
+    state._mkdir("/opt/otel")
+    state._write_file(
+        "/opt/otel/config.yaml",
+        "receivers:\n  otlp:\n    protocols:\n      grpc:\n        endpoint: 0.0.0.0:4317\n"
+        "exporters:\n  logging:\n    loglevel: debug\n"
+        "service:\n  pipelines:\n    traces:\n      receivers: [otlp]\n"
+        "      exporters: [broken_backend]\n",
+    )
+    state.services["otelcol"] = SimService(
+        "otelcol", active="failed", enabled="enabled",
+        description="OpenTelemetry Collector", loaded="loaded", sub_state="failed",
+    )
+    from .scenario_presets import _plant_broken_config_sentinel
+    _plant_broken_config_sentinel(slug, state)
+    return True
+
+
+def _fault_service_mesh(state: Any, slug: str) -> bool:
+    from .rhel_os import SimService
+
+    state._mkdir("/opt/service-mesh")
+    state._write_file(
+        "/opt/service-mesh/lab-state.json",
+        '{"control_plane":"unhealthy","sidecar":"injection-failed","status":"broken"}\n',
+    )
+    unit = "istiod" if "istio" in slug or "mesh" in slug else "linkerd-destination"
+    state.services[unit] = SimService(
+        unit, active="failed", enabled="enabled",
+        description="Service mesh control plane", loaded="loaded", sub_state="failed",
+    )
+    from .scenario_presets import _plant_broken_config_sentinel
+    _plant_broken_config_sentinel(slug, state)
+    return True
+
+
+def _fault_commvault(state: Any, slug: str) -> bool:
+    from .rhel_os import SimService
+
+    state._mkdir("/opt/commvault")
+    state._write_file(
+        "/opt/commvault/lab-state.json",
+        '{"media_agent":"offline","backup_set":"failed","status":"broken"}\n',
+    )
+    state.services["commvault"] = SimService(
+        "commvault", active="failed", enabled="enabled",
+        description="Commvault MediaAgent", loaded="loaded", sub_state="failed",
+    )
+    from .scenario_presets import _plant_broken_config_sentinel
+    _plant_broken_config_sentinel(slug, state)
+    return True
+
+
+def _fault_ai_infra(state: Any, slug: str) -> bool:
+    """AI infra academy: prefer GPU/operator narrative over nginx."""
+    from .rhel_os import SimService
+
+    if any(k in slug for k in ("gpu", "xid", "nvlink", "ecc", "hbm", "cuda")):
+        return _fault_gpu(state, slug)
+
+    state._mkdir("/opt/ai-infra")
+    state._write_file(
+        "/opt/ai-infra/lab-state.json",
+        '{"device_plugin":"CrashLoopBackOff","dcgm":"down","status":"broken"}\n',
+    )
+    state.services["nvidia-device-plugin"] = SimService(
+        "nvidia-device-plugin", active="failed", enabled="enabled",
+        description="NVIDIA GPU device plugin", loaded="loaded", sub_state="failed",
+    )
+    state.gpu_healthy = False
     from .scenario_presets import _plant_broken_config_sentinel
     _plant_broken_config_sentinel(slug, state)
     return True

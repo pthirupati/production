@@ -68,11 +68,50 @@ _MAX_OPEN_FILES = 256      # RLIMIT_NOFILE — bound fd exhaustion
 SUPPORTED_LANGUAGES = {"python", "javascript", "sql"}
 # Languages we recognise but cannot safely auto-grade on the backend yet.
 # These return needs_review instead of ever auto-passing (fail-closed).
-NEEDS_REVIEW_LANGUAGES = {"bash", "shell", "sh"}
+NEEDS_REVIEW_LANGUAGES = {"bash", "shell", "sh", "java"}
 
 # Languages whose harness IS a Python program, so they reuse the python image,
 # argv and address-space limit even though the learner writes another language.
 PYTHON_HOSTED_LANGUAGES = {"python", "sql"}
+
+# Authoring ``language`` (what the IDE labels) → gradeable ``runtime``.
+# Audit §Y2c: language and runtime must be separable so HTML labs can declare
+# ``language: html`` while still grading through the JS PAGE_HTML harness.
+AUTHORING_TO_RUNTIME = {
+    "python": "python",
+    "polars": "python",
+    "sklearn": "python",
+    "scikit-learn": "python",
+    "javascript": "javascript",
+    "js": "javascript",
+    "node": "javascript",
+    "nodejs": "javascript",
+    "sql": "sql",
+    "html": "javascript",
+    "css": "javascript",
+    "react": "javascript",
+    "jsx": "javascript",
+    "typescript": "javascript",
+    "ts": "javascript",
+    "bash": "bash",
+    "shell": "bash",
+    "sh": "bash",
+    "java": "java",
+}
+
+
+def resolve_runtime(spec: dict | None, language_override: str | None = None) -> str:
+    """Return the gradeable runtime for a coding_spec (audit §Y2c).
+
+    Explicit ``coding_spec.runtime`` wins. Otherwise map the authoring
+    ``language`` (or a request override) through AUTHORING_TO_RUNTIME.
+    """
+    spec = spec or {}
+    explicit = str(spec.get("runtime") or "").strip().lower()
+    if explicit:
+        return explicit
+    lang = str(language_override or spec.get("language") or "python").strip().lower()
+    return AUTHORING_TO_RUNTIME.get(lang, lang)
 
 
 def compose_user_code_from_files(files: dict, entrypoint: str = "") -> str:
@@ -331,7 +370,13 @@ _PY_RESULT_PREFIX = "__FIXITLAB_RESULT__:"
 _JS_RESULT_PREFIX = "__FIXITLAB_RESULT__:"
 
 
-def _build_python_harness(user_code: str, tests: list[dict]) -> str:
+def _build_python_harness(
+    user_code: str,
+    tests: list[dict],
+    *,
+    inject_polars: bool = False,
+    inject_sklearn: bool = False,
+) -> str:
     """Compose a Python program that runs each test and emits a JSON verdict.
 
     Each test dict has {name, code, hidden}. `code` runs inside a function with
@@ -343,6 +388,24 @@ def _build_python_harness(user_code: str, tests: list[dict]) -> str:
           "hidden": bool(t.get("hidden"))}
          for i, t in enumerate(tests)]
     )
+    shim_inject = ""
+    if inject_polars:
+        from apps.labs.polars_shim import POLARS_SHIM_SOURCE
+        shim_inject += (
+            "exec(" + repr(POLARS_SHIM_SOURCE) + ", _g)\n"
+            "_g['pl'] = _g.get('pl')\n"
+        )
+    if inject_sklearn:
+        from apps.labs.sklearn_shim import SKLEARN_SHIM_SOURCE
+        shim_inject += (
+            "exec(" + repr(SKLEARN_SHIM_SOURCE) + ", _g)\n"
+            "_g['sklearn'] = _g.get('sklearn')\n"
+            "_g['imblearn'] = _g.get('imblearn')\n"
+            "_g['train_test_split'] = _g.get('train_test_split')\n"
+            "_g['LogisticRegression'] = _g.get('LogisticRegression')\n"
+            "_g['accuracy_score'] = _g.get('accuracy_score')\n"
+            "_g['SMOTE'] = _g.get('SMOTE')\n"
+        )
     # The user's code and the tests are embedded as data and exec'd inside the
     # sandboxed child only — never in our process.
     return (
@@ -350,7 +413,8 @@ def _build_python_harness(user_code: str, tests: list[dict]) -> str:
         "_USER_SRC = " + repr(user_code) + "\n"
         "_TESTS = json.loads(" + repr(payload) + ")\n"
         "_g = {'__name__': '__fixitlab__'}\n"
-        "_results = []\n"
+        + shim_inject
+        + "_results = []\n"
         "_compile_error = None\n"
         "try:\n"
         "    exec(compile(_USER_SRC, '<solution>', 'exec'), _g)\n"
@@ -485,7 +549,7 @@ def _build_sql_harness(user_code: str, tests: list[dict]) -> str:
     )
 
 
-def _build_js_harness(user_code: str, tests: list[dict]) -> str:
+def _build_js_harness(user_code: str, tests: list[dict], *, api_client: dict | None = None) -> str:
     """Compose a Node program that runs each test and emits a JSON verdict.
 
     Each test runs in a fresh Function whose body is `user_code` immediately
@@ -493,6 +557,9 @@ def _build_js_harness(user_code: str, tests: list[dict]) -> str:
     (functions, consts, classes) through normal lexical scope. assert() throws
     on failure. A standalone compile of the user code first surfaces syntax
     errors as a single compile_error rather than N identical test failures.
+
+    When ``api_client`` is set (or truthy empty dict), inject mockFetch from the
+    shared api_client_mock routes so graded fetch() never opens a socket.
     """
     payload = json.dumps(
         [{"name": t.get("name", f"test_{i}"),
@@ -501,8 +568,16 @@ def _build_js_harness(user_code: str, tests: list[dict]) -> str:
          for i, t in enumerate(tests)]
     )
     user_src_json = json.dumps(user_code)
+    prelude = ""
+    if api_client is not None:
+        from apps.labs.api_client_mock import build_mock_fetch_prelude, _DEFAULT_ROUTES
+        routes = None
+        if isinstance(api_client, dict) and api_client.get("routes"):
+            routes = api_client["routes"]
+        prelude = build_mock_fetch_prelude(routes if routes is not None else _DEFAULT_ROUTES)
     return (
-        "const TESTS = " + payload + ";\n"
+        prelude
+        + "const TESTS = " + payload + ";\n"
         "const USER_SRC = " + user_src_json + ";\n"
         "const assert = (c, m) => { if (!c) throw new Error(m || 'assertion failed'); };\n"
         "const results = [];\n"
@@ -717,6 +792,8 @@ def grade_submission(
     tests: list[dict],
     *,
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
+    api_client: dict | None = None,
+    authoring_language: str | None = None,
 ) -> GradeResult:
     """Run user_code against `tests` in a sandbox and return a GradeResult.
 
@@ -724,8 +801,15 @@ def grade_submission(
     without raising. all_passed is True ONLY when every test ran and passed —
     an empty test list, a missing runtime, a compile error, or a timeout all
     fail closed (all_passed=False).
+
+    ``api_client`` (optional) injects mockFetch into the JS harness from the
+    shared in-process route table — never a real socket.
+
+    ``authoring_language`` (optional) is the IDE label (e.g. ``polars``) when
+    ``language`` is the resolved gradeable runtime (``python``).
     """
     lang = (language or "").lower()
+    auth_lang = (authoring_language or "").lower()
     timeout = max(1, min(int(timeout or DEFAULT_TIMEOUT_SECONDS), MAX_TIMEOUT_SECONDS))
 
     if lang in NEEDS_REVIEW_LANGUAGES:
@@ -756,7 +840,14 @@ def grade_submission(
         if lang in PYTHON_HOSTED_LANGUAGES:
             harness = (
                 _build_sql_harness(user_code, tests) if lang == "sql"
-                else _build_python_harness(user_code, tests)
+                else _build_python_harness(
+                    user_code, tests,
+                    inject_polars=(auth_lang == "polars" or lang == "polars"),
+                    inject_sklearn=(
+                        auth_lang in ("sklearn", "scikit-learn")
+                        or lang in ("sklearn", "scikit-learn")
+                    ),
+                )
             )
             script_name = "_runner.py"
             script = os.path.join(workdir, script_name)
@@ -764,7 +855,7 @@ def grade_submission(
                 fh.write(harness)
             argv = [sys.executable, "-I", "-B", script]
         else:  # javascript
-            harness = _build_js_harness(user_code, tests)
+            harness = _build_js_harness(user_code, tests, api_client=api_client)
             script_name = "_runner.js"
             script = os.path.join(workdir, script_name)
             with open(script, "w", encoding="utf-8") as fh:

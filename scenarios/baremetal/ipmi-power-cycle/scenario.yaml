@@ -3,36 +3,29 @@ description: 'CONTEXT: A team operating bare metal operations has raised a ticke
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline physical server lab. The architecture is a single
   lab-primary node exposing IPMI, RAID, BIOS, and out-of-band console; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: bare-metal host reachable only via its BMC/IPMI interface. The operating system
   is hung and unreachable in-band; power must be managed through ipmitool.
-
 
   OBJECTIVE: Query the current chassis power state via IPMI; Perform a power cycle (or off/on) on the
   unresponsive host; Confirm the server powers back on after the cycle. Acceptance criteria: the change
   is minimal and reversible, and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant IPMI, RAID, BIOS, and out-of-band console), changing one thing at a time. Check your
   work continuously against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -87,7 +80,6 @@ hints:
 
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 initial_state: bare-metal host reachable only via its BMC/IPMI interface. The operating system
@@ -115,7 +107,7 @@ tags:
 - baremetal
 - fix
 - hands-on
-linked_tutorial: baremetal-fundamentals
+linked_tutorial: bare-metal-datacenter-zero-hero
 what_you_will_learn:
 - Query the current chassis power state via IPMI
 - Perform a power cycle (or off/on) on the unresponsive host

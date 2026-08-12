@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Award, ArrowRight, ShieldCheck } from 'lucide-react'
+import { Award, ArrowRight, ShieldCheck } from '../../../ui/eagerIcons'
 import { certApi } from '../../../api/certifications'
 import { blurIn, scaleIn, staggerContainer, viewportOnce } from '../../../ui/motion'
 

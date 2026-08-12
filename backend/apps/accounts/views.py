@@ -605,6 +605,9 @@ class UserProfileView(APIView):
                     for s in social
                 ],
                 "support_bot_enabled": profile.support_bot_enabled if profile else True,
+                "interview_processing_consent": (
+                    profile.interview_processing_consent if profile else True
+                ),
             })
         except Exception as exc:
             import logging
@@ -667,6 +670,10 @@ class UserProfileView(APIView):
                 profile.billing_state = billing_state
             if "support_bot_enabled" in request.data:
                 profile.support_bot_enabled = bool(request.data.get("support_bot_enabled"))
+            if "interview_processing_consent" in request.data:
+                profile.interview_processing_consent = bool(
+                    request.data.get("interview_processing_consent")
+                )
             profile.save()
 
             return Response({
@@ -678,6 +685,7 @@ class UserProfileView(APIView):
                 "country": profile.country,
                 "billing_state": profile.billing_state,
                 "support_bot_enabled": profile.support_bot_enabled,
+                "interview_processing_consent": profile.interview_processing_consent,
             })
         except Exception as exc:
             import logging

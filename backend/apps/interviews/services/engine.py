@@ -558,6 +558,26 @@ def ask_next_question(round_obj: InterviewRound) -> InterviewMessage | None:
         last_practical_config=last_practical_config,
     )
 
+    # Optional self-hosted LLM phrasing (audit Y1f): rules decide *what* to ask;
+    # LLM only rewrites *how* when FIXITLAB_LLM_GENERATE_URL is set.
+    try:
+        from .voice_stack import llm_generate_reply
+
+        polished = llm_generate_reply(
+            system=(
+                "You are a concise technical interviewer. Rewrite the question below "
+                "in natural spoken English. Keep the same technical ask and difficulty. "
+                "One question only, under 60 words. No preamble."
+            ),
+            user=gen.text,
+            max_tokens=120,
+        )
+        if polished and len(polished.strip()) > 15:
+            from dataclasses import replace
+            gen = replace(gen, text=polished.strip())
+    except Exception:  # noqa: BLE001
+        pass
+
     msg = InterviewMessage.objects.create(
         round=round_obj,
         role="interviewer",
@@ -1339,6 +1359,39 @@ def pause_state(round_obj: InterviewRound) -> dict:
     }
 
 
+def paste_state(round_obj: InterviewRound) -> dict:
+    """Paste-into-answer counters (report-only; never blocks the candidate)."""
+    meta = round_obj.metadata if isinstance(round_obj.metadata, dict) else {}
+    state = meta.get("pastes") if isinstance(meta.get("pastes"), dict) else {}
+    return {
+        "count": int(state.get("count") or 0),
+        "events": list(state.get("events") or []),
+    }
+
+
+def record_paste(round_obj: InterviewRound, *, source: str = "answer") -> dict:
+    """Increment paste-into-answer detection for this round.
+
+    Fired by the room on `paste` into the answer field / practical editor.
+    Reported on the confidence_analysis.proctoring block; never ends the round.
+    """
+    if round_obj.status != "in_progress":
+        return paste_state(round_obj)
+    state = paste_state(round_obj)
+    state["count"] += 1
+    # Bounded event log — same rationale as pause events.
+    label = (source or "answer").strip()[:40] or "answer"
+    state["events"] = (state["events"] + [{
+        "at": timezone.now().isoformat(),
+        "source": label,
+    }])[-20:]
+    meta = round_obj.metadata if isinstance(round_obj.metadata, dict) else {}
+    meta["pastes"] = state
+    round_obj.metadata = meta
+    round_obj.save(update_fields=["metadata"])
+    return state
+
+
 def pause_round(round_obj: InterviewRound) -> bool:
     """Freeze the countdown while the candidate is away (tab hidden / left room)."""
     if round_obj.status != "in_progress" or round_obj.paused_at:
@@ -1521,16 +1574,18 @@ def end_round(round_obj: InterviewRound, reason: str = "completed") -> dict:
         if narrative:
             confidence["round_narrative"] = narrative
 
-        # Proctoring signal: report tab-switches rather than blocking on them.
-        # Only attached when the candidate actually left, so a clean round has
-        # no such key and reviewers don't learn to ignore an always-zero field.
+        # Proctoring signals: report tab-switches and paste-into-answer counts
+        # rather than blocking. Only attached when something actually happened,
+        # so a clean round has no always-zero field reviewers learn to ignore.
         pauses = pause_state(round_obj)
-        if pauses["count"]:
+        pastes = paste_state(round_obj)
+        if pauses["count"] or pastes["count"]:
             confidence["proctoring"] = {
                 "tab_switches": pauses["count"],
                 "away_seconds": pauses["total_seconds"],
                 "credited_seconds": pauses["credited_seconds"],
                 "uncredited_seconds": pauses["uncredited_seconds"],
+                "paste_events": pastes["count"],
             }
 
         report = InterviewReport.objects.create(

@@ -7,11 +7,8 @@ from apps.interviews.services.interview_ai import (
     _count_keyword_hits,
     _detect_topic,
     _generate_feedback,
-    _normalize_answer_for_scoring,
     _refine_quality,
     _score_star_coverage,
-    _TECHNICAL_DEPTH,
-    _CONCRETE_EVIDENCE,
 )
 
 
@@ -21,13 +18,26 @@ def compute_semantic_scores(
     question_text: str,
     round_type: str,
     expected_keywords: list[str] | None = None,
+    reference_text: str = "",
+    technology_id: int | None = None,
 ) -> dict:
     """Score from content relevance, not length + buzzwords alone."""
-    from apps.interviews.services.conversation.analysis import analyze_answer
+    from apps.interviews.services.conversation.analysis import (
+        analyze_answer,
+        score_concrete_evidence,
+        score_technical_depth,
+    )
+
+    ref = (reference_text or "").strip()
+    if not ref and technology_id:
+        from apps.interviews.services.answer_corpus import best_reference_answer
+
+        ref = best_reference_answer(question_text, technology_id=technology_id)
 
     analysis = analyze_answer(
         answer_text=candidate_answer,
         question_text=question_text,
+        reference_text=ref,
     )
     quality = _assess_quality(candidate_answer, question_text)
     star = _score_star_coverage(candidate_answer)
@@ -39,12 +49,13 @@ def compute_semantic_scores(
     # separately rather than folding it into the grading signal.
     topic = _detect_topic(candidate_answer)
     question_topic = _detect_topic(question_text)
-    scored_text = _normalize_answer_for_scoring(candidate_answer)
-    low = scored_text
     word_count = analysis.word_count
 
-    depth_score = min(100, sum(1 for k in _TECHNICAL_DEPTH if k in low) * 12)
-    concrete_score = min(100, sum(1 for k in _CONCRETE_EVIDENCE if k in low) * 15)
+    # I1: depth/concrete used to be substring hits on generic English
+    # ("because", "second", "request"). Stuffing topped the scale; real
+    # explanations that avoided those words scored near zero.
+    depth_score = score_technical_depth(candidate_answer)
+    concrete_score = score_concrete_evidence(candidate_answer)
     star_score = round(sum(star.values()) / 4 * 100)
 
     # Cap length reward — long irrelevant answers must not win.

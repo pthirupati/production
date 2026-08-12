@@ -298,10 +298,22 @@ def seed_v2() -> dict[str, Any]:
             {
                 "name": "bert-text-classifier", "latest_version": 8, "stage": "Production",
                 "run_id": "run_abc123", "updated": _now(),
+                "versions": [
+                    {"version": 8, "run_id": "run_abc123", "stage": "Production", "created": "2024-06-20T10:00:00Z"},
+                ],
+                "stage_history": [
+                    {"from": "Staging", "to": "Production", "at": "2024-06-20T10:00:00Z", "run_id": "run_abc123"},
+                ],
+                "previous_production_run_id": None,
             },
             {
                 "name": "xgboost-churn", "latest_version": 15, "stage": "Staging",
                 "run_id": "run_bcd456", "updated": _now(),
+                "versions": [
+                    {"version": 15, "run_id": "run_bcd456", "stage": "Staging", "created": "2024-06-18T10:00:00Z"},
+                ],
+                "stage_history": [],
+                "previous_production_run_id": None,
             },
         ],
         "knowledge_bases": [
@@ -338,6 +350,57 @@ def ensure_v2(state: dict) -> None:
     for key, value in seed_v2().items():
         if key not in state or state.get(key) is None:
             state[key] = value if not isinstance(value, dict) else dict(value)
+    # Backfill registry lineage fields on older session snapshots.
+    for m in state.get("model_registry") or []:
+        m.setdefault("versions", [])
+        m.setdefault("stage_history", [])
+        m.setdefault("previous_production_run_id", None)
+
+
+def _metrics_from_params(params: dict | None) -> dict[str, float]:
+    """Deterministic training metrics from hyperparameters (no random.uniform).
+
+    Teaches that lr / epochs / batch size actually move acc/loss — peak near
+    lr≈2e-5, epochs≈5, bs≈32.
+    """
+    params = params or {}
+    try:
+        lr = float(params.get("lr") if params.get("lr") is not None else 2e-5)
+    except (TypeError, ValueError):
+        lr = 2e-5
+    try:
+        epochs = int(params.get("epochs") if params.get("epochs") is not None else 3)
+    except (TypeError, ValueError):
+        epochs = 3
+    try:
+        bs = int(params.get("bs") or params.get("batch_size") or 32)
+    except (TypeError, ValueError):
+        bs = 32
+
+    # Gaussian-ish peak at 2e-5; far-off lrs hurt.
+    lr_score = math.exp(-((math.log10(max(lr, 1e-8)) - math.log10(2e-5)) ** 2) / 0.35)
+    epoch_score = min(epochs, 8) / 8.0
+    bs_pen = abs(math.log2(max(bs, 1) / 32.0)) * 0.03
+    acc = 0.72 + 0.20 * lr_score + 0.08 * epoch_score - bs_pen
+    acc = max(0.50, min(0.99, acc))
+    loss = max(0.05, min(1.0, 1.15 - acc))
+    f1 = max(0.45, min(0.99, acc - 0.004))
+    return {"acc": round(acc, 3), "f1": round(f1, 3), "loss": round(loss, 3)}
+
+
+def _duration_from_params(params: dict | None) -> int:
+    blob = repr(sorted((params or {}).items())).encode()
+    digest = hashlib.blake2b(blob, digest_size=4).digest()
+    return 600 + (int.from_bytes(digest, "big") % 4400)
+
+
+_STAGE_EDGES = {
+    "None": {"Staging", "Archived"},
+    "Staging": {"Production", "Archived", "None"},
+    "Production": {"Staging", "Archived"},  # Staging = rollback
+    "Archived": set(),
+}
+_PROD_ACC_FLOOR = 0.90
 
 
 def _retrieval_params(payload: dict) -> dict[str, Any]:
@@ -372,14 +435,21 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
 
     if action == "log_run":
         exp_id = payload.get("experiment_id") or ((state.get("experiments") or [{}])[0].get("id"))
+        params = payload.get("params") or {"lr": "2e-5", "epochs": 3}
+        metrics = payload.get("metrics")
+        if not isinstance(metrics, dict):
+            metrics = _metrics_from_params(params)
+        duration = payload.get("duration_s")
+        if duration is None:
+            duration = _duration_from_params(params)
         row = {
             "id": f"run_{_hex(6)}",
             "experiment_id": exp_id,
             "name": payload.get("name") or f"run_{_hex(4)}",
             "status": payload.get("status") or "FINISHED",
-            "duration_s": int(payload.get("duration_s") or random.randint(600, 5000)),
-            "metrics": payload.get("metrics") or {"acc": round(random.uniform(0.85, 0.96), 3), "loss": round(random.uniform(0.1, 0.3), 3)},
-            "params": payload.get("params") or {"lr": "2e-5", "epochs": 3},
+            "duration_s": int(duration),
+            "metrics": metrics,
+            "params": params,
             "user": payload.get("user") or "labuser",
             "created": _now(),
         }
@@ -391,17 +461,34 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
 
     if action == "register_model":
         name = (payload.get("name") or f"model-{_hex(4)}").strip()
+        run_id = payload.get("run_id") or ""
         existing = next((m for m in state.get("model_registry") or [] if m.get("name") == name), None)
         if existing:
+            if (
+                (existing.get("stage") or "") == "Production"
+                and run_id
+                and run_id != existing.get("run_id")
+            ):
+                existing["previous_production_run_id"] = existing.get("run_id")
             existing["latest_version"] = int(existing.get("latest_version") or 1) + 1
-            existing["run_id"] = payload.get("run_id") or existing.get("run_id")
+            existing["run_id"] = run_id or existing.get("run_id")
             existing["updated"] = _now()
+            existing.setdefault("versions", []).append({
+                "version": existing["latest_version"],
+                "run_id": existing.get("run_id"),
+                "stage": existing.get("stage") or "None",
+                "created": _now(),
+            })
             return {"ok": True, "message": f"Registered {name} v{existing['latest_version']}", "model": existing}
+        stage = payload.get("stage") or "None"
         row = {
             "name": name, "latest_version": 1,
-            "stage": payload.get("stage") or "None",
-            "run_id": payload.get("run_id") or "",
+            "stage": stage,
+            "run_id": run_id,
             "updated": _now(),
+            "versions": [{"version": 1, "run_id": run_id, "stage": stage, "created": _now()}],
+            "stage_history": [],
+            "previous_production_run_id": None,
         }
         state.setdefault("model_registry", []).append(row)
         return {"ok": True, "message": f"Registered model {name}", "model": row}
@@ -414,9 +501,47 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         stage = payload.get("stage") or "Staging"
         if stage not in ("None", "Staging", "Production", "Archived"):
             return {"ok": False, "error": "Invalid stage"}
+        current = model.get("stage") or "None"
+        allowed = _STAGE_EDGES.get(current, set())
+        if stage != current and stage not in allowed:
+            return {
+                "ok": False,
+                "error": f"Invalid stage transition {current} → {stage}",
+            }
+        if stage == "Production":
+            run_id = model.get("run_id") or ""
+            run = next((r for r in state.get("ml_runs") or [] if r.get("id") == run_id), None)
+            if not run:
+                return {"ok": False, "error": "Production gate: linked run not found"}
+            acc = float((run.get("metrics") or {}).get("acc") or 0)
+            if acc < _PROD_ACC_FLOOR:
+                return {
+                    "ok": False,
+                    "error": (
+                        f"Production gate: acc {acc:.3f} < {_PROD_ACC_FLOOR} "
+                        "(promote a higher-quality run)"
+                    ),
+                }
+        if current == "Production" and stage == "Staging":
+            # Rollback: restore prior production pointer when available
+            prev = model.get("previous_production_run_id")
+            if prev:
+                model["run_id"] = prev
+        model.setdefault("stage_history", []).append({
+            "from": current, "to": stage, "at": _now(), "run_id": model.get("run_id"),
+        })
         model["stage"] = stage
         model["updated"] = _now()
         return {"ok": True, "message": f"{name} → {stage}", "model": model}
+
+    if action == "rollback_model_stage":
+        name = payload.get("name") or ""
+        model = next((m for m in state.get("model_registry") or [] if m.get("name") == name), None)
+        if not model:
+            return {"ok": False, "error": "Model not found"}
+        if (model.get("stage") or "") != "Production":
+            return {"ok": False, "error": "Rollback only from Production"}
+        return apply_v2_action(state, "transition_model_stage", {"name": name, "stage": "Staging"})
 
     if action == "create_knowledge_base":
         name = (payload.get("name") or f"kb-{_hex(4)}").strip()

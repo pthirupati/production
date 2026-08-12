@@ -13,11 +13,9 @@ description: 'CONTEXT: A team operating security hardening has raised a ticket f
   must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
   underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline hardening lab. The architecture is a single lab-primary
   node exposing SSH, firewall, TLS, audit logs, and IAM settings; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: Docker host with a running container named `webapp` launched with --privileged
 
@@ -25,28 +23,23 @@ description: 'CONTEXT: A team operating security hardening has raised a ticket f
 
   with default configuration. Audit logs show unexpected host filesystem access.
 
-
   OBJECTIVE: Identify the privileged container and its dangerous mounts using docker inspect; Stop the
   offending container and document the security misconfigurations found; Redeploy the container without
   --privileged, with --cap-drop=ALL --cap-add=NET_BIND_SERVICE, and --read-only. Acceptance criteria:
   the change is minimal and reversible, and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant SSH, firewall, TLS, audit logs, and IAM settings), changing one thing at a time.
   Check your work continuously against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -104,7 +97,6 @@ hints:
 
     3. Confirm `bash check.sh` shows the container Up.
 
-
     WHY: the checker validates the container is actually running.'
 summary: Complete the docker escape attempt - detect and harden container security lab and verify success
   with the checker
@@ -116,7 +108,7 @@ tags:
 - fix
 - hands-on
 - security
-linked_tutorial: security-fundamentals
+linked_tutorial: cybersecurity-zero-hero
 what_you_will_learn:
 - Identify the privileged container and its dangerous mounts using docker inspect
 - Stop the offending container and document the security misconfigurations found

@@ -16,14 +16,11 @@ description: 'CONTEXT: DCOps / Bare Metal ticket (PSINFRA board) — a thermal a
   transient state. Facilities flagged the rack sensor; DCOps must clear the alert before the
   fleet bring-up can continue.
 
-
   ENVIRONMENT: Bare Metal (MAAS) console + Lab Terminal + Datacenter twin for rack/thermal/BMC
   context. Treat gpu-node-02 as the production canary for this incident.
 
-
   SYMPTOM / STARTING STATE: Thermal alert active on gpu-node-02; MAAS commissioning stuck; the
   node will not progress to Ready until the alert clears and commissioning is retried.
-
 
   OBJECTIVE: Clear the thermal alert in Bare Metal / Datacenter twin; reset the stuck
   commissioning state so gpu-node-02 re-enters the queue cleanly; Deploy the node successfully;

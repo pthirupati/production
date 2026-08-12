@@ -4,7 +4,7 @@ import { orgApi } from '../api/org'
 import { subscriptionApi } from '../api/subscriptions'
 import api from '../api/client'
 import {
-  Users, Building2, Mail, Shield, AlertCircle, BarChart3, CreditCard,
+  Building2, Mail, Shield, AlertCircle, BarChart3, CreditCard,
   Clock, Trash2, UserMinus, ChevronRight, X, BookOpen, FlaskConical, Webhook, Paintbrush,
   Plus, Sparkles
 } from 'lucide-react'

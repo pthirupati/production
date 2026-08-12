@@ -24,18 +24,23 @@ Design notes:
   network by port" primitive even if an attacker finds a public host that proxies
   inward.
 
-Residual risk we accept and document: TOCTOU between this check and the actual
-request (DNS rebinding). Fully closing it means pinning the resolved IP and
-connecting to it directly with SNI/Host preserved, which is a bigger change to
-the request layer. Combined with https-only and 443-only, and with the request
-moved off the synchronous path, the remaining window is narrow. If you later need
-to close it completely, pin the address here and pass it through to the adapter.
+* **Pin the resolved address.** Validating and then letting ``requests`` resolve
+  the name a second time is a TOCTOU: an attacker-controlled DNS zone can answer
+  public on the first lookup and ``127.0.0.1`` on the second (DNS rebinding).
+  ``pinned_session`` opens the socket against the exact address this module
+  vetted, so there is no second lookup to poison. See ``PinnedHTTPAdapter`` for
+  why SNI, the ``Host`` header and certificate verification all stay on the
+  *hostname* — dropping any of them would break CDN- and shared-hosting-fronted
+  webhook endpoints, which is most of them.
 """
 from __future__ import annotations
 
 import ipaddress
 import socket
 from urllib.parse import urlparse
+
+import requests
+from requests.adapters import HTTPAdapter
 
 # Ranges that must never be reachable from a user-supplied URL. `is_global` on a
 # resolved address covers most of this, but we keep the cloud metadata addresses
@@ -98,16 +103,86 @@ def resolve_public_addresses(host: str) -> list[str]:
     return addresses
 
 
+class PinnedHTTPAdapter(HTTPAdapter):
+    """Connect to a pre-validated IP instead of re-resolving the hostname.
+
+    Three things must survive the substitution or we break far more webhooks than
+    we protect:
+
+    * **SNI** — a CDN or shared host serves many certificates off one IP and
+      picks by SNI. Sending the IP (or nothing) gets the wrong certificate or a
+      handshake failure.
+    * **Certificate verification** — must still be checked against the hostname.
+      Verifying against the IP would fail for every name-based certificate, and
+      turning verification off to compensate would trade an SSRF for a MITM.
+    * **The Host header** — name-based virtual hosts route on it. urllib3 derives
+      it from the pool host, which is now an address, so we set it explicitly.
+
+    Redirects are the caller's responsibility (``allow_redirects=False`` in
+    webhooks.py): a redirect to a new hostname would not be covered by this pin.
+    """
+
+    def __init__(self, addresses: list[str], **kwargs):
+        if not addresses:
+            raise UnsafeURLError("Refusing to send with no validated address.")
+        self._pinned_address = addresses[0]
+        super().__init__(**kwargs)
+
+    def build_connection_pool_key_attributes(self, request, verify, cert=None):
+        host_params, pool_kwargs = super().build_connection_pool_key_attributes(
+            request, verify, cert
+        )
+        hostname = host_params["host"]
+        host_params = {**host_params, "host": self._pinned_address}
+        # server_hostname drives SNI; assert_hostname keeps certificate
+        # verification on the name rather than the address we dialled.
+        pool_kwargs = {
+            **pool_kwargs,
+            "server_hostname": hostname,
+            "assert_hostname": hostname,
+        }
+        return host_params, pool_kwargs
+
+    def send(self, request, **kwargs):
+        parsed = urlparse(request.url)
+        host_header = parsed.hostname or ""
+        if parsed.port and parsed.port != 443:
+            host_header = f"{host_header}:{parsed.port}"
+        request.headers["Host"] = host_header
+        return super().send(request, **kwargs)
+
+
+def pinned_session(addresses: list[str]) -> requests.Session:
+    """A Session that only ever dials ``addresses[0]`` for https requests."""
+    session = requests.Session()
+    session.mount("https://", PinnedHTTPAdapter(addresses))
+    # http:// is unreachable by construction (ALLOWED_SCHEMES is https-only), but
+    # leaving the default adapter mounted would silently un-pin anything that
+    # slipped through a future change to that set.
+    session.adapters.pop("http://", None)
+    return session
+
+
 def validate_outbound_url(value: str) -> str:
     """Return a normalised URL that is safe to request, or raise UnsafeURLError.
 
     Empty input is allowed and returned as ``""`` — clearing a webhook is valid.
     """
+    return validate_and_resolve(value)[0]
+
+
+def validate_and_resolve(value: str) -> tuple[str, list[str]]:
+    """Validate ``value`` and return ``(url, vetted_addresses)``.
+
+    The addresses are returned so the caller can pin them for the actual request
+    instead of letting the resolver run a second time. ``([], "")`` for empty
+    input, which means "no webhook configured", not "unsafe".
+    """
     if value is None:
-        return ""
+        return "", []
     url = str(value).strip()
     if not url:
-        return ""
+        return "", []
 
     if len(url) > 500:
         raise UnsafeURLError("URL is too long.")
@@ -130,6 +205,6 @@ def validate_outbound_url(value: str) -> str:
         raise UnsafeURLError("Webhook URLs must use port 443.")
 
     # Raises if the host resolves anywhere non-public.
-    resolve_public_addresses(parsed.hostname)
+    addresses = resolve_public_addresses(parsed.hostname)
 
-    return url
+    return url, addresses

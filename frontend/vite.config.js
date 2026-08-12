@@ -55,8 +55,12 @@ export default defineConfig({
     outDir: "dist",
     rollupOptions: {
       output: {
-        // Isolate AWS console + shared lab chrome so lazy AwsLabOverlay never
-        // side-imports the LabRunner page module (circular init → lab crash).
+        // Isolate AWS console so lazy AwsLabOverlay never side-imports the
+        // LabRunner page module (circular init → lab crash). Lab chrome
+        // (`components/lab/**`) is intentionally NOT forced into a manual
+        // chunk: Rollup absorbs shared deps of manual chunks into them, which
+        // made entry import `lab-shared` for helpers like reportClientError /
+        // SimErrorBoundary (session 43). Let lab modules follow LabRunner.
         manualChunks(id) {
           if (id.includes("node_modules")) {
             if (
@@ -66,44 +70,31 @@ export default defineConfig({
             ) {
               return "vendor";
             }
-            // Keep lucide in its own chunk. Measured 2026-08-09: dropping this
-            // rule does NOT shrink the eager path (656.1kB → 656.5kB gzip) —
-            // the icons just migrate into `lab-shared`, which is preloaded too,
-            // taking it from 27kB to 904kB. The 877kB is eager because
-            // `aws-console`/`lab-shared` are still statically reachable from the
-            // entry, not because of this rule. Fix that reachability first;
-            // splitting here only moves bytes between eager chunks.
+            // Keep lucide in its own chunk so tree-shaken icons from lazy routes
+            // are not duplicated into every sim chunk. Eager layouts still
+            // preload this (~155kB gzip9) until their lucide imports shrink —
+            // residual W3 icons half.
             if (id.includes("lucide-react")) return "icons";
             if (id.includes("zustand") || id.includes("axios")) return "state";
             return undefined;
           }
-          // MUST come before the aws-console rule. These three are reachable
-          // from the entry (main → App → authStore / api/scenarios /
-          // userScopedStorage) AND imported by components/aws/**. Without an
-          // explicit home Rollup folds them into whichever chunk claims them
-          // first — `aws-console` — so the entry ended up importing
-          // aws-console, and Vite preloaded all 1.19MB of it on first paint.
-          // No static import of components/aws/ exists anymore (awsSimLifecycle
-          // made it dynamic); the preload was purely this grouping artifact.
-          // Measured 2026-08-09: eager preload 877kB → 545kB gzip, i.e. the
-          // 332.85kB aws-console chunk leaves the critical path entirely.
+          // MUST come before the aws-console rule. Modules reachable from the
+          // entry AND imported by components/aws/** need an explicit home, or
+          // Rollup folds them into aws-console and Vite preloads ~1.2MB on first
+          // paint. Measured 2026-08-09: eager preload 877kB → 545kB gzip.
           if (
             id.includes("/src/store/authStore")
             || id.includes("/src/api/scenarios")
             || id.includes("/src/utils/userScopedStorage")
+            || id.includes("/src/utils/lazyWithRetry")
+            || id.includes("/src/store/labStore")
+            || id.includes("/src/utils/reportClientError")
+            || id.includes("/src/components/SimErrorBoundary")
           ) {
             return "app-shared";
           }
           if (id.includes("/src/components/aws/")) return "aws-console";
           if (id.includes("/src/api/labs")) return "labs-api";
-          if (
-            id.includes("/src/components/lab/")
-            || id.includes("/src/utils/simLayout")
-            || id.includes("/src/store/labStore")
-            || id.includes("/src/utils/lazyWithRetry")
-          ) {
-            return "lab-shared";
-          }
           return undefined;
         },
       },

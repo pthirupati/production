@@ -20,6 +20,7 @@ Keys rewritten:
     DOCKER_SOCKET        = ssh://root@<LABS_PRIVATE_IP>
     DOCKER_HOST          = ssh://root@<LABS_PRIVATE_IP>
     VAULT_ADDR           = http://<EDGE_PRIVATE_IP>:8200
+    EDGE_BIND_IP         = <EDGE_PRIVATE_IP>      (Vault/Redis/Rabbit publish bind)
     APP_PRIVATE_IP       = <APP_PRIVATE_IP>       (consumed by the edge gateway)
     DJANGO_ALLOWED_HOSTS += APP_PRIVATE_IP, EDGE_PUBLIC_IP
 
@@ -144,6 +145,10 @@ def main() -> int:
     if redis_pass:
         set_val(lines, "CELERY_RESULT_BACKEND", f"redis://:{redis_pass}@{edge}:6379/2")
     set_val(lines, "VAULT_ADDR", f"http://{edge}:8200")
+    # Bind Vault/Redis/Rabbit published ports to the VPC interface (edge.yml
+    # EDGE_BIND_IP). Without this, compose defaults to 0.0.0.0 and the cloud
+    # firewall is the only control in front of plaintext Vault (audit O5).
+    set_val(lines, "EDGE_BIND_IP", edge)
 
     # ── Labs droplet (D4): remote docker engine ──
     set_val(lines, "DOCKER_SOCKET", f"ssh://root@{labs}")
@@ -162,7 +167,7 @@ def main() -> int:
     summary_keys = [
         "POSTGRES_HOST", "PGBOUNCER_HOST", "PGBOUNCER_PORT", "REDIS_HOST",
         "CELERY_BROKER_URL", "CELERY_RESULT_BACKEND", "DOCKER_SOCKET",
-        "VAULT_ADDR", "APP_PRIVATE_IP", "DJANGO_ALLOWED_HOSTS",
+        "VAULT_ADDR", "EDGE_BIND_IP", "APP_PRIVATE_IP", "DJANGO_ALLOWED_HOSTS",
     ]
 
     def redact(key: str, val: str) -> str:

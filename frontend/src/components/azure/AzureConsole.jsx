@@ -10,8 +10,7 @@ import {
 import { simPanelRoot } from '../../utils/simLayout'
 import {
   SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession,
-  GlobalSearch, indexAzureState,
-} from '../sim/shared'
+  GlobalSearch, indexAzureState, SimLoginGateCard } from '../sim/shared'
 import CloudShellPanel from '../lab/CloudShellPanel'
 import { renderAzureV2Page } from './AzureV2Panels'
 import '../../styles/sim-products.css'
@@ -210,7 +209,7 @@ export default function AzureConsole({
       <div className={simPanelRoot(embedded, 'bg-[#0a1929]')}>
         <LabChromeBar title="Microsoft Azure" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <SimLoginGateCard title="Sign in to Azure" onClose={onExit} className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold flex items-center gap-2" style={{ background: ACCENT }}>
               <Cloud size={18} /> Sign in to Azure
             </div>
@@ -240,7 +239,7 @@ export default function AzureConsole({
                 Use lab credentials (autofill)
               </button>
             </form>
-          </div>
+          </SimLoginGateCard>
         </div>
       </div>
     )

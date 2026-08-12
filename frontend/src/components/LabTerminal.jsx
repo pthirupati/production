@@ -709,24 +709,24 @@ function LabTerminal({
             </button>
           )
         })}
-        <button type="button" className="shrink-0 p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title="New terminal tab" onClick={addTab}>
+        <button type="button" className="shrink-0 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded text-surface-400 hover:text-white hover:bg-surface-800" title="New terminal tab" aria-label="New terminal tab" onClick={addTab}>
           <Plus size={14} />
         </button>
         <span className="flex-1" />
-        <span className="hidden md:inline text-[10px] text-surface-500 font-mono">{statusText}</span>
-        <button type="button" className={`p-1 rounded ${split ? 'text-accent-cyan bg-accent-cyan/10' : 'text-surface-400 hover:text-white hover:bg-surface-800'}`} title="Split terminal" onClick={() => setSplit((s) => !s)}>
+        <span className="hidden md:inline text-[10px] text-surface-500 font-mono" aria-live="polite">{statusText}</span>
+        <button type="button" className={`min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded ${split ? 'text-accent-cyan bg-accent-cyan/10' : 'text-surface-400 hover:text-white hover:bg-surface-800'}`} title="Split terminal" aria-label="Split terminal" aria-pressed={split} onClick={() => setSplit((s) => !s)}>
           <Columns2 size={14} />
         </button>
-        <button type="button" className="p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Decrease font size" onClick={() => setFontSize((s) => Math.max(9, s - 1))}>
+        <button type="button" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Decrease font size" aria-label="Decrease font size" onClick={() => setFontSize((s) => Math.max(9, s - 1))}>
           <Minus size={14} />
         </button>
-        <button type="button" className="p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Increase font size" onClick={() => setFontSize((s) => Math.min(20, s + 1))}>
+        <button type="button" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Increase font size" aria-label="Increase font size" onClick={() => setFontSize((s) => Math.min(20, s + 1))}>
           <Plus size={14} />
         </button>
-        <button type="button" className="p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Download session log" onClick={downloadLog}>
+        <button type="button" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Download session log" aria-label="Download session log" onClick={downloadLog}>
           <Download size={14} />
         </button>
-        <button type="button" className="p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title={fullscreen ? 'Exit full screen' : 'Full screen'} onClick={() => setFullscreen((f) => !f)}>
+        <button type="button" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded text-surface-400 hover:text-white hover:bg-surface-800" title={fullscreen ? 'Exit full screen' : 'Full screen'} aria-label={fullscreen ? 'Exit full screen' : 'Full screen'} onClick={() => setFullscreen((f) => !f)}>
           {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
       </div>

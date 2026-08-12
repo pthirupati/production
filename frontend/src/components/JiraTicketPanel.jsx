@@ -124,7 +124,7 @@ export default function JiraTicketPanel({
             className="input-field flex-1 text-xs py-1.5"
             disabled={commenting}
           />
-          <button type="submit" disabled={commenting || !commentText.trim()} className="btn-secondary px-2 py-1.5 disabled:opacity-50">
+          <button type="submit" disabled={commenting || !commentText.trim()} className="btn-secondary px-2 py-1.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center disabled:opacity-50" aria-label="Send comment">
             <Send size={14} />
           </button>
         </form>

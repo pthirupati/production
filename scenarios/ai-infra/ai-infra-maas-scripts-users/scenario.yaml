@@ -15,14 +15,11 @@ description: 'CONTEXT: Bare Metal / AI Infra — the team needs a custom hardwar
   script to run automatically on every commission, and a dedicated operator account with an SSH key so
   on-call engineers stop sharing the admin login.
 
-
   ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin.
-
 
   SYMPTOM: No custom commissioning scripts are registered under Scripts, so hardware inventory beyond the
   MAAS defaults is never collected; no operator user exists, so day-2 SSH access relies on the shared admin
   account.
-
 
   OBJECTIVE: Under Scripts, upload and attach the commissioning script so it runs in the commissioning
   script set; under Users, create an operator account with an SSH key; commission a node and confirm the

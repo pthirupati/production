@@ -87,7 +87,7 @@ def _now_iso() -> str:
 # Node types + palette (what the UI may add)
 # ---------------------------------------------------------------------------
 
-NODE_TYPES = ("trigger", "llm", "tool", "mcp_tool", "transform", "condition", "output")
+NODE_TYPES = ("trigger", "llm", "tool", "mcp_tool", "agent", "transform", "condition", "output")
 
 # Palette metadata surfaced to the frontend so it can render an "add node" menu
 # with typed icons + a starter config for each type.
@@ -121,6 +121,17 @@ NODE_PALETTE = [
         "default_config": {"server": "metrics", "tool": "get_cpu", "args": {}},
     },
     {
+        "type": "agent",
+        "label": "Agent (ReAct)",
+        "icon": "bot",
+        "description": "Reason→act→observe loop with scratchpad and iteration cap (deterministic tools).",
+        "default_config": {
+            "max_iters": 5,
+            "goal_field": "text",
+            "tools": ["http_get", "db_query", "send_notification"],
+        },
+    },
+    {
         "type": "transform",
         "label": "Transform",
         "icon": "shuffle",
@@ -151,9 +162,8 @@ NODE_PALETTE = [
 # NO randomness and NO I/O. That is what makes the lab reproducible + gradeable.
 # ---------------------------------------------------------------------------
 
-# Ordered keyword rules for ticket/intent classification. First matching
-# category wins, so order encodes priority (billing/security before the
-# generic "question"). Lowercased substring match against the input text.
+# Ordered keyword rules for ticket/intent classification. All categories are
+# scored; argmax wins (order is the tie-break). Lowercased substring match.
 _CLASSIFY_RULES = [
     ("billing", ["refund", "invoice", "charge", "charged", "payment", "billing",
                  "subscription", "credit card", "overcharged", "receipt"]),
@@ -178,21 +188,30 @@ _POSITIVE_CUES = ["thanks", "thank you", "great", "love", "awesome", "appreciate
 def llm_classify(text: str) -> dict:
     """Deterministic intent + sentiment classifier.
 
-    Returns {category, confidence, sentiment, priority}. Category is the first
-    rule whose keyword set matches; confidence is a deterministic function of how
-    many keywords hit; sentiment/priority come from cue words. Fully reproducible.
+    Scores **every** category (not first-match-wins) so overlapping cues like
+    "refund after breach" resolve to security when security keywords dominate.
+    Confidence uses hit count + margin over the runner-up.
     """
     low = (text or "").lower()
-    category = "general"
-    hits = 0
+    scores: dict[str, int] = {}
     for cat, keywords in _CLASSIFY_RULES:
-        matched = sum(1 for kw in keywords if kw in low)
-        if matched:
-            category = cat
-            hits = matched
-            break
-    # Deterministic confidence: base 0.55, +0.15 per matched keyword, capped.
-    confidence = round(min(0.99, 0.55 + 0.15 * hits), 2) if hits else 0.4
+        # Multi-word phrases count as 2 so "password reset" beats a lone "error".
+        matched = 0
+        for kw in keywords:
+            if kw in low:
+                matched += 2 if " " in kw else 1
+        scores[cat] = matched
+
+    ordered = list(scores.items())
+    ordered.sort(key=lambda kv: (-kv[1], [c for c, _ in _CLASSIFY_RULES].index(kv[0])))
+    best_cat, hits = ordered[0] if ordered else ("general", 0)
+    category = best_cat if hits else "general"
+    second = ordered[1][1] if len(ordered) > 1 else 0
+    if hits:
+        margin = max(0, hits - second)
+        confidence = round(min(0.99, 0.5 + 0.08 * hits + 0.12 * margin), 2)
+    else:
+        confidence = 0.4
 
     neg = sum(1 for c in _NEGATIVE_CUES if c in low)
     pos = sum(1 for c in _POSITIVE_CUES if c in low)
@@ -218,6 +237,7 @@ def llm_classify(text: str) -> dict:
         "confidence": confidence,
         "sentiment": sentiment,
         "priority": priority,
+        "scores": scores,
     }
 
 
@@ -523,6 +543,96 @@ def _run_tool_node(config: dict, payload: dict, run: dict,
             out["notified"] = False
         return out
     return {"tool_kind": kind, "tool_result": {"ok": False, "error": f"unknown tool kind {kind!r}"}}
+
+
+def _run_agent_node(config: dict, payload: dict, run: dict, node_id: str = "agent") -> dict:
+    """Minimal ReAct loop: Thought → Act → Observe, with iteration cap.
+
+    Deterministic planner uses llm_classify + keyword cues to pick the next tool
+    or FINISH. Does not rewrite the DAG — this is one node type inside the graph.
+    """
+    max_iters = int((config or {}).get("max_iters") or 5)
+    max_iters = max(1, min(8, max_iters))
+    goal_field = (config or {}).get("goal_field") or "text"
+    goal = str(payload.get(goal_field) or payload.get("goal") or "")
+    allowed = list((config or {}).get("tools") or ["http_get", "db_query", "send_notification"])
+    scratchpad: list[dict] = []
+    capped = False
+    final_answer = ""
+
+    for i in range(max_iters):
+        classification = llm_classify(goal + " " + " ".join(
+            str(s.get("observation", ""))[:80] for s in scratchpad[-2:]
+        ))
+        low = goal.lower()
+        # Plan next action from cues + remaining budget.
+        if i == max_iters - 1:
+            action = "FINISH"
+            thought = "Iteration budget nearly spent — synthesize and finish."
+        elif "http_get" in allowed and any(k in low for k in ("http", "url", "status page", "endpoint")) and not any(
+            s.get("action") == "http_get" for s in scratchpad
+        ):
+            action = "http_get"
+            thought = f"Need live status; classify={classification.get('category')}."
+        elif "db_query" in allowed and any(k in low for k in ("order", "customer", "lookup", "database", "refund")) and not any(
+            s.get("action") == "db_query" for s in scratchpad
+        ):
+            action = "db_query"
+            thought = "Need structured record lookup before answering."
+        elif "send_notification" in allowed and classification.get("priority") == "high" and not any(
+            s.get("action") == "send_notification" for s in scratchpad
+        ):
+            action = "send_notification"
+            thought = "High priority — escalate via notification."
+        elif scratchpad:
+            action = "FINISH"
+            thought = "Enough observations collected — finish."
+        elif "http_get" in allowed:
+            action = "http_get"
+            thought = "No cue yet — probe default status endpoint."
+        else:
+            action = "FINISH"
+            thought = "No applicable tools — finish with classification only."
+
+        observation: dict | str = ""
+        if action == "FINISH":
+            final_answer = {
+                "category": classification.get("category"),
+                "priority": classification.get("priority"),
+                "steps": len(scratchpad) + 1,
+                "summary": llm_summarize(goal).get("summary") or goal[:160],
+            }
+            scratchpad.append({
+                "iter": i + 1, "thought": thought, "action": "FINISH",
+                "observation": final_answer,
+            })
+            break
+
+        tool_cfg = {"kind": action}
+        if action == "http_get":
+            tool_cfg["url"] = (config or {}).get("url") or "https://status.example/health"
+        elif action == "db_query":
+            tool_cfg["query_id"] = (config or {}).get("query_id") or "order_by_email"
+        elif action == "send_notification":
+            tool_cfg["channel"] = (config or {}).get("channel") or "oncall"
+            tool_cfg["message"] = (config or {}).get("message") or f"Agent escalate: {classification.get('category')}"
+        tool_out = _run_tool_node(tool_cfg, payload, run, f"{node_id}-t{i}")
+        observation = tool_out.get("tool_result") or tool_out
+        scratchpad.append({
+            "iter": i + 1, "thought": thought, "action": action, "observation": observation,
+        })
+    else:
+        capped = True
+        final_answer = {"capped": True, "category": llm_classify(goal).get("category")}
+
+    return {
+        "agent_mode": "react",
+        "scratchpad": scratchpad,
+        "final_answer": final_answer,
+        "iterations": len(scratchpad),
+        "capped": capped,
+        "agent_category": (final_answer or {}).get("category") if isinstance(final_answer, dict) else None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1076,6 +1186,9 @@ def _run_workflow(graph: dict) -> dict:
             elif ntype == "mcp_tool":
                 produced = _run_mcp_node(config, payload)
                 note = f"mcp {config.get('server')}.{config.get('tool')}"
+            elif ntype == "agent":
+                produced = _run_agent_node(config, payload, run, node_id)
+                note = f"agent react iters={produced.get('iterations')} capped={produced.get('capped')}"
             elif ntype == "transform":
                 produced = _run_transform_node(config, payload)
                 note = f"transform {config.get('op')}"
@@ -1801,6 +1914,9 @@ def _grade(state: dict) -> tuple[bool, str]:
         if not _has_node_config(graph, "tool", "kind", goal["require_tool_kind"]):
             return False, (f"A tool node of kind '{goal['require_tool_kind']}' "
                            "must be present.")
+    if goal.get("require_agent_node"):
+        if not any(n.get("type") == "agent" for n in graph.get("nodes") or []):
+            return False, "An agent (ReAct) node must be present."
     if goal.get("require_transform_op") is not None:
         if not _has_node_config(graph, "transform", "op", goal["require_transform_op"]):
             return False, (f"A transform node with op '{goal['require_transform_op']}' "
@@ -1836,6 +1952,25 @@ def _grade(state: dict) -> tuple[bool, str]:
         if not notifs:
             return False, ("No notification was sent on this run — the "
                            "send_notification tool must fire on the taken branch.")
+
+    if goal.get("require_agent_not_capped"):
+        agent_traces = [t for t in run.get("trace", []) if t.get("type") == "agent"]
+        if not agent_traces:
+            return False, "Agent node did not run."
+        if any((t.get("output") or {}).get("capped") for t in agent_traces):
+            return False, "Agent hit the iteration cap — finish earlier or raise max_iters."
+    if goal.get("require_scratchpad_tool"):
+        want = goal["require_scratchpad_tool"]
+        found = False
+        for t in run.get("trace", []):
+            if t.get("type") != "agent":
+                continue
+            for step in (t.get("output") or {}).get("scratchpad") or []:
+                if step.get("action") == want:
+                    found = True
+                    break
+        if not found:
+            return False, f"Agent scratchpad never called tool {want!r}."
 
     # A channel the run must NOT have notified (e.g. the attacker's exfil
     # channel in the prompt-injection lab).

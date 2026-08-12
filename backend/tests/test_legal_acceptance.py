@@ -37,7 +37,11 @@ class SignupRecordsAcceptanceTests(TestCase):
     def _register(self):
         from apps.accounts.serializers import RegisterSerializer
 
-        s = RegisterSerializer(data={"email": "new@example.com", "password": PASSWORD})
+        s = RegisterSerializer(data={
+            "email": "new@example.com",
+            "password": PASSWORD,
+            "accepted_legal": True,
+        })
         self.assertTrue(s.is_valid(), s.errors)
         return s.save()
 
@@ -60,11 +64,35 @@ class SignupRecordsAcceptanceTests(TestCase):
         from apps.accounts.serializers import RegisterSerializer
 
         s = RegisterSerializer(
-            data={"email": "p@example.com", "password": PASSWORD, "phone_number": "+911234567890"}
+            data={
+                "email": "p@example.com",
+                "password": PASSWORD,
+                "phone_number": "+911234567890",
+                "accepted_legal": True,
+            }
         )
         self.assertTrue(s.is_valid(), s.errors)
         user = s.save()
         self.assertEqual(Profile.objects.get(user=user).phone_number, "+911234567890")
+
+    def test_signup_requires_explicit_legal_acceptance(self):
+        """Stamp without a tick would invent consent the user never gave."""
+        from apps.accounts.serializers import RegisterSerializer
+
+        s = RegisterSerializer(data={
+            "email": "no-tick@example.com",
+            "password": PASSWORD,
+            "accepted_legal": False,
+        })
+        self.assertFalse(s.is_valid())
+        self.assertIn("accepted_legal", s.errors)
+
+    def test_signup_rejects_missing_legal_flag(self):
+        from apps.accounts.serializers import RegisterSerializer
+
+        s = RegisterSerializer(data={"email": "missing@example.com", "password": PASSWORD})
+        self.assertFalse(s.is_valid())
+        self.assertIn("accepted_legal", s.errors)
 
 
 class _AuthedBase(TestCase):

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Award, ArrowRight, Layers, Clock, ShieldCheck } from 'lucide-react'
+import { Award, ArrowRight, Layers, ShieldCheck } from 'lucide-react'
 import PublicLayout from '../../components/layout/PublicLayout'
 import MarketingPageShell from '../../components/MarketingPageShell'
 import { FixitPanel } from '../../components/design'

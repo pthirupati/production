@@ -13,6 +13,31 @@ GRACE_PERIOD_DAYS = 3  # Read-only window after expiry before full lockout
 TEST_CERTIFICATE_ID = "FIXIT-TEST-ADMIN-CERT-2026"
 
 
+def apply_dunning_status(subscription, sub_status: str) -> dict:
+    """Apply Stripe-like subscription status with a past_due dunning grace.
+
+    ``past_due`` keeps ``is_active`` True so plan limits continue while retries
+    run (same GRACE_PERIOD_DAYS spirit as expiry grace). ``unpaid`` /
+    ``cancelled`` deactivate. Returns a small audit dict for tests/logs.
+    """
+    status = (sub_status or "").strip().lower()
+    if status == "past_due":
+        # Do not hard-kill — dunning / retry window.
+        if not subscription.is_active:
+            subscription.is_active = True
+            subscription.save(update_fields=["is_active"])
+        return {"action": "dunning_grace", "is_active": True, "status": status}
+    if status in ("unpaid", "cancelled", "canceled"):
+        subscription.is_active = False
+        subscription.save(update_fields=["is_active"])
+        return {"action": "deactivate", "is_active": False, "status": status}
+    if status == "active":
+        subscription.is_active = True
+        subscription.save(update_fields=["is_active"])
+        return {"action": "activate", "is_active": True, "status": status}
+    return {"action": "noop", "is_active": bool(subscription.is_active), "status": status}
+
+
 def subscription_expires_at(from_dt=None):
     base = from_dt or timezone.now()
     return base + timedelta(days=SUBSCRIPTION_TERM_DAYS)

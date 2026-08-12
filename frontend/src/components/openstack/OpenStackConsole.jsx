@@ -5,7 +5,7 @@ import {
   LogIn, Cloud, Server, Network, HardDrive, Plus, Play, Square, RotateCw, KeyRound, Layers, Workflow,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
-import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession, SimLoginGateCard } from '../sim/shared'
 import { renderOpenStackV2Page } from '../sim/V3PlatformPanels'
 import '../../styles/sim-products.css'
 import './openstack.css'
@@ -109,7 +109,7 @@ export default function OpenStackConsole({
       <div className={simPanelRoot(embedded, 'bg-[#1a1a1a]')}>
         <LabChromeBar title="OpenStack Horizon" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <SimLoginGateCard title="Sign in to Horizon" onClose={onExit} className="bg-white rounded shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold flex items-center gap-2" style={{ background: ACCENT }}>
               <Cloud size={18} /> Sign in to Horizon
             </div>
@@ -135,7 +135,7 @@ export default function OpenStackConsole({
                 Use lab credentials (autofill)
               </button>
             </form>
-          </div>
+          </SimLoginGateCard>
         </div>
       </div>
     )
@@ -187,15 +187,15 @@ export default function OpenStackConsole({
                 key: 'actions', label: 'Actions',
                 render: (r) => (
                   <div className="flex gap-1">
-                    <button type="button" title="Start" className="p-1 rounded hover:bg-slate-100"
+                    <button type="button" title="Start" aria-label="Start instance" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100"
                       onClick={(e) => { e.stopPropagation(); run(() => openstackApi.startInstance(sessionId, r.name), 'Started') }} disabled={busy}>
                       <Play size={14} />
                     </button>
-                    <button type="button" title="Stop" className="p-1 rounded hover:bg-slate-100"
+                    <button type="button" title="Stop" aria-label="Stop instance" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100"
                       onClick={(e) => { e.stopPropagation(); run(() => openstackApi.stopInstance(sessionId, r.name), 'Stopped') }} disabled={busy}>
                       <Square size={14} />
                     </button>
-                    <button type="button" title="Resize to m1.large" className="p-1 rounded hover:bg-slate-100"
+                    <button type="button" title="Resize to m1.large" aria-label="Resize instance to m1.large" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100"
                       onClick={(e) => { e.stopPropagation(); run(() => openstackApi.resizeInstance(sessionId, r.name, 'm1.large'), 'Resized') }} disabled={busy}>
                       <RotateCw size={14} />
                     </button>

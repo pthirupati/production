@@ -315,17 +315,15 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         }
 
     if action == "assume_role":
-        role = (payload.get("role") or payload.get("role_name") or payload.get("name") or "").strip()
-        if not role:
-            return {"ok": False, "error": "Role name required"}
-        session = payload.get("session_name") or "fixitlab-session"
-        state.setdefault("sts", {})["assumed_role"] = {
-            "role": role,
-            "session_name": session,
-            "arn": payload.get("arn") or f"arn:aws:sts::123456789012:assumed-role/{role}/{session}",
-            "assumed_at": _now(),
+        # Deprecated path: aws_engine.apply_action handles trust/ExternalId before
+        # calling here. Kept as a hard fail so direct façade callers cannot bypass.
+        return {
+            "ok": False,
+            "error": (
+                "AccessDenied: sts:AssumeRole must go through aws_engine "
+                "(trust policy + ExternalId checks)."
+            ),
         }
-        return {"ok": True, "message": f"Assumed role {role}", "sts": state["sts"]["assumed_role"]}
 
     if action == "transition_generic_resource":
         service = payload.get("service") or ""

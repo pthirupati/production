@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { X, Sparkles, ChevronRight, Wrench } from 'lucide-react'
+import { X, Sparkles, ChevronRight, Wrench } from '../ui/eagerIcons'
 import { useState } from 'react'
 import { resolveMediaUrl } from '../utils/mediaUrl'
 

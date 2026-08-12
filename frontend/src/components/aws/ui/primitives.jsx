@@ -37,7 +37,7 @@ export function IDCopy({ value, link, mono = true, onClick }) {
       ) : (
         <span className={mono ? 'aws-mono' : ''}>{value}</span>
       )}
-      <button className="aws-copy-btn" onClick={copy} title="Copy">{copied ? <Check size={13} /> : <Copy size={13} />}</button>
+      <button className="aws-copy-btn" onClick={copy} title="Copy" aria-label="Copy">{copied ? <Check size={13} /> : <Copy size={13} />}</button>
     </span>
   )
 }
@@ -52,7 +52,7 @@ export function Flash({ items, onDismiss }) {
           <div key={f.id} className={`aws-flash aws-flash-${f.type}`}>
             <Icon size={18} style={{ marginTop: 1, flexShrink: 0 }} />
             <div style={{ flex: 1 }}>{f.message}</div>
-            <button className="aws-copy-btn" onClick={() => onDismiss(f.id)}><X size={16} /></button>
+            <button type="button" className="aws-copy-btn" onClick={() => onDismiss(f.id)} aria-label="Dismiss notification"><X size={16} /></button>
           </div>
         )
       })}
@@ -95,7 +95,7 @@ export function Modal({ title, children, onClose, footer, width }) {
       <div className="aws-modal" ref={ref} style={width ? { maxWidth: width } : undefined}>
         <div className="aws-modal-header">
           <span>{title}</span>
-          <button className="aws-copy-btn" onClick={onClose}><X size={18} /></button>
+          <button type="button" className="aws-copy-btn" onClick={onClose} aria-label="Close dialog"><X size={18} /></button>
         </div>
         <div className="aws-modal-body">{children}</div>
         {footer && <div className="aws-modal-footer">{footer}</div>}

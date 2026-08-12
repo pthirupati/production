@@ -1,8 +1,4 @@
-# Unpublished: this lab ships a bare `raise NotImplementedError` stub with no
-# starter code, no seeded fault and only a `placeholder` grader, so there is
-# nothing to diagnose and any trivial return earns XP. Set is_active: true
-# once it has real content and a grader that checks it (audit §G1).
-is_active: false
+is_active: true
 title: Fix broken update trigger
 slug: sqlite-trigger-update
 technology: sqlite
@@ -11,35 +7,28 @@ description: 'CONTEXT: A team operating SQLite has raised a ticket for `Fix brok
   customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it. Business
   impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline SQLite database file. The architecture is a single
   lab-primary node exposing sqlite3 CLI, schema, WAL mode, and pragmas; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: updated_at column never changes on row update.
-
 
   OBJECTIVE: Understand the current failure mode affecting Fix broken update trigger; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant sqlite3 CLI, schema, WAL mode, and pragmas), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -102,23 +91,75 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: updated_at column never changes on row update.
+  instructions: 'The updated_at column never changes when a row is updated. Fix solution(conn) so it installs
+    an AFTER UPDATE trigger on `items` that sets updated_at to the new_stamp argument for the row that
+    was just updated. Return the trigger name you created. The trigger must not fire on INSERT, and must
+    only touch the updated row.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn, new_stamp):\n    # BUG: fires on INSERT rather than UPDATE, and rewrites\
+      \ every row in the\n    # table instead of just the one that changed.\n    conn.execute(\n     \
+      \   \"CREATE TRIGGER items_touch AFTER INSERT ON items BEGIN \"\n        \"UPDATE items SET updated_at\
+      \ = '%s'; END\" % new_stamp\n    )\n    return 'items_touch'\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert solution() is not None
+  - name: update stamps the changed row
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT);\")\n    conn.executemany(\"\
+      INSERT INTO items VALUES (?,?,?)\", rows)\n    return conn\ndef _stamp(conn, rid):\n    return conn.execute(\"\
+      SELECT updated_at FROM items WHERE id=?\", (rid,)).fetchone()[0]\ndef _rows(conn):\n    return conn.execute(\"\
+      SELECT * FROM items ORDER BY id\").fetchall()\nconn = _seed([(1,'a','old'),(2,'b','old')])\nsolution(conn,\
+      \ 'NEW')\nconn.execute(\"UPDATE items SET name='a2' WHERE id=1\")\nassert _stamp(conn,1) == 'NEW',\
+      \ _rows(conn)\n"
+  - name: untouched rows keep their stamp
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT);\")\n    conn.executemany(\"\
+      INSERT INTO items VALUES (?,?,?)\", rows)\n    return conn\ndef _stamp(conn, rid):\n    return conn.execute(\"\
+      SELECT updated_at FROM items WHERE id=?\", (rid,)).fetchone()[0]\ndef _rows(conn):\n    return conn.execute(\"\
+      SELECT * FROM items ORDER BY id\").fetchall()\nconn = _seed([(1,'a','old'),(2,'b','old')])\nsolution(conn,\
+      \ 'NEW')\nconn.execute(\"UPDATE items SET name='a2' WHERE id=1\")\nassert _stamp(conn,2) == 'old',\
+      \ _rows(conn)\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert solution() is not None
+  - name: insert does not fire the trigger
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT);\")\n    conn.executemany(\"\
+      INSERT INTO items VALUES (?,?,?)\", rows)\n    return conn\ndef _stamp(conn, rid):\n    return conn.execute(\"\
+      SELECT updated_at FROM items WHERE id=?\", (rid,)).fetchone()[0]\ndef _rows(conn):\n    return conn.execute(\"\
+      SELECT * FROM items ORDER BY id\").fetchall()\nconn = _seed([])\nsolution(conn, 'NEW')\nconn.execute(\"\
+      INSERT INTO items VALUES (9,'fresh','orig')\")\nassert _stamp(conn,9) == 'orig', _rows(conn)\n"
+  - name: trigger name is returned
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT);\")\n    conn.executemany(\"\
+      INSERT INTO items VALUES (?,?,?)\", rows)\n    return conn\ndef _stamp(conn, rid):\n    return conn.execute(\"\
+      SELECT updated_at FROM items WHERE id=?\", (rid,)).fetchone()[0]\ndef _rows(conn):\n    return conn.execute(\"\
+      SELECT * FROM items ORDER BY id\").fetchall()\nconn = _seed([])\nname = solution(conn, 'NEW')\n\
+      found = conn.execute(\"SELECT name FROM sqlite_master WHERE type='trigger'\").fetchall()\nassert\
+      \ (name,) in found, (name, found)\n"
+  - name: second update re-stamps only its own row
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT);\")\n    conn.executemany(\"\
+      INSERT INTO items VALUES (?,?,?)\", rows)\n    return conn\ndef _stamp(conn, rid):\n    return conn.execute(\"\
+      SELECT updated_at FROM items WHERE id=?\", (rid,)).fetchone()[0]\ndef _rows(conn):\n    return conn.execute(\"\
+      SELECT * FROM items ORDER BY id\").fetchall()\nconn = _seed([(1,'a','old'),(2,'b','old')])\nsolution(conn,\
+      \ 'NEW')\nconn.execute(\"UPDATE items SET name='b2' WHERE id=2\")\nassert _stamp(conn,1) == 'old'\
+      \ and _stamp(conn,2) == 'NEW', _rows(conn)\n"
+  - name: updating every row stamps every row
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT);\")\n    conn.executemany(\"\
+      INSERT INTO items VALUES (?,?,?)\", rows)\n    return conn\ndef _stamp(conn, rid):\n    return conn.execute(\"\
+      SELECT updated_at FROM items WHERE id=?\", (rid,)).fetchone()[0]\ndef _rows(conn):\n    return conn.execute(\"\
+      SELECT * FROM items ORDER BY id\").fetchall()\nconn = _seed([(1,'a','old'),(2,'b','old')])\nsolution(conn,\
+      \ 'NEW')\nconn.execute(\"UPDATE items SET name = name || 'x'\")\nassert _stamp(conn,1) == 'NEW'\
+      \ and _stamp(conn,2) == 'NEW', _rows(conn)\n"
   timeout: 8
 summary: Complete the fix broken update trigger sqlite lab and verify success with the checker
 estimated_minutes: 20
@@ -129,7 +170,7 @@ tags:
 - fix
 - hands-on
 - sqlite
-linked_tutorial: sqlite-fundamentals
+linked_tutorial: sqlite-embedded-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Fix broken update trigger
 - Restore expected service behavior with a minimal, documented change

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Star } from 'lucide-react'
+import { Star } from '../../../ui/eagerIcons'
 import { testimonials } from '../data/homeContent'
 import { blurIn, fadeUp, viewportOnce } from '../../../ui/motion'
 

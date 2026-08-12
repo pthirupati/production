@@ -13,6 +13,11 @@ services:
       fixitlab_net:
         aliases:
           - vault
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   gateway:
     build:
@@ -48,6 +53,11 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   certbot:
     # Pinned by digest (certbot 5.7.0, resolved 2026-08) — same pin as edge.yml.
@@ -59,6 +69,11 @@ services:
     # Auto-renew every 12 hours
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 43200 & wait $${!}; done'"
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend-prod:
     build:
@@ -67,7 +82,21 @@ services:
     image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-frontend:${IMAGE_TAG:-latest}
     networks:
       - fixitlab_net
+    # Static SPA harden: no privilege escalation; read-only rootfs with tmpfs
+    # for nginx runtime paths. Still root for :80 bind (gateway proxies here).
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=16m,mode=755
+      - /var/run:size=8m,mode=755
+      - /tmp:size=8m,mode=1777
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   backend:
     build: ./backend
@@ -165,6 +194,11 @@ services:
   #       limits:
   #         memory: 2G
   #   restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   celery_worker:
     build: ./backend
@@ -204,6 +238,11 @@ services:
         limits:
           memory: 1G
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   celery_provisioning:
     build: ./backend
@@ -242,6 +281,11 @@ services:
         limits:
           memory: 1G
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   celery_maintenance:
     build: ./backend
@@ -280,6 +324,11 @@ services:
         limits:
           memory: 512M
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   celery_beat:
     build: ./backend
@@ -312,6 +361,11 @@ services:
       retries: 3
       start_period: 30s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   pgbouncer:
     # Pinned by digest (PgBouncer 1.25.2, resolved 2026-08) — same pin as data.yml.
@@ -345,6 +399,11 @@ services:
       retries: 5
       start_period: 15s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   database:
     build: ./database
@@ -368,6 +427,11 @@ services:
       retries: 5
       start_period: 10s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:7-alpine
@@ -391,6 +455,11 @@ services:
       timeout: 3s
       retries: 3
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -411,6 +480,11 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   fixitlab_db_data:

@@ -386,7 +386,7 @@ class TechnologyDetailView(APIView):
         if tech.coming_soon:
             tech_data = TechnologySerializer(tech).data
             tech_data["scenario_count"] = 0
-            tech_data["difficulty_counts"] = {"easy": 0, "medium": 0, "hard": 0}
+            tech_data["difficulty_counts"] = {"easy": 0, "medium": 0, "hard": 0, "expert": 0}
             tech_data["categories"] = []
             if request.user.is_authenticated:
                 from apps.progress.learning_path import get_learning_path_progress
@@ -422,7 +422,7 @@ class TechnologyDetailView(APIView):
             tech_data = TechnologySerializer(tech).data
             tech_data["scenario_count"] = len(scenario_list)
 
-            difficulty_counts = {"easy": 0, "medium": 0, "hard": 0}
+            difficulty_counts = {"easy": 0, "medium": 0, "hard": 0, "expert": 0}
             for s in scenario_list:
                 if s.difficulty in difficulty_counts:
                     difficulty_counts[s.difficulty] += 1
@@ -581,7 +581,7 @@ class ScenariosListView(APIView):
         if not request.user.is_authenticated:
             params = request.query_params
             cache_key = (
-                f"scenarios_anon_{params.get('technology','')}_{params.get('technology_slug','')}_{params.get('difficulty','')}_{params.get('type','')}_{params.get('category','')}_{params.get('tag','')}_{params.get('search','')}_{params.get('free','')}_{params.get('page',1)}_{params.get('page_size',50)}"
+                f"scenarios_anon_{params.get('technology','')}_{params.get('technology_slug','')}_{params.get('difficulty','')}_{params.get('type','')}_{params.get('category','')}_{params.get('tag','')}_{params.get('search','')}_{params.get('free','')}_{params.get('gradeable','')}_{params.get('page',1)}_{params.get('page_size',50)}"
             )
             cached = cache.get(cache_key)
             if cached is not None:
@@ -622,8 +622,49 @@ class ScenariosListView(APIView):
             qs = qs.filter(tags__slug=tag)
         if search:
             qs = _apply_scenario_search(qs, search)
-        if is_free:
+        # `free` is a tri-state query flag: 1/true → free only; 0/false → paid only.
+        # A bare truthy string check wrongly treated free=0 as free-only.
+        free_raw = (is_free or "").strip().lower()
+        if free_raw in ("1", "true", "yes"):
             qs = qs.filter(is_free=True)
+        elif free_raw in ("0", "false", "no"):
+            qs = qs.filter(is_free=False)
+
+        # Authed-only progress filter: completed=1 → solved; completed=0 → unsolved.
+        completed_raw = (request.query_params.get("completed") or "").strip().lower()
+        if completed_raw in ("1", "true", "yes", "0", "false", "no") and request.user.is_authenticated:
+            solved = Exists(
+                UserScenarioProgress.objects.filter(
+                    user=request.user,
+                    scenario_id=OuterRef("pk"),
+                    completed=True,
+                )
+            )
+            if completed_raw in ("1", "true", "yes"):
+                qs = qs.filter(solved)
+            else:
+                qs = qs.exclude(solved)
+
+        # Tri-state gradeable filter (audit §X7b residual): 1 → auto-checkable;
+        # 0 → stub/missing validation. Uses coding_mode + sim resolve + trivial check.
+        gradeable_raw = (request.query_params.get("gradeable") or "").strip().lower()
+        if gradeable_raw in ("1", "true", "yes", "0", "false", "no"):
+            from apps.labs.provisioner.simulation.validation import scenario_is_gradeable
+
+            want = gradeable_raw in ("1", "true", "yes")
+            gradeable_ids = [
+                sid
+                for sid, slug, coding, lab_mode, script in qs.values_list(
+                    "id", "slug", "coding_mode", "lab_mode", "validation_script",
+                )
+                if scenario_is_gradeable(
+                    slug=slug or "",
+                    coding_mode=bool(coding),
+                    lab_mode=lab_mode or "",
+                    validation_script=script or "",
+                ) == want
+            ]
+            qs = qs.filter(id__in=gradeable_ids)
 
         # Certification labs are listed under /certifications only unless explicitly requested.
         scenario_group = (request.query_params.get("scenario_group") or "").strip().lower()
@@ -776,14 +817,25 @@ class ScenarioDetailView(APIView):
                 Tutorial.objects.filter(is_published=True, scenario_slug=scenario.slug)
                 .order_by("order", "title")[:4]
             )
+            # Prefer the scenario's linked_tutorial course (§C1) over a vague
+            # technology-topic fallback — that was returning unrelated lessons.
+            course_slug = (getattr(scenario, "linked_tutorial", None) or "").strip()
+            if not related_tutorials and course_slug:
+                related_tutorials = list(
+                    Tutorial.objects.filter(
+                        is_published=True, course_slug=course_slug,
+                    ).order_by("module_order", "order", "title")[:4]
+                )
             if not related_tutorials and scenario.technology:
                 related_tutorials = list(
                     Tutorial.objects.filter(is_published=True, topic__iexact=scenario.technology.name)
                     .order_by("order", "title")[:4]
                 )
             data["related_tutorials"] = TutorialListSerializer(related_tutorials, many=True).data
+            data["linked_tutorial"] = course_slug
         except Exception:
             data["related_tutorials"] = []
+            data["linked_tutorial"] = getattr(scenario, "linked_tutorial", "") or ""
 
         return Response(data)
 
@@ -1268,15 +1320,29 @@ class ValidateLabView(APIView):
 
             if passed:
                 # Single shared completion path — see apps.labs.completion.
+                from apps.labs.acceptance_checklist import build_acceptance_checklist
                 from apps.labs.completion import finalize_validated_session
+                from apps.question_bank.scenario_copy import public_objectives
                 payload = finalize_validated_session(session, request.user, provisioner)
                 payload["output"] = output
+                payload["checklist"] = build_acceptance_checklist(
+                    public_objectives(session.scenario.objectives),
+                    passed=True,
+                    output=output or "",
+                )
                 return Response(payload)
             else:
+                from apps.labs.acceptance_checklist import build_acceptance_checklist
+                from apps.question_bank.scenario_copy import public_objectives
                 return Response({
                     "passed": False,
                     "output": output,
                     "message": "Validation failed. Keep trying!",
+                    "checklist": build_acceptance_checklist(
+                        public_objectives(session.scenario.objectives),
+                        passed=False,
+                        output=output or "",
+                    ),
                 })
 
         except Exception as e:
@@ -1436,8 +1502,14 @@ def public_coding_spec(scenario):
     spec = dict(scenario.coding_spec or {})
     visible = spec.get("visible_tests") or []
     hidden = spec.get("hidden_tests") or []
+    from apps.labs.code_exec import resolve_runtime
+
+    language = spec.get("language", "python")
     payload = {
-        "language": spec.get("language", "python"),
+        "language": language,
+        # §Y2c — authoring label vs gradeable runtime. IDE uses language for
+        # chrome/grammar; Check grades against runtime.
+        "runtime": resolve_runtime(spec),
         "files": spec.get("files", []),
         "entrypoint": spec.get("entrypoint", ""),
         "instructions": spec.get("instructions", "") or scenario.description,
@@ -1448,6 +1520,8 @@ def public_coding_spec(scenario):
         "hidden_test_count": len(hidden),
         "starter_note": spec.get("starter_note", ""),
     }
+    if isinstance(spec.get("preview"), dict):
+        payload["preview"] = spec["preview"]
     # Prompt Engineering scenarios reuse coding_mode to open a custom in-browser
     # surface (PromptPlayground) instead of the code editor. The whole
     # prompt_config is purely educational content (lessons, rubric, exercises) —
@@ -1458,6 +1532,11 @@ def public_coding_spec(scenario):
         payload["kind"] = kind
     if kind == "prompt":
         payload["prompt_config"] = spec.get("prompt_config", {}) or {}
+    from apps.labs.api_client_mock import public_api_client_spec
+
+    ac = public_api_client_spec(spec.get("api_client") if isinstance(spec.get("api_client"), dict) else None)
+    if ac:
+        payload["api_client"] = ac
     return payload
 
 
@@ -1470,6 +1549,8 @@ class CodingSpecView(APIView):
         scenario = session.scenario
         if not getattr(scenario, "coding_mode", False):
             return Response({"error": "Not a coding scenario"}, status=400)
+        snap = session.simulation_snapshot if isinstance(session.simulation_snapshot, dict) else {}
+        ide_draft = snap.get("ide_draft") if isinstance(snap.get("ide_draft"), dict) else None
         return Response({
             "coding_mode": True,
             "scenario": {
@@ -1482,7 +1563,152 @@ class CodingSpecView(APIView):
             "spec": public_coding_spec(scenario),
             "status": session.status,
             "validation_passed": session.validation_passed,
+            "ide_draft": ide_draft,
         })
+
+
+class IdeDraftView(APIView):
+    """GET/PUT server-side coding IDE draft (survives browser clear / device switch).
+
+    Stored under LabSession.simulation_snapshot['ide_draft'] — no migration.
+    localStorage remains a fast cache; this is the durable copy.
+    """
+
+    permission_classes = [IsAuthenticated]
+    MAX_FILES = 80
+    MAX_BYTES = 1_500_000  # ~1.5 MB total payload
+
+    def get(self, request, session_id):
+        session = get_object_or_404(LabSession, pk=session_id, user=request.user)
+        snap = session.simulation_snapshot if isinstance(session.simulation_snapshot, dict) else {}
+        draft = snap.get("ide_draft") if isinstance(snap.get("ide_draft"), dict) else None
+        return Response({"draft": draft})
+
+    def put(self, request, session_id):
+        session = get_object_or_404(LabSession, pk=session_id, user=request.user)
+        if session.status not in ("RUNNING", "PROVISIONING", "COMPLETED"):
+            return Response({"error": "Session is not writable"}, status=400)
+        files = request.data.get("files")
+        if not isinstance(files, dict):
+            return Response({"error": "files map required"}, status=400)
+        if len(files) > self.MAX_FILES:
+            return Response({"error": f"Too many files (max {self.MAX_FILES})"}, status=400)
+        clean = {}
+        total = 0
+        for path, content in files.items():
+            if not isinstance(path, str) or not path.strip() or len(path) > 260:
+                continue
+            if not isinstance(content, str):
+                continue
+            total += len(content.encode("utf-8", errors="ignore"))
+            if total > self.MAX_BYTES:
+                return Response({"error": "Draft too large"}, status=400)
+            clean[path] = content
+        from django.utils import timezone
+        draft = {
+            "files": clean,
+            "ts": int(timezone.now().timestamp() * 1000),
+            "updated_at": timezone.now().isoformat(),
+        }
+        snap = session.simulation_snapshot if isinstance(session.simulation_snapshot, dict) else {}
+        snap = dict(snap)
+        snap["ide_draft"] = draft
+        session.simulation_snapshot = snap
+        session.save(update_fields=["simulation_snapshot"])
+        return Response({"ok": True, "draft": draft})
+
+
+class ApiClientDraftView(APIView):
+    """GET/PUT server-side API client panel draft (merge with localStorage).
+
+    Stored under LabSession.simulation_snapshot['api_client_draft'] — no migration.
+    """
+
+    permission_classes = [IsAuthenticated]
+    MAX_BYTES = 200_000
+    ALLOWED_KEYS = (
+        "method", "url", "headersText", "bodyText", "varsText",
+        "preRequest", "testScript", "authType", "authToken", "authUser",
+        "authPass", "authKey", "authValue", "history", "ts",
+    )
+
+    def get(self, request, session_id):
+        session = get_object_or_404(LabSession, pk=session_id, user=request.user)
+        snap = session.simulation_snapshot if isinstance(session.simulation_snapshot, dict) else {}
+        draft = snap.get("api_client_draft") if isinstance(snap.get("api_client_draft"), dict) else None
+        return Response({"draft": draft})
+
+    def put(self, request, session_id):
+        session = get_object_or_404(LabSession, pk=session_id, user=request.user)
+        if session.status not in ("RUNNING", "PROVISIONING", "COMPLETED"):
+            return Response({"error": "Session is not writable"}, status=400)
+        raw = request.data.get("draft") if isinstance(request.data.get("draft"), dict) else request.data
+        if not isinstance(raw, dict):
+            return Response({"error": "draft object required"}, status=400)
+        clean = {}
+        total = 0
+        for key in self.ALLOWED_KEYS:
+            if key not in raw:
+                continue
+            val = raw[key]
+            if key == "history":
+                if not isinstance(val, list):
+                    continue
+                clean[key] = val[:20]
+            elif isinstance(val, (str, int, float, bool)) or val is None:
+                clean[key] = val
+            else:
+                continue
+            total += len(str(val).encode("utf-8", errors="ignore"))
+            if total > self.MAX_BYTES:
+                return Response({"error": "Draft too large"}, status=400)
+        from django.utils import timezone
+        clean["ts"] = int(clean.get("ts") or timezone.now().timestamp() * 1000)
+        clean["updated_at"] = timezone.now().isoformat()
+        snap = session.simulation_snapshot if isinstance(session.simulation_snapshot, dict) else {}
+        snap = dict(snap)
+        snap["api_client_draft"] = clean
+        session.simulation_snapshot = snap
+        session.save(update_fields=["simulation_snapshot"])
+        return Response({"ok": True, "draft": clean})
+
+
+class ApiClientSendView(APIView):
+    """Interactive API-client send — in-process mock router only (no sockets).
+
+    Audit Y3 / api_client interactive surface. Graded fetch mock is residual.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        from apps.labs.api_client_mock import dispatch_mock_request, evaluate_assertions
+
+        session = get_object_or_404(LabSession, pk=session_id, user=request.user)
+        if session.status not in ("RUNNING", "PROVISIONING", "COMPLETED"):
+            return Response({"error": "Session is not active"}, status=400)
+        method = request.data.get("method") or "GET"
+        url = request.data.get("url") or ""
+        if not isinstance(url, str) or not url.strip():
+            return Response({"error": "url required"}, status=400)
+        headers = request.data.get("headers") if isinstance(request.data.get("headers"), dict) else {}
+        variables = request.data.get("variables") if isinstance(request.data.get("variables"), dict) else {}
+        body = request.data.get("body")
+        result = dispatch_mock_request(
+            method=method,
+            url=url,
+            headers=headers,
+            body=body,
+            variables=variables,
+        )
+        assertions = request.data.get("assertions")
+        if assertions is None:
+            spec = getattr(session.scenario, "coding_spec", None) or {}
+            ac = spec.get("api_client") if isinstance(spec, dict) else None
+            assertions = (ac or {}).get("assertions") if isinstance(ac, dict) else None
+        if assertions:
+            result["assertions"] = evaluate_assertions(result, assertions)
+        return Response(result)
 
 
 class CodeValidateView(APIView):
@@ -1498,7 +1724,7 @@ class CodeValidateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
-        from apps.labs.code_exec import grade_submission
+        from apps.labs.code_exec import grade_submission, resolve_runtime
 
         session = get_object_or_404(
             LabSession, pk=session_id, user=request.user, status="RUNNING"
@@ -1508,7 +1734,15 @@ class CodeValidateView(APIView):
             return Response({"error": "Not a coding scenario"}, status=400)
 
         spec = scenario.coding_spec or {}
-        language = (request.data.get("language") or spec.get("language") or "python").lower()
+        # Client may still send the authoring language; grade on resolved runtime
+        # so language: html / react still hit the JS harness (audit §Y2c).
+        language_hint = (
+            request.data.get("runtime")
+            or request.data.get("language")
+            or spec.get("language")
+            or "python"
+        )
+        runtime = resolve_runtime(spec, language_override=str(language_hint).lower())
 
         # Accept either a single concatenated source string, or a {path: content}
         # map of files. We grade the entrypoint file's content (multi-file
@@ -1529,8 +1763,14 @@ class CodeValidateView(APIView):
                for i, t in enumerate(hidden)]
         )
 
-        result = grade_submission(language, user_code, all_tests,
-                                  timeout=int(spec.get("timeout", 8)))
+        result = grade_submission(
+            runtime,
+            user_code,
+            all_tests,
+            timeout=int(spec.get("timeout", 8)),
+            api_client=spec.get("api_client") if isinstance(spec.get("api_client"), dict) else None,
+            authoring_language=spec.get("language") or "",
+        )
 
         # Reveal hidden test names only once the scenario is already solved.
         already_solved = session.validation_passed
@@ -2115,7 +2355,7 @@ class UserProgressView(APIView):
                     "total": diff_totals.get(d, 0),
                     "completed": diff_done.get(d, 0),
                 }
-                for d in ["easy", "medium", "hard"]
+                for d in ["easy", "medium", "hard", "expert"]
             }
 
             # Achievements
@@ -2946,6 +3186,71 @@ def _user_passed_scenario(user, scenario) -> bool:
     return LabSession.objects.filter(
         user=user, scenario=scenario, validation_passed=True
     ).exists()
+
+
+class ProjectsListView(APIView):
+    """GET /api/projects/ — catalog index for capstone projects (audit §C3).
+
+    Projects historically lived only under TechnologyDetail. Journeys and the
+    dashboard need a top-level browse surface with stable /projects/:slug links.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        qs = (
+            Project.objects.filter(is_active=True)
+            .select_related("technology", "lab_scenario")
+            .annotate(task_count=Count("tasks"))
+            .order_by("technology__order", "order", "title")
+        )
+        tech_slug = (request.query_params.get("technology") or "").strip()
+        if tech_slug:
+            qs = qs.filter(technology__slug=tech_slug)
+        items = []
+        for p in qs:
+            items.append({
+                "id": p.id,
+                "slug": p.slug,
+                "title": p.title,
+                "description": p.description,
+                "difficulty": p.difficulty,
+                "estimated_hours": p.estimated_hours,
+                "architecture_type": p.architecture_type,
+                "technology": {
+                    "slug": p.technology.slug,
+                    "name": p.technology.name,
+                },
+                "task_count": p.task_count,
+                "has_lab": bool(p.lab_scenario_id),
+                "lab_scenario_slug": p.lab_scenario.slug if p.lab_scenario_id else None,
+            })
+        return Response({"projects": items, "count": len(items)})
+
+
+class ProjectDetailView(APIView):
+    """GET /api/projects/<slug>/ — single project for the /projects/:slug page."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, slug):
+        project = get_object_or_404(
+            Project.objects.select_related("technology", "lab_scenario")
+            .prefetch_related("tasks", "stages__stage_technology", "stages__lab_scenario"),
+            slug=slug,
+            is_active=True,
+        )
+        # Reuse the technology serializer shape so Start + task UI stay consistent
+        # with TechnologyDetail's projects tab.
+        serialized = _serialize_projects(project.technology, request.user if request.user.is_authenticated else None)
+        match = next((p for p in serialized if p["slug"] == project.slug), None)
+        if not match:
+            return Response({"error": "Project not found"}, status=404)
+        match["technology"] = {
+            "slug": project.technology.slug,
+            "name": project.technology.name,
+        }
+        match["has_lab"] = bool(project.lab_scenario_id)
+        match["lab_scenario_slug"] = project.lab_scenario.slug if project.lab_scenario_id else None
+        return Response(match)
 
 
 class ProjectStartView(APIView):

@@ -478,13 +478,87 @@ LANGUAGE_ENTRYPOINT_EXTS: dict[str, set[str]] = {
 # CI fails 150 healthy labs on day one.
 NO_ENTRYPOINT_LANGUAGES = {"text"}
 
-# R5: the language a spec declares must be one the server can actually execute.
-# The real gate is apps.labs.code_exec.SUPPORTED_LANGUAGES; we mirror it here
-# rather than importing so the validator stays a pure-filesystem command with no
-# Django app-loading requirement (CI runs it standalone after `migrate`).
-# `html` labs declare `javascript` and execute through the JS runtime; `text`
-# labs never reach an interpreter at all.
+# R5: the *resolved runtime* must be one the server can execute.
+# Mirror apps.labs.code_exec.SUPPORTED_LANGUAGES + AUTHORING_TO_RUNTIME here so
+# the validator stays a pure-filesystem command (no Django load). Audit §Y2c:
+# ``language: html`` is legal because it resolves to the javascript runtime.
 EXECUTABLE_LANGUAGES = {"python", "javascript", "sql"}
+AUTHORING_TO_RUNTIME = {
+    "python": "python",
+    "javascript": "javascript",
+    "js": "javascript",
+    "node": "javascript",
+    "nodejs": "javascript",
+    "sql": "sql",
+    "html": "javascript",
+    "css": "javascript",
+    "react": "javascript",
+    "jsx": "javascript",
+    "typescript": "javascript",
+    "ts": "javascript",
+    "bash": "bash",
+    "shell": "bash",
+    "sh": "bash",
+    "java": "java",
+}
+
+# R4 — authoring language must be plausible for the parent technology directory.
+# Only enforced for *active* labs so unpublished placeholder cohorts (react+python)
+# stay quarantined without blocking the catalog gate. Path is scenarios/<tech>/...
+TECH_PLAUSIBLE_LANGUAGES: dict[str, frozenset[str]] = {
+    "html": frozenset({"html", "css", "javascript"}),
+    "javascript": frozenset({"javascript", "typescript"}),
+    "java": frozenset({"java"}),
+    "python": frozenset({"python"}),
+    "shell-script": frozenset({"bash", "shell", "sh"}),
+    "react": frozenset({"javascript", "react", "jsx", "typescript"}),
+    "nodejs": frozenset({"javascript", "typescript", "nodejs"}),
+    "sqlite": frozenset({"python", "sql"}),
+    "postgresql": frozenset({"python", "sql"}),
+    "mysql": frozenset({"python", "sql"}),
+    "prompt-engineering": frozenset({"text"}),
+    "ai-ml": frozenset({"python"}),
+    "data-science": frozenset({"python"}),
+}
+
+
+def _resolved_runtime(spec: dict) -> str:
+    explicit = str(spec.get("runtime") or "").strip().lower()
+    if explicit:
+        return explicit
+    lang = str(spec.get("language") or "").strip().lower()
+    return AUTHORING_TO_RUNTIME.get(lang, lang)
+
+
+def _tech_from_scenario_path(path: Path) -> str:
+    """scenarios/<tech>/<lab>/scenario.yaml → tech directory name."""
+    try:
+        parts = path.resolve().parts
+        idx = parts.index("scenarios")
+        return parts[idx + 1]
+    except (ValueError, IndexError):
+        return path.parent.parent.name
+
+
+def _language_plausible_gaps(spec: dict, path: Path, *, is_active: bool) -> list[str]:
+    """R4: coding_spec.language must match the parent technology (active labs only)."""
+    if not is_active:
+        return []
+    if str(spec.get("kind") or "").strip().lower() in HIDDEN_TEST_EXEMPT_KINDS:
+        return []
+    lang = str(spec.get("language") or "").strip().lower()
+    if not lang:
+        return []
+    tech = _tech_from_scenario_path(path)
+    allowed = TECH_PLAUSIBLE_LANGUAGES.get(tech)
+    if allowed is None:
+        return []  # technologies without a coding track — no R4 opinion
+    if lang not in allowed:
+        return [
+            f"coding_spec.language '{lang}' is not plausible for technology "
+            f"'{tech}' (expected one of: {'/'.join(sorted(allowed))})"
+        ]
+    return []
 
 
 def _spec_file_paths(spec: dict) -> list[str]:
@@ -549,12 +623,15 @@ def _coding_spec_gaps(spec: dict) -> list[str]:
 
     # R5/R6 apply to any lab that actually executes code. `text` labs have no
     # interpreter and no files by design, so they are exempt from both.
+    # R5 judges the *resolved runtime* (§Y2c), not the authoring language label.
     if lang not in NO_ENTRYPOINT_LANGUAGES:
-        if lang in LANGUAGE_ENTRYPOINT_EXTS and lang not in EXECUTABLE_LANGUAGES:
-            # Recognised extension-wise but no server runtime — code_exec would
-            # reject this at grade time, after the learner has written a solution.
+        runtime = _resolved_runtime(spec)
+        if lang in LANGUAGE_ENTRYPOINT_EXTS and runtime not in EXECUTABLE_LANGUAGES:
+            # Recognised authoring language but no gradeable runtime (java/bash
+            # until those images ship). code_exec would return needs_review.
             gaps.append(
-                f"coding_spec.language '{lang}' has no server runtime "
+                f"coding_spec.language '{lang}' resolves to runtime '{runtime}' "
+                f"which has no server grader "
                 f"(executable: {'/'.join(sorted(EXECUTABLE_LANGUAGES))})"
             )
         if file_paths and not _has_editable_file(spec):
@@ -706,6 +783,7 @@ def validate_scenario_file(
     fix_stubs: bool = False,
     course_slugs: frozenset[str] | None = None,
     check_linked_tutorial: bool = False,
+    min_hidden_tests: int = 0,
 ) -> list[str]:
     """Return list of gap messages for one scenario.yaml.
 
@@ -713,6 +791,8 @@ def validate_scenario_file(
     happens once per run rather than once per file; when omitted it is resolved
     lazily so direct callers (tests, ad-hoc scripts) still get the check.
     ``check_linked_tutorial`` is opt-in — see _cross_layer_gaps for why.
+    ``min_hidden_tests`` (session 88) ratchets impl/fix labs to N hidden cases
+    without enabling it on the default CI catalog pass.
     """
     gaps: list[str] = []
     try:
@@ -792,9 +872,26 @@ def validate_scenario_file(
                 gaps.append("coding lab has no hidden tests (grading is trivial)")
         else:
             gaps.extend(_tautological_test_gaps(hidden, spec))
+            kind = str(spec.get("kind") or "").strip().lower()
+            if (
+                min_hidden_tests > 0
+                and kind in ("impl", "fix")
+                and len(hidden) < min_hidden_tests
+            ):
+                gaps.append(
+                    f"coding lab has {len(hidden)} hidden tests "
+                    f"(min {min_hidden_tests} for kind={kind})"
+                )
         gaps.extend(_coding_spec_gaps(spec))
         gaps.extend(_preview_gaps(data, spec))
         gaps.extend(_grader_field_gaps(data, spec))
+        # R4 only for published labs — unpublished placeholders keep odd language
+        # tags without blocking the catalog gate.
+        gaps.extend(
+            _language_plausible_gaps(
+                spec, path, is_active=data.get("is_active") is True,
+            )
+        )
     elif sim_type in DEDICATED_SIM_TYPES:
         # Graded by a dedicated engine; the on-disk check.sh is not used.
         pass
@@ -857,6 +954,16 @@ class Command(BaseCommand):
                 "fails the whole catalog until that remap lands."
             ),
         )
+        parser.add_argument(
+            "--min-hidden-tests",
+            type=int,
+            default=0,
+            help=(
+                "When >0, coding labs with kind=impl|fix must have at least this many "
+                "hidden_tests (prompt/text kinds exempt). Use to ratchet the thin-test "
+                "corpus without failing the default CI catalog pass."
+            ),
+        )
         parser.add_argument("--fail-on-gaps", action="store_true", help="Exit 1 if any gaps found")
         parser.add_argument("--limit", type=int, default=0, help="Stop after N scenarios (smoke)")
 
@@ -879,6 +986,7 @@ class Command(BaseCommand):
         gap_rows: list[tuple[str, list[str]]] = []
         slug_to_files: dict[str, list[str]] = {}
 
+        min_hidden = int(options.get("min_hidden_tests") or 0)
         for tech_path in sorted(SCEN.iterdir()):
             if not tech_path.is_dir() or tech_path.name == "shared":
                 continue
@@ -904,6 +1012,7 @@ class Command(BaseCommand):
                     fix_stubs=fix_stubs,
                     course_slugs=course_slugs,
                     check_linked_tutorial=check_linked_tutorial,
+                    min_hidden_tests=min_hidden,
                 )
                 if rule_filter:
                     gaps = [g for g in gaps if any(r in g for r in rule_filter)]

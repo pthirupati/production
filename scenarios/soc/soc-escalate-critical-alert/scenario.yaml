@@ -16,37 +16,30 @@ description: 'CONTEXT: A team operating SOC and cybersecurity operations has rai
   engineer (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked
   users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline security operations lab. The architecture is a single
   lab-primary node exposing SIEM, EDR, tickets, and investigation timelines; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: SOC console with critical alert AL-1003 open against ws-finance-07 and no
   linked incident in the Incidents tab. AL-1003 is open in the alert queue with no linked incident — the
   Incidents tab is empty.
 
-
   OBJECTIVE: Sign in to the SOC console; Open AL-1003 in the alert queue; Escalate AL-1003 into a formal
   incident. Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits
   successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant SIEM, EDR, tickets, and investigation timelines), changing one thing at a time. Check
   your work continuously against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -106,7 +99,6 @@ hints:
 
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 summary: Escalate the open critical C2 alert into a formally tracked incident from the SOC console.
@@ -120,7 +112,7 @@ tags:
 - soc
 - siem
 - incident-response
-linked_tutorial: soc-fundamentals
+linked_tutorial: soc-operations-zero-hero
 what_you_will_learn:
 - Why formal incident escalation matters beyond just seeing an alert
 - How an escalated alert links to a tracked incident record

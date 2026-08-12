@@ -15,6 +15,11 @@ terminal. The engine tracks:
                   permissions), and users[] {oprid, roles, locked, ...}.
   - integration : Integration Broker — nodes[] {name, status active|down} and
                   services[] {name, active}.
+  - migration   : Application Designer / Change Assistant — DEV/TEST/PROD
+                  environments each with their own managed object definitions,
+                  change projects built in DEV, and change packages that are
+                  compared, applied along DEV -> TEST -> PROD, conflict on site
+                  customisations, and can be rolled back out of an environment.
 
 Each scenario preset puts this world into a clearly *broken* state (a process
 run stuck in error, a user missing the role that unlocks a component, a
@@ -174,6 +179,86 @@ def _ib_service(name: str, *, active: bool = True, operations: list[str] | None 
         "name": name,
         "active": bool(active),
         "operations": list(operations or []),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Application Designer / Change Assistant — the DEV -> TEST -> PROD migration
+# lifecycle. This is a *sibling* of portal/process/security/integration under
+# world["migration"]; the flat top-level world shape the existing ~150 labs and
+# their checkers read (world["portal"]["modules"], world["security"], ...) is
+# deliberately left untouched.
+#
+# Model:
+#   environments[] : DEV / TEST / PROD, each holding its OWN objects{} map of
+#                    definition name -> {version, body, customised}. Objects are
+#                    always copied by VALUE on promotion (see _copy_object), so
+#                    applying to TEST can never alias into PROD.
+#   projects[]     : App Designer change projects built in DEV — a list of
+#                    object names plus the DEV version captured at build time.
+#   packages[]     : Change Assistant change packages cut from a project. Each
+#                    carries the frozen payload (name -> object snapshot) and an
+#                    apply history so a bad patch can be rolled back.
+# ---------------------------------------------------------------------------
+
+# Ordered promotion path. A package must be applied to each environment in turn;
+# skipping straight from DEV to PROD is rejected the way Change Assistant does.
+_ENV_ORDER = ("DEV", "TEST", "PROD")
+# Change package lifecycle states.
+_PKG_STATUSES = ("built", "applied", "rolled_back")
+
+
+def _ps_object(name: str, *, version: int = 1, body: str = "",
+               customised: bool = False, obj_type: str = "Page") -> dict:
+    """One App Designer managed definition (Record / Page / PeopleCode / ...).
+
+    customised: True marks a site-local change made directly in an environment.
+    A promotion landing on a customised object is a *conflict* and is refused
+    until the learner resolves it (keep-customisation or accept-vendor).
+    """
+    return {
+        "name": name,
+        "type": obj_type,
+        "version": int(version),
+        "body": body or f"-- {name} definition v{version}",
+        "customised": bool(customised),
+    }
+
+
+def _copy_object(obj: dict) -> dict:
+    """Deep-ish copy of a managed object.
+
+    Promotion MUST copy by value: an object dict shared between two
+    environments would make a TEST apply silently mutate PROD and make a
+    rollback appear to succeed while leaving PROD dirty.
+    """
+    return copy.deepcopy(obj)
+
+
+def _environment(name: str, objects: list[dict]) -> dict:
+    return {
+        "name": name,
+        "objects": {o["name"]: _copy_object(o) for o in objects},
+        "last_applied_package": "",
+    }
+
+
+def _base_migration() -> dict:
+    """Three environments seeded to a consistent, already-promoted baseline."""
+    baseline = [
+        _ps_object("PSU_JOB_DATA_PAGE", version=3, obj_type="Page"),
+        _ps_object("PSU_EXPENSE_AE", version=2, obj_type="App Engine"),
+        _ps_object("PSU_VOUCHER_REC", version=5, obj_type="Record"),
+    ]
+    return {
+        "environments": [
+            _environment("DEV", baseline),
+            _environment("TEST", baseline),
+            _environment("PROD", baseline),
+        ],
+        "projects": [],
+        "packages": [],
+        "next_package_seq": 1,
     }
 
 
@@ -422,6 +507,9 @@ def _base_world() -> dict:
         },
         # Employee Self-Service (Fluid pages) — records keyed by OPRID.
         "self_service": _base_self_service(),
+        # App Designer / Change Assistant migration lifecycle. Sibling key —
+        # the flat shape above is unchanged so existing checkers keep working.
+        "migration": _base_migration(),
         "events": [],
     }
 
@@ -508,6 +596,94 @@ def _find_service(world: dict, name: str) -> dict | None:
         if svc["name"].lower() == nm.lower():
             return svc
     return None
+
+
+def _migration(world: dict) -> dict:
+    """Migration sub-world, self-healing for sessions cached before it existed."""
+    mig = world.get("migration")
+    if not isinstance(mig, dict) or "environments" not in mig:
+        mig = _base_migration()
+        world["migration"] = mig
+    return mig
+
+
+def _find_env(world: dict, name: str) -> dict | None:
+    nm = (name or "").strip().upper()
+    if not nm:
+        return None
+    for env in _migration(world)["environments"]:
+        if env["name"] == nm:
+            return env
+    return None
+
+
+def _find_project(world: dict, name: str) -> dict | None:
+    nm = (name or "").strip()
+    if not nm:
+        return None
+    for proj in _migration(world)["projects"]:
+        if proj["name"].lower() == nm.lower():
+            return proj
+    return None
+
+
+def _find_package(world: dict, pkg_id: str) -> dict | None:
+    pid = (pkg_id or "").strip()
+    if not pid:
+        return None
+    for pkg in _migration(world)["packages"]:
+        if pkg["id"].lower() == pid.lower():
+            return pkg
+    return None
+
+
+def _compare_report(world: dict, source: str, target: str,
+                    object_names: list[str] | None = None) -> dict:
+    """App Designer compare report: source env definitions vs target env.
+
+    Mirrors the real compare's per-object outcomes:
+      absent          — target has no such object (new definition)
+      upgrade         — source is a newer version than target
+      same            — identical version
+      customisation   — target version was changed locally (customised flag);
+                        promoting would overwrite site-local work.
+    """
+    src = _find_env(world, source)
+    tgt = _find_env(world, target)
+    if not src or not tgt:
+        return {}
+    names = list(object_names) if object_names else sorted(src["objects"])
+    rows = []
+    for name in names:
+        s_obj = src["objects"].get(name)
+        if not s_obj:
+            continue
+        t_obj = tgt["objects"].get(name)
+        if t_obj is None:
+            outcome = "absent"
+        elif t_obj.get("customised"):
+            outcome = "customisation"
+        elif s_obj["version"] > t_obj["version"]:
+            outcome = "upgrade"
+        elif s_obj["version"] == t_obj["version"]:
+            outcome = "same"
+        else:
+            outcome = "target_newer"
+        rows.append({
+            "object": name,
+            "type": s_obj.get("type", "Page"),
+            "source_version": s_obj["version"],
+            "target_version": (t_obj or {}).get("version"),
+            "target_customised": bool((t_obj or {}).get("customised")),
+            "action": outcome,
+        })
+    return {
+        "source": src["name"],
+        "target": tgt["name"],
+        "generated_at": _now_iso(),
+        "rows": rows,
+        "conflicts": [r["object"] for r in rows if r["action"] == "customisation"],
+    }
 
 
 def _user_permissions(world: dict, user: dict) -> set[str]:
@@ -704,6 +880,83 @@ def _apply_preset(state: dict, slug: str) -> None:
         }
         return
 
+    # 7. Promote a fix DEV -> TEST -> PROD through Change Assistant, working
+    #    around a site customisation that TEST made to one of the objects.
+    #    Excludes the rollback keywords so a "back-out-change-package" slug
+    #    lands on the rollback lab below rather than here.
+    if (("promote" in s or "migration" in s or "change-package" in s
+         or "change-assistant" in s)
+            and not ("rollback" in s or "bad-patch" in s or "back-out" in s)):
+        mig = _migration(world)
+        dev = _find_env(world, "DEV")
+        test = _find_env(world, "TEST")
+        # DEV holds the fix; TEST customised the same page locally, so the
+        # compare report will flag a conflict the learner has to resolve.
+        dev["objects"]["PSU_EXPENSE_AE"]["version"] = 3
+        dev["objects"]["PSU_EXPENSE_AE"]["body"] = (
+            "-- PSU_EXPENSE_AE v3: fixes the duplicate-reimbursement defect")
+        test["objects"]["PSU_JOB_DATA_PAGE"]["customised"] = True
+        test["objects"]["PSU_JOB_DATA_PAGE"]["version"] = 4
+        state["goal"] = {
+            "kind": "package_promoted",
+            "title": "Promote the expense fix from DEV to PROD",
+            "target_objects": ["PSU_EXPENSE_AE"],
+            "require_version": {"PSU_EXPENSE_AE": 3},
+            "require_environments": ["TEST", "PROD"],
+            "protect_customisation": {"TEST": ["PSU_JOB_DATA_PAGE"]},
+            "objective": (
+                "The PSU_EXPENSE_AE fix (version 3) is finished in DEV but PROD is still "
+                "running version 2. Build an Application Designer change project over "
+                "PSU_EXPENSE_AE, cut a Change Assistant package, run a compare report, and "
+                "apply it to TEST and then PROD. TEST has a local customisation of "
+                "PSU_JOB_DATA_PAGE that must survive the promotion."),
+        }
+        return
+
+    # 8. Back a bad change package out of PROD.
+    if "bad-patch" in s or "rollback" in s or "back-out" in s:
+        mig = _migration(world)
+        prod = _find_env(world, "PROD")
+        dev = _find_env(world, "DEV")
+        # A regression shipped: PROD is running v9 of the voucher record, which
+        # broke AP. The pre-patch definition (v5) is captured in the package
+        # history so a rollback restores it exactly.
+        bad = _ps_object("PSU_VOUCHER_REC", version=9, obj_type="Record",
+                         body="-- PSU_VOUCHER_REC v9: regression — drops the vendor key")
+        dev["objects"]["PSU_VOUCHER_REC"] = _copy_object(bad)
+        before = {"PSU_VOUCHER_REC": _copy_object(prod["objects"]["PSU_VOUCHER_REC"])}
+        prod["objects"]["PSU_VOUCHER_REC"] = _copy_object(bad)
+        prod["last_applied_package"] = "CP-014"
+        mig["packages"].append({
+            "id": "CP-014",
+            "project": "PSU_AP_HOTFIX",
+            "source": "DEV",
+            "status": "applied",
+            "created_at": _now_iso(),
+            "payload": {"PSU_VOUCHER_REC": _copy_object(bad)},
+            "applied_to": ["TEST", "PROD"],
+            "history": [
+                {"environment": "TEST", "action": "apply", "at": _now_iso(),
+                 "before": {"PSU_VOUCHER_REC": _copy_object(before["PSU_VOUCHER_REC"])},
+                 "objects": ["PSU_VOUCHER_REC"]},
+                {"environment": "PROD", "action": "apply", "at": _now_iso(),
+                 "before": before, "objects": ["PSU_VOUCHER_REC"]},
+            ],
+        })
+        state["goal"] = {
+            "kind": "package_rolled_back",
+            "title": "Roll change package CP-014 out of PROD",
+            "target_package": "CP-014",
+            "target_environment": "PROD",
+            "target_objects": ["PSU_VOUCHER_REC"],
+            "restore_version": {"PSU_VOUCHER_REC": 5},
+            "objective": (
+                "Change package CP-014 shipped a regression: PSU_VOUCHER_REC version 9 "
+                "drops the vendor key and Accounts Payable is failing in PROD. Roll CP-014 "
+                "back out of PROD in Change Assistant so PROD returns to version 5."),
+        }
+        return
+
     # Default goal so an unrecognised slug still presents a real task.
     world["process"]["runs"].insert(0, _process_run(
         1009, "GL_JOURNAL_POST", "error", server="PSUNX", run_control="gl_post_default",
@@ -762,6 +1015,8 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     current_oprid = world["session"].get("oprid", "PS")
     ess_profile = _find_profile(world, current_oprid)
 
+    mig = _migration(world)
+
     return {
         "session_id": str(session_id),
         "scenario_slug": entry.get("scenario_slug") or scenario_slug,
@@ -772,6 +1027,9 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "access": accessible,
         # Self-service record for the signed-in operator (Fluid pages read this).
         "ess_profile": ess_profile,
+        # App Designer / Change Assistant lifecycle state + the last compare run.
+        "migration": mig,
+        "compare_report": state.get("last_compare"),
         "summary": {
             "env": world["env"]["name"],
             "peopletools": world["env"]["peopletools"],
@@ -796,6 +1054,11 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "objective": goal.get("objective", ""),
             "queries": len((world.get("v2") or {}).get("queries") or []),
             "journals": len((world.get("v2") or {}).get("journals") or []),
+            "environments_total": len(mig["environments"]),
+            "change_projects_total": len(mig["projects"]),
+            "change_packages_total": len(mig["packages"]),
+            "change_packages_applied": sum(1 for p in mig["packages"] if p.get("applied_to")),
+            "compare_conflicts": len((state.get("last_compare") or {}).get("conflicts") or []),
         },
     }
 
@@ -1103,6 +1366,246 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
         return {"ok": True, "message": f"Saved {comp['name']} configuration",
                 "config": comp["config"]}
 
+    # ---- Application Designer / Change Assistant migration lifecycle ----
+    # DEV build -> compare report -> TEST apply -> conflict -> resolve ->
+    # PROD promote, with rollback of a bad patch.
+    if act in ("edit_object", "modify_object", "customise_object"):
+        # Edit a definition inside one environment. Editing anywhere other than
+        # DEV is a site customisation — that is what later collides with a
+        # promotion and produces the compare-report conflict.
+        env = _find_env(world, payload.get("environment") or payload.get("env") or "DEV")
+        if not env:
+            return {"ok": False, "error": f"Environment '{payload.get('environment')}' not found"}
+        name = (payload.get("object") or payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "An object name is required"}
+        obj = env["objects"].get(name)
+        if not obj:
+            obj = _ps_object(name, version=0, obj_type=payload.get("type") or "Page")
+            env["objects"][name] = obj
+        obj["version"] = int(obj["version"]) + 1
+        if payload.get("body"):
+            obj["body"] = str(payload["body"])
+        # A change made outside DEV is a local customisation.
+        if env["name"] != "DEV":
+            obj["customised"] = True
+        _event(state, f"{env['name']}: saved {name} (version {obj['version']})"
+                      + (" — site customisation" if obj.get("customised") else ""))
+        return {"ok": True, "message": f"Saved {name} in {env['name']} (v{obj['version']})",
+                "object": _copy_object(obj)}
+
+    if act in ("create_project", "build_project", "create_change_project"):
+        # App Designer: build a change project in DEV from a list of objects.
+        name = (payload.get("project") or payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "A project name is required"}
+        if _find_project(world, name):
+            return {"ok": False, "error": f"Project '{name}' already exists"}
+        src = _find_env(world, payload.get("source") or "DEV")
+        if not src:
+            return {"ok": False, "error": "Source environment not found"}
+        raw = payload.get("objects") or payload.get("object_names") or []
+        if isinstance(raw, str):
+            raw = [p.strip() for p in raw.split(",") if p.strip()]
+        objects = [n for n in raw if n in src["objects"]]
+        missing = [n for n in raw if n not in src["objects"]]
+        if missing:
+            return {"ok": False,
+                    "error": f"Not in {src['name']}: {', '.join(missing)}"}
+        if not objects:
+            return {"ok": False, "error": "A change project needs at least one object"}
+        proj = {
+            "name": name,
+            "source": src["name"],
+            "objects": objects,
+            # DEV version captured at build time — the package payload is cut
+            # from this, so later DEV edits do not leak into a built package.
+            "built_versions": {n: src["objects"][n]["version"] for n in objects},
+            "created_at": _now_iso(),
+        }
+        _migration(world)["projects"].append(proj)
+        _event(state, f"Built change project {name} in {src['name']} "
+                      f"({len(objects)} object(s))")
+        return {"ok": True, "message": f"Project {name} built in {src['name']}",
+                "project": copy.deepcopy(proj)}
+
+    if act in ("compare_project", "compare_report", "run_compare"):
+        # Change Assistant / App Designer compare: source env vs target env.
+        proj_name = payload.get("project") or payload.get("name")
+        proj = _find_project(world, proj_name) if proj_name else None
+        if proj_name and not proj:
+            return {"ok": False, "error": f"Project '{proj_name}' not found"}
+        source = payload.get("source") or (proj or {}).get("source") or "DEV"
+        target = payload.get("target") or payload.get("environment")
+        if not target:
+            return {"ok": False, "error": "A target environment is required"}
+        report = _compare_report(world, source, target,
+                                 (proj or {}).get("objects"))
+        if not report:
+            return {"ok": False, "error": "Source or target environment not found"}
+        state["last_compare"] = report
+        _event(state, f"Compare report {report['source']} -> {report['target']}: "
+                      f"{len(report['rows'])} object(s), "
+                      f"{len(report['conflicts'])} conflict(s)")
+        return {"ok": True, "message": (f"Compare {report['source']} -> {report['target']} "
+                                        f"complete ({len(report['conflicts'])} conflict(s))"),
+                "report": report}
+
+    if act in ("create_package", "build_package", "cut_package"):
+        # Change Assistant: freeze the project's DEV definitions into a package.
+        proj = _find_project(world, payload.get("project") or payload.get("name"))
+        if not proj:
+            return {"ok": False, "error": "Change project not found — build it in App Designer first"}
+        src = _find_env(world, proj["source"])
+        if not src:
+            return {"ok": False, "error": "Project source environment not found"}
+        mig = _migration(world)
+        seq = mig["next_package_seq"]
+        mig["next_package_seq"] = seq + 1
+        pkg_id = (payload.get("package") or payload.get("package_id")
+                  or f"CP-{seq:03d}").strip()
+        if _find_package(world, pkg_id):
+            return {"ok": False, "error": f"Change package '{pkg_id}' already exists"}
+        pkg = {
+            "id": pkg_id,
+            "project": proj["name"],
+            "source": src["name"],
+            "status": "built",
+            "created_at": _now_iso(),
+            # Frozen payload — copied by value out of DEV at cut time.
+            "payload": {n: _copy_object(src["objects"][n])
+                        for n in proj["objects"] if n in src["objects"]},
+            # Per-environment apply history; each entry keeps the pre-apply
+            # snapshot so rollback restores exactly what was overwritten.
+            "applied_to": [],
+            "history": [],
+        }
+        mig["packages"].append(pkg)
+        _event(state, f"Cut change package {pkg_id} from project {proj['name']}")
+        return {"ok": True, "message": f"Change package {pkg_id} built from {proj['name']}",
+                "package_id": pkg_id, "package": copy.deepcopy(pkg)}
+
+    if act in ("apply_package", "promote_package", "promote", "apply_change_package"):
+        pkg = _find_package(world, payload.get("package") or payload.get("package_id"))
+        if not pkg:
+            return {"ok": False, "error": "Change package not found — build it in Change Assistant first"}
+        target = _find_env(world, payload.get("target") or payload.get("environment"))
+        if not target:
+            return {"ok": False, "error": f"Environment '{payload.get('target')}' not found"}
+        if target["name"] == pkg["source"]:
+            return {"ok": False, "error": f"{pkg['id']} was built in {pkg['source']} — "
+                                          "promote it to a downstream environment"}
+        # Enforce the DEV -> TEST -> PROD path: every environment between the
+        # package source and the target must already have this package applied.
+        try:
+            src_i = _ENV_ORDER.index(pkg["source"])
+            tgt_i = _ENV_ORDER.index(target["name"])
+        except ValueError:
+            return {"ok": False, "error": "Unknown environment in promotion path"}
+        if tgt_i < src_i:
+            return {"ok": False, "error": f"Cannot promote backwards to {target['name']}"}
+        skipped = [e for e in _ENV_ORDER[src_i + 1:tgt_i] if e not in pkg["applied_to"]]
+        if skipped:
+            return {"ok": False,
+                    "error": (f"{pkg['id']} has not been applied to {', '.join(skipped)} yet — "
+                              f"promote through {_ENV_ORDER[src_i + 1]} before {target['name']}.")}
+        if target["name"] in pkg["applied_to"]:
+            return {"ok": True, "message": f"{pkg['id']} is already applied to {target['name']}"}
+        # Customisation conflict: refuse rather than silently overwriting local
+        # work. The learner must resolve each conflicting object first.
+        force = bool(payload.get("force") or payload.get("overwrite"))
+        conflicts = [n for n in pkg["payload"]
+                     if (target["objects"].get(n) or {}).get("customised")]
+        if conflicts and not force:
+            return {"ok": False, "conflicts": conflicts,
+                    "error": (f"Customisation conflict applying {pkg['id']} to {target['name']}: "
+                              f"{', '.join(sorted(conflicts))} was customised in {target['name']}. "
+                              "Run a compare report and resolve each conflict "
+                              "(keep_customisation or accept_vendor) before promoting.")}
+        # Snapshot what we are about to overwrite so rollback is exact.
+        before = {n: _copy_object(target["objects"][n])
+                  for n in pkg["payload"] if n in target["objects"]}
+        for name, obj in pkg["payload"].items():
+            # Copy by VALUE — sharing the dict would make a later TEST edit
+            # mutate PROD (and make rollback appear to succeed while dirty).
+            target["objects"][name] = _copy_object(obj)
+        pkg["applied_to"].append(target["name"])
+        pkg["status"] = "applied"
+        pkg["history"].append({
+            "environment": target["name"], "action": "apply", "at": _now_iso(),
+            "before": before, "objects": sorted(pkg["payload"]),
+        })
+        target["last_applied_package"] = pkg["id"]
+        _event(state, f"Applied change package {pkg['id']} to {target['name']} "
+                      f"({len(pkg['payload'])} object(s))")
+        return {"ok": True, "message": f"{pkg['id']} applied to {target['name']}",
+                "environment": target["name"], "objects": sorted(pkg["payload"])}
+
+    if act in ("resolve_conflict", "resolve_customisation"):
+        # Resolve one compare-report conflict before promoting.
+        #   keep_customisation — keep the target's local definition and drop the
+        #                        object from the package payload.
+        #   accept_vendor      — discard the local customisation and let the
+        #                        package overwrite it.
+        target = _find_env(world, payload.get("environment") or payload.get("target"))
+        if not target:
+            return {"ok": False, "error": f"Environment '{payload.get('environment')}' not found"}
+        name = (payload.get("object") or payload.get("name") or "").strip()
+        obj = target["objects"].get(name)
+        if not obj:
+            return {"ok": False, "error": f"{name} not found in {target['name']}"}
+        resolution = (payload.get("resolution") or payload.get("action") or "").strip().lower()
+        pkg = _find_package(world, payload.get("package") or payload.get("package_id"))
+        if resolution in ("accept_vendor", "vendor", "overwrite", "take_source"):
+            obj["customised"] = False
+            _event(state, f"{target['name']}: accepted vendor definition for {name}")
+            return {"ok": True, "message": f"{name} will take the incoming definition in "
+                                           f"{target['name']}"}
+        if resolution in ("keep_customisation", "keep", "keep_target"):
+            if not pkg:
+                return {"ok": False, "error": "keep_customisation needs the package id so the "
+                                              "object can be dropped from its payload"}
+            pkg["payload"].pop(name, None)
+            obj["customised"] = False
+            _event(state, f"{target['name']}: kept the site customisation of {name} — "
+                          f"removed from package {pkg['id']}")
+            return {"ok": True, "message": f"Kept {target['name']}'s customisation of {name}; "
+                                           f"{name} dropped from {pkg['id']}"}
+        return {"ok": False, "error": "resolution must be 'keep_customisation' or 'accept_vendor'"}
+
+    if act in ("rollback_package", "rollback", "back_out_package"):
+        # Back a bad patch out of one environment, restoring the exact
+        # pre-apply definitions captured in the apply history.
+        pkg = _find_package(world, payload.get("package") or payload.get("package_id"))
+        if not pkg:
+            return {"ok": False, "error": "Change package not found"}
+        target = _find_env(world, payload.get("environment") or payload.get("target"))
+        if not target:
+            return {"ok": False, "error": f"Environment '{payload.get('environment')}' not found"}
+        entry = next((h for h in reversed(pkg["history"])
+                      if h["environment"] == target["name"] and h["action"] == "apply"), None)
+        if not entry or target["name"] not in pkg["applied_to"]:
+            return {"ok": False, "error": f"{pkg['id']} is not applied to {target['name']} — "
+                                          "nothing to roll back"}
+        for name in entry["objects"]:
+            prior = entry["before"].get(name)
+            if prior is None:
+                # The object did not exist before the apply — remove it again.
+                target["objects"].pop(name, None)
+            else:
+                target["objects"][name] = _copy_object(prior)
+        pkg["applied_to"].remove(target["name"])
+        pkg["status"] = "rolled_back" if not pkg["applied_to"] else "applied"
+        pkg["history"].append({
+            "environment": target["name"], "action": "rollback", "at": _now_iso(),
+            "objects": list(entry["objects"]),
+        })
+        target["last_applied_package"] = ""
+        _event(state, f"Rolled back change package {pkg['id']} from {target['name']}",
+               severity="warning")
+        return {"ok": True, "message": f"{pkg['id']} rolled back from {target['name']}",
+                "environment": target["name"], "objects": list(entry["objects"])}
+
     if act in ("reset",):
         # Re-seed the world from the preset (fresh start).
         slug = state.get("goal", {}).get("slug") or ""
@@ -1215,5 +1718,54 @@ def validate_peoplesoft_lab(session_id: str, scenario_slug: str = "") -> tuple[b
             return False, (f"{user['oprid']} is still locked out — unlock the account "
                            "(set Account Locked Out = N) in User Profiles.")
         return True, (f"{user['oprid']} is unlocked and can sign in — validation passed.")
+
+    if kind == "package_promoted":
+        # The fix must be live in every required environment at the right
+        # version, and any protected site customisation must have survived.
+        for env_name in goal.get("require_environments") or []:
+            env = _find_env(world, env_name)
+            if not env:
+                return False, f"Environment {env_name} not found."
+            for name, want in (goal.get("require_version") or {}).items():
+                obj = env["objects"].get(name)
+                if not obj:
+                    return False, (f"{name} has not been promoted to {env_name} yet — build a "
+                                   "change package in Change Assistant and apply it.")
+                if int(obj.get("version", 0)) < int(want):
+                    return False, (f"{env_name} is still running {name} version "
+                                   f"{obj.get('version')} (need {want}). Apply the change "
+                                   "package to this environment.")
+        for env_name, names in (goal.get("protect_customisation") or {}).items():
+            env = _find_env(world, env_name)
+            if not env:
+                continue
+            for name in names:
+                if name not in env["objects"]:
+                    return False, (f"The {env_name} customisation of {name} was destroyed by the "
+                                   "promotion — resolve the conflict with keep_customisation "
+                                   "instead of overwriting it.")
+        return True, ("The change package is promoted through to PROD and the site "
+                      "customisation survived — validation passed.")
+
+    if kind == "package_rolled_back":
+        pkg = _find_package(world, goal.get("target_package"))
+        if not pkg:
+            return False, f"Change package {goal.get('target_package')} not found."
+        env_name = goal.get("target_environment") or "PROD"
+        env = _find_env(world, env_name)
+        if not env:
+            return False, f"Environment {env_name} not found."
+        if env_name in pkg.get("applied_to", []):
+            return False, (f"{pkg['id']} is still applied to {env_name} — roll it back in "
+                           "Change Assistant.")
+        for name, want in (goal.get("restore_version") or {}).items():
+            obj = env["objects"].get(name)
+            if not obj:
+                return False, f"{name} is missing from {env_name} after the rollback."
+            if int(obj.get("version", 0)) != int(want):
+                return False, (f"{env_name} is running {name} version {obj.get('version')} — "
+                               f"the rollback must restore version {want}.")
+        return True, (f"{pkg['id']} is rolled back and {env_name} is on the pre-patch "
+                      "definition — validation passed.")
 
     return False, "No validation goal configured for this scenario"

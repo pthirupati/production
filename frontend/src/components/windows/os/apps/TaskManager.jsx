@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useOS } from '../store'
 import { useCtxMenu } from '../ui'
 
@@ -23,7 +23,7 @@ function Graph({ data, color, max = 100, h = 160 }) {
   )
 }
 
-export default function TaskManager({ win }) {
+export default function TaskManager({ win: _win }) {
   const os = useOS()
   const ctx = useCtxMenu()
   const [tab, setTab] = useState('Processes')

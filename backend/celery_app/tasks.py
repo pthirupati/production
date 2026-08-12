@@ -16,7 +16,7 @@ def debug_task(self):
     return {"task_id": self.request.id, "status": "completed"}
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=60, retry_kwargs={"max_retries": 2})
 def cleanup_expired_labs():
     """
     Terminate lab sessions that have exceeded their time limit.
@@ -206,7 +206,7 @@ BEAT_HEARTBEAT_INTERVAL_SECONDS = 60
 BEAT_HEARTBEAT_MAX_AGE_SECONDS = 200
 
 
-@shared_task(name="celery_app.tasks.beat_heartbeat")
+@shared_task(name="celery_app.tasks.beat_heartbeat", autoretry_for=(OSError,), retry_backoff=5, retry_kwargs={"max_retries": 2})
 def beat_heartbeat():
     """Prove celery beat is still scheduling (audit Z5-15).
 
@@ -246,7 +246,13 @@ def beat_heartbeat():
     return {"written_at": payload.strip()}
 
 
-@shared_task(name="celery_app.tasks.prune_docker_artifacts", queue="provisioning")
+@shared_task(
+    name="celery_app.tasks.prune_docker_artifacts",
+    queue="provisioning",
+    autoretry_for=(Exception,),
+    retry_backoff=30,
+    retry_kwargs={"max_retries": 2},
+)
 def prune_docker_artifacts():
     """Reclaim disk from dangling images, build cache and unused volumes.
 
@@ -314,7 +320,7 @@ def prune_docker_artifacts():
     return {"status": "ok", "reclaimed_bytes": reclaimed, "total_bytes": total}
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=60, retry_kwargs={"max_retries": 2})
 def cleanup_orphaned_containers():
     """
     Remove Docker containers and cloud instances that don't have a matching active lab session.
@@ -364,7 +370,7 @@ def cleanup_orphaned_containers():
     return results
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=30, retry_kwargs={"max_retries": 2})
 def recalculate_leaderboard():
     """
     Recalculate the global leaderboard snapshot from progress data.
@@ -569,7 +575,7 @@ def teardown_lab_resource(self, session_id: str):
     return {"status": "terminated", "session_id": str(session_id)}
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=30, retry_kwargs={"max_retries": 2})
 def cleanup_expired_otps():
     """
     Remove expired OTP records older than 24 hours.
@@ -582,7 +588,7 @@ def cleanup_expired_otps():
     return {"deleted_otps": deleted}
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=30, retry_kwargs={"max_retries": 2})
 def cleanup_expired_tokens():
     """
     Remove used/expired password reset tokens older than 7 days.
@@ -596,7 +602,7 @@ def cleanup_expired_tokens():
     return {"deleted_tokens": deleted}
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=30, retry_kwargs={"max_retries": 2})
 def cleanup_old_audit_logs():
     """
     Remove audit log entries older than 90 days.
@@ -609,7 +615,7 @@ def cleanup_old_audit_logs():
     return {"deleted_audit_logs": deleted}
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=30, retry_kwargs={"max_retries": 2})
 def cleanup_old_notifications():
     """
     Remove read notifications older than 60 days.
@@ -808,6 +814,7 @@ def deliver_jira_team_reply(
     scenario_slug: str = "",
 ):
     """Delayed Jira @team bot reply — applies simulation ops then posts comment."""
+    from apps.jira_integration.pending_team_replies import cancel_pending_for_issue
     from apps.jira_integration.team_bots import deliver_team_reply_now
 
     deliver_team_reply_now(
@@ -818,8 +825,28 @@ def deliver_jira_team_reply(
         actions or [],
         scenario_slug,
     )
+    # Celery path won — drop the durable pending row so beat does not double-post.
+    try:
+        cancel_pending_for_issue(issue_key)
+    except Exception:  # pragma: no cover
+        pass
     logger.info("Jira team reply delivered issue=%s author=%s", issue_key, author)
     return {"issue_key": issue_key, "author": author}
+
+
+@shared_task
+def sweep_pending_team_replies():
+    """Beat sweeper for durable @team replies (audit X2b).
+
+    Re-delivers any pending row whose countdown was lost (worker restart /
+    broker drop). Idempotent with the Celery countdown path via cancel-on-deliver.
+    """
+    from apps.jira_integration.pending_team_replies import deliver_due_pending_team_replies
+
+    result = deliver_due_pending_team_replies()
+    if result.get("delivered") or result.get("failed"):
+        logger.info("pending team reply sweep: %s", result)
+    return result
 
 
 @shared_task
@@ -886,7 +913,7 @@ from celery_app.tasks_monitoring import check_business_signals  # noqa: E402,F40
 from apps.accounts.webhooks import deliver_org_webhook  # noqa: E402,F401
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=60, retry_kwargs={"max_retries": 2})
 def purge_expired_personal_data():
     """Enforce the retention periods in settings for the sensitive data classes.
 
@@ -907,6 +934,7 @@ def purge_expired_personal_data():
     """
     from django.conf import settings
 
+    from apps.accounts.models import AccountLifecycleEvent
     from apps.interviews.models import AsyncVideoResponse, CandidateProfile, InterviewMessage
     from apps.labs.models import CommandHistory
 
@@ -974,6 +1002,16 @@ def purge_expired_personal_data():
             resume_file="", resume_text="",
         ),
         _purge_resumes,
+    )
+
+    # Audit Z4-12 leftover: email kept after inactive deletion for anti-abuse.
+    # Basis + TTL must be stated (privacy page) and enforced here — unbounded
+    # retention of a deleted user's email is the defect, not the retention itself.
+    _sweep(
+        "account_lifecycle",
+        getattr(settings, "RETENTION_ACCOUNT_LIFECYCLE_DAYS", 0),
+        lambda c: AccountLifecycleEvent.objects.filter(created_at__lt=c),
+        lambda qs: qs.delete(),
     )
 
     # ── Operational growth (audit Z5-8) ────────────────────────────────────────

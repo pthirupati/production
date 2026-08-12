@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'CONTEXT: Complete the fetch coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab JavaScript/React practice IDE — edit solution.js, Run visible
   tests, then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: fetch. The stub in solution.js is incomplete
   so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required function so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -74,7 +70,7 @@ tags:
 - fix
 - hands-on
 - javascript
-linked_tutorial: javascript-fundamentals
+linked_tutorial: javascript-language-zero-hero
 what_you_will_learn:
 - Unsafe defaults related to fetch are removed or constrained
 - Access follows least privilege and is auditable
@@ -156,5 +152,9 @@ coding_spec:
   - name: bad
     code: assert(parseJsonSafe('{') === null);
   - name: num
+    code: assert(parseJsonSafe('7') === 7);
+  - name: s87_fn_defined
+    code: assert(typeof parseJsonSafe === "function");
+  - name: s87_repeat_last
     code: assert(parseJsonSafe('7') === 7);
   timeout: 8

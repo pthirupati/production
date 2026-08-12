@@ -381,6 +381,29 @@ const CodeEditor = forwardRef(function CodeEditor(
     focus: () => viewRef.current?.focus(),
     formatDocument: () => formatDoc(viewRef.current),
     getValue: () => viewRef.current?.state.doc.toString() ?? '',
+    /** Character offset of the cursor — the anchor for go-to-definition. */
+    getCursorOffset: () => viewRef.current?.state.selection.main.head ?? 0,
+    /**
+     * Scroll to a 1-based line/column and put the cursor there.
+     *
+     * Clamped to the document because the caller's line number comes from a
+     * symbol index built off `files`, which can be a render behind the buffer
+     * after a fast edit. An out-of-range dispatch would throw and blank the
+     * editor; landing on the last line is a harmless miss instead.
+     */
+    revealPosition: (line, column = 1) => {
+      const v = viewRef.current
+      if (!v) return false
+      const lineNo = Math.max(1, Math.min(Number(line) || 1, v.state.doc.lines))
+      const lineObj = v.state.doc.line(lineNo)
+      const pos = Math.min(lineObj.from + Math.max(0, (Number(column) || 1) - 1), lineObj.to)
+      v.dispatch({
+        selection: { anchor: pos, head: pos },
+        effects: EditorView.scrollIntoView(pos, { y: 'center' }),
+      })
+      v.focus()
+      return true
+    },
     // The live EditorView. Exposed so callers (and tests) can run CodeMirror
     // commands such as undo against the editor's real state.
     getView: () => viewRef.current,

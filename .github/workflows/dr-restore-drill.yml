@@ -1,0 +1,26 @@
+# Monthly Postgres backup → restore drill (audit O8 / Z5-8).
+# Proves scripts/restore-pg-backup.sh against a disposable postgres:16 container.
+# Does not touch production D3.
+name: DR restore drill
+
+on:
+  schedule:
+    - cron: "0 6 1 * *" # 06:00 UTC on the 1st of each month
+  workflow_dispatch:
+
+concurrency:
+  group: dr-restore-drill
+  cancel-in-progress: false
+
+jobs:
+  restore-drill:
+    name: Backup and restore drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run restore drill
+        run: |
+          chmod +x scripts/dr-restore-drill.sh scripts/restore-pg-backup.sh
+          ./scripts/dr-restore-drill.sh

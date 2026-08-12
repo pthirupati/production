@@ -3,36 +3,29 @@ description: 'CONTEXT: A team operating Red Hat Enterprise Linux has raised a ti
   Mode`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline RHEL practice host. The architecture is a single
   lab-primary node exposing dnf, subscription-manager, firewalld, and SELinux; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: RHEL 9 server that drops to the `grub rescue>` prompt at boot. GRUB cannot
   load its normal configuration, so the OS does not start.
-
 
   OBJECTIVE: Identify the boot/root partition from the grub rescue prompt; Boot into the OS (or a rescue
   environment); Reinstall GRUB and regenerate its config so the system boots normally. Acceptance criteria:
   the change is minimal and reversible, and success means `firewall-cmd --state` includes `running`.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant dnf, subscription-manager, firewalld, and SELinux), changing one thing at a time.
   Check your work continuously against the objective — success means `firewall-cmd --state` includes `running`.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `firewall-cmd --state` includes `running`.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -81,7 +74,6 @@ hints:
 
     3. Confirm `firewall-cmd --list-ports` includes the required port.
 
-
     WHY: a running service behind a closed firewall still fails health checks.'
 initial_state: RHEL 9 server that drops to the `grub rescue>` prompt at boot. GRUB cannot load
   its normal configuration, so the OS does not start.
@@ -108,7 +100,7 @@ tags:
 - fix
 - hands-on
 - rhel-linux
-linked_tutorial: rhel-linux-fundamentals
+linked_tutorial: rhel-linux-zero-hero
 what_you_will_learn:
 - Identify the boot/root partition from the grub rescue prompt
 - Boot into the OS (or a rescue environment)

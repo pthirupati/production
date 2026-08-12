@@ -6,6 +6,8 @@ Pipeline mirrors GitHub Actions–style Image Factory workflow runs.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -36,12 +38,55 @@ NVIDIA_MARKERS = (
 ACTIONS = frozenset({
     "packer_factory_get_state",
     "packer_factory_start_pipeline",
+    "packer_factory_start_matrix",
+    "packer_factory_fail_matrix_sku",
+    "packer_factory_publish_matrix",
     "packer_factory_advance_job",
     "packer_factory_publish_artifact",
     "packer_factory_rerun_job",
     "packer_factory_get_job_logs",
     "packer_factory_mark_build",
+    "packer_factory_get_manifest",
+    "packer_factory_verify_upstream",
 })
+
+# Artifact manifest schema version. Bumped whenever a field is ADDED or its
+# meaning changes. Consumers (aws_engine import-image, graders) must compare
+# this rather than probing for individual keys — a `.get(key, default)` probe
+# on an old manifest-less blob would silently read a default and fail OPEN,
+# passing a learner who never built the image.
+MANIFEST_SCHEMA_VERSION = 1
+
+# Base cloud images a build can start from, keyed by the SKU's OS family. The
+# digest is the artifact's identity: import-image refuses a manifest whose
+# digest does not match what the build recorded.
+BASE_IMAGES = {
+    "jammy": {
+        "name": "ubuntu-22.04-server-cloudimg-amd64.img",
+        "os": "ubuntu-22.04",
+        "arch": "x86_64",
+        "user": "ubuntu",
+        "kernel": "5.15.0-91-generic",
+        # Teaching digests — supply-chain gate compares learner-supplied values.
+        "sha256": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        "gpg_fingerprint": "843938DF228D22F7B3742BC0D94AA3F0EFE21092",
+    },
+    "rhel-gpu": {
+        "name": "rhel-9.3-x86_64-kvm.qcow2",
+        "os": "rhel-9",
+        "arch": "x86_64",
+        "user": "ec2-user",
+        "kernel": "5.14.0-362.el9.x86_64",
+        "sha256": "sha256:c5f969d8a0e3c5f1f7a0e4b2c8d6e0a1b3c5d7e9f1a3b5c7d9e1f3a5b7c9d1e3",
+        "gpg_fingerprint": "567E347AD0044ADE55BA8A5F199E2F91FD431D51",
+    },
+}
+
+# Packages libguestfs-customize bakes in on every build, before SKU extras.
+BASE_PACKAGES = ("cloud-init", "qemu-guest-agent", "openssh-server")
+
+# Driver stack added only when the template genuinely provisions NVIDIA.
+GPU_PACKAGES = ("nvidia-driver-535", "nvidia-persistenced", "cuda-toolkit-12-3", "datacenter-gpu-manager")
 
 
 def _now() -> str:
@@ -179,6 +224,121 @@ def _has_nvidia_marker(files: dict | None, template_blob: str = "") -> bool:
     return False
 
 
+def _base_image_for(sku: str) -> dict:
+    sku = (sku or "h100").strip().lower()
+    return BASE_IMAGES["rhel-gpu"] if sku in ("rhel-gpu", "rhel") else BASE_IMAGES["jammy"]
+
+
+def verify_upstream_image(payload: dict | None = None, *, sku: str = "h100") -> tuple[bool, str]:
+    """Supply-chain gate: refuse the build on checksum/GPG mismatch (audit X3).
+
+    Enforcement is opt-in via payload fields or ``force_verify`` so existing
+    pipelines that never supply a checksum keep working. When a checksum or
+    GPG result *is* supplied, mismatch fails closed — no artifact is produced.
+    """
+    payload = payload or {}
+    base = _base_image_for(sku)
+    expected = str(base.get("sha256") or "")
+    got = str(payload.get("checksum") or payload.get("sha256") or "").strip()
+    force = bool(payload.get("verify_upstream") or payload.get("force_verify"))
+
+    if got or force:
+        if not got:
+            return False, "ClientError: upstream image checksum required before build"
+        if not got.startswith("sha256:"):
+            got = f"sha256:{got}"
+        if got != expected:
+            return False, (
+                f"ClientError: upstream image checksum mismatch "
+                f"(got {got}, expected {expected}) — refuse to build"
+            )
+
+    if payload.get("gpg_ok") is False or payload.get("gpg_verify") is False:
+        return False, (
+            "ClientError: upstream image GPG signature verification failed — refuse to build"
+        )
+
+    fingerprint = str(payload.get("gpg_fingerprint") or "").strip().upper().replace(" ", "")
+    if fingerprint:
+        want = str(base.get("gpg_fingerprint") or "").upper().replace(" ", "")
+        if fingerprint != want:
+            return False, (
+                f"ClientError: upstream image GPG fingerprint mismatch "
+                f"(got {fingerprint}) — refuse to build"
+            )
+
+    if got or force or fingerprint or payload.get("gpg_ok") is True:
+        return True, "upstream image verified"
+    return True, "upstream verify skipped"
+
+
+def _artifact_digest(run: dict) -> str:
+    """Content digest over the inputs that decide what lands in the image.
+
+    Deterministic (blake2b over a sorted, canonical projection) so the same
+    template + SKU + gate outcomes always produce the same digest — a grader can
+    therefore assert "this AMI came from that build" rather than trusting a
+    random id. Gate outcomes are part of the identity on purpose: a remediated
+    image is genuinely different content from the one that failed the CVE gate.
+    """
+    payload = json.dumps(
+        {
+            "sku": run.get("sku") or "",
+            "base": _base_image_for(run.get("sku")).get("name"),
+            "has_nvidia_marker": bool(run.get("has_nvidia_marker")),
+            "cve_remediated": bool(run.get("cve_remediated")),
+            "files": {k: str(v) for k, v in sorted((run.get("files_snapshot") or {}).items())},
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return "sha256:" + hashlib.blake2b(payload.encode("utf-8"), digest_size=32).hexdigest()
+
+
+def build_manifest(run: dict) -> dict:
+    """Content manifest describing what a completed build actually produced.
+
+    This is the grading substrate for the image→AMI→instance chain: the packages,
+    kernel, users and CIS findings recorded here are what an imported AMI carries
+    into a launched instance's guest state. Fields are always present (never
+    conditionally omitted) so a consumer never has to guess whether absence means
+    "not built" or "old schema" — `schema_version` answers that instead.
+    """
+    sku = (run.get("sku") or "h100").strip().lower()
+    base = _base_image_for(sku)
+    has_gpu = bool(run.get("has_nvidia_marker"))
+
+    packages = list(BASE_PACKAGES) + (list(GPU_PACKAGES) if has_gpu else [])
+    services = ["cloud-init", "sshd", "qemu-guest-agent"] + (["nvidia-persistenced", "dcgm-exporter"] if has_gpu else [])
+
+    # The CVE gate is what remediation actually clears. An unremediated build
+    # carries its findings forward so a vuln-scan lab can assert on them.
+    cve_open = [] if run.get("cve_remediated") or not run.get("cve_failed") else ["CVE-2024-XXXX"]
+
+    return {
+        "schema_version": MANIFEST_SCHEMA_VERSION,
+        "sku": sku,
+        "base_image": base["name"],
+        "os": base["os"],
+        "arch": base["arch"],
+        "kernel": base["kernel"],
+        "default_user": base["user"],
+        "packages": sorted(packages),
+        "services_enabled": sorted(services),
+        "gpu_stack": has_gpu,
+        "cloud_init_enabled": True,
+        "ssh_keys_baked": True,
+        "ssh_host_keys": ["ssh-ed25519", "ssh-rsa"],
+        "cve_open": cve_open,
+        "cve_remediated": bool(run.get("cve_remediated")),
+        "gpu_sanity_failed": bool(run.get("gpu_sanity_failed")),
+        "digest": _artifact_digest(run),
+        "built_at": _now(),
+        "boot_resource": run.get("boot_resource") or _boot_resource_name(sku),
+        "run_id": run.get("id"),
+    }
+
+
 def ensure_factory(state: dict) -> dict:
     factory = state.setdefault("packer_factory", {})
     factory.setdefault("runs", [])
@@ -187,7 +347,62 @@ def ensure_factory(state: dict) -> dict:
     factory.setdefault("artifact_ready", False)
     factory.setdefault("suggested_boot_resource", "custom/h100-jammy")
     factory.setdefault("matrix", list(MATRIX_SKUS))
+    factory.setdefault("build_cache", {})
     return factory
+
+
+def _provisioner_layers(template_blob: str, files: dict | None = None) -> list[dict[str, Any]]:
+    """Ordered provisioner-layer digests for bake-time cache (X3 golden bake).
+
+    Reordering a late-changing script earlier busts digests after that point —
+    the teaching signal for layer/provisioner ordering regressions.
+    """
+    files = files or {}
+    cleaned = _strip_hcl_comments(template_blob or "")
+    bodies = _block_bodies(cleaned, _SHELL_PROV_RE)
+    # Also treat top-level shell files as ordered layers when no HCL bodies.
+    if not bodies and files:
+        bodies = [f"{path}\n{content}" for path, content in sorted(files.items())]
+    layers = []
+    parent = "scratch"
+    for i, body in enumerate(bodies):
+        digest_src = f"{parent}\n{body.strip()}\n"
+        for path, content in sorted(files.items()):
+            digest_src += f"{path}:{hashlib.blake2b(str(content).encode(), digest_size=8).hexdigest()}\n"
+        layer_digest = "blake2:" + hashlib.blake2b(digest_src.encode(), digest_size=16).hexdigest()
+        summary = body.strip().splitlines()[0][:80] if body.strip() else f"layer-{i}"
+        layers.append({
+            "digest": layer_digest,
+            "index": i,
+            "summary": summary,
+            "instr": body.strip()[:200],
+        })
+        parent = layer_digest
+    return layers
+
+
+def _apply_bake_cache(factory: dict, run: dict, template_blob: str, files: dict | None) -> dict:
+    """Record cache hits and simulated bake_seconds on the active run."""
+    cache = factory.setdefault("build_cache", {})
+    layers = _provisioner_layers(template_blob, files)
+    hits = 0
+    for layer in layers:
+        d = layer["digest"]
+        if d in cache:
+            hits += 1
+            layer["cache_hit"] = True
+        else:
+            cache[d] = {"at": _now(), "summary": layer.get("summary")}
+            layer["cache_hit"] = False
+    misses = max(0, len(layers) - hits)
+    # Cold: 30 + 45*layers; warm rebuild only pays for misses.
+    bake_seconds = 30 + 45 * misses + (5 * hits)  # hits still cost a tiny verify
+    run["layer_digests"] = [L["digest"] for L in layers]
+    run["layers"] = layers
+    run["cache_hits"] = hits
+    run["cache_misses"] = misses
+    run["bake_seconds"] = bake_seconds
+    return {"cache_hits": hits, "cache_misses": misses, "bake_seconds": bake_seconds, "layers": layers}
 
 
 def get_factory_state(state: dict) -> dict:
@@ -202,6 +417,7 @@ def get_factory_state(state: dict) -> dict:
         "active_run": active,
         "build_succeeded": bool(factory.get("build_succeeded")),
         "artifact_ready": bool(factory.get("artifact_ready")),
+        "manifest": (active or {}).get("manifest") or factory.get("manifest"),
         "suggested_boot_resource": factory.get("suggested_boot_resource") or "custom/h100-jammy",
         "matrix": list(factory.get("matrix") or MATRIX_SKUS),
         "checks": (active or {}).get("checks") or [],
@@ -336,6 +552,20 @@ def start_pipeline(state: dict, payload: dict | None = None) -> dict:
     sku = (payload.get("sku") or "h100").strip().lower()
     if sku not in MATRIX_SKUS and sku not in ("a100", "rhel-gpu", "rhel"):
         sku = "h100"
+
+    # Supply-chain gate (X3): checksum/GPG mismatch refuses before any job runs.
+    gate_payload = dict(payload)
+    broken = state.get("broken") if isinstance(state.get("broken"), dict) else {}
+    if broken.get("upstream_checksum_mismatch") or broken.get("upstream_gpg_fail"):
+        gate_payload["force_verify"] = True
+        if broken.get("upstream_gpg_fail") and "gpg_ok" not in gate_payload:
+            gate_payload["gpg_ok"] = False
+    ok, msg = verify_upstream_image(gate_payload, sku=sku)
+    if not ok:
+        factory["build_succeeded"] = False
+        factory["artifact_ready"] = False
+        return {**get_factory_state(state), "ok": False, "error": msg}
+
     files = payload.get("files") if isinstance(payload.get("files"), dict) else {}
     template_blob = payload.get("template") or ""
     has_nvidia = _has_nvidia_marker(files, template_blob)
@@ -363,7 +593,9 @@ def start_pipeline(state: dict, payload: dict | None = None) -> dict:
         "artifact_ready": False,
         "boot_resource": boot,
         "files_snapshot": {k: (str(v)[:200] if v else "") for k, v in (files or {}).items()},
+        "template_snapshot": (template_blob or "")[:4000],
     }
+    bake = _apply_bake_cache(factory, run, template_blob, files)
     # Seed first job as ready to advance
     run["jobs"][0]["status"] = "queued"
     factory["runs"].insert(0, run)
@@ -373,6 +605,8 @@ def start_pipeline(state: dict, payload: dict | None = None) -> dict:
     return {
         "ok": True,
         "message": f"Image Factory run #{run_id} started (matrix {sku})",
+        "bake_seconds": bake["bake_seconds"],
+        "cache_hits": bake["cache_hits"],
         "run": run,
         **get_factory_state(state),
     }
@@ -552,6 +786,10 @@ def advance_job(state: dict, payload: dict | None = None) -> dict:
         run["artifact_ready"] = True
         factory["artifact_ready"] = True
         factory["suggested_boot_resource"] = run.get("boot_resource")
+        # Manifest is written only on a fully-gated success, so its presence is
+        # itself the proof the build passed — import-image needs no gate re-check.
+        run["manifest"] = build_manifest(run)
+        factory["manifest"] = run["manifest"]
         run["updated_at"] = _now()
         _sync_checks(run)
         return {
@@ -646,6 +884,8 @@ def publish_artifact(state: dict, payload: dict | None = None) -> dict:
         if run:
             run["artifact_ready"] = True
             run["boot_resource"] = name
+            run["manifest"] = build_manifest(run)
+            factory["manifest"] = run["manifest"]
         return {
             "ok": True,
             "message": result.get("message"),
@@ -684,6 +924,128 @@ def mark_build(state: dict, payload: dict | None = None) -> dict:
     }
 
 
+def get_manifest(state: dict) -> dict:
+    """Return the manifest of the most recent successfully-published build.
+
+    Fails CLOSED: no manifest means no image was produced, and the caller (AWS
+    import-image) must refuse rather than fabricate a default. Returning an empty
+    dict here would let a consumer's `.get(...)` read a default and import an
+    image that was never built.
+    """
+    factory = ensure_factory(state)
+    run = _active_run(factory)
+    manifest = (run or {}).get("manifest") or factory.get("manifest")
+    if not manifest:
+        return {"ok": False, "error": "No published image artifact — run the Image Factory pipeline to completion first."}
+    return {"ok": True, "manifest": manifest, "schema_version": manifest.get("schema_version")}
+
+
+def start_matrix_pipeline(state: dict, payload: dict | None = None) -> dict:
+    """Multi-SKU matrix: each SKU is an independent track (X3).
+
+    One SKU failing must not block publish of the others.
+    """
+    payload = payload or {}
+    factory = ensure_factory(state)
+    skus = payload.get("skus") or list(MATRIX_SKUS)
+    if isinstance(skus, str):
+        skus = [s.strip() for s in skus.split(",") if s.strip()]
+    skus = [str(s).strip().lower() for s in skus]
+    matrix_id = int(factory.get("next_matrix_id") or 1)
+    factory["next_matrix_id"] = matrix_id + 1
+    tracks = []
+    for sku in skus:
+        tracks.append({
+            "sku": sku,
+            "status": "success",
+            "conclusion": "success",
+            "boot_resource": _boot_resource_name(sku),
+            "published": False,
+            "error": None,
+        })
+    matrix = {
+        "id": matrix_id,
+        "status": "in_progress",
+        "tracks": tracks,
+        "created_at": _now(),
+        "updated_at": _now(),
+    }
+    factory.setdefault("matrices", []).insert(0, matrix)
+    factory["active_matrix_id"] = matrix_id
+    return {
+        "ok": True,
+        **get_factory_state(state),
+        "message": f"Matrix #{matrix_id} started for {len(tracks)} SKU(s)",
+        "matrix_run": matrix,
+    }
+
+
+def fail_matrix_sku(state: dict, payload: dict | None = None) -> dict:
+    payload = payload or {}
+    factory = ensure_factory(state)
+    mid = payload.get("matrix_id") or factory.get("active_matrix_id")
+    matrix = next((m for m in (factory.get("matrices") or []) if m.get("id") == mid), None)
+    if not matrix:
+        return {"ok": False, "error": "No active matrix — start_matrix first"}
+    sku = (payload.get("sku") or "").strip().lower()
+    track = next((t for t in matrix.get("tracks") or [] if t.get("sku") == sku), None)
+    if not track:
+        return {"ok": False, "error": f"SKU '{sku}' not in matrix"}
+    track["status"] = "failure"
+    track["conclusion"] = "failure"
+    track["error"] = payload.get("error") or f"gpu-sanity failed for {sku}"
+    track["published"] = False
+    matrix["updated_at"] = _now()
+    # Matrix overall stays in_progress until publish; one failure is fine.
+    return {
+        "ok": True,
+        **get_factory_state(state),
+        "message": f"Matrix SKU {sku} marked failed — others unaffected",
+        "matrix_run": matrix,
+    }
+
+
+def publish_matrix(state: dict, payload: dict | None = None) -> dict:
+    """Publish every successful SKU; skip failures without blocking the batch."""
+    payload = payload or {}
+    factory = ensure_factory(state)
+    mid = payload.get("matrix_id") or factory.get("active_matrix_id")
+    matrix = next((m for m in (factory.get("matrices") or []) if m.get("id") == mid), None)
+    if not matrix:
+        return {"ok": False, "error": "No active matrix — start_matrix first"}
+    published = []
+    skipped = []
+    for track in matrix.get("tracks") or []:
+        if track.get("status") != "success":
+            skipped.append({"sku": track.get("sku"), "reason": track.get("error") or "failed"})
+            continue
+        pub = publish_artifact(state, {
+            "sku": track.get("sku"),
+            "boot_resource": track.get("boot_resource"),
+        })
+        if pub.get("ok"):
+            track["published"] = True
+            published.append(track.get("sku"))
+        else:
+            track["status"] = "failure"
+            track["error"] = pub.get("error") or "publish failed"
+            skipped.append({"sku": track.get("sku"), "reason": track["error"]})
+    matrix["status"] = "completed"
+    matrix["conclusion"] = "success" if published else "failure"
+    matrix["updated_at"] = _now()
+    factory["artifact_ready"] = bool(published)
+    return {
+        "ok": True,
+        **get_factory_state(state),
+        "message": (
+            f"Published {len(published)} SKU(s); skipped {len(skipped)} failed"
+        ),
+        "published": published,
+        "skipped": skipped,
+        "matrix_run": matrix,
+    }
+
+
 def handle_action(state: dict, action: str, payload: dict | None = None) -> dict | None:
     if action not in ACTIONS:
         return None
@@ -692,6 +1054,12 @@ def handle_action(state: dict, action: str, payload: dict | None = None) -> dict
         return get_factory_state(state)
     if action == "packer_factory_start_pipeline":
         return start_pipeline(state, payload)
+    if action == "packer_factory_start_matrix":
+        return start_matrix_pipeline(state, payload)
+    if action == "packer_factory_fail_matrix_sku":
+        return fail_matrix_sku(state, payload)
+    if action == "packer_factory_publish_matrix":
+        return publish_matrix(state, payload)
     if action == "packer_factory_advance_job":
         return advance_job(state, payload)
     if action == "packer_factory_publish_artifact":
@@ -702,6 +1070,12 @@ def handle_action(state: dict, action: str, payload: dict | None = None) -> dict
         return get_job_logs(state, payload)
     if action == "packer_factory_mark_build":
         return mark_build(state, payload)
+    if action == "packer_factory_get_manifest":
+        return get_manifest(state)
+    if action == "packer_factory_verify_upstream":
+        sku = (payload.get("sku") or "h100").strip().lower()
+        ok, msg = verify_upstream_image(payload, sku=sku)
+        return {"ok": ok, "message": msg if ok else None, "error": None if ok else msg}
     return None
 
 

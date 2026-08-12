@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  BarChart3, LineChart, Table2, PieChart, RefreshCw, ArrowLeft, StopCircle,
+  BarChart3, LineChart, Table2, PieChart, RefreshCw,
   Lightbulb, XCircle, Target, Filter, Layers, Sigma, History, RotateCcw,
   Database, CheckCircle2, FileCode2, Terminal, Sparkles,
 } from 'lucide-react'
@@ -331,7 +331,6 @@ export default function DataDashboardSimulator({
 
   const dataset = state?.dataset || {}
   const dashboard = state?.dashboard || {}
-  const goal = state?.goal || {}
   const summary = state?.summary || {}
   const aggregations = state?.aggregations || ['sum', 'avg', 'count', 'min', 'max']
   const chartTypes = state?.chart_types || ['bar', 'line', 'table', 'pie']

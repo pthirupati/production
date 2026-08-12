@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { User, Lock, LogIn, Loader2, AlertCircle } from 'lucide-react'
 import { setMonitoringAuthenticated } from './MonitoringLoginGate'
 import MonitoringLabChrome from './MonitoringLabChrome'
+import { useModalA11y } from '../ConfirmModal'
 import '../../styles/monitoring-sim.css'
 
 const ACCENT = '#f7913b'
@@ -53,6 +54,7 @@ export default function GrafanaLoginScreen({
   const [pass, setPass] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const loginCardRef = useModalA11y(true, onExit || (() => {}))
 
   const submit = (e) => {
     e.preventDefault()
@@ -113,7 +115,15 @@ export default function GrafanaLoginScreen({
           <span className="mt-3 text-[22px] font-bold tracking-tight text-white">Grafana</span>
         </div>
 
-        <div className="mon-card !p-7" style={{ borderColor: '#262a45', background: '#121425' }}>
+        <div
+          ref={loginCardRef}
+          tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Sign in to Grafana"
+          className="mon-card !p-7 outline-none"
+          style={{ borderColor: '#262a45', background: '#121425' }}
+        >
           <h1 className="text-center text-lg font-semibold mb-1" style={{ color: '#d8def0' }}>
             Welcome to Grafana
           </h1>

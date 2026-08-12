@@ -201,6 +201,18 @@ TICKET_TYPES = (
 )
 
 
+# Priority → response target (minutes). Mirrors ITSM SLA_MINUTES with string keys
+# the twin UI already uses (medium/high/critical).
+OPS_SLA_MINUTES = {
+    "critical": 60,
+    "high": 240,
+    "medium": 480,
+    "moderate": 480,
+    "low": 1440,
+    "planning": 2880,
+}
+
+
 def build_ops_ticket(
     *,
     vendor: str,
@@ -211,9 +223,14 @@ def build_ops_ticket(
     summary: str,
     service_tag: str | None = None,
     priority: str = "medium",
+    now_ts: float | None = None,
 ) -> dict:
     vendor = vendor if vendor in SUPPORT_VENDORS else (vendor or "Dell")
-    tid = f"{vendor[:4].upper()}-{ticket_type[:3].upper()}-{int(time.time()) % 100000:05d}"
+    created_ts = float(now_ts if now_ts is not None else time.time())
+    tid = f"{vendor[:4].upper()}-{ticket_type[:3].upper()}-{int(created_ts) % 100000:05d}"
+    pri = (priority or "medium").lower()
+    sla_minutes = int(OPS_SLA_MINUTES.get(pri, OPS_SLA_MINUTES["medium"]))
+    due_ts = created_ts + sla_minutes * 60
     return {
         "id": tid,
         "type": ticket_type if ticket_type in TICKET_TYPES else "incident",
@@ -222,9 +239,14 @@ def build_ops_ticket(
         "hostname": hostname,
         "component": component,
         "status": "open",
-        "priority": priority,
+        "priority": pri,
         "summary": summary,
-        "created": _now(),
+        "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(created_ts)),
+        "created_ts": created_ts,
+        "sla_minutes": sla_minutes,
+        "sla_due": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(due_ts)),
+        "sla_remaining_sec": sla_minutes * 60,
+        "sla_breached": False,
         "service_tag": service_tag,
         "assignee": None,
         "escalation": 0,
@@ -233,6 +255,43 @@ def build_ops_ticket(
         "maintenance_window": None,
         "history": [{"time": _now(), "event": "created"}],
     }
+
+
+def refresh_ticket_sla(ticket: dict, now_ts: float | None = None) -> dict:
+    """Recompute remaining/breach for an open ticket. Resolved/closed stay frozen."""
+    now = float(now_ts if now_ts is not None else time.time())
+    if ticket.get("status") in ("resolved", "closed"):
+        ticket["sla_remaining_sec"] = 0
+        return ticket
+    pri = str(ticket.get("priority") or "medium").lower()
+    sla_minutes = int(ticket.get("sla_minutes") or OPS_SLA_MINUTES.get(pri, 480))
+    ticket["sla_minutes"] = sla_minutes
+    created_ts = float(ticket.get("created_ts") or 0)
+    if not created_ts:
+        # Legacy tickets created before the SLA clock — treat as freshly opened.
+        created_ts = now
+        ticket["created_ts"] = created_ts
+    due_ts = created_ts + sla_minutes * 60
+    ticket["sla_due"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(due_ts))
+    remaining = int(due_ts - now)
+    ticket["sla_remaining_sec"] = max(0, remaining)
+    was = bool(ticket.get("sla_breached"))
+    ticket["sla_breached"] = remaining < 0
+    if ticket["sla_breached"] and not was:
+        hist = ticket.setdefault("history", [])
+        hist.insert(0, {"time": _now(), "event": "sla_breached"})
+    return ticket
+
+
+def refresh_all_ticket_slas(state: dict, now_ts: float | None = None) -> list[dict]:
+    """Tick every open ops ticket's SLA clock. Returns newly breached tickets."""
+    newly: list[dict] = []
+    for ticket in state.get("tickets") or []:
+        before = bool(ticket.get("sla_breached"))
+        refresh_ticket_sla(ticket, now_ts=now_ts)
+        if ticket.get("sla_breached") and not before:
+            newly.append(ticket)
+    return newly
 
 
 # Above this share of the rack breaker, pulling a redundant feed during a visit
@@ -286,6 +345,10 @@ def advance_ticket(ticket: dict, action: str, **kwargs) -> dict:
     elif action == "escalate":
         ticket["escalation"] = int(ticket.get("escalation") or 0) + 1
         ticket["priority"] = "critical" if ticket["escalation"] >= 2 else "high"
+        ticket["sla_minutes"] = OPS_SLA_MINUTES.get(ticket["priority"], 60)
+        # Escalate tightens the remaining window from *now*, not the original open.
+        ticket["created_ts"] = time.time()
+        refresh_ticket_sla(ticket)
         hist.insert(0, {"time": _now(), "event": f"escalated L{ticket['escalation']}"})
     elif action == "ship_rma":
         ticket["type"] = "rma"

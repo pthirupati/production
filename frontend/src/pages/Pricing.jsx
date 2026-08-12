@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
+import { useModalA11y } from '../components/ConfirmModal'
 import {
   Check, ArrowRight, Zap, Crown, Loader2, Sun, Moon, Server, Globe,
   Monitor, Database, Cpu, Shield, Lock, Sparkles, ShoppingCart, X,
@@ -11,7 +12,6 @@ import { useThemeStore } from '../store/themeStore'
 import { useDataStore } from '../store/dataStore'
 import { subscriptionApi } from '../api/subscriptions'
 import { interviewsApi } from '../api/interviews'
-import api from '../api/client'
 import { PlatformBanners } from '../components/PlatformBanners'
 import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_LINKS } from '../constants/publicNav'
 import MarketingFooter from './home/components/MarketingFooter'
@@ -19,6 +19,7 @@ import { mergeTechnologies } from '../constants/techCatalog'
 import { PageHeader, FixitPanel } from '../components/design'
 import { useRevealOnScroll } from '../hooks/useRevealOnScroll'
 import { usePageTitle } from '../hooks/usePageTitle'
+import { useFetch } from '../hooks/useFetch'
 import toast from 'react-hot-toast'
 
 const techIcons = {
@@ -161,20 +162,23 @@ export default function Pricing() {
   const [showCart, setShowCart] = useState(false)
   const [gatewayDown, setGatewayDown] = useState(false)
   const [gatewayMessage, setGatewayMessage] = useState('')
-  const [platformConfig, setPlatformConfig] = useState(null)
+  const { data: platformConfig } = useFetch('/config/', {
+    config: { silentError: true },
+    initialData: null,
+  })
   const [couponCode, setCouponCode] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState(null)
   const [couponLoading, setCouponLoading] = useState(false)
   const [batchProcessing, setBatchProcessing] = useState(false)
   const [stripeConfigured, setStripeConfigured] = useState(false)
   const [interviewPlans, setInterviewPlans] = useState([])
+  const [interviewPlansLoading, setInterviewPlansLoading] = useState(true)
+  const [interviewPlansFailed, setInterviewPlansFailed] = useState(false)
   const [interviewEntitlement, setInterviewEntitlement] = useState(null)
   const [subscribingInterview, setSubscribingInterview] = useState(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-
-  useEffect(() => {
-    api.get('/config/', { silentError: true }).then(res => setPlatformConfig(res.data)).catch(() => {})
-  }, [])
+  const cartOpen = showCart && cart.length > 0
+  const cartPanelRef = useModalA11y(cartOpen, () => setShowCart(false))
 
   // Reveal-on-scroll: elements tagged `.reveal` start at opacity:0 (see
   // index.css) and only become visible once `.visible` is added. Without a
@@ -222,7 +226,16 @@ export default function Pricing() {
     getTechnologies()
       .then(data => setTechnologies(mergeTechnologies(data)))
       .catch(() => setTechnologies(mergeTechnologies([])))
-    interviewsApi.getPlans().then(d => setInterviewPlans(d.plans || [])).catch(() => {})
+    interviewsApi.getPlans()
+      .then(d => {
+        setInterviewPlans(d.plans || [])
+        setInterviewPlansFailed(false)
+      })
+      .catch(() => {
+        setInterviewPlans([])
+        setInterviewPlansFailed(true)
+      })
+      .finally(() => setInterviewPlansLoading(false))
     if (isAuthenticated) {
       subscriptionApi.getMySubscriptions()
         .then(data => setMySubscriptions(data.subscriptions || []))
@@ -849,11 +862,17 @@ export default function Pricing() {
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-4xl mx-auto">
-          {(interviewPlans.length ? interviewPlans : [
-            { code: 'free', name: 'Free Mini', price_inr: 0, interviews_per_month: 1, max_rounds: 1, description: '1 sample per month' },
-            { code: 'pro', name: 'Interview Pro', price_inr: 999, interviews_per_month: 10, max_rounds: 3, description: 'Voice + reports' },
-            { code: 'premium', name: 'Interview Premium', price_inr: 2499, interviews_per_month: 10, max_rounds: 5, description: 'Certificate + 5 rounds' },
-          ]).filter(p => p.code !== 'admin-demo' && p.is_active !== false).map((plan, planIdx) => {
+          {interviewPlansLoading ? (
+            <p className="col-span-full text-center text-sm text-surface-500 py-8">Loading interview plans…</p>
+          ) : interviewPlansFailed ? (
+            <p className="col-span-full text-center text-sm text-surface-400 py-8">
+              Could not load interview plans. Refresh to try again.
+            </p>
+          ) : interviewPlans.length === 0 ? (
+            <p className="col-span-full text-center text-sm text-surface-400 py-8">
+              Interview plans are not available right now.
+            </p>
+          ) : interviewPlans.filter(p => p.code !== 'admin-demo' && p.is_active !== false).map((plan, planIdx) => {
             const priceINR = Number(plan.price_inr || 0)
             const priceDisplay = getDisplayPrice(priceINR)
             const subscribed = isInterviewSubscribed(plan)
@@ -956,16 +975,23 @@ export default function Pricing() {
       </section>
 
       {/* Floating Cart Panel */}
-      {showCart && cart.length > 0 && (
+      {cartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCart(false)} />
-          <div className="relative w-full max-w-md bg-surface-900 border-l border-surface-700/50 h-full overflow-y-auto shadow-2xl">
+          <div
+            ref={cartPanelRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Cart (${cart.length})`}
+            className="relative w-full max-w-md bg-surface-900 border-l border-surface-700/50 h-full overflow-y-auto shadow-2xl outline-none"
+          >
             <div className="sticky top-0 bg-surface-900/95 backdrop-blur-xl border-b border-surface-700/30 p-5 flex items-center justify-between z-10">
               <div className="flex items-center gap-2">
                 <ShoppingCart size={18} className="text-accent-cyan" />
                 <h2 className="text-lg font-bold text-white">Cart ({cart.length})</h2>
               </div>
-              <button onClick={() => setShowCart(false)} className="p-1.5 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800 transition-all">
+              <button type="button" onClick={() => setShowCart(false)} aria-label="Close cart" className="p-1.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-surface-400 hover:text-white hover:bg-surface-800 transition-all">
                 <X size={18} />
               </button>
             </div>
@@ -991,7 +1017,7 @@ export default function Pricing() {
                         <p className="text-[10px] text-surface-500">&#x20B9;{priceINR}</p>
                       )}
                     </div>
-                    <button onClick={() => removeFromCart(tech.id)} className="p-1 text-surface-500 hover:text-red-400 transition-colors shrink-0">
+                    <button type="button" onClick={() => removeFromCart(tech.id)} aria-label={`Remove ${tech.name} from cart`} className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-red-400 transition-colors shrink-0">
                       <X size={14} />
                     </button>
                   </FixitPanel>

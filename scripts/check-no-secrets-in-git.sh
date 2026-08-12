@@ -6,6 +6,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 FAIL=0
 SELF="scripts/check-no-secrets-in-git.sh"
+# Duplicate copy kept under backend/ for some CI jobs — exclude both from self-hits.
+SELF_BACKEND="backend/scripts/check-no-secrets-in-git.sh"
 
 echo "=== Checking tracked files for leaked secrets ==="
 
@@ -109,11 +111,11 @@ COMBINED_PREFIX_RE="$(IFS='|'; printf '%s' "${PATTERNS[*]}")"
 # future leak inside it.
 #
 # Entries must stay exact literals — never regexes. An allowlist suppresses
-# findings, so a `-----BEGIN RSA PRIVATE KEY-----.*` style entry would mute every
-# real PEM leak in the repo, which is precisely the failure PLACEHOLDER_RE's
-# `/your/` scar records. Anything shorter than a complete credential can also
-# occur inside a real one. If a fake value is too variable to write out in full,
-# it needs a SIMULATED-CREDENTIAL marker at the source instead.
+# findings, so a PEM-header + ".*" style entry would mute every real PEM in the
+# repo, which is precisely the failure PLACEHOLDER_RE's `/your/` scar records.
+# Anything shorter than a complete credential can also occur inside a real one.
+# If a fake value is too variable to write out in full, it needs a
+# SIMULATED-CREDENTIAL marker at the source instead.
 #
 # AKIAIOSFODNN7EXAMPLE is AWS's own documentation key, reserved by Amazon and
 # valid nowhere. It is the only allowlisted value in the tree today.
@@ -123,6 +125,9 @@ ALLOWED_SECRET_VALUES=(
 
 PREFIX_EXCLUDES=(
   ":!$SELF"
+  ":!$SELF_BACKEND"
+  # Scanner unit tests intentionally quote pattern shapes; they are not secrets.
+  ':!backend/tests/test_secret_scanner_rules.py'
 )
 
 # Narrow, temporary carve-out — one file, one pattern, not a directory tree.
@@ -194,6 +199,7 @@ GENERIC_INCLUDES=(
 )
 GENERIC_EXCLUDES=(
   ":!$SELF"
+  ":!$SELF_BACKEND"
   ':!*example*'
   ':!scenarios/**'
   ':!backend/apps/vmware_sim/**'
@@ -202,6 +208,8 @@ GENERIC_EXCLUDES=(
   ':!**/curriculum/**'
   ':!**/tests/**'
   ':!**/test_*.py'
+  ':!**/*.test.js'
+  ':!**/*.test.jsx'
   # `test/` singular is a real top-level dir here (smoketest_e2e.py), and its
   # filename does not match test_*.py — both misses were caught by a live run.
   ':!test/**'
@@ -245,7 +253,7 @@ while IFS= read -r hit; do
   if sed -n "${from},${lineno}p" "$file" 2>/dev/null | grep -q "$SIM_MARKER"; then
     continue
   fi
-  echo "  FAIL: $file:$lineno embeds a credential in a URL (scheme://user:password@host)"
+  echo "  FAIL: $file:$lineno embeds a credential in a URL (scheme://user:****@host)"
   FAIL=1
 done < <(git grep -nIE "$URL_USERINFO_RE" -- "${GENERIC_INCLUDES[@]}" "${GENERIC_EXCLUDES[@]}" 2>/dev/null)
 

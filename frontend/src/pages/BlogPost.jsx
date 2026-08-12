@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Clock, ArrowLeft, Tag, User, Calendar, ChevronRight } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import api from '../api/client'
@@ -7,6 +7,12 @@ import { getCategoryClass } from '../data/blogFallback'
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
 import { usePageTitle } from '../hooks/usePageTitle'
+import { useFetch } from '../hooks/useFetch'
+import {
+  useStructuredData,
+  blogPostingSchema,
+  breadcrumbSchema,
+} from '../hooks/useStructuredData'
 
 // Audit Z3-12: the prose moved to the database (migration 0010) and to a
 // dynamically-imported offline copy. Loaded once, only when the API cannot answer.
@@ -25,8 +31,12 @@ async function loadFallback(slug) {
 export default function BlogPost() {
   const { slug } = useParams()
   const [post, setPost] = useState(null)
-  const [related, setRelated] = useState([])
   const [loading, setLoading] = useState(true)
+  const { data: blogList, error: blogListError } = useFetch('/blog/', {
+    config: { silentError: true },
+    initialData: null,
+  })
+  const [fallbackRelated, setFallbackRelated] = useState([])
 
   usePageTitle(
     post?.title,
@@ -34,10 +44,17 @@ export default function BlogPost() {
     post ? { canonical: `${typeof window !== 'undefined' ? window.location.origin : ''}/blog/${slug}` } : undefined,
   )
 
+  useStructuredData('article', blogPostingSchema(post))
+  useStructuredData('breadcrumb', breadcrumbSchema([
+    { name: 'Home', path: '/' },
+    { name: 'Blog', path: '/blog' },
+    { name: post?.title },
+  ]))
+
   useEffect(() => {
     setLoading(true)
-    let cancelled = false
-    api.get(`/blog/${slug}/`, { silentError: true })
+    const controller = new AbortController()
+    api.get(`/blog/${slug}/`, { silentError: true, signal: controller.signal })
       .then(async res => {
         const apiPost = res.data
         // The database wins whenever it has a body. The previous version preferred
@@ -48,34 +65,39 @@ export default function BlogPost() {
         if (!content.trim()) {
           content = (await loadFallback(slug))?.content || ''
         }
-        if (!cancelled) setPost({ ...apiPost, content, color: 'accent-cyan' })
+        if (!controller.signal.aborted) setPost({ ...apiPost, content, color: 'accent-cyan' })
       })
-      .catch(async () => {
+      .catch(async (err) => {
+        if (controller.signal.aborted || err?.code === 'ERR_CANCELED') return
         // API unreachable — this is what the offline copy is for.
         const rich = await loadFallback(slug)
-        if (!cancelled) setPost(rich || null)
+        if (!controller.signal.aborted) setPost(rich || null)
       })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => { controller.abort() }
   }, [slug])
 
   useEffect(() => {
-    api.get('/blog/', { silentError: true })
-      .then(res => {
-        const list = (res.data || []).filter(p => p.slug !== slug).slice(0, 3)
-        setRelated(list)
-      })
-      .catch(async () => {
-        const all = await loadFallback(null)
-        if (!all) return
-        setRelated(
-          Object.entries(all)
-            .filter(([s]) => s !== slug)
-            .slice(0, 3)
-            .map(([s, p]) => ({ slug: s, title: p.title, category: p.category, readTime: p.readTime }))
-        )
-      })
-  }, [slug])
+    if (!blogListError) return undefined
+    let cancelled = false
+    loadFallback(null).then((all) => {
+      if (cancelled || !all) return
+      setFallbackRelated(
+        Object.entries(all)
+          .filter(([s]) => s !== slug)
+          .slice(0, 3)
+          .map(([s, p]) => ({ slug: s, title: p.title, category: p.category, readTime: p.readTime })),
+      )
+    })
+    return () => { cancelled = true }
+  }, [blogListError, slug])
+
+  const related = useMemo(() => {
+    if (Array.isArray(blogList)) {
+      return blogList.filter(p => p.slug !== slug).slice(0, 3)
+    }
+    return fallbackRelated
+  }, [blogList, fallbackRelated, slug])
 
   if (loading) {
     return (
@@ -107,7 +129,6 @@ export default function BlogPost() {
     const elements = []
     let inCodeBlock = false
     let codeLines = []
-    let codeLang = ''
     let inTable = false
     let tableRows = []
 
@@ -145,7 +166,6 @@ export default function BlogPost() {
           codeLines = []
           inCodeBlock = false
         } else {
-          codeLang = line.slice(3)
           inCodeBlock = true
         }
         continue

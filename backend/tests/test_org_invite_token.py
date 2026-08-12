@@ -64,6 +64,7 @@ class _InviteBase(TestCase):
             "email": EMAIL,
             "password": "GoodP@ss99!",
             "session_token": "invite-sess-token",
+            "accepted_legal": True,
         }
         payload.update(extra)
         return self.client.post("/api/auth/register/", payload, format="json")

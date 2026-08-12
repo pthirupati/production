@@ -16,22 +16,18 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   engineer (you) must diagnose and resolve it. Business impact: reduced service reliability
   and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline vSphere lab. The architecture
   is a single lab-primary node exposing VMs, datastores, vCenter, and ESXi tasks;
   treat it as the production host for this incident. All tools run locally — no paid
   APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Operators still perform manual steps for Jinja2 templates.
   Automate the boring parts without hiding important safety checks.
-
 
   OBJECTIVE: Day-2 Jinja2 templates work completes safely in this environment; Changes
   are verified with before/after checks; The system remains stable for dependent teams.
   Acceptance criteria: the change is minimal and reversible, and success means `check.sh`
   exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it
   and use the equivalent already on the host. Make the smallest configuration change
@@ -39,16 +35,13 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   and ESXi tasks), changing one thing at a time. Check your work continuously against
   the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully.
   Capture the before/after output as evidence. Success criteria: the objective''s
   healthy state holds on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately
   (restore the original config file / undo the edit / restart the affected component)
   and re-observe before trying another hypothesis. Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
   or fake completion with marker files — the checker validates real system state.'
@@ -113,7 +106,6 @@ hints:
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not
     stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts
     when the subsystem is actually healthy.'
 vmware_link: true
@@ -127,7 +119,7 @@ tags:
 - do
 - hands-on
 - vmware
-linked_tutorial: vmware-fundamentals
+linked_tutorial: vmware-vsphere-zero-hero
 what_you_will_learn:
 - Day-2 Jinja2 templates work completes safely in this environment
 - Changes are verified with before/after checks

@@ -1,8 +1,4 @@
-# Unpublished: this lab ships a bare `raise NotImplementedError` stub with no
-# starter code, no seeded fault and only a `placeholder` grader, so there is
-# nothing to diagnose and any trivial return earns XP. Set is_active: true
-# once it has real content and a grader that checks it (audit §G1).
-is_active: false
+is_active: true
 title: Refresh stale planner statistics
 slug: pg-statistics-stale
 technology: postgresql
@@ -11,35 +7,28 @@ description: 'CONTEXT: A team operating PostgreSQL has raised a ticket for `Refr
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline PostgreSQL cluster. The architecture is a single
   lab-primary node exposing psql, pg_hba.conf, roles, and WAL; treat it as the production host for this
   incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Planner chooses nested loop after bulk load.
-
 
   OBJECTIVE: Understand the current failure mode affecting Refresh stale planner statistics; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant psql, pg_hba.conf, roles, and WAL), changing one thing at a time. Check your work
   continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -103,23 +92,63 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: Planner chooses nested loop after bulk load.
+  instructions: 'After a bulk load the planner still uses row counts from before the load. Fix solution(conn)
+    so it returns the join strategy as ''nested_loop'' or ''hash_join'' based on the CURRENT row count.
+    Count the rows actually in `events` rather than trusting the cached estimate in stats(relname, est_rows).
+    Use nested_loop only when the real count is below 100, otherwise hash_join.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn):\n    # BUG: trusts the stale cached estimate, which still says the table\
+      \ is\n    # tiny after a bulk load.\n    est = conn.execute(\"SELECT est_rows FROM stats WHERE relname='events'\"\
+      ).fetchone()[0]\n    return 'nested_loop' if est < 100 else 'hash_join'\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert solution() is not None
+  - name: bulk-loaded table switches to hash join
+    code: "import sqlite3\ndef _seed(n_rows, est):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE events (id INTEGER PRIMARY KEY);\"\n        \"CREATE TABLE stats (relname\
+      \ TEXT, est_rows INTEGER);\")\n    conn.executemany(\"INSERT INTO events VALUES (?)\", [(i,) for\
+      \ i in range(1, n_rows + 1)])\n    conn.execute(\"INSERT INTO stats VALUES ('events', ?)\", (est,))\n\
+      \    return conn\nconn = _seed(500, est=10)\nassert solution(conn) == 'hash_join', solution(conn)\n"
+  - name: genuinely small table keeps nested loop
+    code: "import sqlite3\ndef _seed(n_rows, est):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE events (id INTEGER PRIMARY KEY);\"\n        \"CREATE TABLE stats (relname\
+      \ TEXT, est_rows INTEGER);\")\n    conn.executemany(\"INSERT INTO events VALUES (?)\", [(i,) for\
+      \ i in range(1, n_rows + 1)])\n    conn.execute(\"INSERT INTO stats VALUES ('events', ?)\", (est,))\n\
+      \    return conn\nconn = _seed(5, est=5)\nassert solution(conn) == 'nested_loop', solution(conn)\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert solution() is not None
+  - name: empty table uses nested loop
+    code: "import sqlite3\ndef _seed(n_rows, est):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE events (id INTEGER PRIMARY KEY);\"\n        \"CREATE TABLE stats (relname\
+      \ TEXT, est_rows INTEGER);\")\n    conn.executemany(\"INSERT INTO events VALUES (?)\", [(i,) for\
+      \ i in range(1, n_rows + 1)])\n    conn.execute(\"INSERT INTO stats VALUES ('events', ?)\", (est,))\n\
+      \    return conn\nconn = _seed(0, est=99999)\nassert solution(conn) == 'nested_loop', solution(conn)\n"
+  - name: threshold boundary at 100 is hash join
+    code: "import sqlite3\ndef _seed(n_rows, est):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE events (id INTEGER PRIMARY KEY);\"\n        \"CREATE TABLE stats (relname\
+      \ TEXT, est_rows INTEGER);\")\n    conn.executemany(\"INSERT INTO events VALUES (?)\", [(i,) for\
+      \ i in range(1, n_rows + 1)])\n    conn.execute(\"INSERT INTO stats VALUES ('events', ?)\", (est,))\n\
+      \    return conn\nconn = _seed(100, est=1)\nassert solution(conn) == 'hash_join', solution(conn)\n"
+  - name: just below threshold is nested loop
+    code: "import sqlite3\ndef _seed(n_rows, est):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE events (id INTEGER PRIMARY KEY);\"\n        \"CREATE TABLE stats (relname\
+      \ TEXT, est_rows INTEGER);\")\n    conn.executemany(\"INSERT INTO events VALUES (?)\", [(i,) for\
+      \ i in range(1, n_rows + 1)])\n    conn.execute(\"INSERT INTO stats VALUES ('events', ?)\", (est,))\n\
+      \    return conn\nconn = _seed(99, est=1)\nassert solution(conn) == 'nested_loop', solution(conn)\n"
+  - name: a stale high estimate does not force hash join
+    code: "import sqlite3\ndef _seed(n_rows, est):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE events (id INTEGER PRIMARY KEY);\"\n        \"CREATE TABLE stats (relname\
+      \ TEXT, est_rows INTEGER);\")\n    conn.executemany(\"INSERT INTO events VALUES (?)\", [(i,) for\
+      \ i in range(1, n_rows + 1)])\n    conn.execute(\"INSERT INTO stats VALUES ('events', ?)\", (est,))\n\
+      \    return conn\nconn = _seed(3, est=100000)\nassert solution(conn) == 'nested_loop', solution(conn)\n"
   timeout: 8
 summary: Complete the refresh stale planner statistics postgresql lab and verify success with the checker
 estimated_minutes: 20
@@ -130,7 +159,7 @@ tags:
 - fix
 - hands-on
 - postgresql
-linked_tutorial: postgresql-fundamentals
+linked_tutorial: postgresql-dba-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Refresh stale planner statistics
 - Restore expected service behavior with a minimal, documented change

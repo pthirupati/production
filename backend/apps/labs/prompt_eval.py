@@ -17,6 +17,7 @@ language model, and the code is honest about that.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 
@@ -289,3 +290,118 @@ def evaluate_course(prompt_config: dict, submissions: dict) -> dict:
         "total": total,
         "results": results,
     }
+
+
+_INJECTION_MARKERS = (
+    "ignore previous", "ignore all previous", "disregard your", "jailbreak",
+    "system prompt override", "dan mode", "developer mode",
+)
+
+
+def simulate_reply(prompt: str, task: dict | None = None) -> dict:
+    """Deterministic content reply so different prompts yield different outputs.
+
+    Not an LLM — branches on role / JSON / injection / length so prompt labs can
+    demonstrate that prompting changes the *answer*, not only a coaching tip.
+    """
+    task = task or {}
+    text = (prompt or "").strip()
+    low = text.lower()
+    words = len(re.findall(r"\S+", text))
+
+    if any(m in low for m in _INJECTION_MARKERS):
+        return {
+            "kind": "refusal",
+            "body": "I cannot override my instructions or enter unrestricted modes.",
+            "refused": True,
+            "schema_valid": False,
+            "word_count": 12,
+        }
+
+    wants_json = bool(
+        task.get("force_json")
+        or re.search(r"\bjson\b", low)
+        or "schema" in low
+        or '{"' in text
+    )
+    has_role = _assigns_role(text)
+    max_words = None
+    m = re.search(r"(?:under|at most|max(?:imum)?|no more than)\s+(\d+)\s*words?", low)
+    if m:
+        max_words = int(m.group(1))
+    elif task.get("max_output_words"):
+        max_words = int(task["max_output_words"])
+
+    if wants_json:
+        payload = {
+            "role": "expert" if has_role else "assistant",
+            "task": "structured",
+            "summary": (text[:80] + "…") if len(text) > 80 else text,
+            "words_in_prompt": words,
+        }
+        body = json.dumps(payload, indent=2)
+        return {
+            "kind": "json",
+            "body": body,
+            "refused": False,
+            "schema_valid": True,
+            "word_count": len(body.split()),
+            "data": payload,
+        }
+
+    if has_role:
+        tone = "As your assigned specialist, "
+        detail = (
+            f"I will approach this with domain focus. "
+            f"Your request ({words} words) asks for a concrete deliverable."
+        )
+    else:
+        tone = ""
+        detail = (
+            f"Here is a generic answer to a {words}-word prompt without a clear role. "
+            "Results may be vague."
+        )
+
+    body = tone + detail
+    if "bullet" in low or "list" in low:
+        body = tone + "Key points:\n- Clarify the goal\n- Add constraints\n- Specify output format"
+    if max_words is not None:
+        toks = body.split()
+        if len(toks) > max_words:
+            body = " ".join(toks[:max_words]) + "…"
+
+    return {
+        "kind": "prose",
+        "body": body,
+        "refused": False,
+        "schema_valid": False,
+        "word_count": len(body.split()),
+        "has_role_tone": has_role,
+    }
+
+
+def assert_output_conformance(reply: dict, rules: dict | None = None) -> dict:
+    """Grade a simulate_reply result against output-side rules (not prompt text)."""
+    rules = rules or {}
+    reply = reply or {}
+    missing = []
+    matched = []
+
+    if rules.get("require_refusal"):
+        (matched if reply.get("refused") else missing).append("refused unsafe request")
+    if rules.get("require_output_json") or rules.get("schema_valid"):
+        (matched if reply.get("schema_valid") and reply.get("kind") == "json"
+         else missing).append("valid JSON output")
+    if "max_output_words" in rules:
+        cap = int(rules["max_output_words"])
+        wc = int(reply.get("word_count") or 0)
+        (matched if wc <= cap else missing).append(f"output ≤ {cap} words")
+    if rules.get("contains"):
+        body = (reply.get("body") or "").lower()
+        needle = str(rules["contains"]).lower()
+        (matched if needle in body else missing).append(f"contains {rules['contains']!r}")
+
+    total = len(matched) + len(missing)
+    passed = len(missing) == 0 and total > 0
+    score = 100 if total == 0 else round(len(matched) * 100 / total)
+    return {"passed": passed, "score": score, "matched": matched, "missing": missing}

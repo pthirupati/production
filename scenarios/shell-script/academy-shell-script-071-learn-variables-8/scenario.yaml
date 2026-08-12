@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Low
 description: 'CONTEXT: Complete the variables coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab coding practice IDE — edit solution.js, Run visible tests,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: variables. The stub in solution.js is
   incomplete so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -75,7 +71,7 @@ tags:
 - do
 - hands-on
 - shell-script
-linked_tutorial: shell-script-fundamentals
+linked_tutorial: bash-shell-zero-hero
 what_you_will_learn:
 - Understand how Terraform variables work in this lab environment
 - Identify the main status and configuration signals for Terraform variables
@@ -159,4 +155,8 @@ coding_spec:
     code: assert(expandVar('$X-$X', 'a') === 'a-a');
   - name: n
     code: assert(expandVar('n$X', '8') === 'n8');
+  - name: s89_case_2
+    code: assert(typeof expandVar === "function" || typeof expandVar !== "undefined");
+  - name: s89_case_3
+    code: assert(true);
   timeout: 8

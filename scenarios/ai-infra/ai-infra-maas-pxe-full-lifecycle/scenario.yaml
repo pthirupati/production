@@ -15,12 +15,9 @@ description: 'CONTEXT: Bare Metal / AI Infra — walk a GPU node through the ful
   New → Commissioning → Ready → Allocated → Deployed, with PXE stages (DHCP → TFTP → kernel →
   Curtin → cloud-init → sshd). Prefer ImageDev custom boot resource when published.
 
-
   ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin (PXE LED animation on the rack).
 
-
   SYMPTOM: Node New; PXE path untested; Deploy never completed.
-
 
   OBJECTIVE: Enlist/Commission to Ready; Deploy (custom image if available); verify PXE/cloud-init
   path and nvidia-smi; FIXED-OK.'

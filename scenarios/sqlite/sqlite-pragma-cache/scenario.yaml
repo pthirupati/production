@@ -1,8 +1,4 @@
-# Unpublished: this lab ships a bare `raise NotImplementedError` stub with no
-# starter code, no seeded fault and only a `placeholder` grader, so there is
-# nothing to diagnose and any trivial return earns XP. Set is_active: true
-# once it has real content and a grader that checks it (audit §G1).
-is_active: false
+is_active: true
 title: Tune cache size for performance
 slug: sqlite-pragma-cache
 technology: sqlite
@@ -11,35 +7,28 @@ description: 'CONTEXT: A team operating SQLite has raised a ticket for `Tune cac
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline SQLite database file. The architecture is a single
   lab-primary node exposing sqlite3 CLI, schema, WAL mode, and pragmas; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Slow reads on large local database file.
-
 
   OBJECTIVE: Understand the current failure mode affecting Tune cache size for performance; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant sqlite3 CLI, schema, WAL mode, and pragmas), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -102,23 +91,45 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: Slow reads on large local database file.
+  instructions: 'Reads are slow on a large local database. Fix solution(conn) so it returns the cache_size
+    pragma value to apply for a target cache of target_mb megabytes, given the page_size argument in bytes.
+    SQLite takes a NEGATIVE cache_size as a size in kibibytes, which is what you want here: return -1
+    * (target_mb * 1024). Return 0 when target_mb is 0, and never return a positive number.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn, target_mb, page_size):\n    # BUG: returns a positive page COUNT, which\
+      \ SQLite reads as pages rather\n    # than KiB, so the real cache depends on page_size and is far\
+      \ too small.\n    return (target_mb * 1024 * 1024) // page_size\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert solution() is not None
+  - name: 64 MiB becomes a negative KiB value
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ 64, 4096) == -65536, solution(conn, 64, 4096)\n"
+  - name: result is independent of page size
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ 64, 4096) == solution(conn, 64, 8192), 'page_size must not matter'\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert solution() is not None
+  - name: zero target returns zero
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ 0, 4096) == 0, solution(conn, 0, 4096)\n"
+  - name: never returns a positive value
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ 8, 4096) <= 0, solution(conn, 8, 4096)\n"
+  - name: 1 MiB is -1024
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ 1, 4096) == -1024, solution(conn, 1, 4096)\n"
+  - name: scales linearly with target
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ 16, 4096) == 2 * solution(conn, 8, 4096), 'must scale linearly'\n"
   timeout: 8
 summary: Complete the tune cache size for performance sqlite lab and verify success with the checker
 estimated_minutes: 20
@@ -129,7 +140,7 @@ tags:
 - fix
 - hands-on
 - sqlite
-linked_tutorial: sqlite-fundamentals
+linked_tutorial: sqlite-embedded-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Tune cache size for performance
 - Restore expected service behavior with a minimal, documented change

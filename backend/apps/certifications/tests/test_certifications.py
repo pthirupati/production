@@ -150,6 +150,36 @@ class CertificationsTestCase(APITestCase):
         self.assertEqual(submit.data["status"], "failed")
         self.assertIsNone(submit.data["certificate"])
 
+    def test_exam_proctoring_signals_are_report_only(self):
+        self.client.force_authenticate(user=self.user)
+        start = self.client.post("/api/certifications/rhcsa/exam/start/")
+        self.assertEqual(start.status_code, 201)
+        aid = start.data["id"]
+        self.assertEqual(start.data["proctoring"]["tab_switches"], 0)
+
+        r1 = self.client.post(
+            f"/api/certifications/exam/{aid}/proctoring/",
+            {"event": "tab_switch"},
+            format="json",
+        )
+        self.assertEqual(r1.status_code, 200)
+        self.assertEqual(r1.data["proctoring"]["tab_switches"], 1)
+
+        r2 = self.client.post(
+            f"/api/certifications/exam/{aid}/proctoring/",
+            {"event": "paste", "source": "page"},
+            format="json",
+        )
+        self.assertEqual(r2.status_code, 200)
+        self.assertEqual(r2.data["proctoring"]["paste_events"], 1)
+
+        submit = self.client.post(f"/api/certifications/exam/{aid}/submit/")
+        self.assertEqual(submit.status_code, 200)
+        self.assertEqual(submit.data["proctoring"]["tab_switches"], 1)
+        self.assertEqual(submit.data["proctoring"]["paste_events"], 1)
+        # Signals never block grading.
+        self.assertIn(submit.data["status"], ("failed", "passed", "expired"))
+
     def test_exam_ignores_pre_exam_completions(self):
         """Integrity: labs completed BEFORE the exam window must not count."""
         # Complete every mapped scenario a day before the exam starts.

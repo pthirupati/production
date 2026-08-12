@@ -16,11 +16,9 @@ description: 'CONTEXT: A team operating SOC and cybersecurity operations has rai
   the on-call engineer (you) must diagnose and resolve it. Business impact: reduced service reliability
   and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline security operations lab. The architecture is a single
   lab-primary node exposing SIEM, EDR, tickets, and investigation timelines; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: SOC console with a new, unacknowledged critical alert (AL-1003) reporting
   a C2 beacon from ws-finance-07, which remains connected to the network with no containment actions taken
@@ -29,27 +27,22 @@ description: 'CONTEXT: A team operating SOC and cybersecurity operations has rai
   open. Every minute this stays open is a minute the attacker can pull more data out or push a second-stage
   payload in.
 
-
   OBJECTIVE: Acknowledge critical alert AL-1003; Escalate AL-1003 into a tracked incident; Run the Malware
   Containment playbook (pb-malware-contain). Acceptance criteria: the change is minimal and reversible,
   and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant SIEM, EDR, tickets, and investigation timelines), changing one thing at a time. Check
   your work continuously against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -110,7 +103,6 @@ hints:
 
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 summary: Run the full Tier-1 malware-containment loop on a live C2 beacon — acknowledge, escalate, contain,
@@ -126,7 +118,7 @@ tags:
 - siem
 - security
 - incident-response
-linked_tutorial: soc-fundamentals
+linked_tutorial: soc-operations-zero-hero
 what_you_will_learn:
 - Triaging a critical SIEM alert against real supporting log evidence
 - Escalating an alert into a formally tracked incident

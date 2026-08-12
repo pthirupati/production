@@ -16,14 +16,11 @@ description: 'CONTEXT: ImageDev / Bare Metal end-to-end path — build a GPU ima
   suite before the node is handed to the training team. AI Infra Engineering owns this full
   Packer→cloud-init→gpu-sanity→MAAS chain.
 
-
   ENVIRONMENT: Packer workspace IDE + Bare Metal (MAAS) + Lab Terminal + Datacenter twin for
   rack context. Treat the full chain as the production image-to-deploy pipeline.
 
-
   SYMPTOM / STARTING STATE: No custom image published; the target node is still on stock
   ubuntu/jammy; cloud-init and gpu-sanity have not run on any deployed node yet.
-
 
   OBJECTIVE: Build and Publish the Packer GPU image to MAAS; Deploy a Ready node with the
   custom image; confirm cloud-init status is done; run gpu-sanity and confirm PASS; leave

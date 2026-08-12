@@ -338,7 +338,7 @@ def award_xp_for_completion(user, score: int, difficulty: str | None = None) -> 
     Formula (FREE, deterministic): base 50 + score + difficulty bonus
     (easy 0 / medium 25 / hard 50). Best-effort; never raises.
     """
-    bonus = {"easy": 0, "medium": 25, "hard": 50}.get((difficulty or "").lower(), 0)
+    bonus = {"easy": 0, "medium": 25, "hard": 50, "expert": 75}.get((difficulty or "").lower(), 0)
     gained = 50 + max(0, int(score or 0)) + bonus
     try:
         from apps.accounts.models import Profile

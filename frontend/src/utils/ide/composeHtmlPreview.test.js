@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
-import { composeHtmlPreview, hasHtmlPreview, editorLanguageForPath, preferredHtmlPath, resolvePreviewRef, PREVIEW_LOG_TYPE } from './composeHtmlPreview'
+import { composeHtmlPreview, hasHtmlPreview, editorLanguageForPath, preferredHtmlPath, resolvePreviewRef, previewAssetDataUrl, PREVIEW_LOG_TYPE, PREVIEW_NAV_TYPE, PREVIEW_INSPECT_TYPE } from './composeHtmlPreview'
 
 describe('composeHtmlPreview', () => {
   it('detects html projects', () => {
@@ -257,6 +257,25 @@ describe('preview console bridge', () => {
     expect(doc.indexOf(PREVIEW_LOG_TYPE)).toBeLessThan(doc.indexOf('from learner'))
   })
 
+  it('preserves type=module when inlining a script src (ESM half)', () => {
+    const doc = composeHtmlPreview({
+      'index.html': '<!DOCTYPE html><html><body><script type="module" src="app.js"></script></body></html>',
+      'app.js': 'export const n = 1; console.log(n)',
+    })
+    expect(doc).toMatch(/<script type="module"[^>]*data-preview-src="app\.js"/)
+    expect(doc).toContain('export const n = 1')
+    // Must not dump the module into a classic catch-all script.
+    expect(doc).not.toMatch(/<script>\s*\/\* app\.js \*\//)
+  })
+
+  it('does not classic-inline unreferenced import/export sources', () => {
+    const doc = composeHtmlPreview({
+      'index.html': '<!DOCTYPE html><html><body><h1>Hi</h1></body></html>',
+      'mod.js': 'import x from "./x.js"; export default x',
+    })
+    expect(doc).not.toContain('import x from')
+  })
+
   it('caps output so a runaway loop cannot flood the parent', () => {
     const shim = shimOf(composeHtmlPreview({ 'index.html': '<h1>Hi</h1>' }))
     expect(shim).toMatch(/MAX_MESSAGES/)
@@ -279,6 +298,48 @@ describe('preview console bridge', () => {
     const files = { 'index.html': '<!DOCTYPE html><html><head></head><body><h1>Hi</h1></body></html>' }
     const doc = composeHtmlPreview(files, { consoleBridge: false })
     expect(doc).not.toContain(PREVIEW_LOG_TYPE)
+    expect(doc).not.toContain(PREVIEW_NAV_TYPE)
     expect(doc).toContain('<h1>Hi</h1>')
+  })
+
+  it('injects a same-lab HTML link navigation bridge for multi-page labs', () => {
+    const doc = composeHtmlPreview({
+      'index.html': '<a href="about.html">About</a>',
+      'about.html': '<h1>About</h1>',
+    })
+    expect(doc).toContain(PREVIEW_NAV_TYPE)
+    expect(doc).toContain("closest('a[href]')")
+    expect(doc).toMatch(/\\.html\?\$/)
+  })
+})
+
+describe('preview assets + inspect', () => {
+  it('previewAssetDataUrl encodes SVG and base64 images', () => {
+    expect(previewAssetDataUrl('icon.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>'))
+      .toMatch(/^data:image\/svg\+xml/)
+    expect(previewAssetDataUrl('hero.png', 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB'))
+      .toMatch(/^data:image\/png;base64,/)
+    expect(previewAssetDataUrl('hero.png', 'not-base64!!!')).toBe('')
+  })
+
+  it('rewrites img src and css url() to data URLs', () => {
+    const doc = composeHtmlPreview({
+      'index.html': '<html><head><link rel="stylesheet" href="styles.css" /></head><body><img src="hero.svg" alt="h" /></body></html>',
+      'styles.css': 'body { background: url(hero.svg); }',
+      'hero.svg': '<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>',
+    })
+    expect(doc).toContain('data:image/svg+xml')
+    expect(doc).not.toMatch(/src="hero\.svg"/)
+    expect(doc).toContain('url("data:image/svg+xml')
+  })
+
+  it('injects inspect bridge when inspect option is on', () => {
+    const doc = composeHtmlPreview({
+      'index.html': '<html><body><button id="go">Go</button></body></html>',
+    }, { inspect: true })
+    expect(doc).toContain('data-preview-inspect')
+    expect(doc).toContain(PREVIEW_INSPECT_TYPE)
+    expect(doc).toContain('left:')
+    expect(doc).toContain('top:')
   })
 })

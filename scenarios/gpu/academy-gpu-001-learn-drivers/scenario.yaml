@@ -17,7 +17,6 @@ description: 'CONTEXT: This is your first GPU lab. Nothing here is an outage —
   is missing" apart from "the driver is missing", which is the single most common wrong diagnosis on
   GPU fleets.
 
-
   ENVIRONMENT: One node, `lab-primary`, with 8× NVIDIA H100 80GB HBM3 cards. Two pieces of software sit
   between you and those cards, and you must keep them straight:
 
@@ -33,17 +32,14 @@ description: 'CONTEXT: This is your first GPU lab. Nothing here is an outage —
   Memory) is the 80GB of memory stacked on each H100 die; `nvidia-smi` reports it as Memory-Usage, and
   it is separate from host RAM.
 
-
   SYMPTOM / STARTING STATE: The node boots and is reachable. `nvidia-smi` refuses to report anything.
   Nothing is on fire and no user is affected — this is pre-production certification, so take your time
   and observe before acting.
-
 
   OBJECTIVE: Learn to read the GPU software stack from the bottom up, and prove the node is usable. Work
   out for yourself, from evidence, whether the cards are absent or merely unclaimed by a driver, then
   bring the node to a healthy state. Acceptance criteria: `nvidia-smi` returns the device table (its
   banner line contains `NVIDIA-SMI`) instead of the driver-communication error.
-
 
   WORK TO DO: Answer these three questions in order, with a command for each, and note the answer before
   moving on. (1) Are the cards physically present on the PCIe bus? (2) Is the kernel module loaded? (3)
@@ -51,17 +47,14 @@ description: 'CONTEXT: This is your first GPU lab. Nothing here is an outage —
   and the change is a single command. Do not reinstall drivers or reboot; neither is the answer here,
   and both destroy the evidence you just gathered.
 
-
   VERIFY: Re-run the check the grader uses — `nvidia-smi` — and confirm you get the table. Then read the
   table rather than just accepting it: how many GPUs, what driver and CUDA version, how much HBM per card,
   and how much of it is already in use. Confirm with `lsmod | grep nvidia` that the module you loaded
   is now resident. Success criteria: both hold on a repeat check.
 
-
   ROLLBACK: Every change in this lab is one `modprobe` away from being undone (`modprobe -r nvidia`).
   If you want to see the failure mode again to confirm cause and effect, unload the module, re-run `nvidia-smi`,
   and load it back. That round trip is the lesson.
-
 
   WHAT TO AVOID: Do not skip the observation steps and jump straight to the fix — you will pass the checker
   and learn nothing. Do not conclude "the GPUs are dead" from `nvidia-smi` alone; that error message is
@@ -124,7 +117,6 @@ hints:
     3. Re-run `nvidia-smi` and read the table: 8 GPUs, driver and CUDA version in the banner, and per-card
     HBM usage in MiB out of ~81559 MiB.
 
-
     WHY: the grader queries real device state through the driver, so it only passes once the module is
     actually loaded — there is no marker file to write.'
 summary: Learn the GPU software stack — PCIe hardware, kernel module, and userspace CUDA tooling — by
@@ -137,7 +129,7 @@ tags:
 - do
 - gpu
 - hands-on
-linked_tutorial: gpu-fundamentals
+linked_tutorial: gpu-nvidia-zero-hero
 what_you_will_learn:
 - What the NVIDIA kernel module is, how it differs from userspace tools like nvidia-smi and nvcc, and
   why only one of them can be "missing" at a time

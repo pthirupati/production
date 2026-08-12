@@ -178,3 +178,286 @@ class PeopleSoftSelfServiceTests(TestCase):
         res = ps.apply_action(sid, "totally_unknown", {})
         self.assertFalse(res["ok"])
         self.assertIn("error", res)
+
+
+class PeopleSoftMigrationLifecycleTests(TestCase):
+    """App Designer / Change Assistant DEV -> TEST -> PROD change packages."""
+
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def _session(self, slug: str = "promote-change-package") -> str:
+        sid = f"test-ps-mig-{slug}"
+        ps.drop_session(sid)
+        ps.get_state(sid, slug)
+        ps.apply_action(sid, "login", {"oprid": "PS"})
+        return sid
+
+    def _env(self, sid: str, name: str) -> dict:
+        envs = ps.get_state(sid)["migration"]["environments"]
+        return next(e for e in envs if e["name"] == name)
+
+    # ── the existing flat world shape must be preserved ────────────────────
+    def test_migration_does_not_disturb_the_legacy_world_shape(self):
+        # The ~150 existing PeopleSoft labs grade against the flat world; adding
+        # environments must not move portal/security/process/integration.
+        sid = self._session("rerun-process")
+        world = ps.get_state(sid)["inventory"]
+        for key in ("portal", "process", "security", "integration", "self_service"):
+            self.assertIn(key, world)
+        self.assertTrue(world["portal"]["modules"])
+        self.assertTrue(world["security"]["roles"])
+        # and migration is a sibling, not a wrapper
+        self.assertIn("migration", world)
+        self.assertIn("environments", world["migration"])
+
+    def test_base_environments_start_consistent(self):
+        sid = self._session("rerun-process")
+        names = [e["name"] for e in ps.get_state(sid)["migration"]["environments"]]
+        self.assertEqual(names, ["DEV", "TEST", "PROD"])
+        for name in names:
+            self.assertEqual(self._env(sid, name)["objects"]["PSU_EXPENSE_AE"]["version"], 2)
+
+    # ── DEV build -> compare -> package ────────────────────────────────────
+    def test_compare_report_flags_upgrade_and_customisation(self):
+        sid = self._session("promote-change-package")
+        res = ps.apply_action(sid, "compare_report",
+                              {"source": "DEV", "target": "TEST"})
+        self.assertTrue(res["ok"], res)
+        rows = {r["object"]: r for r in res["report"]["rows"]}
+        # DEV shipped v3 of the expense AE; TEST is still on v2 -> upgrade
+        self.assertEqual(rows["PSU_EXPENSE_AE"]["action"], "upgrade")
+        # TEST customised the job data page -> conflict
+        self.assertEqual(rows["PSU_JOB_DATA_PAGE"]["action"], "customisation")
+        self.assertIn("PSU_JOB_DATA_PAGE", res["report"]["conflicts"])
+        # untouched object compares equal
+        self.assertEqual(rows["PSU_VOUCHER_REC"]["action"], "same")
+
+    def test_project_rejects_objects_absent_from_source(self):
+        sid = self._session("promote-change-package")
+        res = ps.apply_action(sid, "create_project",
+                              {"project": "P1", "objects": ["NO_SUCH_OBJECT"]})
+        self.assertFalse(res["ok"])
+        self.assertIn("NO_SUCH_OBJECT", res["error"])
+
+    def test_package_payload_is_frozen_at_cut_time(self):
+        # Editing DEV after cutting a package must not change the package.
+        sid = self._session("promote-change-package")
+        ps.apply_action(sid, "create_project",
+                        {"project": "P1", "objects": ["PSU_EXPENSE_AE"]})
+        pkg_id = ps.apply_action(sid, "create_package", {"project": "P1"})["package_id"]
+        ps.apply_action(sid, "edit_object",
+                        {"environment": "DEV", "object": "PSU_EXPENSE_AE"})
+        self.assertEqual(self._env(sid, "DEV")["objects"]["PSU_EXPENSE_AE"]["version"], 4)
+        pkgs = {p["id"]: p for p in ps.get_state(sid)["migration"]["packages"]}
+        self.assertEqual(pkgs[pkg_id]["payload"]["PSU_EXPENSE_AE"]["version"], 3)
+
+    # ── promotion path enforcement ─────────────────────────────────────────
+    def test_cannot_skip_test_and_apply_straight_to_prod(self):
+        sid = self._session("promote-change-package")
+        ps.apply_action(sid, "create_project",
+                        {"project": "P1", "objects": ["PSU_EXPENSE_AE"]})
+        pkg_id = ps.apply_action(sid, "create_package", {"project": "P1"})["package_id"]
+        res = ps.apply_action(sid, "apply_package", {"package": pkg_id, "target": "PROD"})
+        self.assertFalse(res["ok"])
+        self.assertIn("TEST", res["error"])
+        # PROD untouched
+        self.assertEqual(self._env(sid, "PROD")["objects"]["PSU_EXPENSE_AE"]["version"], 2)
+
+    def test_apply_refuses_to_clobber_a_site_customisation(self):
+        sid = self._session("promote-change-package")
+        ps.apply_action(sid, "create_project",
+                        {"project": "P1",
+                         "objects": ["PSU_EXPENSE_AE", "PSU_JOB_DATA_PAGE"]})
+        pkg_id = ps.apply_action(sid, "create_package", {"project": "P1"})["package_id"]
+        res = ps.apply_action(sid, "apply_package", {"package": pkg_id, "target": "TEST"})
+        self.assertFalse(res["ok"])
+        self.assertEqual(res["conflicts"], ["PSU_JOB_DATA_PAGE"])
+        # nothing was applied — the expense fix did not sneak through
+        self.assertEqual(self._env(sid, "TEST")["objects"]["PSU_EXPENSE_AE"]["version"], 2)
+
+    def test_keep_customisation_drops_the_object_and_unblocks_the_apply(self):
+        sid = self._session("promote-change-package")
+        ps.apply_action(sid, "create_project",
+                        {"project": "P1",
+                         "objects": ["PSU_EXPENSE_AE", "PSU_JOB_DATA_PAGE"]})
+        pkg_id = ps.apply_action(sid, "create_package", {"project": "P1"})["package_id"]
+        res = ps.apply_action(sid, "resolve_conflict",
+                              {"environment": "TEST", "object": "PSU_JOB_DATA_PAGE",
+                               "resolution": "keep_customisation", "package": pkg_id})
+        self.assertTrue(res["ok"], res)
+        applied = ps.apply_action(sid, "apply_package", {"package": pkg_id, "target": "TEST"})
+        self.assertTrue(applied["ok"], applied)
+        test_env = self._env(sid, "TEST")
+        # the fix landed, the local customisation (v4) survived
+        self.assertEqual(test_env["objects"]["PSU_EXPENSE_AE"]["version"], 3)
+        self.assertEqual(test_env["objects"]["PSU_JOB_DATA_PAGE"]["version"], 4)
+
+    def test_accept_vendor_lets_the_package_overwrite_the_customisation(self):
+        sid = self._session("promote-change-package")
+        ps.apply_action(sid, "create_project",
+                        {"project": "P1",
+                         "objects": ["PSU_EXPENSE_AE", "PSU_JOB_DATA_PAGE"]})
+        pkg_id = ps.apply_action(sid, "create_package", {"project": "P1"})["package_id"]
+        ps.apply_action(sid, "resolve_conflict",
+                        {"environment": "TEST", "object": "PSU_JOB_DATA_PAGE",
+                         "resolution": "accept_vendor"})
+        applied = ps.apply_action(sid, "apply_package", {"package": pkg_id, "target": "TEST"})
+        self.assertTrue(applied["ok"], applied)
+        # TEST's local v4 was replaced by DEV's v3
+        self.assertEqual(self._env(sid, "TEST")["objects"]["PSU_JOB_DATA_PAGE"]["version"], 3)
+
+    # ── promotion copies by value, never by reference ──────────────────────
+    def test_applying_to_test_does_not_mutate_prod(self):
+        sid = self._session("promote-change-package")
+        ps.apply_action(sid, "create_project",
+                        {"project": "P1", "objects": ["PSU_EXPENSE_AE"]})
+        pkg_id = ps.apply_action(sid, "create_package", {"project": "P1"})["package_id"]
+        ps.apply_action(sid, "apply_package", {"package": pkg_id, "target": "TEST"})
+        self.assertEqual(self._env(sid, "TEST")["objects"]["PSU_EXPENSE_AE"]["version"], 3)
+        # PROD must still be on the old version
+        self.assertEqual(self._env(sid, "PROD")["objects"]["PSU_EXPENSE_AE"]["version"], 2)
+
+    def test_promotion_copies_objects_by_value_not_reference(self):
+        # The aliasing trap the audit flagged: if promotion stored the package's
+        # object dict itself, TEST and PROD would end up sharing one dict and a
+        # TEST edit would silently corrupt PROD. Driven through _dispatch on a
+        # live world because apply_action's cache round-trip goes through JSON,
+        # which would launder the shared reference away and hide the bug.
+        world = ps._base_world()
+        state = {"world": world}
+        ps._apply_preset(state, "promote-change-package")
+        ps._dispatch(world, state, "create_project",
+                     {"project": "P1", "objects": ["PSU_EXPENSE_AE"]})
+        pkg_id = ps._dispatch(world, state, "create_package",
+                              {"project": "P1"})["package_id"]
+        for env_name in ("TEST", "PROD"):
+            res = ps._dispatch(world, state, "apply_package",
+                               {"package": pkg_id, "target": env_name})
+            self.assertTrue(res["ok"], res)
+
+        pkg = ps._find_package(world, pkg_id)
+        test_obj = ps._find_env(world, "TEST")["objects"]["PSU_EXPENSE_AE"]
+        prod_obj = ps._find_env(world, "PROD")["objects"]["PSU_EXPENSE_AE"]
+        payload_obj = pkg["payload"]["PSU_EXPENSE_AE"]
+        # every environment (and the package payload) owns a distinct dict
+        self.assertIsNot(test_obj, prod_obj)
+        self.assertIsNot(test_obj, payload_obj)
+        self.assertIsNot(prod_obj, payload_obj)
+
+        # and the behavioural consequence: editing TEST leaves PROD alone
+        ps._dispatch(world, state, "edit_object",
+                     {"environment": "TEST", "object": "PSU_EXPENSE_AE"})
+        self.assertEqual(ps._find_env(world, "TEST")["objects"]["PSU_EXPENSE_AE"]["version"], 4)
+        self.assertEqual(ps._find_env(world, "PROD")["objects"]["PSU_EXPENSE_AE"]["version"], 3)
+
+    def test_rollback_after_prod_promotion_leaves_prod_clean(self):
+        # Rollback must restore PROD's own pre-apply snapshot, not a dict still
+        # shared with TEST or the package payload.
+        world = ps._base_world()
+        state = {"world": world}
+        ps._apply_preset(state, "promote-change-package")
+        ps._dispatch(world, state, "create_project",
+                     {"project": "P1", "objects": ["PSU_EXPENSE_AE"]})
+        pkg_id = ps._dispatch(world, state, "create_package", {"project": "P1"})["package_id"]
+        ps._dispatch(world, state, "apply_package", {"package": pkg_id, "target": "TEST"})
+        ps._dispatch(world, state, "apply_package", {"package": pkg_id, "target": "PROD"})
+        ps._dispatch(world, state, "rollback_package",
+                     {"package": pkg_id, "environment": "PROD"})
+        # PROD back to the pre-patch version; TEST keeps the fix
+        self.assertEqual(ps._find_env(world, "PROD")["objects"]["PSU_EXPENSE_AE"]["version"], 2)
+        self.assertEqual(ps._find_env(world, "TEST")["objects"]["PSU_EXPENSE_AE"]["version"], 3)
+
+    # ── rollback ───────────────────────────────────────────────────────────
+    def test_rollback_restores_the_exact_pre_apply_definition(self):
+        sid = self._session("promote-change-package")
+        ps.apply_action(sid, "create_project",
+                        {"project": "P1", "objects": ["PSU_EXPENSE_AE"]})
+        pkg_id = ps.apply_action(sid, "create_package", {"project": "P1"})["package_id"]
+        ps.apply_action(sid, "apply_package", {"package": pkg_id, "target": "TEST"})
+        res = ps.apply_action(sid, "rollback_package",
+                              {"package": pkg_id, "environment": "TEST"})
+        self.assertTrue(res["ok"], res)
+        self.assertEqual(self._env(sid, "TEST")["objects"]["PSU_EXPENSE_AE"]["version"], 2)
+
+    def test_rollback_of_an_unapplied_package_is_refused(self):
+        sid = self._session("promote-change-package")
+        ps.apply_action(sid, "create_project",
+                        {"project": "P1", "objects": ["PSU_EXPENSE_AE"]})
+        pkg_id = ps.apply_action(sid, "create_package", {"project": "P1"})["package_id"]
+        res = ps.apply_action(sid, "rollback_package",
+                              {"package": pkg_id, "environment": "PROD"})
+        self.assertFalse(res["ok"])
+
+    # ── grading: fresh session fails, intended remediation passes ──────────
+    def test_promote_preset_fails_fresh_and_passes_after_full_promotion(self):
+        sid = self._session("promote-change-package")
+        ok, _ = ps.validate_peoplesoft_lab(sid, "promote-change-package")
+        self.assertFalse(ok, "promotion lab should start broken")
+        ps.apply_action(sid, "create_project",
+                        {"project": "PSU_EXPENSE_FIX", "objects": ["PSU_EXPENSE_AE"]})
+        pkg_id = ps.apply_action(sid, "create_package",
+                                 {"project": "PSU_EXPENSE_FIX"})["package_id"]
+        ps.apply_action(sid, "compare_report", {"source": "DEV", "target": "TEST"})
+        ps.apply_action(sid, "apply_package", {"package": pkg_id, "target": "TEST"})
+        # still not done — PROD has not received it
+        ok, _ = ps.validate_peoplesoft_lab(sid, "promote-change-package")
+        self.assertFalse(ok, "should not pass until PROD is promoted")
+        ps.apply_action(sid, "apply_package", {"package": pkg_id, "target": "PROD"})
+        ok, msg = ps.validate_peoplesoft_lab(sid, "promote-change-package")
+        self.assertTrue(ok, msg)
+
+    def test_rollback_preset_fails_fresh_and_passes_after_rollback(self):
+        sid = self._session("bad-patch-rollback")
+        ok, _ = ps.validate_peoplesoft_lab(sid, "bad-patch-rollback")
+        self.assertFalse(ok, "rollback lab should start broken")
+        self.assertEqual(self._env(sid, "PROD")["objects"]["PSU_VOUCHER_REC"]["version"], 9)
+        res = ps.apply_action(sid, "rollback_package",
+                              {"package": "CP-014", "environment": "PROD"})
+        self.assertTrue(res["ok"], res)
+        self.assertEqual(self._env(sid, "PROD")["objects"]["PSU_VOUCHER_REC"]["version"], 5)
+        ok, msg = ps.validate_peoplesoft_lab(sid, "bad-patch-rollback")
+        self.assertTrue(ok, msg)
+
+    def test_rolling_back_the_wrong_environment_does_not_pass_the_lab(self):
+        sid = self._session("bad-patch-rollback")
+        ps.apply_action(sid, "rollback_package",
+                        {"package": "CP-014", "environment": "TEST"})
+        ok, _ = ps.validate_peoplesoft_lab(sid, "bad-patch-rollback")
+        self.assertFalse(ok, "rolling back TEST must not satisfy the PROD goal")
+
+    # ── preset routing ─────────────────────────────────────────────────────
+    def test_slug_routing_prefers_rollback_over_promote(self):
+        # The preset dispatcher matches substrings, so a slug containing both
+        # "change-package" and "back-out" must land on the rollback lab.
+        cases = {
+            "ps-promote-change-package": "package_promoted",
+            "ps-change-assistant-migration": "package_promoted",
+            "ps-bad-patch-rollback": "package_rolled_back",
+            "ps-back-out-change-package": "package_rolled_back",
+        }
+        for slug, kind in cases.items():
+            with self.subTest(slug=slug):
+                state = {"world": ps._base_world()}
+                ps._apply_preset(state, slug)
+                self.assertEqual(state["goal"]["kind"], kind)
+
+    # ── malformed input never raises ───────────────────────────────────────
+    def test_migration_actions_are_safe_on_bad_input(self):
+        sid = self._session("promote-change-package")
+        for act, payload in [
+            ("create_project", {}),
+            ("create_package", {"project": "nope"}),
+            ("apply_package", {"package": "nope", "target": "PROD"}),
+            ("compare_report", {"source": "DEV"}),
+            ("resolve_conflict", {"environment": "TEST", "object": "nope"}),
+            ("rollback_package", {"package": "nope", "environment": "PROD"}),
+            ("edit_object", {"environment": "NOPE", "object": "x"}),
+        ]:
+            with self.subTest(act=act):
+                res = ps.apply_action(sid, act, payload)
+                self.assertFalse(res["ok"], f"{act} should fail cleanly")
+                self.assertIn("error", res)

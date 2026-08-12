@@ -7,8 +7,10 @@ networks, volumes, and docker-compose service groups.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import random
+import re
 import time
 from typing import Any
 
@@ -771,6 +773,138 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 
     # --- Image operations ---
 
+    if action in ("build_image", "docker_build"):
+        # Dockerfile layer semantics (X4): cache by instruction digest, multi-stage,
+        # digest-pinned FROM, failure → no image tag (docker run → Unable to find image).
+        dockerfile = payload.get("dockerfile") or payload.get("Dockerfile") or ""
+        context_files = payload.get("files") if isinstance(payload.get("files"), dict) else {}
+        tag = (payload.get("tag") or payload.get("name") or "app:latest").strip()
+        if ":" in tag:
+            repo, img_tag = tag.rsplit(":", 1)
+        else:
+            repo, img_tag = tag, "latest"
+
+        ignore = set()
+        dockerignore = context_files.get(".dockerignore") or payload.get("dockerignore") or ""
+        for line in str(dockerignore).splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                ignore.add(line)
+
+        if not dockerfile and "Dockerfile" in context_files:
+            dockerfile = str(context_files["Dockerfile"])
+        if not dockerfile.strip():
+            return {"ok": False, "error": "Dockerfile is required"}
+
+        lines = [ln.rstrip() for ln in dockerfile.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+        if not any(ln.upper().startswith("FROM ") for ln in lines):
+            return {"ok": False, "error": "Dockerfile must start with FROM"}
+
+        cache = state.setdefault("build_cache", {})
+        layers = []
+        stage = "default"
+        stages: dict[str, list] = {}
+        final_layers = []
+        cache_hits = 0
+        parent = "scratch"
+
+        for instr in lines:
+            upper = instr.upper()
+            if upper.startswith("FROM "):
+                # FROM image@sha256:… AS name  OR  FROM name AS stage
+                m = re.match(
+                    r"FROM\s+(\S+)(?:\s+AS\s+(\w+))?",
+                    instr,
+                    re.I,
+                )
+                base = m.group(1) if m else "scratch"
+                stage = (m.group(2) if m and m.group(2) else "default")
+                if "@sha256:" not in base and payload.get("require_digest_pin"):
+                    return {
+                        "ok": False,
+                        "error": (
+                            "build failed: base image must be pinned by digest "
+                            "(FROM repo@sha256:…)"
+                        ),
+                    }
+                parent = base
+                stages.setdefault(stage, [])
+                continue
+
+            # Failure injection for teaching
+            if "FAIL_BUILD" in instr or payload.get("force_fail"):
+                state.setdefault("events", []).append(
+                    _docker_event("build", "die", tag, f"Build failed at: {instr[:80]}")
+                )
+                _save_session(str(session_id), entry)
+                return {
+                    "ok": False,
+                    "error": f"build failed: {instr[:120]}",
+                    "layers": layers,
+                    "cache_hits": cache_hits,
+                }
+
+            # COPY/ADD respect .dockerignore (bloat teaching)
+            if upper.startswith(("COPY ", "ADD ")):
+                parts = instr.split()
+                src = parts[1] if len(parts) > 1 else ""
+                if src in ignore or any(src.startswith(p.rstrip("*")) for p in ignore if p.endswith("*")):
+                    # Still creates a layer but notes ignored content
+                    instr = f"{instr}  # ignored by .dockerignore"
+
+            digest_src = f"{parent}\n{instr}\n"
+            for path, content in sorted(context_files.items()):
+                if path == "Dockerfile":
+                    continue
+                if path in ignore:
+                    continue
+                digest_src += f"{path}:{hashlib.sha256(str(content).encode()).hexdigest()[:16]}\n"
+            layer_digest = "sha256:" + hashlib.sha256(digest_src.encode()).hexdigest()
+            hit = layer_digest in cache
+            if hit:
+                cache_hits += 1
+            else:
+                cache[layer_digest] = {"instr": instr[:200], "at": _now_iso()}
+            layer = {
+                "digest": layer_digest,
+                "instruction": instr[:200],
+                "cache_hit": hit,
+                "stage": stage,
+            }
+            layers.append(layer)
+            stages.setdefault(stage, []).append(layer)
+            parent = layer_digest
+
+        final_layers = stages.get(stage) or layers
+        size_mb = 40 + 15 * max(1, len(final_layers) - cache_hits)
+        img = _image(repo, img_tag, size_mb=size_mb, age_seconds=1)
+        img["layers"] = final_layers
+        img["digest"] = final_layers[-1]["digest"] if final_layers else img["id"]
+        img["stages"] = list(stages.keys())
+        img["cacheHits"] = cache_hits
+        # Replace existing tag
+        state["images"] = [
+            i for i in state.get("images") or []
+            if not (i.get("repository") == repo and i.get("tag") == img_tag)
+        ]
+        state.setdefault("images", []).insert(0, img)
+        state["disk_usage"]["imagesMb"] = sum(i.get("sizeMb") or 0 for i in state["images"])
+        state["disk_usage"]["totalMb"] = (
+            state["disk_usage"]["imagesMb"]
+            + state["disk_usage"].get("containersMb", 0)
+            + state["disk_usage"].get("volumesMb", 0)
+            + state["disk_usage"].get("buildCacheMb", 0)
+        )
+        events.append(_docker_event("build", "build", tag, f"Built {tag} ({len(final_layers)} layers, {cache_hits} cache hits)"))
+        _save_session(str(session_id), entry)
+        return {
+            "ok": True,
+            "message": f"Successfully tagged {repo}:{img_tag}",
+            "image": img,
+            "layers": final_layers,
+            "cache_hits": cache_hits,
+        }
+
     if action == "pull_image":
         image = payload.get("image") or payload.get("name")
         if not image:
@@ -870,6 +1004,21 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         image = (payload.get("image") or "nginx:latest").strip()
         if _find_container(state, name):
             return {"ok": False, "error": f"Conflict. The container name \"/{name}\" is already in use"}
+        # X4 failure propagation: failed build → no tag → Unable to find image
+        # (check before mutating containers).
+        repo, _, tag = image.partition(":")
+        tag = tag or "latest"
+        has_img = any(
+            i.get("repoTag") == image or (i.get("repository") == repo and i.get("tag") == tag)
+            for i in state.get("images") or []
+        )
+        if not has_img:
+            if payload.get("create_missing_image") is False or payload.get("pull") is False:
+                return {
+                    "ok": False,
+                    "error": f"Unable to find image '{image}' locally",
+                }
+            state.setdefault("images", []).insert(0, _image(repo or image, tag=tag, size_mb=80, age_seconds=1))
         network = payload.get("network") or payload.get("network_mode") or "bridge"
         ports_in = payload.get("ports") or []
         ports = []
@@ -910,12 +1059,6 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             containers = net.setdefault("containers", [])
             if name not in containers:
                 containers.append(name)
-        # Ensure image exists locally after a run
-        repo, _, tag = image.partition(":")
-        tag = tag or "latest"
-        if not any(i.get("repoTag") == image or (i.get("repository") == repo and i.get("tag") == tag)
-                   for i in state.get("images") or []):
-            state.setdefault("images", []).insert(0, _image(repo or image, tag=tag, size_mb=80, age_seconds=1))
         events.append(_docker_event("create", "create", name, f"Created container {name}"))
         if start:
             events.append(_docker_event("start", "start", name, f"Started container {name}"))

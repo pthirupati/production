@@ -111,3 +111,19 @@ class PauseCreditCapTests(TestCase):
     def test_clean_round_has_no_proctoring_block(self):
         result = engine.end_round(self.round, reason="completed")
         self.assertNotIn("proctoring", result["report"].confidence_analysis or {})
+
+    def test_paste_events_reach_the_report(self):
+        engine.record_paste(self.round, source="answer")
+        engine.record_paste(self.round, source="code_editor")
+        result = engine.end_round(self.round, reason="completed")
+        proctoring = (result["report"].confidence_analysis or {}).get("proctoring")
+        self.assertIsNotNone(proctoring)
+        self.assertEqual(proctoring["paste_events"], 2)
+        self.assertEqual(proctoring["tab_switches"], 0)
+
+    def test_paste_log_is_bounded(self):
+        for _ in range(25):
+            engine.record_paste(self.round, source="answer")
+        state = engine.paste_state(InterviewRound.objects.get(pk=self.round.pk))
+        self.assertEqual(len(state["events"]), 20)
+        self.assertEqual(state["count"], 25)

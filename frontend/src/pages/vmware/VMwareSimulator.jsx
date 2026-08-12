@@ -40,7 +40,6 @@ import {
   CreateDatastoreClusterModal,
   CreateFolderModal,
 } from '../../components/vmware/VmwareResourceModals'
-import VmModal from '../../components/vmware/VmModal'
 import VmConfigurePanel from '../../components/vmware/VmConfigurePanel'
 import VmwareToast from '../../components/vmware/VmwareToast'
 import '../../styles/vmware-sim.css'
@@ -120,7 +119,7 @@ function SnapshotModal({ vm, onClose, onAction }) {
       <div className="vm-modal w-96">
         <div className="vm-modal-header">
           <span>Take Snapshot — {vm.name}</span>
-          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white">✕</button>
         </div>
         <div className="vm-modal-body space-y-3">
           <div>
@@ -179,7 +178,7 @@ function SnapshotManagerModal({ vm, onClose, onAction, acting }) {
       <div className="vm-modal w-[760px] max-w-[95vw]">
         <div className="vm-modal-header">
           <span>Snapshot Manager — {vm.name}</span>
-          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white">✕</button>
         </div>
         <div className="vm-modal-body">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-4">
@@ -288,7 +287,7 @@ function MigrateModal({ vm, hosts, onClose, onAction }) {
       <div className="vm-modal w-96">
         <div className="vm-modal-header">
           <span>Migrate VM — {vm.name}</span>
-          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white">✕</button>
         </div>
         <div className="vm-modal-body space-y-3">
           <p className="text-xs text-[#8fa5b8]">Select destination host (VMotion):</p>
@@ -354,7 +353,7 @@ function CreateVmModal({ hosts, datastores, networks, onClose, onAction }) {
       <div className="vm-modal w-[480px] max-w-[95vw]">
         <div className="vm-modal-header">
           <span>New Virtual Machine</span>
-          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white">✕</button>
         </div>
         <div className="vm-modal-body space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -495,7 +494,7 @@ function EditVmModal({ vm, networks, datastores = [], onClose, onAction, onAddDi
       <div className="vm-modal w-[560px] max-w-[95vw]">
         <div className="vm-modal-header">
           <span>Edit Settings — {vm.name}</span>
-          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white">✕</button>
         </div>
         <div className="flex border-b border-[#2d3a4a] bg-[#16222f]">
           {[['hardware', 'Virtual Hardware'], ['options', 'VM Options']].map(([id, label]) => (
@@ -694,7 +693,7 @@ function CloneVmModal({ vm, onClose, onAction }) {
       <div className="vm-modal w-80">
         <div className="vm-modal-header">
           <span>Clone Virtual Machine — {vm.name}</span>
-          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white">✕</button>
         </div>
         <div className="vm-modal-body space-y-3">
           <div>
@@ -743,7 +742,7 @@ function DeployFromTemplateModal({ templates, hosts, onClose, onAction }) {
       <div className="vm-modal w-[420px] max-w-[95vw]">
         <div className="vm-modal-header">
           <span>Deploy VM from Template</span>
-          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white">✕</button>
         </div>
         <div className="vm-modal-body space-y-3">
           <div>
@@ -808,7 +807,7 @@ function TaskEventDetailModal({ item, onClose }) {
       <div className="vm-modal w-[440px] max-w-[95vw]" onClick={e => e.stopPropagation()}>
         <div className="vm-modal-header">
           <span>{isTask ? 'Task details' : 'Event details'}{d.target || d.entity ? ` — ${d.target || d.entity}` : ''}</span>
-          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white">✕</button>
         </div>
         <div className="vm-modal-body">
           {rows.map(([label, value]) => (
@@ -840,7 +839,6 @@ export default function VMwareSimulator() {
   const [acting, setActing] = useState(false)
   const [selectedNode, setSelectedNode] = useState({ type: 'host', id: null })
   const [activeTab, setActiveTab] = useState('summary')
-  const [expandedSections, setExpandedSections] = useState({ hosts: true, vms: true, storage: true, networks: false })
   const [showSnapshotModal, setShowSnapshotModal] = useState(false)
   const [showSnapshotManager, setShowSnapshotManager] = useState(false)
   const [showMigrateModal, setShowMigrateModal] = useState(false)
@@ -1247,8 +1245,6 @@ export default function VMwareSimulator() {
 
   const activeAlarms = alarms.filter(a => a.status === 'active')
 
-  const toggleSection = (k) => setExpandedSections(p => ({ ...p, [k]: !p[k] }))
-
   /* ── Resolve a task target / event entity name to an inventory node and
         select it, then open a detail popover with the full record. ── */
   const selectByTargetName = (name) => {
@@ -1359,7 +1355,8 @@ export default function VMwareSimulator() {
           <div className="flex-1" />
           <button type="button"
             onClick={() => { try { sessionStorage.setItem('fixitlab_vmware_creds_hint', '1') } catch { /* ignore */ } setCredsHintDismissed(true) }}
-            className="text-[#8fa5b8] hover:text-white px-1" title="Dismiss">✕</button>
+            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white px-1"
+            title="Dismiss" aria-label="Dismiss credentials hint">✕</button>
         </div>
       )}
 
@@ -2940,50 +2937,6 @@ function getTabs(type) {
   return ['summary']
 }
 
-function NavSection({ label, expanded, onToggle, children }) {
-  return (
-    <div>
-      <button type="button" onClick={onToggle} className="w-full flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold text-[#8fa5b8] uppercase tracking-wider hover:bg-white/[0.05]">
-        <span className="text-[8px]">{expanded ? '▼' : '▶'}</span>
-        {label}
-      </button>
-      {expanded && <div>{children}</div>}
-    </div>
-  )
-}
-
-function NavItem({ icon, label, status, active, onClick, badge, children }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div>
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => { onClick(); if (children) setOpen(v => !v) }}
-        onKeyDown={e => { if (e.key === 'Enter') { onClick(); if (children) setOpen(v => !v) } }}
-        className={`vm-nav-item ${active ? 'vm-nav-item-active' : ''}`}
-        style={{ paddingLeft: 10 }}
-      >
-        <span className="shrink-0">{icon}</span>
-        <StatusIcon status={status} size={8} />
-        <span className="truncate flex-1">{label}</span>
-        {badge && <span className="text-[8px] bg-[#F5A623] text-[#1B2A3B] rounded px-1 font-bold">{badge}</span>}
-        {children && <span className="text-[8px] text-[#6880a0]">{open ? '▾' : '▸'}</span>}
-      </div>
-      {open && children && <div className="pl-4">{children}</div>}
-    </div>
-  )
-}
-
-function NavSubItem({ label, onClick }) {
-  return (
-    <div role="button" tabIndex={0} onClick={onClick} onKeyDown={e => e.key === 'Enter' && onClick()}
-      className="px-3 py-1 text-[10px] text-[#8fa5b8] cursor-pointer hover:bg-white/[0.05] hover:text-white">
-      {label}
-    </div>
-  )
-}
-
 function ContentPanel({ title, children }) {
   return (
     <div className="vm-panel mb-4">
@@ -3062,55 +3015,14 @@ function ToolbarSep() {
 
 function RefreshBtn({ onClick }) {
   return (
-    <button type="button" onClick={onClick} title="Refresh" className="vm-btn">↻</button>
+    <button
+      type="button"
+      onClick={onClick}
+      title="Refresh"
+      aria-label="Refresh inventory"
+      className="vm-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
+    >
+      ↻
+    </button>
   )
-}
-
-function PermissionsPanel({ entityName, definedIn }) {
-  const rows = [
-    { user: 'VSPHERE.LOCAL\\Administrator', role: 'Administrator', prop: 'Yes', defined: 'Root' },
-    { user: 'VSPHERE.LOCAL\\SSOAdminServer', role: 'Administrator', prop: 'Yes', defined: 'Root' },
-    { user: 'root', role: 'Administrator', prop: 'No', defined: definedIn || entityName },
-  ]
-  return (
-    <ContentPanel title={`Roles & Permissions — ${entityName}`}>
-      <div className="flex justify-end mb-2">
-        <button type="button" onClick={() => toast('Permission added')} className="vm-btn vm-btn-blue text-[11px]">Add permission…</button>
-      </div>
-      <table className="vm-table">
-        <thead>
-          <tr>
-            {['User / Group', 'Role', 'Propagate', 'Defined In'].map(h => <th key={h}>{h}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(r => (
-            <tr key={r.user}>
-              <td className="text-[#5b9bf5]">{r.user}</td>
-              <td>{r.role}</td>
-              <td>{r.prop}</td>
-              <td className="text-[#8FA5B8]">{r.defined}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </ContentPanel>
-  )
-}
-
-
-function HostIcon() {
-  return <span className="text-[#5b9bd5] text-[10px]">⊞</span>
-}
-
-function VmIcon({ power }) {
-  return <span className={`text-[10px] ${power === 'poweredOn' ? 'text-[#2db52d]' : power === 'suspended' ? 'text-[#f5a623]' : 'text-[#888]'}`}>◼</span>
-}
-
-function DsIcon() {
-  return <span className="text-[#e67e22] text-[10px]">⬡</span>
-}
-
-function NetIcon() {
-  return <span className="text-[#27ae60] text-[10px]">⬡</span>
 }

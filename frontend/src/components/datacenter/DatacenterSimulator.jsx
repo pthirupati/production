@@ -8,17 +8,21 @@ import {
   RefreshCw, MonitorCog, Database, Boxes, Ticket, Monitor, Box,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
-import { useSimSession, GlobalSearch, indexDatacenterState } from '../sim/shared'
+import { useSimSession, GlobalSearch, indexDatacenterState, SimLoginGateCard } from '../sim/shared'
 import { lazyWithRetry } from '../../utils/lazyWithRetry'
 import {
   MotherboardPanel, RaidPanel, BiosPanel, BmcPanel, CampusRoomView,
   ServiceModePanel, InventoryPanel, FailureInjectBar,
 } from './ServerTwinPanels'
+import { renderFloorPlanPng } from './DcShare'
 import {
   NetworkRoomPhase3, CableOpsPanel, StorageStackPanel,
 } from './NetworkStoragePanels'
 import {
-  RackPhysicsFruPanel, MonitoringPanel, OpsTicketsPanel, TrainingPanel, ComputeAiPanel,
+  RackPhysicsFruPanel, MonitoringPanel, OpsTicketsPanel, ContractsPanel,
+  CostLedgerPanel, InspectEnergizePanel, StaffRosterPanel, TechTreePanel, ReputationPanel,
+  BlueprintPanel, VendorDependencyPanel, VaultLabPanel,
+  TrainingPanel, ComputeAiPanel,
   LiquidCoolingPanel, PxeMaasPanel, FireSafetyPanel, EnvironmentalPanel, OpticalPanel, CapacityPdmPanel,
   DrFailoverPanel, AccessControlPanel, AutomationReportPanel,
   ChangeCabPanel, SustainabilityPanel, ContainmentPanel, CablePlantPanel,
@@ -142,6 +146,15 @@ const EMPTY_NETWORK = Object.freeze({ switches: EMPTY_ARR, topology: EMPTY_ARR }
 // Fallback room for a state payload that has no rooms yet; `roomRacks` memoizes
 // on it, so a fresh literal here re-filtered every rack on every poll tick.
 const EMPTY_ROOM = Object.freeze({ type: 'data_hall', racks: EMPTY_ARR })
+
+/** Room types that mount the walkable 3D twin (X1c — expand beyond data_hall). */
+export const WALKABLE_3D_ROOM_TYPES = Object.freeze([
+  'data_hall', 'network', 'mechanical', 'electrical', 'security',
+  'campus', 'office', 'ops',
+])
+export function isWalkable3dRoom(type) {
+  return WALKABLE_3D_ROOM_TYPES.includes(type)
+}
 
 /* Lab-console flavour, not a real secret: shown to the learner on screen with an
    autofill button so the fake console feels real, and the gate is bypassed once a
@@ -375,7 +388,7 @@ export default function DatacenterSimulator({
   const currentRoom = rooms.find((r) => r.id === currentRoomId) || rooms[0] || EMPTY_ROOM
   // Not a button dashboard: while the 3D twin is walking its own immersive game
   // view, collapse the tab bar / status strip / goal banner into its in-world HUD.
-  const isDataHall3d = currentRoom.type === 'data_hall' && floorView === '3d'
+  const isDataHall3d = isWalkable3dRoom(currentRoom.type) && floorView === '3d'
   const immersed3d = isDataHall3d && twinImmersive
 
   const serversByRack = useMemo(() => {
@@ -498,7 +511,7 @@ export default function DatacenterSimulator({
       <div className={simPanelRoot(embedded, 'bg-[#0b0e14]')}>
         <LabChromeBar title="Data Center Console" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <SimLoginGateCard title="Sign in to Data Center Console" onClose={onExit} className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold flex items-center gap-2" style={{ background: '#1a1d2b' }}>
               <Server size={18} /> DCIM Field Console
             </div>
@@ -531,7 +544,7 @@ export default function DatacenterSimulator({
                 Training credentials: <span className="font-mono text-slate-700">{DC_LAB_USER}</span> / <span className="font-mono text-slate-700">{DC_LAB_PASS}</span>
               </p>
             </form>
-          </div>
+          </SimLoginGateCard>
         </div>
       </div>
     )
@@ -622,7 +635,7 @@ export default function DatacenterSimulator({
             ))}
           </div>
           <div className="dc-status-hint">
-            {currentRoom.type === 'data_hall' && (
+            {isWalkable3dRoom(currentRoom.type) && (
               <span className="dc-view-toggle">
                 <button
                   type="button"
@@ -640,16 +653,26 @@ export default function DatacenterSimulator({
                 >
                   <Box size={11} /> 3D hall
                 </button>
+                {floorView === '2d' && currentRoom.type === 'data_hall' && (
+                  <button
+                    type="button"
+                    className="dc-btn-outline dc-btn-xs"
+                    onClick={() => renderFloorPlanPng({ racks: roomRacks, serversByRack })}
+                    title="Download a shareable PNG of this floor plan"
+                  >
+                    Share plan
+                  </button>
+                )}
               </span>
             )}
-            {currentRoom.type === 'data_hall' && floorView === '3d'
-              ? <><Box size={12} /> 3D twin · Walk (WASD) · Replay enter · Motions on</>
+            {isWalkable3dRoom(currentRoom.type) && floorView === '3d'
+              ? <><Box size={12} /> 3D twin · Walk (WASD) · {currentRoom.type} · Motions on</>
               : <><Move size={12} /> 2D floor · switch to 3D hall for Steam immersion</>}
           </div>
         </div>
       )}
 
-      {currentRoom.type === 'data_hall' && floorView === '3d' && !webglGate.ok && (
+      {isWalkable3dRoom(currentRoom.type) && floorView === '3d' && !webglGate.ok && (
         <div className="dc-3d-fail-banner" role="alert">
           <div className="dc-3d-fail-title">3D hall unavailable</div>
           <p className="dc-3d-fail-msg">
@@ -666,7 +689,7 @@ export default function DatacenterSimulator({
         </div>
       )}
 
-      {currentRoom.type === 'data_hall' && floorView === '3d' && webglGate.ok && (
+      {isWalkable3dRoom(currentRoom.type) && floorView === '3d' && webglGate.ok && (
         // Suspense sits OUTSIDE the error boundary on purpose. The twin chunk is
         // ~1MB gzip; when Suspense was nested inside, a slow or dropped chunk
         // fetch surfaced as a thrown error and got treated as a permanent WebGL
@@ -951,6 +974,76 @@ export default function DatacenterSimulator({
               `Ticket ${advance}`,
             )}
           />
+          <ContractsPanel
+            contracts={st.contracts}
+            busy={busy}
+            onAccept={(payload) => doAction(
+              () => datacenterApi.action(sessionId, 'accept_contract', payload),
+              `Contract ${payload.tenant}`,
+            )}
+          />
+          <CostLedgerPanel
+            ledger={st.ledger}
+            busy={busy}
+            onBuy={(sku) => doAction(() => datacenterApi.action(sessionId, 'economy_buy', { sku }), `Buy ${sku}`)}
+            onTick={(hours) => doAction(() => datacenterApi.action(sessionId, 'economy_tick', { hours }), 'Opex tick')}
+          />
+          <InspectEnergizePanel
+            inspection={st.inspection}
+            busy={busy}
+            onInspect={() => doAction(() => datacenterApi.action(sessionId, 'inspect_floor', {}), 'Inspection')}
+            onEnergize={() => doAction(() => datacenterApi.action(sessionId, 'energize_floor', {}), 'Energize')}
+          />
+          <StaffRosterPanel
+            staff={st.staff}
+            tickets={st.tickets}
+            busy={busy}
+            onHire={(payload) => doAction(() => datacenterApi.action(sessionId, 'hire_staff', payload), `Hire ${payload.name}`)}
+            onDispatch={(ticketId, staffId) => doAction(
+              () => datacenterApi.action(sessionId, 'dispatch_staff', { ticket_id: ticketId, staff_id: staffId }),
+              'Dispatch',
+            )}
+          />
+          <TechTreePanel
+            ownedIds={st.upgrades?.owned}
+            busy={busy}
+            onUpgrade={(id) => doAction(() => datacenterApi.action(sessionId, 'apply_upgrade', { upgrade_id: id }), `Upgrade ${id}`)}
+          />
+          <ReputationPanel
+            reputation={st.reputation}
+            busy={busy}
+            onRefresh={() => doAction(() => datacenterApi.action(sessionId, 'economy_tick', { hours: 1 }), 'Opex+rep')}
+            onUnlockHall={() => doAction(() => datacenterApi.action(sessionId, 'unlock_second_hall', {}), 'Second hall')}
+          />
+          <BlueprintPanel
+            blueprint={st.blueprint}
+            busy={busy}
+            onUndo={() => doAction(() => datacenterApi.action(sessionId, 'blueprint_undo', {}), 'Undo')}
+            onRedo={() => doAction(() => datacenterApi.action(sessionId, 'blueprint_redo', {}), 'Redo')}
+            onSave={(name) => doAction(() => datacenterApi.action(sessionId, 'blueprint_save', { name }), 'Save blueprint')}
+            onLoad={(name) => doAction(() => datacenterApi.action(sessionId, 'blueprint_load', { name }), 'Load blueprint')}
+            onCopyRow={(source_z, dest_z) => doAction(
+              () => datacenterApi.action(sessionId, 'blueprint_copy_row', { source_z, dest_z }),
+              'Copy row',
+            )}
+          />
+          <VendorDependencyPanel
+            events={st.vendor_events}
+            busy={busy}
+            onInject={(kind) => doAction(() => datacenterApi.action(sessionId, 'vendor_inject', { kind }), `Vendor ${kind}`)}
+            onRemediate={(eventId, remediation) => doAction(
+              () => datacenterApi.action(sessionId, 'vendor_remediate', { event_id: eventId, remediation }),
+              'Vendor remediate',
+            )}
+          />
+          <VaultLabPanel
+            vault={st.vault_lab}
+            busy={busy}
+            onSeal={() => doAction(() => datacenterApi.action(sessionId, 'vault_seal', {}), 'Vault seal')}
+            onUnsealKey={(key) => doAction(() => datacenterApi.action(sessionId, 'vault_unseal_key', { key }), 'Unseal')}
+            onAuth={(payload) => doAction(() => datacenterApi.action(sessionId, 'vault_auth', payload), 'Vault auth')}
+            onIssueDb={() => doAction(() => datacenterApi.action(sessionId, 'vault_issue_db', { ttl_seconds: 60 }), 'DB lease')}
+          />
           <TrainingPanel
             training={training}
             busy={busy}
@@ -1160,7 +1253,7 @@ export default function DatacenterSimulator({
                 </div>
                 <div className="dc-drawer-sub">{selectedServer.vendor} {selectedServer.model} · {selectedServer.rack} U{selectedServer.u_slot} · {selectedServer.power_state}</div>
               </div>
-              <button type="button" onClick={() => setSelectedServerId(null)} className="dc-drawer-close"><X size={16} /></button>
+              <button type="button" onClick={() => setSelectedServerId(null)} className="dc-drawer-close" aria-label="Close server details"><X size={16} /></button>
             </div>
 
             <div className="dc-drawer-tabs">

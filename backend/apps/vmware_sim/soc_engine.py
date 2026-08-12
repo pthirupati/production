@@ -10,7 +10,9 @@ playbook run), remediated (quarantine host / block IP), then closed.
 from __future__ import annotations
 
 import copy
+import fnmatch
 import json
+import re
 import time
 
 from django.core.cache import cache
@@ -44,6 +46,466 @@ def _event(state: dict, message: str, severity: str = "info") -> None:
     state.setdefault("events", []).insert(0, entry)
     state.setdefault("activity_log", []).insert(0, entry)
     state["activity_log"] = state["activity_log"][:200]
+
+
+# ---------------------------------------------------------------------------
+# SPL-subset query language
+#
+# Log hunting is the one SOC skill that has to be *typed*, not clicked, so the
+# search box parses a real (small) Splunk-flavoured grammar instead of doing a
+# substring match over the JSON dump of each row. The two rules that matter for
+# grading correctness:
+#
+#   1. A query that fails to parse returns ZERO rows and raises. It must never
+#      degrade into "match everything", because the hunt objective is cleared by
+#      inspecting the result set — a permissive fallback would auto-pass labs.
+#   2. Matching is field-aware. `host=web01` only looks at the host field, so a
+#      learner cannot stumble onto the answer by pasting a term that happens to
+#      appear in an unrelated column.
+#
+# Grammar (subset):
+#   pipeline := search_expr ("|" command)*
+#   search_expr := or_expr
+#   or_expr  := and_expr (("OR") and_expr)*
+#   and_expr := unary (("AND")? unary)*        # juxtaposition is implicit AND
+#   unary    := "NOT" unary | "(" or_expr ")" | comparison | term
+#   comparison := field op value               # op: = != > >= < <=
+#   term     := bare word or "quoted phrase"   # substring/glob over all fields
+#   command  := where <or_expr> | search <or_expr> | stats count [by f]
+#             | fields f,... | sort [-]f | head n | tail n | dedup f | rename a as b
+# ---------------------------------------------------------------------------
+
+
+class SocQueryError(ValueError):
+    """Raised when a search string is not valid in the SPL subset."""
+
+
+_COMPARISON_OPS = ("!=", ">=", "<=", "=", ">", "<")
+# Longest-first so ">=" is never tokenized as ">" followed by "=".
+_TOKEN_RE = re.compile(
+    r"""
+    \s*(?:
+        (?P<lparen>\()
+      | (?P<rparen>\))
+      | (?P<pipe>\|)
+      | (?P<comma>,)
+      | (?P<op>!=|>=|<=|=|>|<)
+      | (?P<quoted>"[^"]*"|'[^']*')
+      | (?P<word>[^\s()|,=!<>]+)
+    )
+    """,
+    re.VERBOSE,
+)
+
+
+def _tokenize(text: str) -> list[tuple[str, str]]:
+    tokens: list[tuple[str, str]] = []
+    pos = 0
+    while pos < len(text):
+        if text[pos].isspace():
+            pos += 1
+            continue
+        match = _TOKEN_RE.match(text, pos)
+        if not match or match.end() == pos:
+            raise SocQueryError(f"unexpected character {text[pos]!r} at position {pos}")
+        kind = match.lastgroup or ""
+        value = match.group(kind)
+        if kind == "quoted":
+            value = value[1:-1]
+        tokens.append((kind, value))
+        pos = match.end()
+    return tokens
+
+
+def _row_values(row: dict) -> list[str]:
+    return [str(v) for v in row.values()]
+
+
+def _coerce(value: str):
+    """Numeric-compare when both sides look numeric, else compare as text."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _match_scalar(actual: str, expected: str) -> bool:
+    """Case-insensitive equality with glob support (`powershell*`)."""
+    actual, expected = str(actual), str(expected)
+    if any(ch in expected for ch in "*?"):
+        return fnmatch.fnmatch(actual.lower(), expected.lower())
+    return actual.lower() == expected.lower()
+
+
+class _Term:
+    """Bare word / quoted phrase: substring or glob across every field."""
+
+    def __init__(self, value: str):
+        self.value = value
+
+    def matches(self, row: dict) -> bool:
+        needle = self.value.lower()
+        globbing = any(ch in self.value for ch in "*?")
+        for raw in _row_values(row):
+            hay = raw.lower()
+            if globbing:
+                if fnmatch.fnmatch(hay, needle):
+                    return True
+            elif needle in hay:
+                return True
+        return False
+
+    def referenced_fields(self) -> set[str]:
+        return set()
+
+
+class _Comparison:
+    def __init__(self, field: str, op: str, value: str):
+        self.field, self.op, self.value = field, op, value
+
+    def matches(self, row: dict) -> bool:
+        if self.field not in row:
+            return False
+        actual = row[self.field]
+        if self.op == "=":
+            return _match_scalar(actual, self.value)
+        if self.op == "!=":
+            return not _match_scalar(actual, self.value)
+        left, right = _coerce(str(actual)), _coerce(self.value)
+        if left is None or right is None:
+            # Non-numeric operands fall back to lexicographic order, which is
+            # what makes `time>2026-07-16T10:00:00Z` work on ISO timestamps.
+            left, right = str(actual).lower(), self.value.lower()
+        if self.op == ">":
+            return left > right
+        if self.op == ">=":
+            return left >= right
+        if self.op == "<":
+            return left < right
+        return left <= right
+
+    def referenced_fields(self) -> set[str]:
+        return {self.field}
+
+
+class _Not:
+    def __init__(self, child):
+        self.child = child
+
+    def matches(self, row: dict) -> bool:
+        return not self.child.matches(row)
+
+    def referenced_fields(self) -> set[str]:
+        return self.child.referenced_fields()
+
+
+class _BoolOp:
+    def __init__(self, op: str, children: list):
+        self.op, self.children = op, children
+
+    def matches(self, row: dict) -> bool:
+        if self.op == "AND":
+            return all(c.matches(row) for c in self.children)
+        return any(c.matches(row) for c in self.children)
+
+    def referenced_fields(self) -> set[str]:
+        fields: set[str] = set()
+        for child in self.children:
+            fields |= child.referenced_fields()
+        return fields
+
+
+class _MatchAll:
+    """Only produced by an explicitly empty stage (e.g. a leading `| stats`)."""
+
+    def matches(self, row: dict) -> bool:
+        return True
+
+    def referenced_fields(self) -> set[str]:
+        return set()
+
+
+class _Parser:
+    def __init__(self, tokens: list[tuple[str, str]]):
+        self.tokens = tokens
+        self.pos = 0
+
+    def _peek(self) -> tuple[str, str] | None:
+        return self.tokens[self.pos] if self.pos < len(self.tokens) else None
+
+    def _next(self) -> tuple[str, str]:
+        token = self._peek()
+        if token is None:
+            raise SocQueryError("unexpected end of query")
+        self.pos += 1
+        return token
+
+    def _at_keyword(self, *words: str) -> bool:
+        token = self._peek()
+        return bool(token and token[0] == "word" and token[1].upper() in words)
+
+    def parse_expr(self):
+        return self._parse_or()
+
+    def _parse_or(self):
+        nodes = [self._parse_and()]
+        while self._at_keyword("OR"):
+            self._next()
+            nodes.append(self._parse_and())
+        return nodes[0] if len(nodes) == 1 else _BoolOp("OR", nodes)
+
+    def _parse_and(self):
+        nodes = [self._parse_unary()]
+        while True:
+            token = self._peek()
+            if token is None or token[0] in ("pipe", "rparen", "comma"):
+                break
+            if self._at_keyword("OR"):
+                break
+            if self._at_keyword("AND"):
+                self._next()
+            nodes.append(self._parse_unary())
+        return nodes[0] if len(nodes) == 1 else _BoolOp("AND", nodes)
+
+    def _parse_unary(self):
+        if self._at_keyword("NOT"):
+            self._next()
+            return _Not(self._parse_unary())
+        token = self._peek()
+        if token is None:
+            raise SocQueryError("unexpected end of query")
+        if token[0] == "lparen":
+            self._next()
+            node = self._parse_or()
+            closing = self._peek()
+            if not closing or closing[0] != "rparen":
+                raise SocQueryError("unbalanced parenthesis")
+            self._next()
+            return node
+        if token[0] in ("word", "quoted"):
+            return self._parse_leaf()
+        raise SocQueryError(f"unexpected token {token[1]!r}")
+
+    def _parse_leaf(self):
+        kind, value = self._next()
+        following = self._peek()
+        # `field=value` — only an unquoted left side may name a field, so
+        # "203.0.113.55" stays a plain term even though it contains dots.
+        if kind == "word" and following and following[0] == "op":
+            _, op = self._next()
+            operand = self._peek()
+            if not operand or operand[0] not in ("word", "quoted"):
+                raise SocQueryError(f"missing value after {value}{op}")
+            self._next()
+            return _Comparison(value, op, operand[1])
+        return _Term(value)
+
+
+def _parse_command(parser: _Parser) -> dict:
+    token = parser._peek()
+    if token is None or token[0] != "word":
+        raise SocQueryError("expected a command after '|'")
+    name = parser._next()[1].lower()
+
+    if name in ("where", "search"):
+        return {"name": name, "expr": parser.parse_expr()}
+
+    if name == "stats":
+        agg = parser._next()
+        if agg[0] != "word" or agg[1].lower() != "count":
+            raise SocQueryError("only 'stats count' is supported")
+        by_fields: list[str] = []
+        if parser._at_keyword("BY"):
+            parser._next()
+            while True:
+                field = parser._peek()
+                if not field or field[0] != "word":
+                    raise SocQueryError("expected a field name after 'by'")
+                by_fields.append(parser._next()[1])
+                nxt = parser._peek()
+                if nxt and nxt[0] == "comma":
+                    parser._next()
+                    continue
+                break
+        return {"name": "stats", "by": by_fields}
+
+    if name == "fields":
+        names: list[str] = []
+        while True:
+            field = parser._peek()
+            if not field or field[0] != "word":
+                break
+            names.append(parser._next()[1])
+            nxt = parser._peek()
+            if nxt and nxt[0] == "comma":
+                parser._next()
+                continue
+            break
+        if not names:
+            raise SocQueryError("'fields' needs at least one field name")
+        return {"name": "fields", "names": names}
+
+    if name == "sort":
+        field = parser._peek()
+        if not field or field[0] != "word":
+            raise SocQueryError("'sort' needs a field name")
+        raw = parser._next()[1]
+        descending = raw.startswith("-")
+        return {"name": "sort", "field": raw.lstrip("-+"), "desc": descending}
+
+    if name in ("head", "tail"):
+        count = parser._peek()
+        limit = 10
+        if count and count[0] == "word":
+            try:
+                limit = int(parser._next()[1])
+            except ValueError:
+                raise SocQueryError(f"'{name}' needs a number")
+        if limit < 0:
+            raise SocQueryError(f"'{name}' needs a non-negative number")
+        return {"name": name, "limit": limit}
+
+    if name == "dedup":
+        field = parser._peek()
+        if not field or field[0] != "word":
+            raise SocQueryError("'dedup' needs a field name")
+        return {"name": "dedup", "field": parser._next()[1]}
+
+    if name == "rename":
+        src = parser._peek()
+        if not src or src[0] not in ("word", "quoted"):
+            raise SocQueryError("'rename' needs a field name")
+        source = parser._next()[1]
+        if not parser._at_keyword("AS"):
+            raise SocQueryError("'rename' syntax is: rename <field> as <name>")
+        parser._next()
+        dest = parser._peek()
+        if not dest or dest[0] not in ("word", "quoted"):
+            raise SocQueryError("'rename' needs a target name")
+        return {"name": "rename", "src": source, "dst": parser._next()[1]}
+
+    raise SocQueryError(f"unknown command '{name}'")
+
+
+def parse_soc_query(query: str) -> dict:
+    """Parse an SPL-subset query into a filter expression plus a command list.
+
+    Raises SocQueryError on anything malformed — callers must surface the error
+    rather than falling back to an unfiltered result set.
+    """
+    text = (query or "").strip()
+    if not text:
+        raise SocQueryError("empty query")
+    tokens = _tokenize(text)
+    if not tokens:
+        raise SocQueryError("empty query")
+
+    parser = _Parser(tokens)
+    # A query may start straight at a pipe (`| stats count by host`), in which
+    # case the implicit base search matches every row.
+    if parser._peek() and parser._peek()[0] == "pipe":
+        expr = _MatchAll()
+    else:
+        expr = parser.parse_expr()
+
+    commands: list[dict] = []
+    while True:
+        token = parser._peek()
+        if token is None:
+            break
+        if token[0] != "pipe":
+            raise SocQueryError(f"unexpected token {token[1]!r} — expected '|'")
+        parser._next()
+        commands.append(_parse_command(parser))
+
+    return {"expr": expr, "commands": commands}
+
+
+def _apply_commands(rows: list[dict], commands: list[dict]) -> list[dict]:
+    for command in commands:
+        name = command["name"]
+        if name in ("where", "search"):
+            rows = [r for r in rows if command["expr"].matches(r)]
+        elif name == "stats":
+            by = command["by"]
+            if not by:
+                rows = [{"count": len(rows)}]
+            else:
+                buckets: dict[tuple, int] = {}
+                for row in rows:
+                    key = tuple(str(row.get(f, "")) for f in by)
+                    buckets[key] = buckets.get(key, 0) + 1
+                rows = [
+                    {**dict(zip(by, key)), "count": count}
+                    for key, count in sorted(buckets.items(), key=lambda kv: (-kv[1], kv[0]))
+                ]
+        elif name == "fields":
+            names = command["names"]
+            rows = [{k: v for k, v in row.items() if k in names} for row in rows]
+        elif name == "sort":
+            field = command["field"]
+            rows = sorted(rows, key=lambda r: str(r.get(field, "")), reverse=command["desc"])
+        elif name == "head":
+            rows = rows[: command["limit"]]
+        elif name == "tail":
+            rows = rows[-command["limit"]:] if command["limit"] else []
+        elif name == "dedup":
+            field = command["field"]
+            seen: set[str] = set()
+            deduped = []
+            for row in rows:
+                key = str(row.get(field, ""))
+                if key in seen:
+                    continue
+                seen.add(key)
+                deduped.append(row)
+            rows = deduped
+        elif name == "rename":
+            src, dst = command["src"], command["dst"]
+            rows = [
+                {(dst if k == src else k): v for k, v in row.items()}
+                for row in rows
+            ]
+    return rows
+
+
+def run_soc_query(rows: list[dict], query: str) -> list[dict]:
+    """Run an SPL-subset query over log rows. Raises SocQueryError if invalid."""
+    plan = parse_soc_query(query)
+    matched = [r for r in rows if plan["expr"].matches(r)]
+    return _apply_commands(matched, plan["commands"])
+
+
+def _hunt_query_isolates_target(rows: list[dict], results: list[dict], target: str) -> bool:
+    """Did this query actually isolate the hunted indicator?
+
+    Result-driven on purpose: the old check was string equality against two IP
+    literals, so `host=web01 AND "198.51.100.23"` — a better query than the
+    literal — failed while pasting the bare IP passed. The objective is met when
+    the query narrowed the index (it did not just return everything) and every
+    row it returned is one of the rows that genuinely mentions the target.
+    """
+    if not results:
+        return False
+    target_rows = [r for r in rows if target.lower() in json.dumps(r, default=str).lower()]
+    if not target_rows:
+        return False
+    # Must be a real narrowing, not `*` or a term that matches the whole index.
+    if len(results) >= len(rows) and len(target_rows) < len(rows):
+        return False
+    # `stats`/`fields` reshape rows, so compare on the projected content: every
+    # returned row has to be derived from a row that mentions the target.
+    for row in results:
+        blob = json.dumps(row, default=str).lower()
+        if target.lower() in blob:
+            continue
+        if any(
+            all(str(v).lower() in json.dumps(tr, default=str).lower() for v in row.values())
+            for tr in target_rows
+        ):
+            continue
+        return False
+    return True
 
 
 def _base_state() -> dict:
@@ -271,12 +733,33 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 
     if action == "search_logs":
         query = (payload.get("query") or "").strip()
-        results = [e for e in state.get("log_index", []) if query.lower() in json.dumps(e).lower()] if query else []
-        if query and query in ("203.0.113.55", "198.51.100.23") and broken.get("needs_log_search") == query:
+        rows = state.get("log_index", []) or []
+        if not query:
+            return {"ok": False, "error": "Enter a search query", "results": []}
+        try:
+            results = run_soc_query(rows, query)
+        except SocQueryError as exc:
+            # Fail closed: a malformed query returns nothing and cannot clear
+            # the hunt objective, otherwise garbage input would pass the lab.
+            _event(state, f"Log search rejected: '{query}' ({exc})", "warning")
+            _save(session_id, entry)
+            return {
+                "ok": False,
+                "error": f"Search syntax error: {exc}",
+                "results": [],
+                "query": query,
+            }
+        target = broken.get("needs_log_search")
+        if target and _hunt_query_isolates_target(rows, results, str(target)):
             broken.pop("needs_log_search", None)
         _event(state, f"Log search: '{query}' ({len(results)} results)", "info")
         _save(session_id, entry)
-        return {"ok": True, "message": f"{len(results)} log entries found", "results": results}
+        return {
+            "ok": True,
+            "message": f"{len(results)} log entries found",
+            "results": results,
+            "query": query,
+        }
 
     if action == "close_incident":
         inc_id = payload.get("incident_id") or ""

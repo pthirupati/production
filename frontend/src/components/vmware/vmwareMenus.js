@@ -136,7 +136,6 @@ export function buildHostMenu(host, onAction, acting) {
 
 /* ── Datacenter (requirement 1) ─────────────────────────────────────── */
 export function buildDatacenterMenu(dc, onAction, acting) {
-  const id = dc.id
   return [
     { label: 'Add Host…', icon: 'Server', onClick: () => onAction('__add_host__', dc) },
     { label: 'New Cluster…', icon: 'Boxes', onClick: () => onAction('__new_cluster__', dc) },

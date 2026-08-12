@@ -5,9 +5,9 @@ import { usePageTitle } from '../../hooks/usePageTitle'
 import { useStructuredData, organizationSchema } from '../../hooks/useStructuredData'
 import { useDataStore } from '../../store/dataStore'
 import { scenarioApi } from '../../api/scenarios'
-import api from '../../api/client'
 import { mergeTechnologies } from '../../constants/techCatalog'
 import { useAuthStore } from '../../store/authStore'
+import { useFetch } from '../../hooks/useFetch'
 import MarketingNav from './components/MarketingNav'
 import MarketingFooter from './components/MarketingFooter'
 import HeroSection from './sections/HeroSection'
@@ -30,7 +30,10 @@ export default function HomePage() {
   const [technologies, setTechnologies] = useState([])
   const [stats, setStats] = useState({})
   const [techLoadFailed, setTechLoadFailed] = useState(false)
-  const [platformConfig, setPlatformConfig] = useState(null)
+  const { data: platformConfig } = useFetch('/config/', {
+    config: { silentError: true },
+    initialData: null,
+  })
   const rootRef = useRef(null)
   const { progressRef, toTopRef, navRef, spotRef, initMagnetic } = useFxPage()
 
@@ -59,17 +62,16 @@ export default function HomePage() {
         setTechnologies(mergeTechnologies([]))
         setTechLoadFailed(true)
       })
-    // stats and /config/ stay quiet on failure by design: HeroSection has its
-    // own literal fallbacks and the config only drives optional banners, so a
-    // blip degrades to a complete page rather than an empty or wrong one.
+    // stats stay quiet on failure by design: HeroSection has its own literal
+    // fallbacks, so a blip degrades to a complete page rather than an empty one.
     scenarioApi.getPlatformStats().then(setStats).catch(() => {})
-    api.get('/config/', { silentError: true }).then(res => {
-      setPlatformConfig(res.data)
-      if (res.data?.platform_stats) {
-        setStats(prev => ({ ...res.data.platform_stats, ...prev }))
-      }
-    }).catch(() => {})
   }, [getTechnologies])
+
+  useEffect(() => {
+    if (platformConfig?.platform_stats) {
+      setStats(prev => ({ ...platformConfig.platform_stats, ...prev }))
+    }
+  }, [platformConfig])
 
   useEffect(() => {
     initMagnetic(rootRef.current)

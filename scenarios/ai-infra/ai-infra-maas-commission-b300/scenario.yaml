@@ -15,14 +15,11 @@ description: 'CONTEXT: PSINFRA / Bare Metal ticket — commission an NVIDIA B300
   node into the inference cluster via MAAS. AI Infra Engineering owns MAAS enlist /
   commission / deploy for GPU SKUs (H100/H200/B300/AMD), not the application GPU course.
 
-
   ENVIRONMENT: Bare Metal (MAAS) console + Lab Terminal. Datacenter twin available for
   rack / BMC context. Prefer ImageDev custom boot resource when published.
 
-
   SYMPTOM: Node is New; BMC reachable; PXE path ready. Commission and verify nvidia-smi
   sees B300 GPUs.
-
 
   OBJECTIVE: Commission in MAAS; Deploy with appropriate image; confirm B300 via nvidia-smi -L;
   mark FIXED-OK.'

@@ -71,6 +71,46 @@ const FORMAT_RE = compileHints(FORMAT_HINTS)
 const assignsRole = (text) => ROLE_RE.test(text)
 const statesLimit = (text) => LIMIT_RE.test(text) || NUMERIC_LIMIT_RE.test(text)
 
+/** Deterministic content reply — mirrors backend prompt_eval.simulate_reply. */
+function simulateClientReply(prompt) {
+  const text = (prompt || '').trim()
+  const low = text.toLowerCase()
+  const words = (text.match(/\S+/g) || []).length
+  const injection = ['ignore previous', 'jailbreak', 'dan mode', 'developer mode']
+  if (injection.some((m) => low.includes(m))) {
+    return {
+      kind: 'refusal',
+      body: 'I cannot override my instructions or enter unrestricted modes.',
+      refused: true,
+    }
+  }
+  const wantsJson = /\bjson\b/.test(low) || low.includes('schema') || text.includes('{"')
+  const hasRole = assignsRole(text)
+  if (wantsJson) {
+    const data = {
+      role: hasRole ? 'expert' : 'assistant',
+      task: 'structured',
+      summary: text.length > 80 ? `${text.slice(0, 80)}…` : text,
+      words_in_prompt: words,
+    }
+    return { kind: 'json', body: JSON.stringify(data, null, 2), refused: false, data }
+  }
+  if (hasRole) {
+    return {
+      kind: 'prose',
+      body: `As your assigned specialist, I will approach this with domain focus. Your request (${words} words) asks for a concrete deliverable.`,
+      refused: false,
+      has_role_tone: true,
+    }
+  }
+  return {
+    kind: 'prose',
+    body: `Here is a generic answer to a ${words}-word prompt without a clear role. Results may be vague.`,
+    refused: false,
+    has_role_tone: false,
+  }
+}
+
 /** Cheap "is this a real word" proxy — no dictionary needed. */
 const looksLikeWord = (token) => {
   const t = token.toLowerCase().replace(/[^a-z]/g, '')
@@ -298,20 +338,14 @@ export default function PromptPlayground({ sessionId, scenario, solved: solvedPr
     const text = sandboxInput.trim()
     if (!text) return
     const analysis = analyzePrompt(text)
-    // Deterministic, rule-based "assistant" reply keyed off prompt quality.
-    let reply
-    if (analysis.score >= 80) {
-      reply = "That's a strong, specific prompt — clear role, task, and format. A real assistant would return exactly the shape you asked for. (This is a rule-based practice reply, not a live model.)"
-    } else if (analysis.score >= 50) {
-      const gap = analysis.checks.find((c) => !c.ok)
-      reply = `Decent prompt. To make the reply more predictable, add: ${gap ? gap.tip : 'a clear format and a constraint.'} (Rule-based practice reply.)`
-    } else {
-      reply = 'That prompt is vague, so the answer would be generic. Add who the AI should be, the exact task, a constraint, and the output format you want. (Rule-based practice reply.)'
-    }
+    // Deterministic content reply — different prompts yield different bodies
+    // (JSON / refusal / role tone), not only coaching tips.
+    const sim = simulateClientReply(text)
+    const reply = `${sim.body}\n\n(Rule-based practice reply — not a live model.)`
     setChat((prev) => [
       ...prev,
       { role: 'user', text },
-      { role: 'assistant', text: reply, analysis },
+      { role: 'assistant', text: reply, analysis, sim },
     ])
     setSandboxInput('')
   }, [sandboxInput])

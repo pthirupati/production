@@ -1,0 +1,26 @@
+Copyright (c) 2026 FixitLab. All rights reserved.
+
+This software and its accompanying source code, documentation, lab scenario
+content and assets (the "Software") are proprietary and confidential.
+
+No license, express or implied, is granted to any person obtaining a copy of the
+Software. Without the prior written permission of the copyright holder, you may
+not copy, modify, merge, publish, distribute, sublicense, sell, or create
+derivative works from the Software, in whole or in part.
+
+Access to this repository does not grant any ownership interest or license to any
+intellectual property contained within it. Authorized collaborators may use the
+Software solely for the purpose of developing and operating FixitLab.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Third-party dependencies are licensed under their own terms; nothing here alters
+those terms. Direct dependency attribution is listed in THIRD_PARTY_NOTICES.md.
+
+Questions about licensing or commercial use: legal@fixitlab.in
+Security reports: see SECURITY.md

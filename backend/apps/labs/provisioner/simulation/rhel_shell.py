@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import shlex
 import time
@@ -2844,8 +2845,195 @@ class RHELShell:
             return engine.shell.state
         return self.state
 
+    # curl flags that consume the following token, so it is never the URL.
+    _CURL_VALUE_FLAGS = (
+        "--unix-socket", "--abstract-unix-socket", "-H", "--header", "-X", "--request",
+        "-d", "--data", "--data-raw", "-o", "--output", "-u", "--user", "-A",
+        "--user-agent", "-e", "--referer", "--connect-timeout", "-m", "--max-time",
+    )
+
+    @staticmethod
+    def _curl_flag_value(p: list[str], *names: str) -> str:
+        for i, tok in enumerate(p):
+            for n in names:
+                if tok == n and i + 1 < len(p):
+                    return p[i + 1]
+                if tok.startswith(n + "="):
+                    return tok.split("=", 1)[1]
+        return ""
+
+    @classmethod
+    def _curl_url_arg(cls, p: list[str]) -> str:
+        """Last positional argument — the URL, even behind `-s --unix-socket X`."""
+        url = ""
+        skip = False
+        for tok in p[1:]:
+            if skip:
+                skip = False
+                continue
+            if tok.startswith("-"):
+                skip = tok in cls._CURL_VALUE_FLAGS
+                continue
+            url = tok
+        return url
+
+    @staticmethod
+    def _docker_api_path(url: str) -> str:
+        """Request path out of a curl URL.
+
+        Handles `http://localhost/v1.43/containers/json?all=1`, docker's own
+        docs form `http:/v1.43/containers/json`, and a bare `/info`.
+        """
+        rest = url.split("://", 1)[-1]
+        slash = rest.find("/")
+        return rest[slash:] if slash != -1 else "/"
+
+    def _cmd_curl_docker_socket(self, p: list[str]) -> str:
+        """`curl --unix-socket /var/run/docker.sock http://localhost/...`.
+
+        Routes to the same DockerState the `docker` CLI drives, so the Engine
+        API and the CLI can never disagree inside one lab session.
+        """
+        url = self._curl_url_arg(p)
+        if not url:
+            return "curl: try 'curl --help' or 'curl --manual' for more information"
+
+        engine = getattr(self, "_engine", None)
+        docker = getattr(engine, "docker", None)
+        # No docker persona on this box: nothing is bound to the socket at all.
+        if docker is None:
+            return "curl: (7) Couldn't connect to server"
+
+        # Same reflection the `docker` handler does — `systemctl stop docker`
+        # must take the REST API down too, not just the CLI.
+        svc = self.state.services.get("docker")
+        if svc is not None:
+            docker.daemon_running = svc.active == "active"
+
+        status, body = docker.engine_api(self._docker_api_path(url))
+        if status == 503:
+            # curl never gets an HTTP response here — connect() to the socket
+            # fails, so it prints a transport error, not the daemon's JSON.
+            return "curl: (7) Couldn't connect to server"
+        if isinstance(body, str):
+            # /_ping answers text/plain "OK", not JSON.
+            return body
+        # Real curl prints the daemon's compact JSON, unindented and unspaced.
+        return json.dumps(body, separators=(",", ":"))
+
+    def _cmd_curl_prometheus(self, p: list[str]) -> str:
+        """`curl http://localhost:9090/api/v1/query?query=up` → monitoring_engine."""
+        url = self._curl_url_arg(p)
+        if not url:
+            return "curl: try 'curl --help' or 'curl --manual' for more information"
+        sid = getattr(self.state, "session_id", "") or ""
+        broken: dict = {}
+        try:
+            from apps.vmware_sim import monitoring_engine as me
+            if sid:
+                entry = me._load_session(str(sid))
+                if entry and isinstance(entry.get("state"), dict):
+                    broken = entry["state"].get("broken") or {}
+            status, body = me.prometheus_http_api(url, broken)
+        except Exception:
+            return "curl: (7) Failed to connect to localhost port 9090: Connection refused"
+        if status == 404:
+            # Real curl still prints the JSON error body for HTTP APIs.
+            return json.dumps(body, separators=(",", ":"))
+        if isinstance(body, str):
+            return body
+        return json.dumps(body, separators=(",", ":"))
+
+    def _cmd_curl_kubernetes(self, p: list[str]) -> str:
+        """`curl https://127.0.0.1:6443/api/v1/pods` → k8s_engine.kubernetes_http_api."""
+        url = self._curl_url_arg(p)
+        if not url:
+            return "curl: try 'curl --help' or 'curl --manual' for more information"
+        sid = getattr(self.state, "session_id", "") or ""
+        cluster: dict = {}
+        try:
+            from apps.vmware_sim import k8s_engine as ke
+            if sid:
+                entry = ke._load_session(str(sid))
+                if entry and isinstance(entry.get("state"), dict):
+                    cluster = entry["state"]
+                else:
+                    # Ensure a default cluster so curl labs aren't empty.
+                    cluster = ke.get_state(str(sid)).get("cluster") or {}
+            status, body = ke.kubernetes_http_api(url, cluster)
+        except Exception:
+            return "curl: (7) Failed to connect to localhost port 6443: Connection refused"
+        if isinstance(body, str):
+            return body
+        return json.dumps(body, separators=(",", ":"))
+
+    def _cmd_curl_rest_sql(self, p: list[str]) -> str:
+        """`curl http://localhost:8088/api/products` → playground REST-over-SQL."""
+        url = self._curl_url_arg(p)
+        if not url:
+            return "curl: try 'curl --help' or 'curl --manual' for more information"
+        method = "GET"
+        for i, tok in enumerate(p):
+            if tok in ("-X", "--request") and i + 1 < len(p):
+                method = p[i + 1].upper()
+                break
+        sid = getattr(self.state, "session_id", "") or "rhel-rest"
+        try:
+            from apps.labs.playground_engine import rest_http_api
+            status, body = rest_http_api(sid, method, url, None)
+        except Exception:
+            return "curl: (7) Failed to connect to localhost port 8088: Connection refused"
+        if status == 204:
+            return ""
+        if isinstance(body, str):
+            return body
+        return json.dumps(body, separators=(",", ":"))
+
+    def _cmd_curl_jira(self, p: list[str]) -> str:
+        """`curl http://jira:8089/rest/api/3/issue/KAN-1` → jira_rest_api."""
+        url = self._curl_url_arg(p)
+        if not url:
+            return "curl: try 'curl --help' or 'curl --manual' for more information"
+        method = "GET"
+        for i, tok in enumerate(p):
+            if tok in ("-X", "--request") and i + 1 < len(p):
+                method = p[i + 1].upper()
+                break
+        try:
+            from apps.jira_integration.jira_rest import jira_rest_api
+            status, body = jira_rest_api(url, method=method)
+        except Exception:
+            return "curl: (7) Failed to connect to jira port 8089: Connection refused"
+        if status == 204:
+            return ""
+        if isinstance(body, str):
+            return body
+        return json.dumps(body, separators=(",", ":"))
+
     def _cmd_curl(self, p: list[str]) -> str:
-        url = p[-1]
+        sock = self._curl_flag_value(p, "--unix-socket", "--abstract-unix-socket")
+        if sock.endswith("docker.sock"):
+            return self._cmd_curl_docker_socket(p)
+
+        url = self._curl_url_arg(p) or (p[-1] if p else "")
+        # Prometheus HTTP API before the generic localhost→nginx handler.
+        if ":9090" in url or "/api/v1/query" in url:
+            return self._cmd_curl_prometheus(p)
+        # Kubernetes apiserver (Y3) — :6443 or classic API paths.
+        if (
+            ":6443" in url
+            or "/apis/apps/v1/" in url
+            or re.search(r"/api/v1/(namespaces/[^/]+/)?pods", url)
+            or re.search(r"/api/v1/(namespaces/[^/]+/)?services", url)
+        ):
+            return self._cmd_curl_kubernetes(p)
+        # REST-over-SQL teaching API (Y3) — playground sqlite products/orders.
+        if "/api/products" in url or "/api/orders" in url or ":8088" in url:
+            return self._cmd_curl_rest_sql(p)
+        # Jira Cloud REST v3 teaching surface.
+        if "/rest/api/3/" in url or ":8089" in url:
+            return self._cmd_curl_jira(p)
+
         st = self.state
         if any(x in url for x in ("10.0.0.10", "primary")):
             st = self._server_state()
@@ -4854,6 +5042,19 @@ class RHELShell:
                             ) or (resolved_ip and resolved_ip == s.get("primary_ip")):
                                 if s.get("power") == "off":
                                     return f"ssh: connect to host {host} port 22: Connection refused"
+                                # §X3 — AMI without baked SSH keys / cloud-init: instance is
+                                # "running" but SSH is refused; console log tells the story.
+                                man = s.get("image_manifest")
+                                if isinstance(man, dict) and (
+                                    not man.get("cloud_init_enabled", True)
+                                    or not man.get("ssh_keys_baked", True)
+                                ):
+                                    return (
+                                        f"ssh: connect to host {host} port 22: Connection refused\r\n"
+                                        "Permission denied (publickey).\r\n"
+                                        "Hint: check cloud-init / authorized_keys on the AMI "
+                                        "(get-console-output)."
+                                    )
                                 inst = (s.get("install_state") or "").lower()
                                 plat = _platform_of(s)
                                 if plat in ("maas", "baremetal", "ai-infra") and inst != "deployed":
@@ -4864,8 +5065,13 @@ class RHELShell:
                                 ip = s.get("primary_ip") or resolved_ip or ""
                                 if hn and ip:
                                     register_terminal_ssh_host(
-                                        sid, hostname=hn, ip=ip, source="identity-fallback",
+                                        sid, hostname=hn, ip=ip,
+                                        ssh_user=(man or {}).get("default_user") if isinstance(man, dict) else "ec2-user",
+                                        source="identity-fallback",
                                     )
+                                # Seed peer guest from AMI manifest before the clone.
+                                if isinstance(man, dict) and man:
+                                    self._pending_peer_manifest = man
                                 host_key = hn
                                 break
                     except Exception:
@@ -4873,6 +5079,8 @@ class RHELShell:
         if not host_key:
             return f"ssh: connect to host {host} port 22: Connection refused"
         # Re-check power for peers already in host maps (AWS stop mid-lab).
+        peer_manifest = getattr(self, "_pending_peer_manifest", None)
+        self._pending_peer_manifest = None
         if sid:
             try:
                 from .server_identity import list_servers
@@ -4882,11 +5090,29 @@ class RHELShell:
                     ):
                         if s.get("power") == "off":
                             return f"ssh: connect to host {host} port 22: Connection refused"
+                        man = s.get("image_manifest")
+                        if isinstance(man, dict):
+                            peer_manifest = man
+                            if (
+                                not man.get("cloud_init_enabled", True)
+                                or not man.get("ssh_keys_baked", True)
+                            ):
+                                return (
+                                    f"ssh: connect to host {host} port 22: Connection refused\r\n"
+                                    "Permission denied (publickey).\r\n"
+                                    "Hint: check cloud-init / authorized_keys on the AMI "
+                                    "(get-console-output)."
+                                )
                         break
             except Exception:
                 pass
         engine = getattr(self, "_engine", None)
         remote = engine.state.clone_for_host(host_key) if engine else self.state.clone_for_host(host_key)
+        if isinstance(peer_manifest, dict) and peer_manifest:
+            try:
+                remote.apply_image_manifest(peer_manifest)
+            except Exception:
+                pass
         meta = getattr(self, "_host_names", {}).get(host) or getattr(self, "_host_names", {}).get(host_key) or {}
         if isinstance(meta, dict) and meta.get("ip"):
             remote.set_host_ip(meta["ip"])

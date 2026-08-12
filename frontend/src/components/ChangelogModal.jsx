@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { X, Sparkles } from 'lucide-react'
+import { Sparkles } from '../ui/eagerIcons'
 import api from '../api/client'
+import ConfirmModal from './ConfirmModal'
 import { currentUserScopedKey, migrateUnscopedKey } from '../utils/userScopedStorage'
 
 // Scoped per user: on a shared browser an unscoped key let account B inherit
@@ -34,34 +35,25 @@ export default function ChangelogModal() {
     setOpen(false)
   }
 
-  if (!open || !entries.length) return null
+  if (!entries.length) return null
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md glass-card border border-surface-700 shadow-2xl animate-in fade-in slide-in-from-bottom-4">
-        <div className="flex items-center justify-between p-4 border-b border-surface-800">
-          <h2 className="font-semibold text-white flex items-center gap-2">
-            <Sparkles size={16} className="text-accent-cyan" /> What&apos;s new
-          </h2>
-          <button type="button" onClick={dismiss} className="text-surface-500 hover:text-white p-1">
-            <X size={18} />
-          </button>
-        </div>
-        <ul className="p-4 space-y-3 max-h-72 overflow-y-auto text-sm">
-          {entries.map((entry, i) => (
-            <li key={entry.id || i} className="border-b border-surface-800/50 pb-3 last:border-0">
-              <p className="font-medium text-white">{entry.title || entry.summary}</p>
-              {entry.date && <p className="text-[10px] text-surface-500 mt-0.5">{entry.date}</p>}
-              <p className="text-surface-400 text-xs mt-1">{entry.body || entry.description}</p>
-            </li>
-          ))}
-        </ul>
-        <div className="p-4 pt-0">
-          <button type="button" onClick={dismiss} className="btn-primary w-full text-sm">
-            Got it
-          </button>
-        </div>
+    <ConfirmModal open={open} onClose={dismiss} title="What's new" maxWidth="max-w-md">
+      <div className="flex items-center gap-2 text-accent-cyan text-xs font-medium mb-3 -mt-1">
+        <Sparkles size={14} /> Latest updates
       </div>
-    </div>
+      <ul className="space-y-3 max-h-72 overflow-y-auto text-sm mb-4">
+        {entries.map((entry, i) => (
+          <li key={entry.id || i} className="border-b border-surface-800/50 pb-3 last:border-0">
+            <p className="font-medium text-white">{entry.title || entry.summary}</p>
+            {entry.date && <p className="text-[10px] text-surface-500 mt-0.5">{entry.date}</p>}
+            <p className="text-surface-400 text-xs mt-1">{entry.body || entry.description}</p>
+          </li>
+        ))}
+      </ul>
+      <button type="button" onClick={dismiss} className="btn-primary w-full text-sm">
+        Got it
+      </button>
+    </ConfirmModal>
   )
 }

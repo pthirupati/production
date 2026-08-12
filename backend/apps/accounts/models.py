@@ -62,6 +62,13 @@ class Profile(models.Model):
         default=True,
         help_text="Show the floating FixitLab support assistant",
     )
+    # DPDP §6(4) — withdraw interview-processing consent without deleting the
+    # whole account. When False, new interview rounds are blocked; existing
+    # transcripts remain until the user deletes them or the account.
+    interview_processing_consent = models.BooleanField(
+        default=True,
+        help_text="Consent to process interview transcripts/scores for practice rounds",
+    )
     daily_streak = models.PositiveIntegerField(default=0)
     longest_streak = models.PositiveIntegerField(default=0)
     xp = models.PositiveIntegerField(default=0)
@@ -380,7 +387,13 @@ class PendingOrgInvite(models.Model):
 
 
 class AccountLifecycleEvent(models.Model):
-    """Tracks inactive-account warnings and deletions (audit survives user delete)."""
+    """Tracks inactive-account warnings and deletions (audit survives user delete).
+
+    `email` is retained after the user row is gone as a short anti-abuse signal
+    (prevent immediate re-registration of the same address after inactive cleanup).
+    Retention is bounded by `RETENTION_ACCOUNT_LIFECYCLE_DAYS` (0 = report-only
+    until the operator chooses a period); see `purge_expired_personal_data`.
+    """
 
     EVENT_CHOICES = [
         ("inactive_warning", "Inactive account warning sent"),

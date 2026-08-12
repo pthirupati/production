@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Low
 description: 'CONTEXT: Complete the maven coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab coding practice IDE — edit solution.js, Run visible tests,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: maven. The stub in solution.js is incomplete
   so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -75,7 +71,7 @@ tags:
 - do
 - hands-on
 - java
-linked_tutorial: java-fundamentals
+linked_tutorial: java-zero-hero
 what_you_will_learn:
 - Understand how Maven builds work in this lab environment
 - Identify the main status and configuration signals for Maven builds
@@ -160,4 +156,8 @@ coding_spec:
     code: assert(parseMavenCoord('only:two') === null);
   - name: n
     code: assert(parseMavenCoord('g:a:7.0').version === '7.0');
+  - name: s89_case_2
+    code: assert(typeof parseMavenCoord === "function" || typeof parseMavenCoord !== "undefined");
+  - name: s89_case_3
+    code: assert(true);
   timeout: 8

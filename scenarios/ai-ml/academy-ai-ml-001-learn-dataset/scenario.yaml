@@ -17,11 +17,9 @@ description: 'CONTEXT: This is your first ML lab, and it is deliberately not an 
   the data scientists will use when they page you. This lab covers both: the vocabulary first, then a
   real service you bring up yourself.
 
-
   ENVIRONMENT: A single node, `lab-primary`, running the offline ML practice workspace. It hosts one systemd
   unit, `model-server` (the ML Model Inference Server) — the process that loads a trained model into memory
   and answers prediction requests. Everything runs locally; no paid APIs or cloud calls.
-
 
   CONCEPTS — read this before you touch anything, because these four words explain every dataset bug
   you will be paged about:
@@ -43,31 +41,25 @@ description: 'CONTEXT: This is your first ML lab, and it is deliberately not an 
   classic symptom "great validation metrics, terrible production performance". If a data scientist reports
   that, leakage is the first hypothesis — and it is a *data* bug, not a server bug.
 
-
   SYMPTOM / STARTING STATE: The workspace is online, but the model-server unit is not running. Nothing
   is on fire and no customer is affected — this is a practice node, so read state carefully before changing
   it.
 
-
   OBJECTIVE: Learn the dataset vocabulary above, and learn to establish service state from evidence instead
   of assumption. Determine what state model-server is in and why, then bring it up. Acceptance criteria:
   the change is minimal and reversible, and `systemctl is-active model-server` returns `active`.
-
 
   WORK TO DO: Do not start the service first. Answer these in order: (1) Which units on this host are
   failed? (2) Is model-server enabled to start at boot, and is it currently loaded? (3) What did the journal
   record when it last tried to start? Only then start the unit. The habit being built is journal-before-restart:
   restarting first destroys the evidence that explains why it stopped.
 
-
   VERIFY: Re-run the check the grader uses — `systemctl is-active model-server` — and confirm it prints
   `active`. Then re-read `journalctl -u model-server` and note that the failure lines are now followed
   by a clean startup. Success criteria: the healthy state holds on a repeat check, not just once.
 
-
   ROLLBACK: Every action here is reversible with `systemctl stop model-server`. If you want to confirm
   cause and effect, stop the unit, watch `systemctl is-active` flip back to inactive, and start it again.
-
 
   WHAT TO AVOID: Do not skip straight to `systemctl start` — you will pass the checker and learn nothing
   about why it was down. Do not edit the unit file; nothing is wrong with it. Do not fake completion with
@@ -131,7 +123,6 @@ hints:
     3. Re-read `journalctl -u model-server --no-pager` and confirm the old failure lines are now followed
     by "Server startup complete" and "Started ML Model Inference Server".
 
-
     WHY: the grader checks real service state, not marker files — and reading the journal after the fix
     is how you confirm the restart actually succeeded rather than merely being requested.'
 summary: Learn the dataset vocabulary — schema, labels, splits, and leakage — then establish and restore
@@ -144,7 +135,7 @@ tags:
 - ai-ml
 - do
 - hands-on
-linked_tutorial: ai-ml-fundamentals
+linked_tutorial: ai-infrastructure-zero-hero
 what_you_will_learn:
 - What a dataset schema is, and why a train/serve schema mismatch produces wrong predictions with no error
 - What a label is and why labels are where dataset errors quietly enter

@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
+import { DistanceCullingHtml } from './DcLod'
 import { RigidBody, BallCollider } from '@react-three/rapier'
 import * as THREE from 'three'
 
@@ -88,9 +89,9 @@ function PortJack({ position, linked, activity, label, arNetwork = false }) {
         </mesh>
       )}
       {label && (
-        <Html position={[0, 0.045, 0]} center distanceFactor={14} style={{ pointerEvents: 'none' }}>
+        <DistanceCullingHtml position={[0, 0.045, 0]} center distanceFactor={14} style={{ pointerEvents: 'none' }}>
           <div className="dc-3d-chip dc-3d-chip-sm">{label}</div>
-        </Html>
+        </DistanceCullingHtml>
       )}
     </group>
   )

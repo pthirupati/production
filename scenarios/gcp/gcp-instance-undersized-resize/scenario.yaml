@@ -16,11 +16,9 @@ description: 'CONTEXT: A team operating Google Cloud operations has raised a tic
   engineer (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked
   users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline GCP practice project. The architecture is a single
   lab-primary node exposing Console, gcloud, Compute Engine, disks, VPC, and IAM; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: Google Cloud Console showing web01 on e2-micro (2 shared vCPU / 1 GiB), RUNNING.
   Terminal `nproc` reports 2 and `free -h` reports ~1GiB total. web01 is running on e2-micro (2 shared
@@ -28,28 +26,23 @@ description: 'CONTEXT: A team operating Google Cloud operations has raised a tic
   `nproc` and `free -h` on the terminal confirms only a couple of shared cores and ~1GiB are available
   to the guest right now.
 
-
   OBJECTIVE: Sign in to the Google Cloud Console; Open Compute Engine > VM instances and select web01;
   Stop web01, change its machine type to one with more vCPU and RAM (e2-standard-2 or larger), and start
   it again. Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits
   successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant Console, gcloud, Compute Engine, disks, VPC, and IAM), changing one thing at a time.
   Check your work continuously against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -102,7 +95,6 @@ hints:
 
     3. Retry the command that failed with ''No space left on device''.
 
-
     WHY: many services fail cryptically when disk is full.'
 summary: Change the machine type of the undersized GCP instance before the next nightly batch job
   OOM-kills it again, and confirm the new vCPU/RAM inside the guest.
@@ -116,7 +108,7 @@ tags:
 - gcp
 - compute-engine
 - cloud
-linked_tutorial: gcp-fundamentals
+linked_tutorial: gcp-cloud-zero-hero
 what_you_will_learn:
 - Changing a Compute Engine instance's machine type from the Cloud Console
 - Reading vCPU/RAM allocation from nproc and free -h

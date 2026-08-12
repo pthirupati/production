@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { subscriptionApi } from '../api/subscriptions'
-import { interviewsApi } from '../api/interviews'
 import {
-  CreditCard, Calendar, Mic2, Layers, FileText, Download, RefreshCw,
-  AlertTriangle, CheckCircle2, Clock, IndianRupee, Tag,
+  Mic2, Layers, FileText, Download, RefreshCw,
+  AlertTriangle, Clock, IndianRupee,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageHeader, FixitPanel } from '../components/design'

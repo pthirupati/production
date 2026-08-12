@@ -5,7 +5,7 @@ import { authApi } from '../api/auth'
 import { labApi } from '../api/labs'
 import { subscriptionApi } from '../api/subscriptions'
 import api from '../api/client'
-import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, BellOff, Calendar, AlertTriangle, FileText, Download, Users, Trash2, Mic2, Bot } from 'lucide-react'
+import { User, Lock, Save, Phone, Mail, Shield, CreditCard, Zap, ArrowUpRight, MapPin, Bell, Calendar, AlertTriangle, Download, Users, Trash2, Mic2, Bot } from 'lucide-react'
 // Github was renamed in lucide-react ≥1.x — use an inline SVG to stay version-agnostic
 const GithubIcon = ({ size = 18, className = '' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -43,7 +43,7 @@ export default function Profile() {
   const [notifPrefs, setNotifPrefs] = useState(null)
   const [techSubscriptions, setTechSubscriptions] = useState([])
   const [complimentaryAccess, setComplimentaryAccess] = useState(false)
-  const [invoices, setInvoices] = useState([])
+  const [, setInvoices] = useState([])
   const [organizations, setOrganizations] = useState([])
   const [socialAccounts, setSocialAccounts] = useState([])
   const [socialConfig, setSocialConfig] = useState(null)
@@ -56,25 +56,29 @@ export default function Profile() {
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [hasUsablePassword, setHasUsablePassword] = useState(true)
   const [supportBotEnabled, setSupportBotEnabled] = useState(true)
+  const [interviewProcessingConsent, setInterviewProcessingConsent] = useState(true)
 
   // Load full profile data including phone number
   useEffect(() => {
+    let active = true
+    const prefsController = new AbortController()
     // A failed config fetch is not the same as "provider disabled" — leaving
     // socialConfig null made handleSocialLink tell the user GitHub/Google was
     // "not configured on this server", which sends them chasing a server
     // misconfiguration that may not exist. Track the failure separately.
     authApi.getSocialConfig()
-      .then((cfg) => { setSocialConfig(cfg); setSocialConfigFailed(false) })
-      .catch(() => setSocialConfigFailed(true))
+      .then((cfg) => { if (active) { setSocialConfig(cfg); setSocialConfigFailed(false) } })
+      .catch(() => { if (active) setSocialConfigFailed(true) })
     Promise.allSettled([
       authApi.getProfile(),
       labApi.getUserPlan(),
-      api.get('/notifications/preferences/').then(r => r.data),
+      api.get('/notifications/preferences/', { signal: prefsController.signal }).then(r => r.data),
       subscriptionApi.getMySubscriptions(),
       subscriptionApi.getMyInvoices(),
       subscriptionApi.getUnifiedBilling(),
       interviewsApi.getProfile(),
     ]).then(([profileRes, planRes, prefsRes, subsRes, invRes, unifiedRes, intRes]) => {
+      if (!active) return
       const val = (r) => (r.status === 'fulfilled' ? r.value : null)
       const profileData = val(profileRes) || {}
       const subsData = val(subsRes)
@@ -95,6 +99,7 @@ export default function Profile() {
       setSocialAccounts(profileData.social_accounts || [])
       setHasUsablePassword(profileData.has_usable_password !== false)
       setSupportBotEnabled(profileData.support_bot_enabled !== false)
+      setInterviewProcessingConsent(profileData.interview_processing_consent !== false)
       setOrganizations(unified?.organizations || [])
       setInterviewProfile(val(intRes))
 
@@ -109,7 +114,11 @@ export default function Profile() {
       if (profileRes.status === 'rejected') {
         toast.error('Failed to load your profile')
       }
-    }).finally(() => setLoading(false))
+    }).finally(() => { if (active) setLoading(false) })
+    return () => {
+      active = false
+      prefsController.abort()
+    }
   }, [])
 
   const validateProfile = () => {
@@ -130,7 +139,7 @@ export default function Profile() {
       await authApi.updateProfile({ username, phone_number: phoneNumber, first_name: firstName, last_name: lastName, country, billing_state: billingState })
       toast.success('Profile updated')
       setErrors({})
-    } catch (err) {
+    } catch {
       toast.error('Update failed')
     } finally {
       setSaving(false)
@@ -171,22 +180,6 @@ export default function Profile() {
       return
     }
     startOAuth(provider, 'link')
-  }
-
-  const downloadInvoice = async (inv) => {
-    try {
-      const res = await subscriptionApi.downloadInvoice(inv.id)
-      const blob = new Blob([res.data], { type: 'text/html' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${inv.invoice_number}.html`
-      a.click()
-      URL.revokeObjectURL(url)
-      toast.success('Invoice downloaded')
-    } catch {
-      toast.error('Failed to download invoice')
-    }
   }
 
   if (loading) return (
@@ -424,6 +417,40 @@ export default function Profile() {
                       window.dispatchEvent(new CustomEvent('fixitlab-support-config-changed'))
                     } catch {
                       setSupportBotEnabled(supportBotEnabled)
+                      toast.error('Failed to update preference')
+                    }
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-10 h-5 bg-surface-700 peer-checked:bg-accent-cyan rounded-full transition-colors" />
+                <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5" />
+              </div>
+            </label>
+          </div>
+          <div className="space-y-4 mb-6 pb-6 border-b border-surface-700/40">
+            <label className="flex items-center justify-between p-3 rounded-lg bg-surface-800/50 hover:bg-surface-800 transition-colors cursor-pointer group">
+              <div>
+                <p className="text-sm text-white font-medium flex items-center gap-2">
+                  <Mic2 size={14} className="text-accent-cyan" /> Interview data processing
+                </p>
+                <p className="text-xs text-surface-500">
+                  Allow FixitLab to store transcripts and scores for practice interviews.
+                  Turn off to withdraw consent (DPDP §6) — new rounds are blocked; delete
+                  existing interviews from Interview Studio history.
+                </p>
+              </div>
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={interviewProcessingConsent}
+                  onChange={async () => {
+                    const next = !interviewProcessingConsent
+                    setInterviewProcessingConsent(next)
+                    try {
+                      await authApi.updateProfile({ interview_processing_consent: next })
+                      toast.success(next ? 'Interview processing enabled' : 'Interview processing consent withdrawn')
+                    } catch {
+                      setInterviewProcessingConsent(interviewProcessingConsent)
                       toast.error('Failed to update preference')
                     }
                   }}

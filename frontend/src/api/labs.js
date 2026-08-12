@@ -27,6 +27,35 @@ export const labApi = {
     return data
   },
 
+  async getIdeDraft(sessionId) {
+    const { data } = await api.get(`/labs/${sessionId}/ide-draft/`, { silentError: true })
+    return data // { draft: { files, ts } | null }
+  },
+
+  async saveIdeDraft(sessionId, files) {
+    const { data } = await api.put(`/labs/${sessionId}/ide-draft/`, { files }, { silentError: true })
+    return data
+  },
+
+  async getApiClientDraft(sessionId) {
+    const { data } = await api.get(`/labs/${sessionId}/api-client/draft/`, { silentError: true })
+    return data // { draft: {...} | null }
+  },
+
+  async saveApiClientDraft(sessionId, draft) {
+    const { data } = await api.put(
+      `/labs/${sessionId}/api-client/draft/`,
+      { draft },
+      { silentError: true },
+    )
+    return data
+  },
+
+  async apiClientSend(sessionId, payload) {
+    const { data } = await api.post(`/labs/${sessionId}/api-client/send/`, payload)
+    return data
+  },
+
   // Submit code for the authoritative backend grade (hidden tests). `payload`
   // is { language, files: {path: content}, entrypoint } or { language, code }.
   async codeValidate(sessionId, payload) {

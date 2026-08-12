@@ -286,6 +286,10 @@ export default function Scenarios() {
     category:    searchParams.get('category')    || '',
     tag:         searchParams.get('tag')         || '',
     search:      searchParams.get('search')      || '',
+    // Backend `?free=1` (scenarios.js already forwards it). UI was the missing half of §X7b.
+    free:        searchParams.get('free')        || '',
+    completed:   searchParams.get('completed')   || '',
+    gradeable:   searchParams.get('gradeable')   || '',
   }
 
   // The `technology` URL param can be either a numeric PK (from the filter
@@ -320,7 +324,7 @@ export default function Scenarios() {
 
   const clearFilters = () => setSearchParams({})
   const hasFilters = Object.values(filters).some(Boolean)
-  const activeFilterCount = [filters.technology, filters.difficulty, filters.type, filters.category, filters.tag].filter(Boolean).length
+  const activeFilterCount = [filters.technology, filters.difficulty, filters.type, filters.category, filters.tag, filters.free, filters.completed, filters.gradeable].filter(Boolean).length
 
   // The active technology filter may be stored as an id (chips) or a slug
   // (links from a technology page). Match on either so the chip highlights.
@@ -495,7 +499,7 @@ export default function Scenarios() {
             </div>
           </div>
 
-          {/* Difficulty + Type */}
+          {/* Difficulty + Type + Access */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <p className="text-[11px] font-semibold text-surface-500 uppercase tracking-widest mb-3">Difficulty</p>
@@ -503,6 +507,7 @@ export default function Scenarios() {
                 {Object.entries(difficultyConfig).map(([key, cfg]) => (
                   <button
                     key={key}
+                    type="button"
                     onClick={() => setFilter('difficulty', filters.difficulty === key ? '' : key)}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                       filters.difficulty === key ? cfg.badge : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
@@ -522,6 +527,7 @@ export default function Scenarios() {
                   return (
                     <button
                       key={key}
+                      type="button"
                       onClick={() => setFilter('type', filters.type === key ? '' : key)}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                         filters.type === key ? cfg.color : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
@@ -534,6 +540,86 @@ export default function Scenarios() {
               </div>
             </div>
           </div>
+
+          <div>
+            <p className="text-[11px] font-semibold text-surface-500 uppercase tracking-widest mb-3">Access</p>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setFilter('free', filters.free === '1' ? '' : '1')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  filters.free === '1'
+                    ? 'bg-accent-green/10 text-accent-green border-accent-green/20'
+                    : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
+                }`}
+              >
+                Free only
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter('free', filters.free === '0' ? '' : '0')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  filters.free === '0'
+                    ? 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20'
+                    : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
+                }`}
+              >
+                Paid only
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter('gradeable', filters.gradeable === '1' ? '' : '1')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  filters.gradeable === '1'
+                    ? 'bg-accent-green/10 text-accent-green border-accent-green/20'
+                    : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
+                }`}
+              >
+                Gradeable
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter('gradeable', filters.gradeable === '0' ? '' : '0')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  filters.gradeable === '0'
+                    ? 'bg-accent-amber/10 text-accent-amber border-accent-amber/20'
+                    : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
+                }`}
+              >
+                Ungradeable
+              </button>
+            </div>
+          </div>
+
+          {isAuthenticated && (
+            <div>
+              <p className="text-[11px] font-semibold text-surface-500 uppercase tracking-widest mb-3">Progress</p>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setFilter('completed', filters.completed === '1' ? '' : '1')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    filters.completed === '1'
+                      ? 'bg-accent-green/10 text-accent-green border-accent-green/20'
+                      : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
+                  }`}
+                >
+                  Solved
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilter('completed', filters.completed === '0' ? '' : '0')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    filters.completed === '0'
+                      ? 'bg-accent-amber/10 text-accent-amber border-accent-amber/20'
+                      : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
+                  }`}
+                >
+                  Unsolved
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Tags */}
           {tags.length > 0 && (

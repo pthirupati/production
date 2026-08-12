@@ -13,7 +13,7 @@ vi.mock('../../../api/certifications', () => ({ certApi: { list: () => list() } 
 // Strip the animation-only props so React doesn't warn about unknown DOM attrs.
 vi.mock('framer-motion', () => ({
   motion: new Proxy({}, {
-    get: () => ({ children, initial, whileInView, viewport, variants, ...rest }) => (
+    get: () => ({ children, initial: _initial, whileInView: _whileInView, viewport: _viewport, variants: _variants, ...rest }) => (
       <div {...rest}>{children}</div>
     ),
   }),

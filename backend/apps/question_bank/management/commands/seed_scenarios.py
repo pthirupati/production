@@ -8,6 +8,7 @@ import os
 import yaml
 from django.core.management.base import BaseCommand, CommandError
 from apps.question_bank.models import Technology, Scenario
+from apps.question_bank.linked_tutorial_map import resolve_linked_tutorial
 from apps.hints.models import Hint
 
 TECH_META = {
@@ -321,6 +322,11 @@ class Command(BaseCommand):
                         "consoles": consoles,
                         "lab_servers": lab_servers,
                         "certification_only": data.get("certification_only", False),
+                        # Tutorial course_slug (audit §C1). Map dangling
+                        # *-fundamentals refs to real zero-hero courses.
+                        "linked_tutorial": resolve_linked_tutorial(
+                            data.get("linked_tutorial", "")
+                        ),
                         # ITSM (ServiceNow-style) ticket flow.
                         "itsm_enabled": data.get("itsm_enabled", False),
                         "itsm_ticket_type": data.get("itsm_ticket_type", "incident"),

@@ -4,6 +4,7 @@ import {
   resolveChargeAmountPaise,
   isOrderUsable,
   hasDisplayableGst,
+  resolveDisplayAmountInr,
 } from './checkoutAmount'
 
 // Audit Z6-12 — "payment has zero frontend tests; Razorpay checkout can break on
@@ -168,5 +169,34 @@ describe('hasDisplayableGst', () => {
 
   it('hides a malformed breakup rather than rendering NaN', () => {
     expect(hasDisplayableGst({ gst_amount: 'abc' })).toBe(false)
+  })
+})
+
+describe('resolveDisplayAmountInr', () => {
+  it('prefers the server total over an editable URL amount', () => {
+    expect(resolveDisplayAmountInr({
+      serverTotalInr: 499,
+      bootstrapAmountInr: 399,
+      urlAmountInr: 1,
+    })).toBe(499)
+  })
+
+  it('falls back to bootstrap before URL', () => {
+    expect(resolveDisplayAmountInr({
+      serverTotalInr: null,
+      bootstrapAmountInr: 399,
+      urlAmountInr: 1,
+    })).toBe(399)
+  })
+
+  it('uses the URL only as a last-resort hint', () => {
+    expect(resolveDisplayAmountInr({
+      urlAmountInr: '499',
+    })).toBe(499)
+  })
+
+  it('returns 0 when nothing is usable', () => {
+    expect(resolveDisplayAmountInr({})).toBe(0)
+    expect(resolveDisplayAmountInr({ urlAmountInr: 'abc' })).toBe(0)
   })
 })

@@ -126,11 +126,20 @@ case "$SOURCE" in
 esac
 [ -n "${DUMP:-}" ] && [ -f "$DUMP" ] || { echo "[restore] no dump file resolved (source=$SOURCE)" >&2; exit 1; }
 
-# ── Integrity check before we touch the DB ──
+# Integrity check before we touch the DB.
+# Do NOT use `zcat | head | grep` under set -o pipefail — head/grep exit early,
+# zcat dies SIGPIPE (141), and pipefail rejects every dump larger than the pipe
+# buffer (audit Z5-8 / runbook finding). Read a bounded prefix instead.
 if ! gzip -t "$DUMP" 2>/dev/null; then
   echo "[restore] ERROR: $DUMP failed gzip integrity check" >&2; exit 1
 fi
-if ! zcat "$DUMP" | head -c 4096 | grep -q "PostgreSQL database dump"; then
+HEADER_SAMPLE="$(DUMP_PATH="$DUMP" python3 - <<'PY'
+import gzip, os, sys
+with gzip.open(os.environ["DUMP_PATH"], "rb") as fh:
+    sys.stdout.buffer.write(fh.read(4096))
+PY
+)" || HEADER_SAMPLE=""
+if ! printf '%s' "$HEADER_SAMPLE" | grep -q "PostgreSQL database dump"; then
   echo "[restore] ERROR: $DUMP does not look like a pg_dump (missing header)" >&2; exit 1
 fi
 
@@ -156,9 +165,19 @@ if [ "$ASSUME_YES" != "1" ]; then
 fi
 
 echo "[restore] restoring into '$PGDB' ..."
-# psql restore; ON_ERROR_STOP makes a failed restore non-silent. The dump is a
-# plain SQL pg_dump, so pipe it straight into psql inside the container.
-zcat "$DUMP" | docker exec -i "$DB_CONTAINER" \
+# Plain pg_dump SQL is not an in-place overwrite: CREATE TABLE / COPY fail when
+# objects already exist. Drop and recreate the database first (confirmation
+# already passed above) so "overwrite" is real rather than aspirational.
+docker exec "$DB_CONTAINER" psql -v ON_ERROR_STOP=1 -U "$PGUSER" -d postgres \
+  -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${PGDB}' AND pid <> pg_backend_pid();" \
+  >/dev/null
+docker exec "$DB_CONTAINER" psql -v ON_ERROR_STOP=1 -U "$PGUSER" -d postgres \
+  -c "DROP DATABASE IF EXISTS \"${PGDB}\";"
+docker exec "$DB_CONTAINER" psql -v ON_ERROR_STOP=1 -U "$PGUSER" -d postgres \
+  -c "CREATE DATABASE \"${PGDB}\" OWNER \"${PGUSER}\";"
+
+# Use gzip -dc (not zcat): macOS zcat only accepts .Z and appends the suffix.
+gzip -dc "$DUMP" | docker exec -i "$DB_CONTAINER" \
   psql -v ON_ERROR_STOP=1 -U "$PGUSER" -d "$PGDB"
 
 echo "[restore] done. Verify row counts on users / payments / subscriptions before resuming traffic."

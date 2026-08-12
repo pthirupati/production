@@ -24,7 +24,12 @@ class TechnologySerializer(serializers.ModelSerializer):
 
 
 class ScenarioListSerializer(serializers.ModelSerializer):
-    """Lightweight serializer for listing scenarios"""
+    """Lightweight serializer for listing scenarios.
+
+    Heavy lab-runtime fields (blocked_commands, consoles, lab_servers) live on
+    ScenarioDetailSerializer — catalog cards never render them, and list pages
+    can return up to page_size 200.
+    """
     technology = TechnologySerializer(read_only=True)
     tags = TagSerializer(many=True, read_only=True)
     completion_rate = serializers.IntegerField(read_only=True, required=False)
@@ -39,10 +44,10 @@ class ScenarioListSerializer(serializers.ModelSerializer):
             "id", "slug", "title", "subtitle", "category", "difficulty",
             "scenario_type", "technology", "tags", "time_limit", "max_score",
             "is_free", "attempts_count", "completions_count", "completion_rate",
-            "is_bookmarked", "blocked_commands", "learn",
+            "is_bookmarked", "learn",
             "lab_mode", "simulation_type", "dual_terminal", "requires_companion_hosts",
             "interview_mode", "coding_mode", "cross_technology", "vmware_link", "datacenter_link",
-            "consoles", "lab_servers", "created_at",
+            "created_at",
         ]
 
     def get_learn(self, scenario):

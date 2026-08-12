@@ -13,11 +13,9 @@ description: 'CONTEXT: A team operating security hardening has raised a ticket f
   (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
   the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline hardening lab. The architecture is a single lab-primary
   node exposing SSH, firewall, TLS, audit logs, and IAM settings; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: Ubuntu 22.04 with Apache2. /var/www/html/ has no index.html. Apache returns
   a
@@ -26,12 +24,10 @@ description: 'CONTEXT: A team operating security hardening has raised a ticket f
 
   has `Options Indexes FollowSymLinks`.
 
-
   OBJECTIVE: Confirm directory listing is enabled by accessing a directory without index; Remove or disable
   the Options Indexes directive in the Apache config; Reload Apache and verify directory listings are
   no longer served. Acceptance criteria: the change is minimal and reversible, and success means `systemctl
   is-active --quiet` returns active.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
@@ -39,16 +35,13 @@ description: 'CONTEXT: A team operating security hardening has raised a ticket f
   Check your work continuously against the objective — success means `systemctl is-active --quiet``` returns
   active.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active --quiet`` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -107,7 +100,6 @@ hints:
 
     3. Run `systemctl restart --quiet` and confirm `systemctl is-active --quiet` succeeds.
 
-
     WHY: the grader checks real service state, not marker files.'
 summary: Complete the apache directory listing enabled — disable options indexes security lab and verify
   success with the checker
@@ -119,7 +111,7 @@ tags:
 - fix
 - hands-on
 - security
-linked_tutorial: security-fundamentals
+linked_tutorial: cybersecurity-zero-hero
 what_you_will_learn:
 - Confirm directory listing is enabled by accessing a directory without index
 - Remove or disable the Options Indexes directive in the Apache config

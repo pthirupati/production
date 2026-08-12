@@ -8,12 +8,10 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture
   is a single lab-primary node exposing terminal and config files under /etc and /var;
   treat it as the production host for this incident. All tools run locally — no paid
   APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: RHEL 9 server (web-prod-01), also present in the vCenter
   console. /data
@@ -23,12 +21,10 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
 
   no spare disk is attached. /var/lib/docker lives on /data.
 
-
   OBJECTIVE: Open the VMware console (toolbar link) and add a new Hard Disk to web-prod-01;
   Rescan the SCSI bus in the terminal so /dev/sdc is discovered; Add the disk to LVM
   (pvcreate /dev/sdc; vgextend vgdata /dev/sdc). Acceptance criteria: the change is
   minimal and reversible, and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it
   and use the equivalent already on the host. Make the smallest configuration change
@@ -36,16 +32,13 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   files under /etc and /var), changing one thing at a time. Check your work continuously
   against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully.
   Capture the before/after output as evidence. Success criteria: the objective''s
   healthy state holds on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately
   (restore the original config file / undo the edit / restart the affected component)
   and re-observe before trying another hypothesis. Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
   or fake completion with marker files — the checker validates real system state.'
@@ -115,7 +108,6 @@ hints:
 
     3. Confirm `bash check.sh` shows the container Up.
 
-
     WHY: the checker validates the container is actually running.'
 requires_companion_hosts: false
 dual_terminal: false
@@ -131,7 +123,7 @@ tags:
 - fix
 - hands-on
 - linux
-linked_tutorial: linux-fundamentals
+linked_tutorial: linux-sysadmin-zero-hero
 what_you_will_learn:
 - Open the VMware console (toolbar link) and add a new Hard Disk to web-prod-01
 - Rescan the SCSI bus in the terminal so /dev/sdc is discovered

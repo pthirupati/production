@@ -18,10 +18,28 @@ import {
   MAX_FRAME_DT,
   clampDt,
   DEFAULT_LOOK,
+  DEFAULT_BINDS,
   PITCH_LIMIT,
   applyLook,
   readLookSettings,
   writeLookSettings,
+  readBinds,
+  writeBinds,
+  movementIntent,
+  mergeIntent,
+  gamepadSample,
+  setTouchHold,
+  clearTouchHold,
+  touchHoldRef,
+  touchLookDelta,
+  deviceOrientationLookDelta,
+  requestGyroPermission,
+  prefersCoarsePointer,
+  pduLoadFraction,
+  pduMeterLabel,
+  pdusForRack,
+  buildPduPsuCables,
+  walkKeySet,
   isTypingTarget,
   isSprinting,
   WALK_KEYS,
@@ -29,11 +47,38 @@ import {
   freeUSlots,
   findInteractable,
   MAX_INTERACT_DISTANCE,
+  FACE_DETAIL_MAX_DIST,
+  FACE_HTML_MAX_DIST,
+  DistanceCullingHtml,
+  HTML_LABEL_MAX_DIST,
   EYE_Y,
   CONTROL_BINDINGS,
+  buildHallColliders,
+  resolveWalk,
+  stepVertical,
+  PLAYER_RADIUS,
+  HALL_BOUNDS,
+  CROUCH_EYE_Y,
+  CEILING_Y,
+  sanitizeSpawn,
+  readPlayerPos,
+  writePlayerPos,
+  playerPosKey,
+  SAFE_SPAWN,
+  captureCanvasPng,
+  renderFloorPlanPng,
 } from './DatacenterTwin3D'
 
 const readSource = (name) => fs.readFile(new URL(`./${name}`, import.meta.url), 'utf8')
+
+const makeStore = (seed) => {
+  const data = { ...seed }
+  return {
+    getItem: (k) => (k in data ? data[k] : null),
+    setItem: (k, v) => { data[k] = String(v) },
+    removeItem: (k) => { delete data[k] },
+  }
+}
 
 describe('D4 — frame delta clamping', () => {
   it('clamps an alt-tab / GC pause to the max step', () => {
@@ -73,7 +118,10 @@ describe('D4 — frame delta clamping', () => {
 describe('D3 — camera Y is written before it is read', () => {
   it('assigns pos.current.y above the camera.position.set() that consumes it', async () => {
     const src = await readSource('DatacenterTwin3D.jsx')
-    const assign = src.indexOf('pos.current.y = EYE_Y')
+    // Y is now the output of stepVertical() rather than the EYE_Y constant
+    // (crouch/jump, audit L578) — the write-before-read ordering is the invariant,
+    // not the particular right-hand side.
+    const assign = src.indexOf('pos.current.y = vert.y')
     const consume = src.indexOf('camera.position.set(pos.current.x + sway')
     expect(assign).toBeGreaterThan(-1)
     expect(consume).toBeGreaterThan(-1)
@@ -162,6 +210,177 @@ describe('D6 — look settings persistence', () => {
   })
 })
 
+describe('D6 — key rebinding', () => {
+  it('round-trips remapped walk binds', () => {
+    const s = makeStore({})
+    writeBinds(s, { ...DEFAULT_BINDS, forward: 'KeyI', interact: 'KeyF' })
+    const loaded = readBinds(s)
+    expect(loaded.forward).toBe('KeyI')
+    expect(loaded.interact).toBe('KeyF')
+    expect(loaded.back).toBe('KeyS')
+  })
+
+  it('drives movementIntent from the bind map (arrows stay aliases)', () => {
+    const binds = { ...DEFAULT_BINDS, forward: 'KeyI' }
+    expect(movementIntent({ KeyI: true }, binds).forward).toBe(true)
+    expect(movementIntent({ KeyW: true }, binds).forward).toBe(false)
+    expect(movementIntent({ ArrowUp: true }, binds).forward).toBe(true)
+    expect(walkKeySet(binds).has('KeyI')).toBe(true)
+  })
+
+  it('exposes rebind actions on the controls table', () => {
+    const rebindable = CONTROL_BINDINGS.filter((b) => b.rebind?.length)
+    expect(rebindable.length).toBeGreaterThanOrEqual(4)
+  })
+})
+
+describe('D6 — gamepad half', () => {
+  it('gamepadSample maps stick + buttons; mergeIntent ORs keyboard', () => {
+    const pad = {
+      connected: true,
+      axes: [0.8, -0.9, 0.3, 0],
+      buttons: [
+        { pressed: true, value: 1 },
+        { pressed: false, value: 0 },
+        { pressed: false, value: 0 },
+        { pressed: false, value: 0 },
+        { pressed: true, value: 1 },
+      ],
+    }
+    const g = gamepadSample(pad)
+    expect(g.intent.forward).toBe(true)
+    expect(g.intent.right).toBe(true)
+    expect(g.jump).toBe(true)
+    expect(g.sprint).toBe(true)
+    expect(g.lookDx).toBeGreaterThan(0)
+    expect(mergeIntent({ forward: true }, { left: true })).toEqual({
+      forward: true, back: false, left: true, right: false,
+    })
+  })
+
+  it('WalkController polls getGamepads', async () => {
+    const src = await fs.readFile(new URL('./DatacenterTwin3D.jsx', import.meta.url), 'utf8')
+    expect(src).toContain('getGamepads')
+    expect(src).toContain('gamepadSample')
+    expect(src).toContain('mergeIntent')
+  })
+})
+
+describe('D6 — touch pad half', () => {
+  it('touchHoldRef merges with setTouchHold', () => {
+    clearTouchHold()
+    setTouchHold({ forward: true, sprint: true })
+    expect(touchHoldRef.current.forward).toBe(true)
+    expect(touchHoldRef.current.sprint).toBe(true)
+    expect(mergeIntent(movementIntent({}), touchHoldRef.current).forward).toBe(true)
+    clearTouchHold()
+    expect(touchHoldRef.current.forward).toBe(false)
+  })
+
+  it('mounts TouchWalkPad and SSAO/Vignette quality gates', async () => {
+    const src = await fs.readFile(new URL('./DatacenterTwin3D.jsx', import.meta.url), 'utf8')
+    expect(src).toContain('TouchWalkPad')
+    expect(src).toContain('data-testid="dc-touch-pad"')
+    expect(src).toContain('SSAO')
+    expect(src).toContain('Vignette')
+    expect(src).toContain('ssao: true')
+    expect(prefersCoarsePointer(() => ({ matches: true }))).toBe(true)
+  })
+
+  it('touch look-stick yields deltas without pointer lock', () => {
+    clearTouchHold()
+    setTouchHold({ lookLeft: true, lookUp: true })
+    const d = touchLookDelta(touchHoldRef.current, 2)
+    expect(d.dx).toBe(-2)
+    expect(d.dy).toBe(-2)
+    clearTouchHold()
+  })
+
+  it('deviceOrientationLookDelta is relative and requestGyroPermission is safe', async () => {
+    const prev = { current: null }
+    expect(deviceOrientationLookDelta({ beta: 10, gamma: 5 }, prev)).toEqual({ dx: 0, dy: 0 })
+    const d = deviceOrientationLookDelta({ beta: 12, gamma: 9 }, prev, 1)
+    expect(d.dx).toBe(4)
+    expect(d.dy).toBe(2)
+    expect(await requestGyroPermission({ requestPermission: async () => 'granted' })).toBe(true)
+    expect(await requestGyroPermission({ requestPermission: async () => 'denied' })).toBe(false)
+  })
+})
+
+describe('D12 — ToR-in-rack + Noise', () => {
+  it('mounts per-rack TorSwitch and high-quality Noise', async () => {
+    const src = await fs.readFile(new URL('./DatacenterTwin3D.jsx', import.meta.url), 'utf8')
+    expect(src).toContain('tor-${rack.id}')
+    expect(src).toContain('RACK_H + 0.18')
+    expect(src).toContain('Noise')
+    expect(src).toContain('noise: true')
+  })
+})
+
+describe('D12 — PDU whips + patch panel', () => {
+  it('buildPduPsuCables emits A/B whips; PatchPanel mounts', async () => {
+    const cables = buildPduPsuCables(
+      [{ id: 'r1', name: 'R1' }],
+      [
+        { id: 'PDU-r1', rack: 'r1', feed: 'A' },
+        { id: 'PDU-r1-B', rack: 'r1', feed: 'B' },
+      ],
+    )
+    expect(cables.length).toBe(2)
+    expect(cables[0].from).toHaveLength(3)
+    const src = await fs.readFile(new URL('./DatacenterTwin3D.jsx', import.meta.url), 'utf8')
+    expect(src).toContain('PduPsuCables')
+    expect(src).toContain('PatchPanel')
+  })
+})
+
+describe('D12 — dual PDU + amp meter', () => {
+  it('pduLoadFraction prefers kW rating; pdusForRack pairs A/B', () => {
+    expect(pduLoadFraction({ load_kw: 4, rating_kw: 8 })).toBe(0.5)
+    expect(pduMeterLabel({ load_kw: 4, rating_kw: 8 })).toContain('4.0/8kW')
+    expect(pduMeterLabel({ status: 'tripped' })).toBe('PDU TRIP')
+    const { feedA, feedB } = pdusForRack([
+      { id: 'PDU-r1', rack: 'r1', feed: 'A', load_kw: 2, rating_kw: 8 },
+      { id: 'PDU-r1-B', rack: 'r1', feed: 'B', load_kw: 1, rating_kw: 8 },
+    ], 'r1')
+    expect(feedA.feed).toBe('A')
+    expect(feedB.feed).toBe('B')
+  })
+})
+
+describe('Photo mode / floor share', () => {
+  it('captureCanvasPng returns a data URL without requiring download DOM', () => {
+    const canvas = {
+      toDataURL: () => 'data:image/png;base64,AAA',
+    }
+    expect(captureCanvasPng(canvas, { download: false })).toBe('data:image/png;base64,AAA')
+    expect(captureCanvasPng(null, { download: false })).toBeNull()
+  })
+
+  it('renderFloorPlanPng draws racks onto a stub canvas', () => {
+    const ops = []
+    const stub = {
+      width: 0,
+      height: 0,
+      getContext: () => ({
+        fillRect: (...a) => ops.push(['fillRect', ...a]),
+        strokeRect: (...a) => ops.push(['strokeRect', ...a]),
+        fillText: (...a) => ops.push(['fillText', a[0]]),
+        fillStyle: '',
+        strokeStyle: '',
+        font: '',
+      }),
+      toDataURL: () => 'data:image/png;base64,FLOOR',
+    }
+    const url = renderFloorPlanPng(
+      { racks: [{ id: 'R01' }], serversByRack: { R01: [{ components: { psu: 'healthy' } }] } },
+      { download: false, createCanvas: () => stub },
+    )
+    expect(url).toBe('data:image/png;base64,FLOOR')
+    expect(ops.some((o) => o[0] === 'fillText' && String(o[1]).includes('R01'))).toBe(true)
+  })
+})
+
 describe('D6 — keyboard hygiene', () => {
   it('treats text-entry surfaces as not-the-game', () => {
     // This is the fix for "WASD types into every input in the app".
@@ -243,7 +462,12 @@ describe('D2 — pointer lock is observed, not assumed', () => {
 
   it('Esc opens the menu but never toggles it closed', async () => {
     const src = await readSource('DatacenterTwin3D.jsx')
-    const esc = src.slice(src.indexOf("if (e.code === 'Escape')"), src.indexOf("if (e.code === 'Escape')") + 400)
+    // Prefer the immersive room-hotkey handler — ControlsPanel also listens for Escape
+    // while capturing a rebind, which must not confuse this contract.
+    const marker = 'Open-only. The browser has already released'
+    const at = src.indexOf(marker)
+    expect(at).toBeGreaterThan(0)
+    const esc = src.slice(at - 120, at + 220)
     // A plain toggle fights the unlock-triggered open and makes the menu reopen
     // itself on every unlock (the risk called out in the audit).
     expect(esc).not.toContain('setMenuOpen((m) => !m)')
@@ -286,6 +510,22 @@ describe('D6/D11 — crosshair interaction', () => {
   it('limits reach to arm-ish distance', () => {
     expect(MAX_INTERACT_DISTANCE).toBeGreaterThan(1)
     expect(MAX_INTERACT_DISTANCE).toBeLessThan(6)
+    expect(FACE_DETAIL_MAX_DIST).toBeGreaterThan(MAX_INTERACT_DISTANCE)
+    expect(FACE_HTML_MAX_DIST).toBeLessThanOrEqual(FACE_DETAIL_MAX_DIST)
+    expect(FACE_HTML_MAX_DIST).toBe(HTML_LABEL_MAX_DIST)
+  })
+
+  it('distance-culls rack/PDU/ticket/portal/cable Html labels (D10 half)', async () => {
+    expect(typeof DistanceCullingHtml).toBe('function')
+    const twin = await readSource('DatacenterTwin3D.jsx')
+    expect(twin).toContain('DistanceCullingHtml')
+    expect(twin).toMatch(/DistanceCullingHtml[\s\S]*RACK_H \+ 0\.06/)
+    expect(twin).toContain('TicketWaypoint')
+    const cable = await readSource('DcCableSystem.jsx')
+    expect(cable).toContain('DistanceCullingHtml')
+    const lod = await readSource('DcLod.jsx')
+    expect(lod).toContain('group.current.visible')
+    expect(lod).toContain('distanceTo')
   })
 
   it('uses a real raycaster instead of a synthetic MouseEvent at canvas center', async () => {
@@ -578,5 +818,284 @@ describe('chunk loading UX', () => {
     // Must never claim 100% — import() reports no byte progress.
     expect(src).toContain('Math.min(92')
     expect(src).toContain('onSkipTo2D')
+  })
+})
+
+/**
+ * Audit L536/L542/L544/L578 — world collision, wall-slide, badge-gated mantrap,
+ * and vertical movement. Pure helpers so the whole contract is exercisable in
+ * `environment: 'node'` with no WebGL.
+ */
+describe('L536 — hall collider list', () => {
+  it('derives rack colliders from the same rackPosition() the meshes use', () => {
+    const cols = buildHallColliders({ rackCount: 8 })
+    const racks = cols.filter((c) => c.id.startsWith('rack-'))
+    expect(racks).toHaveLength(8)
+    // rack 0 sits at x -2.1, z -0.5 with a 0.6 x 1.05 footprint.
+    expect(racks[0].minX).toBeCloseTo(-2.4, 6)
+    expect(racks[0].maxX).toBeCloseTo(-1.8, 6)
+    expect(racks[0].minZ).toBeCloseTo(-1.025, 6)
+    expect(racks[0].maxZ).toBeCloseTo(0.025, 6)
+  })
+
+  it('scales with the real rack and CRAC counts rather than a hardcoded list', () => {
+    expect(buildHallColliders({ rackCount: 0, cracCount: 0 })
+      .some((c) => c.id.startsWith('rack-'))).toBe(false)
+    expect(buildHallColliders({ rackCount: 3, cracCount: 2 })
+      .filter((c) => c.id.startsWith('crac-'))).toHaveLength(2)
+  })
+
+  it('includes the corridor walls, MDF cage and reception desk', () => {
+    const ids = buildHallColliders({}).map((c) => c.id)
+    expect(ids).toEqual(expect.arrayContaining([
+      'reception-wall', 'corridor-wall-x', 'corridor-wall-z', 'reception-desk', 'mdf-cage',
+    ]))
+  })
+})
+
+describe('L542 — capsule-vs-AABB resolution', () => {
+  const cols = buildHallColliders({ rackCount: 8, cracCount: 2, doorOpen: true })
+
+  it('blocks a walk straight into a rack', () => {
+    // Start in the aisle just south of rack 0 (collider maxZ 0.025, so the
+    // capsule stops at 0.305) and push north into it.
+    const start = { x: -2.1, z: 0.4 }
+    const out = resolveWalk(start, { x: 0, z: -0.2 }, cols)
+    expect(out.z).toBeGreaterThan(0.025 + PLAYER_RADIUS - 1e-6)
+    expect(out.z).toBe(start.z) // fully rejected, not partially tunnelled
+  })
+
+  it('slides along a wall instead of sticking (independent X/Z passes)', () => {
+    // Diagonal into rack 0's face: the Z component is refused, the X component
+    // must survive — that tangential motion IS the slide.
+    const start = { x: -2.1, z: 0.4 }
+    const out = resolveWalk(start, { x: 0.35, z: -0.2 }, cols)
+    expect(out.z).toBe(start.z)
+    expect(out.x).toBeCloseTo(-1.75, 6)
+  })
+
+  it('never lets a diagonal squeeze through a corner between two boxes', () => {
+    // The Z pass is re-tested against the resolved X, so a corner cannot be
+    // crossed by combining two individually-legal axis moves.
+    const box = [{ id: 'b', minX: 0, maxX: 1, minZ: 0, maxZ: 1 }]
+    const out = resolveWalk({ x: -0.5, z: -0.5 }, { x: 1.0, z: 1.0 }, box, 0.2)
+    const inside = out.x > box[0].minX - 0.2 && out.x < box[0].maxX + 0.2
+      && out.z > box[0].minZ - 0.2 && out.z < box[0].maxZ + 0.2
+    expect(inside).toBe(false)
+  })
+
+  it('keeps the outer bounds authoritative even with no colliders', () => {
+    const out = resolveWalk({ x: 7.4, z: 6.4 }, { x: 99, z: 99 }, [])
+    expect(out.x).toBe(HALL_BOUNDS.maxX)
+    expect(out.z).toBe(HALL_BOUNDS.maxZ)
+  })
+
+  it('does not trap a player who somehow starts inside a collider', () => {
+    // Overlapping spawn must still be able to move OUT along a free axis rather
+    // than being frozen forever.
+    const box = [{ id: 'b', minX: -1, maxX: 1, minZ: -1, maxZ: 1 }]
+    const out = resolveWalk({ x: 0, z: 0 }, { x: 3, z: 0 }, box, 0.2)
+    expect(out.x).toBeGreaterThan(0)
+  })
+})
+
+describe('L544 — badge-gated mantrap door', () => {
+  it('is solid before badge-in and gone after', () => {
+    const closed = buildHallColliders({ doorOpen: false }).map((c) => c.id)
+    const open = buildHallColliders({ doorOpen: true }).map((c) => c.id)
+    expect(closed).toContain('mantrap-door')
+    expect(open).not.toContain('mantrap-door')
+  })
+
+  /**
+   * The regression this guards is a soft-lock: the box clamp used to be the ONLY
+   * thing keeping the player in bounds, so a bad door collider can seal them in a
+   * room with no way out. Flood-fill the walkable plane from the spawn point and
+   * assert both the hall and the reception end stay reachable in BOTH door states.
+   */
+  const floodFrom = (cols, sx, sz) => {
+    const step = 0.1
+    const hit = (x, z) => cols.some((c) => (
+      x > c.minX - PLAYER_RADIUS && x < c.maxX + PLAYER_RADIUS
+      && z > c.minZ - PLAYER_RADIUS && z < c.maxZ + PLAYER_RADIUS
+    ))
+    const key = (x, z) => `${Math.round(x / step)},${Math.round(z / step)}`
+    const seen = new Set([key(sx, sz)])
+    const stack = [[sx, sz]]
+    const pts = [[sx, sz]]
+    while (stack.length) {
+      const [x, z] = stack.pop()
+      for (const [dx, dz] of [[step, 0], [-step, 0], [0, step], [0, -step]]) {
+        const nx = x + dx
+        const nz = z + dz
+        if (nx < HALL_BOUNDS.minX || nx > HALL_BOUNDS.maxX) continue
+        if (nz < HALL_BOUNDS.minZ || nz > HALL_BOUNDS.maxZ) continue
+        const k = key(nx, nz)
+        if (seen.has(k) || hit(nx, nz)) continue
+        seen.add(k)
+        stack.push([nx, nz])
+        pts.push([nx, nz])
+      }
+    }
+    return pts
+  }
+
+  it.each([false, true])('leaves no soft-lock with doorOpen=%s', (doorOpen) => {
+    const cols = buildHallColliders({ rackCount: 8, cracCount: 2, doorOpen })
+    // Spawn matches WalkController's initial pos (5.2, _, 4.5).
+    const reachable = floodFrom(cols, 5.2, 4.5)
+    expect(reachable.length).toBeGreaterThan(5000)
+    // The cold aisle deep in the hall.
+    expect(reachable.some(([x, z]) => Math.abs(x) < 0.2 && z < -2)).toBe(true)
+    // The reception / corridor end.
+    expect(reachable.some(([x, z]) => x < -4.5 && z > 4.6)).toBe(true)
+  })
+
+  it('does not spawn the player inside a collider', () => {
+    const cols = buildHallColliders({ rackCount: 8, cracCount: 2, doorOpen: false })
+    const overlapping = cols.filter((c) => (
+      5.2 > c.minX - PLAYER_RADIUS && 5.2 < c.maxX + PLAYER_RADIUS
+      && 4.5 > c.minZ - PLAYER_RADIUS && 4.5 < c.maxZ + PLAYER_RADIUS
+    ))
+    expect(overlapping).toEqual([])
+  })
+})
+
+describe('L578 — crouch and jump', () => {
+  const dt = 1 / 60
+
+  it('eases the eye down to crouch height while Ctrl is held', () => {
+    let s = { y: EYE_Y, vy: 0, grounded: true }
+    for (let i = 0; i < 120; i += 1) s = stepVertical(s, { ControlLeft: true }, dt)
+    expect(s.crouching).toBe(true)
+    expect(s.y).toBeCloseTo(CROUCH_EYE_Y, 2)
+    expect(s.y).toBeLessThan(EYE_Y)
+  })
+
+  it('stands back up when the key is released', () => {
+    let s = { y: CROUCH_EYE_Y, vy: 0, grounded: true }
+    for (let i = 0; i < 120; i += 1) s = stepVertical(s, {}, dt)
+    expect(s.y).toBeCloseTo(EYE_Y, 2)
+  })
+
+  it('jumps and lands back exactly at eye height', () => {
+    let s = stepVertical({ y: EYE_Y, vy: 0, grounded: true }, { Space: true }, dt)
+    expect(s.grounded).toBe(false)
+    expect(s.vy).toBeGreaterThan(0)
+    let peak = s.y
+    for (let i = 0; i < 600 && !s.grounded; i += 1) {
+      s = stepVertical(s, {}, dt)
+      peak = Math.max(peak, s.y)
+    }
+    expect(peak).toBeGreaterThan(EYE_Y + 0.2)
+    expect(s.grounded).toBe(true)
+    expect(s.y).toBe(EYE_Y)
+    expect(s.vy).toBe(0)
+  })
+
+  it('cannot double-jump in mid-air', () => {
+    let s = stepVertical({ y: EYE_Y, vy: 0, grounded: true }, { Space: true }, dt)
+    const vyAfterFirst = s.vy
+    s = stepVertical(s, { Space: true }, dt)
+    expect(s.vy).toBeLessThan(vyAfterFirst)
+  })
+
+  it('never leaves the room through the ceiling', () => {
+    // Even with an absurd upward velocity the head is clamped under the soffit.
+    const s = stepVertical({ y: EYE_Y, vy: 50, grounded: false }, {}, 1)
+    expect(s.y).toBeLessThanOrEqual(CEILING_Y)
+  })
+
+  it('does not jump out of a crouch', () => {
+    const s = stepVertical({ y: CROUCH_EYE_Y, vy: 0, grounded: true }, { Space: true, KeyC: true }, dt)
+    expect(s.grounded).toBe(true)
+  })
+})
+
+describe('L536/L542/L578 — wiring into the walk loop', () => {
+  it('the movement loop resolves against colliders instead of a bare box clamp', async () => {
+    const src = await readSource('DatacenterTwin3D.jsx')
+    const walk = src.slice(src.indexOf('function WalkController'), src.indexOf('function HallDust'))
+    expect(walk).toContain('resolveWalk(')
+    expect(walk).toContain('stepVertical(')
+    // The old unconditional clamp pair must be gone from the walk loop.
+    expect(walk).not.toContain('Math.max(-8.5, Math.min(7.5')
+    // Y is no longer a hard-pinned constant.
+    expect(walk).not.toContain('pos.current.y = EYE_Y')
+  })
+
+  it('the collider list is memoized from the rendered rack and CRAC counts', async () => {
+    const src = await readSource('DatacenterTwin3D.jsx')
+    expect(src).toContain('buildHallColliders({')
+    expect(src).toContain('rackCount: (racks || []).length')
+    expect(src).toContain('colliders={walkColliders}')
+  })
+
+  it('crouch and jump keys are swallowed so they do not scroll the page', () => {
+    expect(WALK_KEYS.has('Space')).toBe(true)
+    expect(WALK_KEYS.has('ControlLeft')).toBe(true)
+    expect(WALK_KEYS.has('KeyC')).toBe(true)
+  })
+})
+
+/** Audit L2234 — per-room player position persistence with a safe-spawn fallback. */
+describe('L2234 — player position persistence', () => {
+  const mkStorage = () => ({
+    store: {},
+    getItem(k) { return this.store[k] ?? null },
+    setItem(k, v) { this.store[k] = String(v) },
+  })
+
+  it('round-trips a position through storage', () => {
+    const ls = mkStorage()
+    writePlayerPos(ls, 'sess-1', 'Data Hall A', { x: 1.5, z: -3.2, yaw: 0.4 })
+    expect(readPlayerPos(ls, 'sess-1', 'Data Hall A')).toEqual({ x: 1.5, z: -3.2, yaw: 0.4 })
+  })
+
+  it('namespaces per session AND per room so coordinates never leak across', () => {
+    expect(playerPosKey('a', 'Data Hall A')).not.toBe(playerPosKey('a', 'MDF'))
+    expect(playerPosKey('a', 'MDF')).not.toBe(playerPosKey('b', 'MDF'))
+    const ls = mkStorage()
+    writePlayerPos(ls, 'sess-1', 'Data Hall A', { x: 1, z: 1, yaw: 0 })
+    expect(readPlayerPos(ls, 'sess-1', 'MDF')).toBeNull()
+    expect(readPlayerPos(ls, 'sess-2', 'Data Hall A')).toBeNull()
+  })
+
+  it('survives private mode / corrupt JSON without throwing', () => {
+    expect(readPlayerPos(null, 's', 'r')).toBeNull()
+    const bad = { getItem: () => '{not json', setItem() {} }
+    expect(readPlayerPos(bad, 's', 'r')).toBeNull()
+    expect(() => writePlayerPos({ setItem() { throw new Error('quota') } }, 's', 'r', {})).not.toThrow()
+  })
+
+  it('falls back to the safe spawn when nothing is saved', () => {
+    expect(sanitizeSpawn(null, [])).toEqual(SAFE_SPAWN)
+    expect(sanitizeSpawn({ x: 'nope', z: NaN }, [])).toEqual(SAFE_SPAWN)
+  })
+
+  it('rejects a saved position that is now inside a rack', () => {
+    // The layout-changed case: rack 0 sits where the player used to stand.
+    const cols = buildHallColliders({ rackCount: 8 })
+    expect(sanitizeSpawn({ x: -2.1, z: -0.5, yaw: 0 }, cols)).toEqual(SAFE_SPAWN)
+  })
+
+  it('rejects a saved position outside the room bounds', () => {
+    expect(sanitizeSpawn({ x: 99, z: 0 }, [])).toEqual(SAFE_SPAWN)
+    expect(sanitizeSpawn({ x: 0, z: -99 }, [])).toEqual(SAFE_SPAWN)
+  })
+
+  it('keeps a valid saved position, yaw included', () => {
+    const cols = buildHallColliders({ rackCount: 8 })
+    expect(sanitizeSpawn({ x: 5.2, z: 4.5, yaw: 1.2 }, cols)).toEqual({ x: 5.2, z: 4.5, yaw: 1.2 })
+  })
+
+  it('the walk controller restores on enter and commits on teardown', async () => {
+    const src = await readSource('DatacenterTwin3D.jsx')
+    const walk = src.slice(src.indexOf('function WalkController'), src.indexOf('function HallDust'))
+    expect(walk).toContain('spawnRef.current')
+    expect(walk).toContain('onPosCommitRef.current?.(')
+    // The restore must be validated by the caller, not trusted raw from storage.
+    expect(src).toContain('sanitizeSpawn(')
+    expect(src).toContain('readPlayerPos(')
   })
 })

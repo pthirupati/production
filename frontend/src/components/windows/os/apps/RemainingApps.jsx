@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronRight, Plus, Shield, Globe, Gauge, Calculator as CalcIcon, Palette, FileText } from 'lucide-react'
+import { ChevronRight, Plus, Shield, Globe, Gauge, Palette } from 'lucide-react'
 import { useOS } from '../store'
 import { Dialog, Tabs } from '../ui'
 
@@ -221,7 +221,6 @@ export function IISManager() {
   const [dialog, setDialog] = useState(null)
   const [busy, setBusy] = useState(false)
   const siteNames = sites.map((s) => s.name)
-  const poolNames = pools.map((p) => p.name)
   const curSite = sites.find((s) => s.name === sel)
   const curPool = pools.find((p) => p.name === sel)
 
@@ -582,7 +581,7 @@ export function Calculator() {
 
 export function WordPad() {
   const [text, setText] = useState('Rich text document\n\nUse the toolbar to format this document.')
-  return <div className="winos-app"><div className="winos-toolbar"><button className="winos-btn"><b>B</b></button><button className="winos-btn"><i>I</i></button><button className="winos-btn"><u>U</u></button><select className="winos-input"><option>Calibri</option><option>Segoe UI</option><option>Consolas</option></select><select className="winos-input"><option>11</option><option>14</option><option>18</option></select></div><textarea value={text} onChange={(e) => setText(e.target.value)} style={{ flex: 1, border: 0, outline: 0, padding: 24, fontFamily: 'Calibri, Segoe UI, sans-serif', fontSize: 16 }} /></div>
+  return <div className="winos-app"><div className="winos-toolbar"><button type="button" className="winos-btn" aria-label="Bold"><b>B</b></button><button type="button" className="winos-btn" aria-label="Italic"><i>I</i></button><button type="button" className="winos-btn" aria-label="Underline"><u>U</u></button><select className="winos-input" aria-label="Font"><option>Calibri</option><option>Segoe UI</option><option>Consolas</option></select><select className="winos-input" aria-label="Font size"><option>11</option><option>14</option><option>18</option></select></div><textarea value={text} onChange={(e) => setText(e.target.value)} style={{ flex: 1, border: 0, outline: 0, padding: 24, fontFamily: 'Calibri, Segoe UI, sans-serif', fontSize: 16 }} /></div>
 }
 
 export function Paint() {

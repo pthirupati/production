@@ -1,5 +1,5 @@
 import { Component } from 'react'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { AlertTriangle, RefreshCw } from '../ui/eagerIcons'
 import { isChunkLoadError } from '../utils/lazyWithRetry'
 import { reportClientError } from '../utils/reportClientError'
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { authApi } from '../../api/auth'
-import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff, Shield } from 'lucide-react'
+import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff, Shield } from '../../ui/eagerIcons'
 import toast from 'react-hot-toast'
 import { startOAuth } from '../../utils/oauth'
 import { AuthShell } from '../../components/design'

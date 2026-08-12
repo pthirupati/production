@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  MessageSquare, Plus, Search, ChevronUp, ChevronDown,
-  Send, Edit3, Trash2, Pin, Lock, Filter, X, Clock, ImagePlus, Flag,
-  Users, Sparkles
+  MessageSquare, Plus, Search, ChevronUp,
+  Send, Edit3, Trash2, Pin, Lock, X, Clock, ImagePlus, Flag,
 } from 'lucide-react'
 import { communityApi } from '../api/community'
 import { useAuthStore } from '../store/authStore'

@@ -24,7 +24,6 @@ from apps.question_bank.models import Scenario, Technology, Tag
 from apps.question_bank.serializers import ScenarioAdminSerializer, TechnologySerializer
 from apps.labs.models import LabSession
 from apps.labs.provisioner import get_provisioner, DockerProvisioner, terminate_lab_session
-from apps.leaderboard.models import LeaderboardEntry
 from apps.progress.models import UserScenarioProgress
 from apps.billing.models import Plan, Subscription, TechnologySubscription
 from apps.hints.models import Hint
@@ -4310,6 +4309,7 @@ class AdminOrganizationDetailView(APIView):
     def patch(self, request, org_id):
         """Update org settings: webhook_url, webhook_secret, logo_url, primary_color, custom_domain, seat_limit."""
         from apps.accounts.models import Organization
+        from apps.accounts.url_safety import UnsafeURLError, validate_outbound_url
         try:
             org = Organization.objects.get(pk=org_id, is_active=True)
         except Organization.DoesNotExist:
@@ -4318,9 +4318,21 @@ class AdminOrganizationDetailView(APIView):
         allowed = ("webhook_url", "webhook_secret", "logo_url", "primary_color", "custom_domain", "seat_limit", "notes", "billing_email")
         update_fields = []
         for field in allowed:
-            if field in request.data:
-                setattr(org, field, request.data[field])
-                update_fields.append(field)
+            if field not in request.data:
+                continue
+            value = request.data[field]
+            # Same SSRF gate as OrganizationSettingsView (org_views.py) — admin
+            # patch must not be a back door around validate_outbound_url (§S5).
+            if field == "webhook_url":
+                try:
+                    value = validate_outbound_url(value)
+                except UnsafeURLError as exc:
+                    return Response(
+                        {"error": f"Invalid webhook_url: {exc}"},
+                        status=400,
+                    )
+            setattr(org, field, value)
+            update_fields.append(field)
 
         if update_fields:
             org.save(update_fields=update_fields)

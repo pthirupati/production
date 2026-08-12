@@ -17,12 +17,10 @@ description: 'CONTEXT: A security review of the `production` namespace filed SEC
   finding came straight back. Business impact: anyone with a copy of an etcd snapshot, a backup tarball,
   or read access to the etcd data directory can recover the database password without any key material.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster. The architecture is a single
   lab-primary node exposing kubectl, the API server''s static manifests, and cluster resources; treat it
   as the production host for this incident. All tools run locally — no paid APIs or external cloud calls
   are required.
-
 
   SYMPTOM / STARTING STATE: Every pod in the cluster is Running and every Deployment is healthy. Nothing
   is crashing. `kubectl get secret db-credentials -n production -o yaml` shows a populated `data:` block
@@ -30,14 +28,12 @@ description: 'CONTEXT: A security review of the `production` namespace filed SEC
   reversible transport encoding with no key, and the API server is writing the decoded bytes into etcd
   under the `identity` provider because no `--encryption-provider-config` is set.
 
-
   OBJECTIVE: Prove the value is recoverable without a key; make `production/db-credentials` genuinely
   protected at rest by either enabling an encryption provider on the API server and re-encrypting the
   objects that already exist, or by moving the value out of etcd behind an External Secrets Operator
   ExternalSecret; keep the billing workload Running throughout. Acceptance criteria: the checker asserts
   the API server''s encryption provider configuration (or the ExternalSecret''s store reference) — it
   deliberately never inspects the encoding of the `data:` field, so re-encoding will not pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. First demonstrate the problem to yourself — decode the value and confirm no key
@@ -49,7 +45,6 @@ description: 'CONTEXT: A security review of the `production` namespace filed SEC
   materialises the Secret from the external store and the cleartext never lives in git or etcd. Make the
   smallest change that satisfies the objective, changing one thing at a time.
 
-
   VERIFY: Re-run the same check the grader uses. For Path A confirm the provider is active, that it
   covers `secrets`, and that the pre-existing object was rewritten — a provider enabled but never
   followed by a rewrite leaves old rows in plaintext, which is the single most common way this fix is
@@ -57,12 +52,10 @@ description: 'CONTEXT: A security review of the `production` namespace filed SEC
   store. Capture the before/after output as evidence. Success criteria: the objective''s healthy state
   holds on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (remove the
   EncryptionConfiguration and restore the API server''s original flags, or delete the ExternalSecret) and
   re-observe before trying another hypothesis. Never stack unverified changes — an API server that will
   not start because of a malformed encryption config takes the whole control plane with it.
-
 
   WHAT TO AVOID: Do not re-base64 the value and call it fixed — that is the exact misconception this lab
   exists to correct, and the checker is built so it cannot pass. Do not delete the Secret to make the
@@ -136,7 +129,6 @@ hints:
     1. Create an ExternalSecret with a `secretStoreRef` (e.g. vault-backend) and a `remoteRef` key whose
     target is `db-credentials`.
 
-
     WHY: the grader reads the API server''s provider configuration and the object''s at-rest state, or
     the ExternalSecret''s store reference. It never reads the `data:` encoding, so a re-encoded manifest
     cannot pass — only a structural change to where and how the value is stored will.'
@@ -152,7 +144,7 @@ tags:
 - hands-on
 - kubernetes
 - secrets
-linked_tutorial: kubernetes-fundamentals
+linked_tutorial: kubernetes-platform-zero-hero
 what_you_will_learn:
 - Demonstrate that the base64 data value is recoverable with no key material
 - Enable a real encryption provider for the secrets resource, or move the value behind an ExternalSecret

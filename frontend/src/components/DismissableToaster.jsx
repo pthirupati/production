@@ -1,5 +1,5 @@
 import { toast, Toaster, ToastBar } from 'react-hot-toast'
-import { X } from 'lucide-react'
+import { X } from '../ui/eagerIcons'
 
 export default function DismissableToaster() {
   return (

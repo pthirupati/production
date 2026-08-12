@@ -1,14 +1,35 @@
-import { useState } from 'react'
+import { cloneElement, isValidElement, useId, useState } from 'react'
+import { useModalA11y } from '../ConfirmModal'
 
 /* Shared modal chrome matching the dark vSphere theme. All text uses the
    light --vm-text / explicit hex tokens so nothing renders white-on-white. */
 function Modal({ title, onClose, children, footer, width = 'w-[440px]' }) {
+  // Keep vSphere chrome; borrow focus trap / Escape / focus restore from the
+  // shared hook (same pattern as MachinesTable / OnboardingTour).
+  const dialogRef = useModalA11y(true, onClose)
   return (
-    <div className="vm-modal-overlay">
-      <div className={`vm-modal ${width} max-w-[95vw]`}>
+    <div
+      className="vm-modal-overlay"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.() }}
+    >
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className={`vm-modal ${width} max-w-[95vw] outline-none`}
+      >
         <div className="vm-modal-header">
           <span>{title}</span>
-          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close dialog"
+            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white"
+          >
+            ✕
+          </button>
         </div>
         <div className="vm-modal-body space-y-3">{children}</div>
         <div className="vm-modal-footer">{footer}</div>
@@ -17,11 +38,17 @@ function Modal({ title, onClose, children, footer, width = 'w-[440px]' }) {
   )
 }
 
+/* The visible <label> already carries the vSphere wording learners are being
+   taught, so we bind it to the control with htmlFor/id rather than duplicating
+   it in an aria-label — a second, hand-written name is what drifts out of sync
+   with the emulated product. A caller-supplied id wins so nothing is clobbered. */
 function Field({ label, children }) {
+  const generatedId = useId()
+  const controlId = isValidElement(children) ? (children.props.id || generatedId) : undefined
   return (
     <div>
-      <label className="block text-xs text-[#8fa5b8] mb-1">{label}</label>
-      {children}
+      <label htmlFor={controlId} className="block text-xs text-[#8fa5b8] mb-1">{label}</label>
+      {isValidElement(children) ? cloneElement(children, { id: controlId }) : children}
     </div>
   )
 }

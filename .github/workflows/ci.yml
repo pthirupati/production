@@ -63,6 +63,14 @@ jobs:
       # is how SETUP_COMPLETE.md ended up tracked with 10 live credentials.
       - name: Check for leaked secrets in tracked files
         run: bash scripts/check-no-secrets-in-git.sh
+      - name: Verify no known-bad rotated secrets in CI env
+        # Detect-only (audit §S1). Does not rotate. Uses CI env which must not
+        # contain django-insecure- / guest:guest broker URLs.
+        run: python scripts/verify_secrets_rotated.py
+        env:
+          SECRET_KEY: ci-test-secret-key-not-for-production
+          DATABASE_URL: postgres://fixitlab:fixitlab@localhost:5432/fixitlab_test
+          REDIS_URL: redis://localhost:6379/0
       - name: Lint hero scenario YAML
         run: python scripts/lint_scenarios.py --strict-heroes
       - name: Lint full scenario catalog (no banned learner-facing words)

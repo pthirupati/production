@@ -5,38 +5,31 @@ description: 'CONTEXT: A team operating JavaScript has raised a ticket for `Fix 
   forEach`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project. The architecture is
   a single lab-primary node exposing modules, browser console, and Node tooling; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: runAll(tasks) should run each thunk and return an array of their results in
   order, but it uses `forEach(async ...)` — forEach ignores the returned promises, so the function returns
   undefined and nothing is collected. Each task here is SYNCHRONOUS (returns a value), so the fix is to
   collect results with map and return the array. The stub returns undefined.
 
-
   OBJECTIVE: See forEach swallow the per-item results; Collect each task''s result into an array; Return
   the results in input order. Acceptance criteria: the change is minimal and reversible, and success means
   all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant modules, browser console, and Node tooling), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -151,7 +144,6 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 technology: javascript
 summary: Complete the fix the sequential await inside foreach javascript lab and verify success with the
@@ -164,7 +156,7 @@ tags:
 - fix
 - hands-on
 - javascript
-linked_tutorial: javascript-fundamentals
+linked_tutorial: javascript-language-zero-hero
 what_you_will_learn:
 - See forEach swallow the per-item results
 - Collect each task's result into an array

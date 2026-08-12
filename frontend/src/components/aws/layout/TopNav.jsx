@@ -204,8 +204,8 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
 
   return (
     <div className="aws-topnav">
-      <button className="aws-topnav-btn" onClick={onToggleSidebar} title="Toggle navigation"><Menu size={18} /></button>
-      <button className="aws-topnav-btn" onClick={() => go(`${BASE}/console/home`)}><AwsLogo /></button>
+      <button type="button" className="aws-topnav-btn" onClick={onToggleSidebar} title="Toggle navigation" aria-label="Toggle navigation"><Menu size={18} /></button>
+      <button type="button" className="aws-topnav-btn" onClick={() => go(`${BASE}/console/home`)} title="AWS Console home" aria-label="AWS Console home"><AwsLogo /></button>
       <button className="aws-topnav-btn" onClick={() => setOpenMenu(openMenu === 'services' ? null : 'services')}>
         <Grid3x3 size={15} /> Services <ChevronDown size={13} />
       </button>
@@ -263,11 +263,11 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
       </div>
 
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-        <button className="aws-topnav-btn" onClick={onToggleCloudShell} title="CloudShell"><TerminalIcon size={16} /></button>
+        <button type="button" className="aws-topnav-btn" onClick={onToggleCloudShell} title="CloudShell" aria-label="CloudShell"><TerminalIcon size={16} /></button>
 
         {/* Notifications bell */}
         <div style={{ position: 'relative' }}>
-          <button className="aws-topnav-btn" title="Notifications" style={{ position: 'relative' }} onClick={() => setOpenMenu(openMenu === 'notifications' ? null : 'notifications')}>
+          <button type="button" className="aws-topnav-btn" title="Notifications" aria-label="Notifications" style={{ position: 'relative' }} onClick={() => setOpenMenu(openMenu === 'notifications' ? null : 'notifications')}>
             <Bell size={16} />
             {inAlarm > 0 && <span style={{ position: 'absolute', top: 2, right: 2, background: 'var(--aws-error)', color: '#fff', borderRadius: 8, fontSize: 9, padding: '0 4px' }}>{inAlarm}</span>}
           </button>
@@ -294,7 +294,7 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
           )}
         </div>
 
-        <button className="aws-topnav-btn" onClick={toggleDark} title="Toggle theme">{darkMode ? <Sun size={16} /> : <Moon size={16} />}</button>
+        <button type="button" className="aws-topnav-btn" onClick={toggleDark} title="Toggle theme" aria-label="Toggle theme">{darkMode ? <Sun size={16} /> : <Moon size={16} />}</button>
 
         {/* Region selector with filter + recently-used */}
         <div style={{ position: 'relative' }}>
@@ -364,7 +364,7 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
             </div>
           )}
         </div>
-        <button className="aws-topnav-btn" title="Settings" onClick={() => go(`${BASE}/console/settings`)}><Settings size={16} /></button>
+        <button type="button" className="aws-topnav-btn" title="Settings" aria-label="Settings" onClick={() => go(`${BASE}/console/settings`)}><Settings size={16} /></button>
       </div>
 
       {/* Favorites bar (below the top row) */}
@@ -392,7 +392,7 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
                 <Search size={15} style={{ position: 'absolute', left: 10, top: 9, color: 'var(--aws-text-muted)' }} />
                 <input className="aws-input" autoFocus style={{ paddingLeft: 30 }} placeholder="Search services" value={megaQuery} onChange={(e) => setMegaQuery(e.target.value)} />
               </div>
-              <button className="aws-copy-btn" onClick={close}><X size={18} /></button>
+              <button type="button" className="aws-copy-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" onClick={close} aria-label="Close services menu"><X size={18} /></button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 24 }}>
@@ -425,8 +425,11 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
                         return (
                           <div key={s.key} className="aws-mega-item" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0' }}>
                             <button
-                              className="aws-copy-btn"
+                              type="button"
+                              className="aws-copy-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
                               title={fav ? 'Remove from favorites' : 'Add to favorites'}
+                              aria-label={fav ? `Remove ${s.name} from favorites` : `Add ${s.name} to favorites`}
+                              aria-pressed={fav}
                               onClick={(e) => { e.stopPropagation(); toggleFavorite(s.key) }}
                             >
                               <Star size={14} fill={fav ? 'var(--aws-orange)' : 'none'} color={fav ? 'var(--aws-orange)' : 'var(--aws-text-muted)'} />

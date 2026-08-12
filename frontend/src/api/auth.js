@@ -18,12 +18,13 @@ export const authApi = {
     return data
   },
 
-  async register(email, password, phoneNumber, sessionToken, firstName, lastName) {
+  async register(email, password, phoneNumber, sessionToken, firstName, lastName, acceptedLegal = true) {
     const { data } = await api.post('/auth/register/', {
       email, password, phone_number: phoneNumber || '',
       session_token: sessionToken,
       first_name: firstName || '',
       last_name: lastName || '',
+      accepted_legal: Boolean(acceptedLegal),
     })
     useAuthStore.getState().setAuth(data.user, data.access, data.refresh)
     await rehydrateAwsSimForUser()
@@ -109,6 +110,11 @@ export const authApi = {
 
   async getProfile() {
     const { data } = await api.get('/auth/profile/')
+    return data
+  },
+
+  async acceptTerms() {
+    const { data } = await api.post('/auth/accept-terms/', {})
     return data
   },
 

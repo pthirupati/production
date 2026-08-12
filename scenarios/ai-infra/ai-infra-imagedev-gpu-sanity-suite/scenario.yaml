@@ -15,12 +15,9 @@ description: 'CONTEXT: ImageDev release gate — before publishing a Packer GPU 
   run the GPU sanity suite (deviceQuery, bandwidthTest, nvidia-smi -L, dcgmi diag -r 1).
   AI Infra Engineering owns ImageDev gates for H100/H200/B300/AMD fleets.
 
-
   ENVIRONMENT: Lab Terminal on a baked image / canary node. Packer + Bare Metal companions.
 
-
   SYMPTOM: Image built but sanity gate not run; MAAS publish blocked by ImageDev checklist.
-
 
   OBJECTIVE: Run gpu-sanity (or cuda-samples / deviceQuery + bandwidthTest + dcgmi diag);
   confirm ALL PASS; FIXED-OK.'

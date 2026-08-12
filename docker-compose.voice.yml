@@ -1,0 +1,49 @@
+# Optional self-hosted interview voice stack (audit Y1e / Y1f).
+# Not started by default — enable when GPU/CPU hosts have models mounted.
+#
+#   docker compose -f docker-compose.voice.yml --profile voice up -d
+#
+# Then point the app env at the published ports (see docs/ops/VOICE_STACK_DEPLOY.md).
+
+services:
+  piper:
+    image: rhasspy/wyoming-piper:latest
+    profiles: ["voice"]
+    ports:
+      - "10200:10200"
+    volumes:
+      - piper_voices:/data
+    environment:
+      PIPER_VOICE: en_US-lessac-medium
+    restart: unless-stopped
+
+  faster-whisper:
+    # OpenAI-compatible /v1/audio/transcriptions — set:
+    #   FIXITLAB_FASTER_WHISPER_URL=http://localhost:8001
+    #   FIXITLAB_FASTER_WHISPER_API=openai   # optional; auto when path has /v1/audio
+    image: fedirz/faster-whisper-server:latest-cpu
+    profiles: ["voice"]
+    ports:
+      - "8001:8000"
+    environment:
+      WHISPER_MODEL: small
+    restart: unless-stopped
+
+  # Indic TTS / ASR and LLM hosts are site-specific (GPU, licence, reference clips).
+  # Keep placeholders so operators know which ports the app expects.
+  # indicf5:
+  #   image: your-registry/indicf5-http:latest
+  #   profiles: ["voice"]
+  #   ports: ["8002:8000"]
+  # indic-whisper:
+  #   image: your-registry/indic-whisper-http:latest
+  #   profiles: ["voice"]
+  #   ports: ["8003:8000"]
+  # llm:
+  #   image: ghcr.io/ggerganov/llama.cpp:server
+  #   profiles: ["voice"]
+  #   ports: ["8080:8080"]
+  #   # FIXITLAB_LLM_GENERATE_URL=http://localhost:8080/v1/chat/completions
+
+volumes:
+  piper_voices:

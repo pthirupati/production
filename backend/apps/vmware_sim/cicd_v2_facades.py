@@ -28,6 +28,8 @@ def seed_v2() -> dict[str, Any]:
                 "target_revision": "main",
                 "auto_sync": True,
                 "last_sync": _now(),
+                "desired_digest": "sha256:prod-api-v1",
+                "live_digest": "sha256:prod-api-v1",
                 "resources": [
                     {"kind": "Deployment", "name": "api-server", "status": "Synced", "health": "Healthy"},
                     {"kind": "Service", "name": "api-server", "status": "Synced", "health": "Healthy"},
@@ -46,6 +48,8 @@ def seed_v2() -> dict[str, Any]:
                 "target_revision": "develop",
                 "auto_sync": False,
                 "last_sync": None,
+                "desired_digest": "sha256:staging-api-v2",
+                "live_digest": "sha256:staging-api-v1",
                 "resources": [
                     {"kind": "Deployment", "name": "api-server", "status": "OutOfSync", "health": "Healthy"},
                     {"kind": "Service", "name": "api-server", "status": "Synced", "health": "Healthy"},
@@ -173,6 +177,9 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         app = next((a for a in state.get("argo_apps") or [] if a.get("name") == name), None)
         if not app:
             return {"ok": False, "error": "Argo CD application not found"}
+        # GitOps heal: live catches up to desired digest written by CI.
+        if app.get("desired_digest"):
+            app["live_digest"] = app["desired_digest"]
         app["sync_status"] = "Synced"
         app["health"] = "Healthy"
         app["last_sync"] = _now()
@@ -180,6 +187,56 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
             r["status"] = "Synced"
             r["health"] = "Healthy"
         return {"ok": True, "message": f"Synced {name}", "app": app}
+
+    if action == "gitops_write_digest":
+        # Post-CI: write image digest into the manifest repo side of the app.
+        name = (payload.get("name") or "").strip()
+        digest = (payload.get("digest") or "").strip()
+        if not name or not digest:
+            return {"ok": False, "error": "name and digest required"}
+        app = next((a for a in state.get("argo_apps") or [] if a.get("name") == name), None)
+        if not app:
+            return {"ok": False, "error": "Argo CD application not found"}
+        app["desired_digest"] = digest
+        if app.get("live_digest") != digest:
+            app["sync_status"] = "OutOfSync"
+            for r in app.get("resources") or []:
+                if r.get("kind") == "Deployment":
+                    r["status"] = "OutOfSync"
+        # Mirror a CI Actions run when requested
+        gh = state.setdefault("github", {})
+        runs = gh.setdefault("actions_runs", [])
+        runs.insert(0, {
+            "id": f"run-{len(runs) + 1}",
+            "name": "build-and-push",
+            "status": "completed",
+            "conclusion": "success",
+            "digest": digest,
+            "at": _now(),
+        })
+        return {"ok": True, "message": f"Wrote digest to {name}", "app": app, "out_of_sync": app["sync_status"] == "OutOfSync"}
+
+    if action == "detect_drift":
+        name = (payload.get("name") or "").strip()
+        apps = state.get("argo_apps") or []
+        if name:
+            apps = [a for a in apps if a.get("name") == name]
+        drifted = []
+        for app in apps:
+            desired = app.get("desired_digest") or ""
+            live = app.get("live_digest") or ""
+            is_drift = bool(desired and live and desired != live)
+            if is_drift:
+                app["sync_status"] = "OutOfSync"
+                drifted.append({"name": app.get("name"), "desired": desired, "live": live})
+            elif desired and live and desired == live:
+                app["sync_status"] = "Synced"
+        return {
+            "ok": True,
+            "drifted": drifted,
+            "drift": bool(drifted),
+            "message": f"{len(drifted)} app(s) out of sync" if drifted else "No digest drift",
+        }
 
     if action == "argo_create_app":
         name = (payload.get("name") or f"app-{(len(state.get('argo_apps') or []) + 1)}").strip()

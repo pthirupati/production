@@ -1,8 +1,4 @@
-# Unpublished: this lab ships a bare `raise NotImplementedError` stub with no
-# starter code, no seeded fault and only a `placeholder` grader, so there is
-# nothing to diagnose and any trivial return earns XP. Set is_active: true
-# once it has real content and a grader that checks it (audit §G1).
-is_active: false
+is_active: true
 title: Fix replication lag on a replica
 slug: mysql-replication-lag
 technology: mysql
@@ -11,35 +7,28 @@ description: 'CONTEXT: A team operating MySQL has raised a ticket for `Fix repli
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline MySQL instance. The architecture is a single lab-primary
   node exposing mysql client, InnoDB, grants, and slow query log; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Replica is hours behind primary due to misconfigured parallel workers.
-
 
   OBJECTIVE: Understand the current failure mode affecting Fix replication lag on a replica; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant mysql client, InnoDB, grants, and slow query log), changing one thing at a time.
   Check your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -102,23 +91,63 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: Replica is hours behind primary due to misconfigured parallel workers.
+  instructions: 'A replica is hours behind because parallel apply workers are misconfigured. Fix solution(conn)
+    so it returns the worker count to configure: scale with the primary''s write concurrency but never
+    exceed the replica''s cpu_count, and never go below 1. Read write_concurrency and cpu_count from cfg(key,
+    value). A worker count of 0 means single-threaded apply, which is the bug - it must never be returned.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn):\n    # BUG: returns the configured value verbatim, including the 0 that\
+      \ pins\n    # the replica to single-threaded apply and causes the lag.\n    return conn.execute(\n\
+      \        \"SELECT value FROM cfg WHERE key='workers'\").fetchone()[0]\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert solution() is not None
+  - name: workers scale with write concurrency
+    code: "import sqlite3\ndef _seed(workers, write_concurrency, cpu_count):\n    conn = sqlite3.connect(':memory:')\n\
+      \    conn.executescript(\"CREATE TABLE cfg (key TEXT PRIMARY KEY, value INTEGER);\")\n    conn.executemany(\"\
+      INSERT INTO cfg VALUES (?,?)\", [\n        ('workers', workers), ('write_concurrency', write_concurrency),\n\
+      \        ('cpu_count', cpu_count)])\n    return conn\nconn = _seed(workers=0, write_concurrency=4,\
+      \ cpu_count=16)\nassert solution(conn) == 4, solution(conn)\n"
+  - name: cpu count is the ceiling
+    code: "import sqlite3\ndef _seed(workers, write_concurrency, cpu_count):\n    conn = sqlite3.connect(':memory:')\n\
+      \    conn.executescript(\"CREATE TABLE cfg (key TEXT PRIMARY KEY, value INTEGER);\")\n    conn.executemany(\"\
+      INSERT INTO cfg VALUES (?,?)\", [\n        ('workers', workers), ('write_concurrency', write_concurrency),\n\
+      \        ('cpu_count', cpu_count)])\n    return conn\nconn = _seed(workers=0, write_concurrency=64,\
+      \ cpu_count=8)\nassert solution(conn) == 8, solution(conn)\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert solution() is not None
+  - name: never returns zero
+    code: "import sqlite3\ndef _seed(workers, write_concurrency, cpu_count):\n    conn = sqlite3.connect(':memory:')\n\
+      \    conn.executescript(\"CREATE TABLE cfg (key TEXT PRIMARY KEY, value INTEGER);\")\n    conn.executemany(\"\
+      INSERT INTO cfg VALUES (?,?)\", [\n        ('workers', workers), ('write_concurrency', write_concurrency),\n\
+      \        ('cpu_count', cpu_count)])\n    return conn\nconn = _seed(workers=0, write_concurrency=0,\
+      \ cpu_count=8)\nassert solution(conn) == 1, solution(conn)\n"
+  - name: single cpu replica gets one worker
+    code: "import sqlite3\ndef _seed(workers, write_concurrency, cpu_count):\n    conn = sqlite3.connect(':memory:')\n\
+      \    conn.executescript(\"CREATE TABLE cfg (key TEXT PRIMARY KEY, value INTEGER);\")\n    conn.executemany(\"\
+      INSERT INTO cfg VALUES (?,?)\", [\n        ('workers', workers), ('write_concurrency', write_concurrency),\n\
+      \        ('cpu_count', cpu_count)])\n    return conn\nconn = _seed(workers=0, write_concurrency=32,\
+      \ cpu_count=1)\nassert solution(conn) == 1, solution(conn)\n"
+  - name: stored workers value is not trusted
+    code: "import sqlite3\ndef _seed(workers, write_concurrency, cpu_count):\n    conn = sqlite3.connect(':memory:')\n\
+      \    conn.executescript(\"CREATE TABLE cfg (key TEXT PRIMARY KEY, value INTEGER);\")\n    conn.executemany(\"\
+      INSERT INTO cfg VALUES (?,?)\", [\n        ('workers', workers), ('write_concurrency', write_concurrency),\n\
+      \        ('cpu_count', cpu_count)])\n    return conn\nconn = _seed(workers=99, write_concurrency=2,\
+      \ cpu_count=8)\nassert solution(conn) == 2, solution(conn)\n"
+  - name: result is always at least one
+    code: "import sqlite3\ndef _seed(workers, write_concurrency, cpu_count):\n    conn = sqlite3.connect(':memory:')\n\
+      \    conn.executescript(\"CREATE TABLE cfg (key TEXT PRIMARY KEY, value INTEGER);\")\n    conn.executemany(\"\
+      INSERT INTO cfg VALUES (?,?)\", [\n        ('workers', workers), ('write_concurrency', write_concurrency),\n\
+      \        ('cpu_count', cpu_count)])\n    return conn\nconn = _seed(workers=0, write_concurrency=0,\
+      \ cpu_count=0)\nassert solution(conn) >= 1, solution(conn)\n"
   timeout: 8
 summary: Complete the fix replication lag on a replica mysql lab and verify success with the checker
 estimated_minutes: 20
@@ -129,7 +158,7 @@ tags:
 - fix
 - hands-on
 - mysql
-linked_tutorial: mysql-fundamentals
+linked_tutorial: mysql-dba-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Fix replication lag on a replica
 - Restore expected service behavior with a minimal, documented change

@@ -304,7 +304,9 @@ REST_FRAMEWORK = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "FixitLab API",
-    "DESCRIPTION": "Public REST API for scenarios, labs, billing, and progress.",
+    # Internal browser BFF (JWT/cookie), not a public partner API — schema is
+    # IsAdminUser. Full apps/public_api → apps/bff rename stays a separate cut.
+    "DESCRIPTION": "FixitLab browser BFF for scenarios, labs, billing, and progress.",
     "VERSION": "2.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
@@ -654,10 +656,19 @@ MAX_CONCURRENT_LABS = env.int("MAX_CONCURRENT_LABS", default=12)
 LEGAL_TERMS_VERSION = env("LEGAL_TERMS_VERSION", default="2026-06-05")
 LEGAL_PRIVACY_VERSION = env("LEGAL_PRIVACY_VERSION", default="2026-08-08")
 
+# Bearer token for GET /api/health/metrics/ (audit Z5-17). Empty → endpoint
+# returns 404 so an unconfigured node does not publish gauges publicly.
+METRICS_TOKEN = env("METRICS_TOKEN", default="")
+
 RETENTION_INTERVIEW_MESSAGE_DAYS = env.int("RETENTION_INTERVIEW_MESSAGE_DAYS", default=0)
 RETENTION_ASYNC_VIDEO_DAYS = env.int("RETENTION_ASYNC_VIDEO_DAYS", default=0)
 RETENTION_RESUME_DAYS = env.int("RETENTION_RESUME_DAYS", default=0)
 RETENTION_COMMAND_HISTORY_DAYS = env.int("RETENTION_COMMAND_HISTORY_DAYS", default=0)
+# Post-deletion AccountLifecycleEvent.email (audit Z4-12 leftover). Basis: short
+# anti-abuse memory after inactive-account cleanup so a deleted address cannot
+# immediately re-register as a "new" free user. Same 0 = report-only discipline —
+# set RETENTION_ACCOUNT_LIFECYCLE_DAYS once volumes are known (90–365 is typical).
+RETENTION_ACCOUNT_LIFECYCLE_DAYS = env.int("RETENTION_ACCOUNT_LIFECYCLE_DAYS", default=0)
 
 # Operational growth caps (audit Z5-8). Same 0 = REPORT ONLY discipline as the
 # privacy retention above: the nightly task counts what it *would* remove against a
@@ -773,14 +784,24 @@ DO_SIZE = env("DO_SIZE", default="s-1vcpu-1gb")
 
 # --------------------------------------------------
 # AI Interview Studio (100% free — browser voice + rule-based AI)
+# Simulation-first, same product pattern as JIRA_SIMULATION_MODE / lab sims:
+# browser SpeechSynthesis / SpeechRecognition + in-process LLM phrasing are
+# the default. Real Piper / IndicF5 / whisper / llama.cpp hosts are optional
+# overrides when FIXITLAB_*_URL / BIN env vars are set.
 # --------------------------------------------------
 INTERVIEW_ENABLED = env.bool("INTERVIEW_ENABLED", default=True)
 INTERVIEW_VOICE_ENGINE = env("INTERVIEW_VOICE_ENGINE", default="browser")
+INTERVIEW_VOICE_SIMULATION_MODE = env.bool("INTERVIEW_VOICE_SIMULATION_MODE", default=True)
+INTERVIEW_LLM_SIMULATION_MODE = env.bool("INTERVIEW_LLM_SIMULATION_MODE", default=True)
 INTERVIEW_AV_GRACE_SECONDS = env.int("INTERVIEW_AV_GRACE_SECONDS", default=300)
 INTERVIEW_ROUND_SCHEDULE_HOURS = env.int("INTERVIEW_ROUND_SCHEDULE_HOURS", default=48)
 INTERVIEW_STAFF_FREE_BY_DEFAULT = env.bool("INTERVIEW_STAFF_FREE_BY_DEFAULT", default=True)
 INTERVIEW_ALLOW_ADMIN_OBSERVER = env.bool("INTERVIEW_ALLOW_ADMIN_OBSERVER", default=True)
 INTERVIEW_FREE_CAMPAIGNS_PER_MONTH = env.int("INTERVIEW_FREE_CAMPAIGNS_PER_MONTH", default=1)
+# Lifetime free-tier campaigns per account (Z1-12). Monthly quota still applies;
+# this stops infinite month-over-month free use on one user. New-email abuse
+# still needs fingerprinting / payment instrument — out of scope here.
+INTERVIEW_FREE_CAMPAIGNS_LIFETIME = env.int("INTERVIEW_FREE_CAMPAIGNS_LIFETIME", default=3)
 
 # Marketing nurture emails (sample → subscribe, no-sub → technology benefits)
 MARKETING_EMAILS_ENABLED = env.bool("MARKETING_EMAILS_ENABLED", default=True)

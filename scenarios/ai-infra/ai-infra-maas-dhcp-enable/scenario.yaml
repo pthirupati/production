@@ -15,14 +15,11 @@ description: 'CONTEXT: Bare Metal / AI Infra — a new GPU node was racked and c
   but commissioning never starts: MAAS never sees a DHCP request from the node because DHCP is disabled
   on that VLAN.
 
-
   ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin (rack view shows the node''s link/power
   LEDs).
 
-
   SYMPTOM: The node stays New with no commissioning log entries; the PXE VLAN in MAAS Networking shows
   DHCP disabled, so the node''s DHCP DISCOVER never gets an OFFER and PXE never reaches TFTP.
-
 
   OBJECTIVE: In MAAS Networking/Subnets, enable DHCP on the PXE VLAN with the rack controller providing
   it; Commission the New node and confirm the DHCP DISCOVER → OFFER → ACK sequence on Lab Terminal; confirm

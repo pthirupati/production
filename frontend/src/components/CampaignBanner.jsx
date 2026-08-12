@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Sparkles, ArrowRight } from 'lucide-react'
+import { X, Sparkles, ArrowRight } from '../ui/eagerIcons'
 import api from '../api/client'
 import { resolveMediaUrl } from '../utils/mediaUrl'
 import { currentUserScopedKey, migrateUnscopedKey } from '../utils/userScopedStorage'

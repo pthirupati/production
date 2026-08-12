@@ -634,3 +634,266 @@ class K8sGpuOperatorTests(SimpleTestCase):
         c.enable_gpu_device_plugin()
         self.assertTrue(c.is_healthy())
         self.assertEqual(c.find_node("gpu-worker-1").gpu_allocatable, 8)
+
+
+# ---------------------------------------------------------------------------
+# kubectl taint / GPU partitioning / node autoscaling reachable from the terminal
+# ---------------------------------------------------------------------------
+
+GPU_COLUMNS = (
+    "kubectl get nodes -o custom-columns="
+    "NAME:.metadata.name,GPU:.status.allocatable.nvidia\\.com/gpu"
+)
+
+
+def _gpu_sim():
+    """GPU scenario with the device plugin already repaired (8 allocatable)."""
+    sim = UnifiedSimulationEngine(
+        scenario_slug="ai-infra-k8s-gpu-operator", simulation_type="baremetal",
+    )
+    sim.cluster.enable_gpu_device_plugin()
+    return sim
+
+
+class K8sTaintCommandTests(SimpleTestCase):
+    def test_taint_add_remove_and_describe(self):
+        sim = _gpu_sim()
+        self.assertEqual(
+            sim.shell.run("kubectl taint nodes gpu-worker-1 dedicated=ml:NoSchedule"),
+            "node/gpu-worker-1 tainted",
+        )
+        self.assertIn("dedicated=ml:NoSchedule",
+                      sim.shell.run("kubectl describe node gpu-worker-1"))
+        self.assertEqual(
+            sim.shell.run("kubectl taint nodes gpu-worker-1 dedicated:NoSchedule-"),
+            "node/gpu-worker-1 untainted",
+        )
+        self.assertEqual(sim.cluster.find_node("gpu-worker-1").taints, [])
+
+    def test_taint_bare_key_removal_clears_every_effect(self):
+        sim = _gpu_sim()
+        sim.shell.run("kubectl taint nodes gpu-worker-1 dedicated=ml:NoSchedule")
+        sim.shell.run("kubectl taint nodes gpu-worker-1 dedicated=ml:PreferNoSchedule")
+        self.assertEqual(len(sim.cluster.find_node("gpu-worker-1").taints), 2)
+        sim.shell.run("kubectl taint nodes gpu-worker-1 dedicated-")
+        self.assertEqual(sim.cluster.find_node("gpu-worker-1").taints, [])
+
+    def test_taint_duplicate_needs_overwrite(self):
+        sim = _gpu_sim()
+        cmd = "kubectl taint nodes gpu-worker-1 dedicated=ml:NoSchedule"
+        sim.shell.run(cmd)
+        self.assertIn("--overwrite is false", sim.shell.run(cmd))
+        self.assertEqual(sim.shell.run(cmd + " --overwrite"), "node/gpu-worker-1 tainted")
+        # --overwrite before the spec must not swallow it.
+        self.assertEqual(
+            sim.shell.run("kubectl taint nodes gpu-worker-1 --overwrite dedicated=ml:NoSchedule"),
+            "node/gpu-worker-1 tainted",
+        )
+        self.assertEqual(len(sim.cluster.find_node("gpu-worker-1").taints), 1)
+
+    def test_taint_rejects_bad_node_and_effect(self):
+        sim = _gpu_sim()
+        self.assertIn("not found",
+                      sim.shell.run("kubectl taint nodes nope k=v:NoSchedule"))
+        self.assertIn("unsupported taint effect",
+                      sim.shell.run("kubectl taint nodes gpu-worker-1 k=v:Bogus"))
+        self.assertIn("not found on node",
+                      sim.shell.run("kubectl taint nodes gpu-worker-1 absent:NoSchedule-"))
+
+    def test_taint_verb_is_registered(self):
+        """Regression: `taint` used to fall through to the unknown-command error."""
+        self.assertNotIn(
+            "unknown command",
+            _gpu_sim().shell.run("kubectl taint nodes gpu-worker-1 a=b:NoSchedule"),
+        )
+
+
+class K8sTolerationManifestTests(SimpleTestCase):
+    GPU_POD = (
+        "apiVersion: v1\n"
+        "kind: Pod\n"
+        "metadata:\n"
+        "  name: trainer\n"
+        "spec:\n"
+        "  containers:\n"
+        "  - name: cuda\n"
+        "    image: nvcr.io/nvidia/pytorch:24.01\n"
+        "    resources:\n"
+        "      limits:\n"
+        "        nvidia.com/gpu: 4\n"
+        "  tolerations:\n"
+        "  - key: \"nvidia.com/gpu\"\n"
+        "    operator: \"Equal\"\n"
+        "    value: \"present\"\n"
+        "    effect: \"NoSchedule\"\n"
+    )
+
+    def _apply(self, sim, name, manifest):
+        sim.shell.state.write_file(f"/tmp/{name}.yaml", manifest)
+        return sim.shell.run(f"kubectl apply -f /tmp/{name}.yaml")
+
+    def test_manifest_populates_tolerations_and_gpu_request(self):
+        sim = _gpu_sim()
+        self._apply(sim, "trainer", self.GPU_POD)
+        pod = sim.cluster.find_pod("trainer")
+        self.assertEqual(pod.tolerations, [("nvidia.com/gpu", "present", "NoSchedule")])
+        self.assertEqual(pod.gpu_request, 4)
+        self.assertEqual(pod.gpu_resource, "nvidia.com/gpu")
+
+    def test_operator_exists_drops_the_value(self):
+        sim = _gpu_sim()
+        self._apply(sim, "any", self.GPU_POD.replace(
+            "    operator: \"Equal\"\n    value: \"present\"\n", "    operator: Exists\n"))
+        self.assertEqual(sim.cluster.find_pod("trainer").tolerations,
+                         [("nvidia.com/gpu", "", "NoSchedule")])
+
+    def test_tolerating_pod_schedules_onto_a_tainted_node(self):
+        sim = _gpu_sim()
+        sim.shell.run("kubectl taint nodes gpu-worker-1 nvidia.com/gpu=present:NoSchedule")
+        self._apply(sim, "trainer", self.GPU_POD)
+        pod = sim.cluster.find_pod("trainer")
+        self.assertEqual(pod.status, "Running")
+        self.assertEqual(pod.node, "gpu-worker-1")
+
+    def test_untolerated_pod_stays_pending_with_a_real_reason(self):
+        sim = _gpu_sim()
+        sim.shell.run("kubectl taint nodes gpu-worker-1 nvidia.com/gpu=present:NoSchedule")
+        self._apply(sim, "plain", self.GPU_POD.replace("trainer", "plain").split("  tolerations:")[0])
+        self.assertEqual(sim.cluster.find_pod("plain").status, "Pending")
+        self.assertIn("untolerated taint", sim.shell.run("kubectl describe pod plain"))
+
+    def test_noexecute_evicts_then_untaint_reschedules(self):
+        sim = _gpu_sim()
+        self._apply(sim, "trainer", self.GPU_POD)
+        self.assertEqual(sim.cluster.find_pod("trainer").status, "Running")
+        sim.shell.run("kubectl taint nodes gpu-worker-1 maint=true:NoExecute")
+        self.assertEqual(sim.cluster.find_pod("trainer").status, "Pending")
+        sim.shell.run("kubectl taint nodes gpu-worker-1 maint:NoExecute-")
+        self.assertEqual(sim.cluster.find_pod("trainer").status, "Running")
+
+
+class K8sGpuPartitioningCommandTests(SimpleTestCase):
+    def test_mig_profile_via_node_label(self):
+        sim = _gpu_sim()
+        out = sim.shell.run("kubectl label node gpu-worker-1 nvidia.com/mig.config=1g.10gb")
+        self.assertIn("1g.10gb", out)
+        self.assertRegex(sim.shell.run(GPU_COLUMNS), r"gpu-worker-1\s+56")
+        # gpu_allocatable stays the PHYSICAL count; expansion lives in advertised_gpu.
+        self.assertEqual(sim.cluster.find_node("gpu-worker-1").gpu_allocatable, 8)
+
+    def test_mig_profile_cleared_by_label_removal(self):
+        sim = _gpu_sim()
+        sim.shell.run("kubectl label node gpu-worker-1 nvidia.com/mig.config=1g.10gb")
+        sim.shell.run("kubectl label node gpu-worker-1 nvidia.com/mig.config-")
+        self.assertEqual(sim.cluster.find_node("gpu-worker-1").mig_profile, "")
+        self.assertRegex(sim.shell.run(GPU_COLUMNS), r"gpu-worker-1\s+8")
+
+    def test_unsupported_mig_profile_is_rejected(self):
+        sim = _gpu_sim()
+        self.assertIn("unsupported MIG profile", sim.shell.run(
+            "kubectl label node gpu-worker-1 nvidia.com/mig.config=9g.99gb"))
+        self.assertEqual(sim.cluster.find_node("gpu-worker-1").mig_profile, "")
+
+    def test_time_slicing_via_node_label(self):
+        sim = _gpu_sim()
+        sim.shell.run("kubectl label node gpu-worker-1 nvidia.com/gpu.replicas=4")
+        self.assertEqual(sim.cluster.find_node("gpu-worker-1").gpu_time_slicing_replicas, 4)
+        self.assertRegex(sim.shell.run(GPU_COLUMNS), r"gpu-worker-1\s+32")
+
+    def test_ordinary_node_labels_still_use_the_generic_path(self):
+        sim = _gpu_sim()
+        self.assertEqual(sim.shell.run("kubectl label node gpu-worker-1 tier=gpu"),
+                         "node/gpu-worker-1 labeled")
+        self.assertEqual(sim.cluster.find_node("gpu-worker-1").labels["tier"], "gpu")
+
+    def test_mig_configmap_apply(self):
+        sim = _gpu_sim()
+        sim.shell.state.write_file("/tmp/mig.yaml",
+            "apiVersion: v1\n"
+            "kind: ConfigMap\n"
+            "metadata:\n"
+            "  name: mig-parted-config\n"
+            "  namespace: gpu-operator\n"
+            "data:\n"
+            "  nvidia.com/mig.config: 2g.10gb\n")
+        sim.shell.run("kubectl apply -f /tmp/mig.yaml")
+        self.assertEqual(sim.cluster.find_node("gpu-worker-1").mig_profile, "2g.10gb")
+        self.assertRegex(sim.shell.run(GPU_COLUMNS), r"gpu-worker-1\s+24")
+
+    def test_nested_time_slicing_configmap_apply(self):
+        sim = _gpu_sim()
+        sim.shell.state.write_file("/tmp/ts.yaml",
+            "apiVersion: v1\n"
+            "kind: ConfigMap\n"
+            "metadata:\n"
+            "  name: time-slicing-config\n"
+            "  namespace: gpu-operator\n"
+            "data:\n"
+            "  any: |-\n"
+            "    version: v1\n"
+            "    sharing:\n"
+            "      timeSlicing:\n"
+            "        resources:\n"
+            "        - name: nvidia.com/gpu\n"
+            "          replicas: 4\n")
+        sim.shell.run("kubectl apply -f /tmp/ts.yaml")
+        self.assertEqual(sim.cluster.find_node("gpu-worker-1").gpu_time_slicing_replicas, 4)
+        self.assertRegex(sim.shell.run(GPU_COLUMNS), r"gpu-worker-1\s+32")
+
+    def test_mig_and_time_slicing_multiply(self):
+        sim = _gpu_sim()
+        sim.shell.run("kubectl label node gpu-worker-1 nvidia.com/mig.config=2g.10gb")
+        sim.shell.run("kubectl label node gpu-worker-1 nvidia.com/gpu.replicas=4")
+        self.assertRegex(sim.shell.run(GPU_COLUMNS), r"gpu-worker-1\s+96")
+        self.assertEqual(sim.cluster.find_node("gpu-worker-1").gpu_allocatable, 8)
+
+
+class K8sClusterAutoscalerCommandTests(SimpleTestCase):
+    MANIFEST = (
+        "apiVersion: apps/v1\n"
+        "kind: Deployment\n"
+        "metadata:\n"
+        "  name: cluster-autoscaler\n"
+        "  namespace: kube-system\n"
+        "spec:\n"
+        "  replicas: 1\n"
+        "  template:\n"
+        "    spec:\n"
+        "      containers:\n"
+        "      - name: cluster-autoscaler\n"
+        "        image: registry.k8s.io/autoscaling/cluster-autoscaler:v1.28.2\n"
+        "        command:\n"
+        "        - ./cluster-autoscaler\n"
+        "        - --nodes=1:4:worker-pool\n"
+    )
+
+    def _sim_with_autoscaler(self):
+        sim = _k8s_sim("sim-k8s-crashloop")
+        sim.shell.state.write_file("/tmp/ca.yaml", self.MANIFEST)
+        return sim, sim.shell.run("kubectl apply -f /tmp/ca.yaml")
+
+    def test_manifest_enables_the_autoscaler_with_its_bounds(self):
+        sim, out = self._sim_with_autoscaler()
+        self.assertIn("cluster-autoscaler enabled (min=1, max=4)", out)
+        self.assertEqual(sim.cluster._autoscaler["min"], 1)
+        self.assertEqual(sim.cluster._autoscaler["max"], 4)
+
+    def test_unschedulable_pods_provoke_a_node_scale_up(self):
+        sim, _ = self._sim_with_autoscaler()
+        before = len(sim.cluster.nodes)
+        sim.shell.run("kubectl taint nodes worker-1 dedicated=infra:NoExecute")
+        self.assertGreater(len(sim.cluster.nodes), before)
+        self.assertIsNotNone(sim.cluster.find_node("worker-2"))
+
+    def test_autoscaler_respects_max_nodes(self):
+        sim, _ = self._sim_with_autoscaler()
+        for i in range(6):
+            sim.shell.run(f"kubectl taint nodes worker-1 t{i}=x:NoExecute")
+        workers = [n for n in sim.cluster.nodes if "control-plane" not in n.roles]
+        self.assertLessEqual(len(workers), 4)
+
+    def test_autoscaler_stays_off_until_enabled(self):
+        sim = _k8s_sim("sim-k8s-crashloop")
+        before = len(sim.cluster.nodes)
+        sim.shell.run("kubectl taint nodes worker-1 dedicated=infra:NoExecute")
+        self.assertEqual(len(sim.cluster.nodes), before)

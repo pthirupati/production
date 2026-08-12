@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { RotateCcw } from '../../ui/eagerIcons'
 import { adminApi } from '../../api/admin'
 
 export default function AdminTopbar() {

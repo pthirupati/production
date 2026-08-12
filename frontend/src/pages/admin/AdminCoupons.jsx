@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
-import { Plus, Edit2, Trash2, X, Save, Tag, Percent } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Save } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function AdminCoupons() {

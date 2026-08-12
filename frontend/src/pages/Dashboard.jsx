@@ -90,8 +90,9 @@ function OnboardingChecklist({ subscriptions, progress, jiraTickets, interviewEn
           </div>
         </div>
         <button
+          type="button"
           onClick={handleDismiss}
-          className="p-1.5 rounded-lg text-surface-500 hover:text-surface-300 hover:bg-surface-800/60 transition-all"
+          className="p-1.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-surface-500 hover:text-surface-300 hover:bg-surface-800/60 transition-all"
           aria-label="Dismiss checklist"
         >
           <X size={16} />
@@ -173,6 +174,7 @@ export default function Dashboard() {
     // starts a duplicate) and a subscription fetch degrading to "no subscription"
     // (a paying user looks free). Only getProgress ever set loadError before.
     let active = true
+    const notifController = new AbortController()
     // One dynamic import shared by both interview calls. Kept lazy (the studio
     // is a heavy chunk) but resolved once, so the two consumers below can't
     // race two separate module evaluations.
@@ -184,7 +186,7 @@ export default function Dashboard() {
       subscriptionApi.getMySubscriptions(),
       jiraApi.getUserTickets(),
       scenarioApi.getBookmarks(),
-      api.get('/notifications/', { silentError: true }),
+      api.get('/notifications/', { silentError: true, signal: notifController.signal }),
       interviewsMod.then(m => m.interviewsApi.getEntitlement()),
       tutorialApi.list(),
       isAuthenticated ? tutorialApi.getContinue() : Promise.resolve([]),
@@ -261,13 +263,16 @@ export default function Dashboard() {
         continueItems.filter((i) => !i.completed && (i.progress_pct ?? 0) < 100).slice(0, 4),
       )
     }).finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
+    return () => {
+      active = false
+      notifController.abort()
+    }
   }, [isAuthenticated])
 
   const handleCancelSubscription = async (sub) => {
     setCancelling(true)
     try {
-      const res = await subscriptionApi.cancelSubscription(sub.subscription_id)
+      await subscriptionApi.cancelSubscription(sub.subscription_id)
       // Still active — access runs to the end of the paid term (audit Z1-11).
       // Marking it inactive here would grey out a subscription the customer can
       // still use, which is the same lie the old backend told.
@@ -518,8 +523,6 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            {/* No link for capstone projects — the SPA has no /projects/<slug>
-                route, so the backend sends link=null rather than a dead link. */}
             {journeyStep.next_step.link ? (
               <Link to={journeyStep.next_step.link} className="btn-secondary text-xs px-3 py-1.5 shrink-0">
                 Resume
@@ -991,7 +994,7 @@ export default function Dashboard() {
       )}
 
       <div className="flex flex-wrap gap-3">
-        <Link to="/technologies" className="btn-primary flex items-center gap-2"><Target size={16} /> Browse Technologies</Link>
+        <Link to="/technologies" className="btn-secondary flex items-center gap-2"><Target size={16} /> Browse Technologies</Link>
         <Link to="/scenarios" className="btn-secondary flex items-center gap-2"><Target size={16} /> All Scenarios</Link>
         <Link to="/leaderboard" className="btn-secondary flex items-center gap-2"><Trophy size={16} /> Leaderboard</Link>
       </div>

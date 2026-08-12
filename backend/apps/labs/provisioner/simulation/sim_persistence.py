@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import logging
+import time
 from dataclasses import asdict
 
 from .boot_sequence import BootState
-from .rhel_os import RHELOSState, SimProcess, SimService, SimUser
+from .rhel_os import RHELOSState, SimGPU, SimProcess, SimService, SimUser
 from .unified_sim import UnifiedSimulationEngine
 
 
+logger = logging.getLogger(__name__)
 SNAPSHOT_VERSION = 1
 
 
@@ -58,6 +61,8 @@ def snapshot_engine(engine: UnifiedSimulationEngine) -> dict:
     lvm = st.lvm
     return {
         "version": SNAPSHOT_VERSION,
+        # Monotonic wall clock for cross-worker cache authority (audit Z5-1).
+        "mutated_at": time.time(),
         "scenario_slug": engine.scenario_slug,
         "simulation_type": engine.simulation_type,
         "hostname": st.hostname,
@@ -82,6 +87,50 @@ def snapshot_engine(engine: UnifiedSimulationEngine) -> dict:
         "env": st.env,
         "dmesg_extra": list(st.dmesg_extra),
         "gpu_healthy": st.gpu_healthy,
+        "gpus": [
+            {
+                "index": g.index,
+                "name": g.name,
+                "uuid": g.uuid,
+                "sku": getattr(g, "sku", ""),
+                "pci_bus_id": getattr(g, "pci_bus_id", ""),
+                "healthy": g.healthy,
+                "memory_total_mib": g.memory_total_mib,
+                "memory_used_mib": g.memory_used_mib,
+                "temp_c": getattr(g, "temp_c", 32),
+                "mem_temp_c": getattr(g, "mem_temp_c", 38),
+                "power_w": getattr(g, "power_w", 70.0),
+                "power_cap_w": getattr(g, "power_cap_w", 300),
+                "util_gpu": getattr(g, "util_gpu", 0),
+                "util_mem": getattr(g, "util_mem", 0),
+                "sm_clock": getattr(g, "sm_clock", 1410),
+                "mem_clock": getattr(g, "mem_clock", 1593),
+                "graphics_clock": getattr(g, "graphics_clock", 1410),
+                "persistence_mode": getattr(g, "persistence_mode", True),
+                "ecc_mode": getattr(g, "ecc_mode", "Enabled"),
+                "ecc_volatile_corrected": getattr(g, "ecc_volatile_corrected", 0),
+                "ecc_volatile_uncorrected": getattr(g, "ecc_volatile_uncorrected", 0),
+                "ecc_aggregate_corrected": getattr(g, "ecc_aggregate_corrected", 0),
+                "ecc_aggregate_uncorrected": getattr(g, "ecc_aggregate_uncorrected", 0),
+                "retired_pages_sbe": getattr(g, "retired_pages_sbe", 0),
+                "retired_pages_dbe": getattr(g, "retired_pages_dbe", 0),
+                "retired_pages_pending": getattr(g, "retired_pages_pending", False),
+                "remap_pending": getattr(g, "remap_pending", False),
+                "remap_failure": getattr(g, "remap_failure", False),
+                "throttle_reasons": list(getattr(g, "throttle_reasons", None) or []),
+                "xid_events": list(getattr(g, "xid_events", None) or []),
+                "mig_mode": getattr(g, "mig_mode", False),
+                "mig_instances": list(getattr(g, "mig_instances", None) or []),
+                "nvlink_links": list(getattr(g, "nvlink_links", None) or []),
+                "diag_pcie_fail": getattr(g, "diag_pcie_fail", False),
+                "diag_memory_fail": getattr(g, "diag_memory_fail", False),
+                "diag_bandwidth_fail": getattr(g, "diag_bandwidth_fail", False),
+                "diag_stress_fail": getattr(g, "diag_stress_fail", False),
+                "diag_power_fail": getattr(g, "diag_power_fail", False),
+                "oom": getattr(g, "oom", False),
+            }
+            for g in (getattr(st, "gpus", None) or [])
+        ],
         "initramfs_fixed": st.initramfs_fixed,
         "grub_fixed": st.grub_fixed,
         "mbr_fixed": st.mbr_fixed,
@@ -193,7 +242,58 @@ def restore_engine(data: dict) -> UnifiedSimulationEngine | None:
         merged = dict(st.installed_binaries); merged.update(data["installed_binaries"]); st.installed_binaries = merged
     st.env = data.get("env", st.env)
     st.dmesg_extra = list(data.get("dmesg_extra", []))
-    st.gpu_healthy = data.get("gpu_healthy", True)
+    # Prefer full per-GPU inventory when present; fall back to the aggregate flag.
+    raw_gpus = data.get("gpus")
+    if isinstance(raw_gpus, list) and raw_gpus:
+        restored = []
+        for row in raw_gpus:
+            if not isinstance(row, dict):
+                continue
+            restored.append(SimGPU(
+                index=int(row.get("index", 0)),
+                name=row.get("name", "NVIDIA L4"),
+                uuid=row.get("uuid", "GPU-00000000-0000-0000-0000-000000000001"),
+                sku=row.get("sku", "l4"),
+                pci_bus_id=row.get("pci_bus_id", "00000000:01:00.0"),
+                healthy=bool(row.get("healthy", True)),
+                memory_total_mib=int(row.get("memory_total_mib", 23034)),
+                memory_used_mib=int(row.get("memory_used_mib", 0)),
+                temp_c=int(row.get("temp_c", 32)),
+                mem_temp_c=int(row.get("mem_temp_c", 38)),
+                power_w=float(row.get("power_w", 70.0)),
+                power_cap_w=int(row.get("power_cap_w", 300)),
+                util_gpu=int(row.get("util_gpu", 0)),
+                util_mem=int(row.get("util_mem", 0)),
+                sm_clock=int(row.get("sm_clock", 1410)),
+                mem_clock=int(row.get("mem_clock", 1593)),
+                graphics_clock=int(row.get("graphics_clock", 1410)),
+                persistence_mode=bool(row.get("persistence_mode", True)),
+                ecc_mode=row.get("ecc_mode", "Enabled"),
+                ecc_volatile_corrected=int(row.get("ecc_volatile_corrected", 0)),
+                ecc_volatile_uncorrected=int(row.get("ecc_volatile_uncorrected", 0)),
+                ecc_aggregate_corrected=int(row.get("ecc_aggregate_corrected", 0)),
+                ecc_aggregate_uncorrected=int(row.get("ecc_aggregate_uncorrected", 0)),
+                retired_pages_sbe=int(row.get("retired_pages_sbe", 0)),
+                retired_pages_dbe=int(row.get("retired_pages_dbe", 0)),
+                retired_pages_pending=bool(row.get("retired_pages_pending", False)),
+                remap_pending=bool(row.get("remap_pending", False)),
+                remap_failure=bool(row.get("remap_failure", False)),
+                throttle_reasons=list(row.get("throttle_reasons") or []),
+                xid_events=list(row.get("xid_events") or []),
+                mig_mode=bool(row.get("mig_mode", False)),
+                mig_instances=list(row.get("mig_instances") or []),
+                nvlink_links=list(row.get("nvlink_links") or []),
+                diag_pcie_fail=bool(row.get("diag_pcie_fail", False)),
+                diag_memory_fail=bool(row.get("diag_memory_fail", False)),
+                diag_bandwidth_fail=bool(row.get("diag_bandwidth_fail", False)),
+                diag_stress_fail=bool(row.get("diag_stress_fail", False)),
+                diag_power_fail=bool(row.get("diag_power_fail", False)),
+                oom=bool(row.get("oom", False)),
+            ))
+        if restored:
+            st.gpus = restored
+    else:
+        st.gpu_healthy = data.get("gpu_healthy", True)
     st.ldconfig_updated = data.get("ldconfig_updated", False)
     st.myapp_working = data.get("myapp_working", False)
     st.terraform_fixed = data.get("terraform_fixed", False)
@@ -288,5 +388,94 @@ def persist_session_snapshot(session_id: str) -> None:
     try:
         snap = snapshot_engine(engine)
         LabSession.objects.filter(id=session_id).update(simulation_snapshot=snap)
+        # Shared-cache mirror (audit Z5-1 partial). Live streams stay process-local
+        # in `_SIM_SESSIONS`; this blob lets another worker rehydrate without waiting
+        # on Postgres JSONB when the local dict misses. Same TTL shape as vmware_sim.
+        cache_put_engine_snapshot(str(session_id), snap)
+    except Exception:
+        pass
+
+
+# ── Cross-process engine blob (audit Z5-1 partial Redis port) ─────────────────
+#
+# Full engines cannot live only in Redis while a terminal WebSocket is open —
+# stream handles are process-local. What *can* be shared is the serialised
+# snapshot the DB already stores. Putting it in cache (Redis in prod, LocMem in
+# tests) gives a worker that never saw the session a faster hydrate path than
+# Postgres, matching the vmware_sim SESSION_TTL=7200 pattern for *state*.
+#
+# This does NOT by itself eliminate multi-worker hot copies; `_SIM_MAX_SESSIONS`
+# + idle TTL still bound process memory. It closes the "only the DB has state"
+# half of the cross-process gap.
+
+SIM_ENGINE_CACHE_TTL = 7200  # matches apps/vmware_sim/* SESSION_TTL
+
+
+def _engine_cache_key(session_id: str) -> str:
+    return f"fixitlab:sim_engine:{session_id}"
+
+
+def cache_put_engine_snapshot(session_id: str, snap: dict | None = None, engine=None) -> None:
+    """Best-effort write of a versioned engine snapshot to the shared cache."""
+    try:
+        from django.core.cache import cache
+
+        if snap is None:
+            if not isinstance(engine, UnifiedSimulationEngine):
+                return
+            snap = snapshot_engine(engine)
+        if not snap or snap.get("version") != SNAPSHOT_VERSION:
+            return
+        cache.set(_engine_cache_key(str(session_id)), snap, SIM_ENGINE_CACHE_TTL)
+    except Exception:
+        logger.debug("sim engine cache put failed for %s", session_id, exc_info=True)
+
+
+def cache_get_engine(session_id: str):
+    """Restore an engine from the shared cache, or None on miss/corruption."""
+    snap = cache_get_snapshot(session_id)
+    if snap is None:
+        return None
+    try:
+        return restore_engine(snap)
+    except Exception:
+        return None
+
+
+def cache_get_snapshot(session_id: str) -> dict | None:
+    """Raw versioned snapshot from shared cache (includes ``mutated_at``)."""
+    try:
+        from django.core.cache import cache
+
+        snap = cache.get(_engine_cache_key(str(session_id)))
+        if not snap or not isinstance(snap, dict):
+            return None
+        if snap.get("version") != SNAPSHOT_VERSION:
+            return None
+        return snap
+    except Exception:
+        return None
+
+
+def cache_drop_engine(session_id: str) -> None:
+    try:
+        from django.core.cache import cache
+
+        cache.delete(_engine_cache_key(str(session_id)))
+    except Exception:
+        pass
+
+
+def cache_touch_engine(session_id: str, engine=None) -> None:
+    """Write-through helper: keep Redis/cache hot on every persist (Z5-1).
+
+    Call sites that mutate the live engine should prefer this over relying solely
+    on the debounced DB JSONB snapshot. Live WebSocket streams remain process-local.
+    """
+    cache_put_engine_snapshot(str(session_id), engine=engine)
+    try:
+        from .shell import mark_sim_engine_mutated
+
+        mark_sim_engine_mutated(str(session_id))
     except Exception:
         pass

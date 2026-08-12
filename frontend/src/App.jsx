@@ -6,6 +6,7 @@ import OfflineBanner from './components/OfflineBanner'
 import ScrollToTop from './components/ScrollToTop'
 import AppRouter from './router/AppRouter'
 import ChangelogModal from './components/ChangelogModal'
+import LegalReacceptanceModal from './components/LegalReacceptanceModal'
 import useSessionTimeout from './hooks/useSessionTimeout'
 import { useThemeStore } from './store/themeStore'
 import { useAuthStore } from './store/authStore'
@@ -78,6 +79,7 @@ export default function App() {
           <SessionMonitor />
           <DismissableToaster />
           <ChangelogModal />
+          <LegalReacceptanceModal />
           <AppRouter />
         </AuthBootValidator>
       </BrowserRouter>

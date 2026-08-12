@@ -15,14 +15,11 @@ description: 'CONTEXT: Bare Metal / AI Infra — recent commissioning runs have 
   checks and coming up on the wrong Ubuntu release; both point back to the global MAAS Settings page, not
   the node itself.
 
-
   ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin.
-
 
   SYMPTOM: MAAS Settings shows an unreachable NTP server list and a commissioning default distro series
   that does not match the images actually imported into boot-resources, so newly commissioned nodes drift
   in clock and pick the wrong release.
-
 
   OBJECTIVE: Open Settings; correct the NTP servers to a reachable pool; set the Commissioning distro series
   to the imported release (jammy); Save; re-commission a node and confirm clock sync and the correct release

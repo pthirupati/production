@@ -7,11 +7,9 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   resolve it. Business impact: reduced service reliability and blocked users until the underlying state
   is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
   lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: RHEL 9 server. Running yum install vim returns:
 
@@ -23,27 +21,22 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
 
   cannot be installed or queried until the RPM database is repaired.
 
-
   OBJECTIVE: Confirm the error with yum install vim and note the exact error message; Remove the corrupted
   RPM database lock files with rm -f /var/lib/rpm/__db.*; Rebuild the RPM database with rpm --rebuilddb.
   Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
   your work continuously against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -122,7 +115,6 @@ hints:
 
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 requires_companion_hosts: false
@@ -138,7 +130,7 @@ tags:
 - fix
 - hands-on
 - linux
-linked_tutorial: linux-fundamentals
+linked_tutorial: linux-sysadmin-zero-hero
 what_you_will_learn:
 - Confirm the error with yum install vim and note the exact error message
 - Remove the corrupted RPM database lock files with rm -f /var/lib/rpm/__db.*

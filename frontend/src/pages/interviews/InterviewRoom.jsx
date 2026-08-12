@@ -23,6 +23,10 @@ import {
 import { pickBackchannel } from '../../utils/interviewBackchannel'
 import InterviewVideoPreview from '../../components/interviews/InterviewVideoPreview'
 import InterviewerStage from '../../components/interviews/InterviewerStage'
+
+/** Map InterviewRound.language (en|hi|te) → BCP-47 for ASR/TTS. */
+const INTERVIEW_LANG_LOCALE = { en: 'en-US', hi: 'hi-IN', te: 'te-IN' }
+const interviewLocale = (code) => INTERVIEW_LANG_LOCALE[code] || INTERVIEW_LANG_LOCALE.en
 import PracticalAnswerPanel from '../../components/interviews/PracticalAnswerPanel'
 import CoachingTip from '../../components/interviews/CoachingTip'
 import { PageHeader } from '../../components/design'
@@ -45,12 +49,32 @@ function fmtClock(s) {
   const sec = s % 60
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
+
+// Build the room transcript from a /start/ response (audit L420 — reconnect).
+//
+// start/ is idempotent: on a refresh mid-round the server returns the FULL prior
+// transcript in `messages` AND echoes the intro / outstanding question as
+// separate keys. Blindly appending those echoes duplicated them in the room, so
+// merge by id. `resuming` reports whether there was already a transcript, which
+// the caller uses to suppress re-speaking the welcome line.
+export function mergeStartTranscript(data) {
+  const messages = [...(data?.messages || [])]
+  const seen = new Set(messages.map(m => m?.id).filter(Boolean))
+  const resuming = seen.size > 0
+  for (const extra of [data?.intro, data?.first_question]) {
+    if (extra?.id && !seen.has(extra.id)) {
+      seen.add(extra.id)
+      messages.push(extra)
+    }
+  }
+  return { messages, resuming }
+}
 // BASE trailing silence (ms) after the candidate stops talking before we
-// AUTO-SUBMIT their answer (FIX 1 — no send button). WS1: raised so a normal
-// between-sentence breath never cuts the candidate off; listenLive GROWS this
-// dynamically for longer/multi-sentence answers (up to ~8s) and extends further
-// when they trail off on a connector ("and…", "so…").
-const TURN_SILENCE_MS = 2200
+// AUTO-SUBMIT their answer (FIX 1 — no send button). Audit Silero VAD target
+// is 400–700 ms endpointing (was 2200). listenLive still GROWS this for
+// longer/multi-sentence answers and extends further when they trail off on a
+// connector ("and…", "so…"); endsOnConnector() remains the semantic override.
+const TURN_SILENCE_MS = 550
 // Mic energy (0–1, same scale as the preflight meter) that counts as "speaking"
 // for barge-in. Above this while the bot is talking → interrupt the bot.
 // Raised from 0.18 — speaker→mic bleed during TTS was cancelling the interviewer
@@ -192,6 +216,7 @@ export default function InterviewRoom() {
   const [rateTarget, setRateTarget] = useState(null)
   const [hostFeedback, setHostFeedback] = useState('')
   const [consentAccepted, setConsentAccepted] = useState(false)
+  const [interviewLanguage, setInterviewLanguage] = useState('en')
   const [showReschedule, setShowReschedule] = useState(false)
   const [rescheduleAt, setRescheduleAt] = useState('')
   const [mediaError, setMediaError] = useState('')
@@ -270,6 +295,15 @@ export default function InterviewRoom() {
   useEffect(() => { if (!isListening) setSilenceCountdown(null) }, [isListening])
 
   const endsAt = round?.ends_at ? new Date(round.ends_at).getTime() : null
+
+  // Reconnect (audit L420): a refresh drops React state but not the server-side
+  // round, so preflight must present itself as "rejoin", not "start over".
+  const isResume = !observerMode && round?.status === 'in_progress'
+  // Transcript replay shown on the reconnect screen. System/AV-warning rows are
+  // machine chatter, not conversation, so they stay out of the recap.
+  const replayMessages = isResume
+    ? messages.filter(m => m?.content && (m.role === 'candidate' || m.role === 'interviewer'))
+    : []
 
   // Proactively request permissions when preflight loads — triggers the browser
   // dialog immediately (like Google Meet), before the user clicks any button.
@@ -420,6 +454,11 @@ export default function InterviewRoom() {
     }
   }, [preflight, started, observerMode, micOn, mediaStream])
 
+  // Soft AEC half (audit WebRTC/speex AEC): keep mic open for barge-in VAD.
+  // Echo control is (1) faster endpointing above, (2) never start STT while
+  // isSpeakingRef is true (listenLive callers already gate), (3) TTS utterance
+  // volume capped in useInterviewVoice. Residual: true WebRTC/speex AEC.
+
   const syncMediaState = (stream) => {
     streamRef.current = stream
     setMediaStream(stream || null)
@@ -507,26 +546,51 @@ export default function InterviewRoom() {
   const enableMedia = () => acquireMedia('both')
 
   useEffect(() => {
+    let active = true
+    const controller = new AbortController()
     if (observerToken) {
       setObserverMode(true)
       setPreflight(false)
       setStarted(true)
       const token = observerTokenRef.current || observerToken
-      adminApi.getInterviewObserverSession(token).then(data => {
+      adminApi.getInterviewObserverSession(token, { signal: controller.signal }).then(data => {
+        if (!active) return
         setRound(data.round)
         setMessages(data.messages || [])
         setHostState(data.host_state || null)
         setObserverJoined(!!data.host_state?.joined)
-      }).catch(() => {
+      }).catch((err) => {
+        if (!active || err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return
         toast.error('Observer session unavailable')
         navigate('/admin/interviews')
       })
-      return
+      return () => {
+        active = false
+        controller.abort()
+      }
     }
-    interviewsApi.getRound(roundId).then(setRound).catch(() => {
+    interviewsApi.getRound(roundId, { signal: controller.signal }).then((data) => {
+      if (!active) return
+      setRound(data)
+      if (data?.language) setInterviewLanguage(data.language)
+      // Reconnect (audit L420): the round survives a refresh server-side, but the
+      // room used to come back as a blank pre-interview check with the transcript
+      // gone. Rehydrate it here so the candidate can read what was already said.
+      // We deliberately do NOT auto-rejoin: camera/mic and the TTS autoplay grant
+      // both need a fresh user gesture, and re-POSTing start/ without one lands
+      // them in a silent room. Preflight stays, relabelled as a resume.
+      if (data?.status === 'in_progress') {
+        setMessages(data.messages || [])
+      }
+    }).catch((err) => {
+      if (!active || err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return
       toast.error('Round not found')
       navigate('/interviews')
     })
+    return () => {
+      active = false
+      controller.abort()
+    }
   }, [roundId, observerToken, navigate])
 
   // Prime browser TTS on the first user gesture (Chrome/Safari autoplay policy).
@@ -545,8 +609,11 @@ export default function InterviewRoom() {
   useEffect(() => {
     if (!observerMode || !observerTokenRef.current) return
     const token = observerTokenRef.current
+    let active = true
+    const controller = new AbortController()
     const poll = () => {
-      adminApi.getInterviewObserverSession(token).then(data => {
+      adminApi.getInterviewObserverSession(token, { signal: controller.signal }).then(data => {
+        if (!active) return
         setMessages(data.messages || [])
         setHostState((prev) => {
           const hs = data.host_state || null
@@ -560,7 +627,11 @@ export default function InterviewRoom() {
     }
     poll()
     const iv = setInterval(poll, 2500)
-    return () => clearInterval(iv)
+    return () => {
+      active = false
+      controller.abort()
+      clearInterval(iv)
+    }
   }, [observerMode])
 
   const joinAsHost = async () => {
@@ -624,7 +695,7 @@ export default function InterviewRoom() {
     unlockSpeech()
     try {
       const result = await listenLive(mediaStream, {
-        locale: 'en-US',
+        locale: interviewLocale(interviewLanguage),
         silenceMs: 1600,
         minSpeechMs: 500,
         maxSilenceMs: 4000,
@@ -758,6 +829,26 @@ export default function InterviewRoom() {
     }
   }, [roundId, started, observerMode])
 
+  // Proctoring: paste-into-answer detection (report-only; never blocks).
+  useEffect(() => {
+    if (!roundId || !started || observerMode) return undefined
+    const onPaste = (e) => {
+      const t = e.target
+      if (!(t instanceof HTMLElement)) return
+      // Answer box, practical code/command editors, or any contenteditable in the room.
+      const isAnswer =
+        t.id === 'interview-answer-input'
+        || t.closest?.('[data-interview-answer="1"]')
+        || t.closest?.('.cm-editor')
+        || t.isContentEditable
+      if (!isAnswer) return
+      const source = t.closest?.('.cm-editor') ? 'code_editor' : 'answer'
+      interviewsApi.recordPaste(roundId, source).catch(() => {})
+    }
+    document.addEventListener('paste', onPaste, true)
+    return () => document.removeEventListener('paste', onPaste, true)
+  }, [roundId, started, observerMode])
+
   const cancelInterview = async () => {
     if (!await confirm({ message: 'Cancel this interview round?', danger: true, confirmLabel: 'Cancel round' })) return
     stopMediaStream(streamRef.current)
@@ -866,14 +957,18 @@ export default function InterviewRoom() {
     setPendingHearText(null)
     voiceUnavailableToastRef.current = false
     bootstrapVoiceRef.current = true
+    // Fullscreen prompt (I11 proctoring) — request only; never block if denied.
     try {
-      const data = await interviewsApi.startRound(roundId)
+      if (!document.fullscreenElement && document.documentElement?.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {})
+      }
+    } catch { /* browsers may reject outside gesture / policy */ }
+    try {
+      const data = await interviewsApi.startRound(roundId, { language: interviewLanguage })
       // startRound left the user-gesture stack — reassert unlock before we speak.
       reassertSpeechUnlockAfterAwait()
       setRound(data)
-      const msgs = [...(data.messages || [])]
-      if (data.intro) msgs.push(data.intro)
-      if (data.first_question) msgs.push(data.first_question)
+      const { messages: msgs, resuming } = mergeStartTranscript(data)
       // Mark bootstrap messages BEFORE setStarted so syncHost cannot cancelSpeech
       // on the same intro/first_question we are about to speak locally.
       for (const m of msgs) {
@@ -907,7 +1002,12 @@ export default function InterviewRoom() {
       reassertSpeechUnlockAfterAwait({ allowPrime: false })
       unlockSpeech({ soft: true })
       resumeSpeechSynthesis()
-      const bootstrap = [introText, firstQ?.content].filter(Boolean).join(' ')
+      // On a resume the candidate already heard the intro — replaying "welcome to
+      // your interview" after a refresh reads as a restart. Re-ask only the
+      // outstanding question so they can answer where they left off.
+      const bootstrap = [resuming ? '' : introText, firstQ?.content]
+        .filter(Boolean)
+        .join(' ')
       if (bootstrap) {
         await speakThenListen(bootstrap, {
           autoListen: !isPracticalMessage(firstQ),
@@ -1072,7 +1172,7 @@ export default function InterviewRoom() {
     // WS1 — the silence window is now dynamic (grows with the answer, extends on
     // connector endings) and surfaces a countdown via onSilenceCountdown.
     const result = await listenLive(streamRef.current, {
-      locale: profile.locale || 'en-IN',
+      locale: interviewLocale(round?.language || interviewLanguage),
       silenceMs: TURN_SILENCE_MS,
       minSpeechMs: 900,
       maxSilenceMs: 5000,
@@ -1216,9 +1316,12 @@ export default function InterviewRoom() {
   // Candidate: sync admin/host messages (founder join, manual questions, AI resume).
   useEffect(() => {
     if (!started || observerMode || !roundId) return
+    let active = true
+    const controller = new AbortController()
     const syncHost = async () => {
       try {
-        const data = await interviewsApi.getRound(roundId, { silent: true })
+        const data = await interviewsApi.getRound(roundId, { silent: true, signal: controller.signal })
+        if (!active) return
         const hs = data.host_state || null
         setHostState((prev) => {
           const a = JSON.stringify(prev ?? null)
@@ -1232,6 +1335,7 @@ export default function InterviewRoom() {
           return added.length ? [...prev, ...added] : prev
         })
         for (const m of incoming) {
+          if (!active) return
           if (!m?.id || processedHostMsgRef.current.has(m.id)) continue
           const meta = m.metadata || {}
           const isAdminLine = meta.admin_host
@@ -1265,12 +1369,16 @@ export default function InterviewRoom() {
           }
         }
       } catch {
-        /* polling best-effort */
+        /* polling best-effort / aborted */
       }
     }
     syncHost()
     const iv = setInterval(syncHost, 3000)
-    return () => clearInterval(iv)
+    return () => {
+      active = false
+      controller.abort()
+      clearInterval(iv)
+    }
     // Deps are intentionally minimal: the poll interval is created ONCE per
     // interview and reads the latest practicalMode / persona voice from refs, so
     // it never tears down + double-fires mid-interview (the "refresh" symptom).
@@ -1601,10 +1709,12 @@ export default function InterviewRoom() {
                 type="button"
                 onClick={toggleHostMic}
                 disabled={mediaLoading}
-                className={`text-xs px-2 py-1 rounded-lg border inline-flex items-center gap-1 ${
+                className={`text-xs px-2 py-1 rounded-lg border inline-flex items-center gap-1 min-h-[44px] ${
                   micOn ? 'border-emerald-500/40 text-emerald-300' : 'border-surface-700 text-surface-400'
                 }`}
                 title="Microphone"
+                aria-label={micOn ? 'Mute microphone' : 'Unmute microphone'}
+                aria-pressed={micOn}
               >
                 {micOn ? <Mic size={12} /> : <MicOff size={12} />}
                 Mic
@@ -1613,10 +1723,12 @@ export default function InterviewRoom() {
                 type="button"
                 onClick={toggleHostCamera}
                 disabled={mediaLoading}
-                className={`text-xs px-2 py-1 rounded-lg border inline-flex items-center gap-1 ${
+                className={`text-xs px-2 py-1 rounded-lg border inline-flex items-center gap-1 min-h-[44px] ${
                   cameraOn ? 'border-emerald-500/40 text-emerald-300' : 'border-surface-700 text-surface-400'
                 }`}
                 title="Camera (optional)"
+                aria-label={cameraOn ? 'Turn camera off' : 'Turn camera on'}
+                aria-pressed={cameraOn}
               >
                 {cameraOn ? <Video size={12} /> : <VideoOff size={12} />}
                 Cam
@@ -1850,9 +1962,34 @@ export default function InterviewRoom() {
         </div>
         <PageHeader
           eyebrow="AI Interview Studio"
-          title="Pre-interview check"
+          title={isResume ? 'Reconnect to your interview' : 'Pre-interview check'}
           subtitle={`${round.title} with ${round.persona_name}`}
         />
+        {isResume && (
+          <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-xs text-indigo-100 space-y-2" role="status">
+            <p>
+              <strong>This round is still running.</strong> Your clock never stopped and nothing you
+              already answered was lost — re-enable camera and mic to rejoin where you left off.
+            </p>
+            {replayMessages.length > 0 && (
+              <details className="text-indigo-200/90">
+                <summary className="cursor-pointer select-none">
+                  Show what was said so far ({replayMessages.length})
+                </summary>
+                <div className="mt-2 max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                  {replayMessages.map(m => (
+                    <p key={m.id} className="leading-snug">
+                      <span className="text-indigo-400 font-medium">
+                        {m.role === 'candidate' ? 'You' : round.persona_name}:
+                      </span>{' '}
+                      <span className="text-surface-300">{m.content}</span>
+                    </p>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        )}
         {round.is_sample && (
           <p className="text-xs text-cyan-400 font-medium -mt-4">Free sample — {round.duration_minutes} minutes only</p>
         )}
@@ -1880,6 +2017,7 @@ export default function InterviewRoom() {
             <li>This is a one-time preview — subscribe for full multi-round interviews</li>
           )}
           <li>Transcripts are stored for feedback; video is not recorded on our servers</li>
+          <li>We may ask for fullscreen; tab switches and paste-into-answer are noted on your report (not blocked)</li>
         </ul>
         <label className="flex items-start gap-2 text-xs text-surface-400 cursor-pointer">
           <input
@@ -1895,6 +2033,25 @@ export default function InterviewRoom() {
             <a href="/privacy" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">Privacy Policy</a>
             {' '}for AI Interview Studio.
           </span>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-surface-400">
+          <span className="font-medium text-surface-300">Interview language</span>
+          <select
+            value={interviewLanguage}
+            onChange={async (e) => {
+              const next = e.target.value
+              setInterviewLanguage(next)
+              try {
+                const updated = await interviewsApi.setRoundLanguage(roundId, next)
+                setRound((prev) => ({ ...prev, ...updated }))
+              } catch { /* pre-start PATCH may fail on older servers — startRound still sends it */ }
+            }}
+            className="rounded-lg border border-surface-700 bg-surface-900 px-2 py-1.5 text-surface-200"
+          >
+            <option value="en">English</option>
+            <option value="hi">Hindi</option>
+            <option value="te">Telugu</option>
+          </select>
         </label>
         <div className="aspect-video rounded-xl overflow-hidden border border-surface-700">
           <InterviewVideoPreview
@@ -2101,7 +2258,7 @@ export default function InterviewRoom() {
         >
           {ttsSupported && !soundVerified
             ? 'Test speakers first — then start'
-            : "I'm ready — start interview"}
+            : isResume ? 'Rejoin interview' : "I'm ready — start interview"}
         </button>
       </div>
       </>
@@ -2215,7 +2372,7 @@ export default function InterviewRoom() {
             {interviewerMuted ? <VolumeX size={12} /> : <Volume2 size={12} />}
             {interviewerMuted ? 'Unmute' : 'Mute'} interviewer
           </button>
-          <button type="button" onClick={cancelInterview} className="p-2 rounded-lg bg-surface-800 text-surface-400 hover:text-white" title="Cancel interview">
+          <button type="button" onClick={cancelInterview} className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg bg-surface-800 text-surface-400 hover:text-white" title="Cancel interview" aria-label="Cancel interview">
             <X size={16} />
           </button>
           <button type="button" onClick={finishAndNextRound} className="text-xs text-indigo-300 hover:text-white flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/25" title="End this round and open the next one">
@@ -2284,8 +2441,10 @@ export default function InterviewRoom() {
                     t.enabled = !t.enabled
                     setMicOn(t.enabled)
                   }}
-                  className={`p-2.5 rounded-full transition-colors ${micOn ? 'bg-surface-800/90 text-white hover:bg-surface-700' : 'bg-red-500/90 text-white'}`}
+                  className={`p-2.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full transition-colors ${micOn ? 'bg-surface-800/90 text-white hover:bg-surface-700' : 'bg-red-500/90 text-white'}`}
                   title={micOn ? 'Mute' : 'Unmute'}
+                  aria-label={micOn ? 'Mute microphone' : 'Unmute microphone'}
+                  aria-pressed={micOn}
                 >
                   {micOn ? <Mic size={18} /> : <MicOff size={18} />}
                 </button>
@@ -2297,8 +2456,10 @@ export default function InterviewRoom() {
                     t.enabled = !t.enabled
                     setCameraOn(t.enabled)
                   }}
-                  className={`p-2.5 rounded-full transition-colors ${cameraOn ? 'bg-surface-800/90 text-white hover:bg-surface-700' : 'bg-red-500/90 text-white'}`}
+                  className={`p-2.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full transition-colors ${cameraOn ? 'bg-surface-800/90 text-white hover:bg-surface-700' : 'bg-red-500/90 text-white'}`}
                   title={cameraOn ? 'Turn camera off' : 'Turn camera on'}
+                  aria-label={cameraOn ? 'Turn camera off' : 'Turn camera on'}
+                  aria-pressed={cameraOn}
                 >
                   {cameraOn ? <Video size={18} /> : <VideoOff size={18} />}
                 </button>
@@ -2438,12 +2599,13 @@ export default function InterviewRoom() {
             <button
               type="button"
               onClick={voiceAnswer}
-              className={`px-3 py-2 rounded-lg transition-colors shrink-0 ${
+              className={`px-3 py-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg transition-colors shrink-0 ${
                 isListening
                   ? 'bg-emerald-500/30 text-emerald-200 ring-1 ring-emerald-400 animate-pulse'
                   : 'btn-secondary opacity-60'
               }`}
               title={isListening ? 'Listening…' : 'Voice (automatic)'}
+              aria-label={isListening ? 'Listening for answer' : 'Start voice answer'}
               aria-hidden={!typingAnswer}
               tabIndex={typingAnswer ? 0 : -1}
             >
@@ -2484,6 +2646,7 @@ export default function InterviewRoom() {
             </button>
             <input
               id="interview-answer-input"
+              data-interview-answer="1"
               value={answer}
               readOnly={started && !typingAnswer}
               onChange={e => { setAnswer(e.target.value); if (e.target.value.trim()) setTypingAnswer(true) }}

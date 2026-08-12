@@ -16,11 +16,9 @@ description: 'CONTEXT: A team operating NetApp ONTAP storage has raised a ticket
   must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
   underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline ONTAP practice cluster. The architecture is a single
   lab-primary node exposing System Manager, SVMs, volumes, LUNs, and SnapMirror; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: The `crond` service is not running (`systemctl is-active crond` → inactive/failed).
   Dependent Troubleshooting Drill tasks cannot succeed until the unit is healthy again. Service operations
@@ -28,11 +26,9 @@ description: 'CONTEXT: A team operating NetApp ONTAP storage has raised a ticket
   Drill workflows that depend on it. Diagnose with `systemctl status crond` and journal logs, apply the
   smallest reliable fix, then verify with `systemctl is-active crond`.
 
-
   OBJECTIVE: The `crond` service is active (running); `systemctl is-active crond`` returns active; The
   fix survives a status re-check (no marker files). Acceptance criteria: the change is minimal and reversible,
   and success means `systemctl is-active crond` returns active.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
@@ -40,16 +36,13 @@ description: 'CONTEXT: A team operating NetApp ONTAP storage has raised a ticket
   Check your work continuously against the objective — success means `systemctl is-active crond` returns
   active.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active crond` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -98,6 +91,5 @@ hints:
     2. Run `systemctl daemon-reload` if you edited a unit file.
 
     3. Run `systemctl restart crond` and confirm `systemctl is-active crond` succeeds.
-
 
     WHY: the grader checks real service state, not marker files.'

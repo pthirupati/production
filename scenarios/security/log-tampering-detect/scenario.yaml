@@ -13,11 +13,9 @@ description: 'CONTEXT: A team operating security hardening has raised a ticket f
   must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
   underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline hardening lab. The architecture is a single lab-primary
   node exposing SSH, firewall, TLS, audit logs, and IAM settings; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: Ubuntu server post-compromise. /var/log/auth.log has gaps between 02:00-03:00
 
@@ -25,29 +23,24 @@ description: 'CONTEXT: A team operating security hardening has raised a ticket f
 
   The attacker had root access for approximately one hour overnight.
 
-
   OBJECTIVE: Use `last` and `lastb` against /var/log/wtmp and /var/log/btmp to find login history the
   attacker could not erase; Compare auth.log timestamps to syslog and journalctl output to find gaps indicating
   deleted entries; Write a timeline of the attack to /tmp/incident-timeline.txt with at least 3 timestamped
   events. Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits
   successfully.
 
-
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant SSH, firewall, TLS, audit logs, and IAM settings), changing one thing at a time.
   Check your work continuously against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -115,7 +108,6 @@ hints:
 
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 summary: Complete the log tampering — detect deleted and altered log entries security lab and verify success
@@ -128,7 +120,7 @@ tags:
 - fix
 - hands-on
 - security
-linked_tutorial: security-fundamentals
+linked_tutorial: cybersecurity-zero-hero
 what_you_will_learn:
 - Use `last` and `lastb` against /var/log/wtmp and /var/log/btmp to find login history the attacker could
   not erase

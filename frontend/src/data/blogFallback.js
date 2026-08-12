@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 
 /** Static catalog when API is empty — mirrors seeded CMS posts + common articles. */
 export const BLOG_FALLBACK_POSTS = [

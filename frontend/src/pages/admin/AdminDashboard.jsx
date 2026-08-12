@@ -194,19 +194,32 @@ export default function AdminDashboard() {
   const [currency, setCurrency] = useState('INR')
   const [health, setHealth] = useState(null)
   const [activity, setActivity] = useState([])
+  const [activityFailed, setActivityFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
   const fetchOverview = useCallback(async () => {
     try {
-      const [o, a, cfg] = await Promise.all([
+      const [oSettled, aSettled, cfgSettled] = await Promise.allSettled([
         adminApi.getOverviewWithCurrency(currency),
-        adminApi.getActivityFeed().catch(() => []),
-        adminApi.getConfig().catch(() => ({})),
+        adminApi.getActivityFeed(),
+        adminApi.getConfig(),
       ])
+      if (oSettled.status === 'rejected') {
+        console.error('Dashboard overview error:', oSettled.reason)
+        return
+      }
+      const o = oSettled.value
+      const cfg = cfgSettled.status === 'fulfilled' ? cfgSettled.value : {}
       if (cfg?.admin_display_currency) setCurrency(cfg.admin_display_currency)
       setOverview(o)
-      setActivity(a)
+      if (aSettled.status === 'fulfilled') {
+        setActivity(aSettled.value || [])
+        setActivityFailed(false)
+      } else {
+        setActivity([])
+        setActivityFailed(true)
+      }
     } catch (e) {
       console.error('Dashboard overview error:', e)
     }
@@ -706,7 +719,16 @@ export default function AdminDashboard() {
 
       {/* ── Recent Activity + Recent Emails ── */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {activity.length > 0 && (
+        {activityFailed && (
+          <div className="glass-card p-6">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-2">
+              <Zap size={18} className="text-accent-amber" />
+              Recent Activity
+            </h2>
+            <p className="text-sm text-amber-300/90">Couldn&apos;t load the activity feed. Overview numbers above are still current.</p>
+          </div>
+        )}
+        {!activityFailed && activity.length > 0 && (
           <div className="glass-card p-6">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
               <Zap size={18} className="text-accent-amber" />

@@ -1,8 +1,4 @@
-# Unpublished: this lab ships a bare `raise NotImplementedError` stub with no
-# starter code, no seeded fault and only a `placeholder` grader, so there is
-# nothing to diagnose and any trivial return earns XP. Set is_active: true
-# once it has real content and a grader that checks it (audit §G1).
-is_active: false
+is_active: true
 title: Configure busy timeout
 slug: sqlite-busy-timeout
 technology: sqlite
@@ -11,35 +7,28 @@ description: 'CONTEXT: A team operating SQLite has raised a ticket for `Configur
   workflow is degraded and the on-call engineer (you) must diagnose and resolve it. Business impact: reduced
   service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline SQLite database file. The architecture is a single
   lab-primary node exposing sqlite3 CLI, schema, WAL mode, and pragmas; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: App crashes on database is locked.
-
 
   OBJECTIVE: Understand the current failure mode affecting Configure busy timeout; Restore expected service
   behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test. Acceptance
   criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant sqlite3 CLI, schema, WAL mode, and pragmas), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -102,23 +91,45 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: App crashes on database is locked.
+  instructions: 'The app crashes with ''database is locked'' the instant it contends. Fix solution(conn)
+    so it returns the retry wait times in milliseconds that a busy handler should use, as a list. Start
+    at the base_ms argument and double each time (exponential backoff) for attempts entries, but never
+    exceed the cap_ms argument - once capped, stay at the cap.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn, base_ms, cap_ms, attempts):\n    # BUG: retries at a flat interval and\
+      \ ignores the cap entirely, which is\n    # what turns contention into a crash loop.\n    return\
+      \ [base_ms] * attempts\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert solution() is not None
+  - name: backoff doubles
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ 10, 10000, 4) == [10,20,40,80], solution(conn, 10, 10000, 4)\n"
+  - name: cap is respected
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ 100, 250, 4) == [100,200,250,250], solution(conn, 100, 250, 4)\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert solution() is not None
+  - name: zero attempts returns empty
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ 10, 100, 0) == [], solution(conn, 10, 100, 0)\n"
+  - name: single attempt returns the base
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ 25, 1000, 1) == [25], solution(conn, 25, 1000, 1)\n"
+  - name: base above the cap is capped immediately
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ 500, 100, 3) == [100,100,100], solution(conn, 500, 100, 3)\n"
+  - name: waits never decrease
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nw = solution(conn,\
+      \ 5, 60, 6)\nassert all(b >= a for a, b in zip(w, w[1:])), w\n"
   timeout: 8
 summary: Complete the configure busy timeout sqlite lab and verify success with the checker
 estimated_minutes: 20
@@ -129,7 +140,7 @@ tags:
 - fix
 - hands-on
 - sqlite
-linked_tutorial: sqlite-fundamentals
+linked_tutorial: sqlite-embedded-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Configure busy timeout
 - Restore expected service behavior with a minimal, documented change

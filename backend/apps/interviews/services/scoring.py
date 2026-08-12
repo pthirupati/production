@@ -194,6 +194,7 @@ def score_answer(question, answer_text: str, metadata: dict | None = None) -> di
             question_text=meta.get("question_text") or (question.question_text if question else ""),
             round_type=round_type,
             expected_keywords=keywords or None,
+            technology_id=question.technology_id if question else None,
         )
     except Exception:  # noqa: BLE001
         breakdown = compute_answer_scores(

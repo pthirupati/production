@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import json
 import random
+import re
 import time
 from typing import Any
 
@@ -1296,6 +1297,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{kind}/{name} patched"}
 
+    if action in ("kubernetes_http", "k8s_http", "http_api"):
+        url = payload.get("url") or payload.get("path") or ""
+        status, body = kubernetes_http_api(url, state)
+        return {"ok": status < 400, "status": status, "body": body}
+
     ensure_v2(state)
     v2 = apply_v2_action(state, action, payload)
     if v2 is not None:
@@ -1304,6 +1310,175 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return v2
 
     return {"ok": False, "error": f"Unknown action: {action}"}
+
+
+# ---------------------------------------------------------------------------
+# Kubernetes HTTP API (Y3 teaching surface — curl to apiserver)
+# ---------------------------------------------------------------------------
+
+def _pod_to_k8s_object(p: dict) -> dict:
+    ns = p.get("namespace") or "default"
+    name = p.get("name") or "pod"
+    containers = []
+    for c in p.get("containers") or []:
+        containers.append({
+            "name": c.get("name") or name,
+            "image": c.get("image") or "fixitlab/app:latest",
+            "ready": bool(c.get("ready")),
+            "restartCount": int(c.get("restartCount") or 0),
+            "state": {str(c.get("state") or "running"): {}},
+        })
+    return {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+            "name": name,
+            "namespace": ns,
+            "labels": dict(p.get("labels") or {}),
+            "creationTimestamp": p.get("startTime"),
+        },
+        "spec": {
+            "nodeName": p.get("node"),
+            "containers": [
+                {"name": c.get("name"), "image": c.get("image")}
+                for c in (p.get("containers") or [])
+            ],
+        },
+        "status": {
+            "phase": p.get("phase") or "Unknown",
+            "podIP": p.get("podIP"),
+            "containerStatuses": containers,
+            "conditions": list(p.get("conditions") or []),
+        },
+    }
+
+
+def _deployment_to_k8s_object(d: dict) -> dict:
+    ns = d.get("namespace") or "default"
+    name = d.get("name") or "deploy"
+    return {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+            "name": name,
+            "namespace": ns,
+            "labels": dict(d.get("labels") or {}),
+            "creationTimestamp": d.get("creationTimestamp"),
+        },
+        "spec": {
+            "replicas": int(d.get("replicas") or 0),
+            "selector": {"matchLabels": dict(d.get("selector") or d.get("labels") or {})},
+            "template": {
+                "metadata": {"labels": dict(d.get("labels") or {})},
+                "spec": {
+                    "containers": [{
+                        "name": name,
+                        "image": d.get("image") or f"fixitlab/{name}:latest",
+                    }],
+                },
+            },
+        },
+        "status": {
+            "replicas": int(d.get("replicas") or 0),
+            "availableReplicas": int(d.get("availableReplicas") or 0),
+            "readyReplicas": int(d.get("readyReplicas") or 0),
+            "updatedReplicas": int(d.get("updatedReplicas") or 0),
+        },
+    }
+
+
+def kubernetes_http_api(url_or_path: str, state: dict | None = None) -> tuple[int, dict]:
+    """Kubernetes apiserver HTTP surface for curl teaching labs (audit Y3).
+
+    Routes ``/api/v1/pods`` and ``/apis/apps/v1/deployments`` (namespaced and
+    cluster-scoped) against the in-session cluster. Returns ``(http_status, body)``.
+    """
+    from urllib.parse import parse_qs, urlparse
+
+    state = state or {}
+    raw = (url_or_path or "").strip()
+    if not raw:
+        return 400, {"kind": "Status", "apiVersion": "v1", "status": "Failure",
+                     "message": "empty URL", "code": 400}
+
+    if "://" in raw:
+        parsed = urlparse(raw)
+        path = parsed.path or "/"
+        qs = parse_qs(parsed.query)
+    elif "?" in raw:
+        path, q = raw.split("?", 1)
+        qs = parse_qs(q)
+    else:
+        path, qs = raw, {}
+
+    norm = path.rstrip("/") or "/"
+    label_selector = (qs.get("labelSelector") or [""])[0]
+
+    def _labels_match(labels: dict) -> bool:
+        if not label_selector:
+            return True
+        want = {}
+        for part in label_selector.split(","):
+            part = part.strip()
+            if "=" in part:
+                k, v = part.split("=", 1)
+                want[k.strip()] = v.strip()
+        return all(labels.get(k) == v for k, v in want.items())
+
+    # /api/v1/namespaces/{ns}/pods[/{name}]
+    m = re.match(r"^/api/v1/namespaces/([^/]+)/pods(?:/([^/]+))?$", norm)
+    if m:
+        ns, name = m.group(1), m.group(2)
+        pods = [p for p in state.get("pods") or [] if p.get("namespace") == ns]
+        if name:
+            pod = next((p for p in pods if p.get("name") == name), None)
+            if not pod:
+                return 404, {
+                    "kind": "Status", "apiVersion": "v1", "status": "Failure",
+                    "message": f'pods "{name}" not found', "reason": "NotFound", "code": 404,
+                }
+            return 200, _pod_to_k8s_object(pod)
+        items = [_pod_to_k8s_object(p) for p in pods if _labels_match(p.get("labels") or {})]
+        return 200, {"kind": "PodList", "apiVersion": "v1", "items": items}
+
+    # /api/v1/pods (all namespaces)
+    if norm == "/api/v1/pods":
+        items = [
+            _pod_to_k8s_object(p) for p in (state.get("pods") or [])
+            if _labels_match(p.get("labels") or {})
+        ]
+        return 200, {"kind": "PodList", "apiVersion": "v1", "items": items}
+
+    # /apis/apps/v1/namespaces/{ns}/deployments[/{name}]
+    m = re.match(r"^/apis/apps/v1/namespaces/([^/]+)/deployments(?:/([^/]+))?$", norm)
+    if m:
+        ns, name = m.group(1), m.group(2)
+        deps = [d for d in state.get("deployments") or [] if d.get("namespace") == ns]
+        if name:
+            dep = next((d for d in deps if d.get("name") == name), None)
+            if not dep:
+                return 404, {
+                    "kind": "Status", "apiVersion": "v1", "status": "Failure",
+                    "message": f'deployments.apps "{name}" not found', "reason": "NotFound", "code": 404,
+                }
+            return 200, _deployment_to_k8s_object(dep)
+        items = [_deployment_to_k8s_object(d) for d in deps if _labels_match(d.get("labels") or {})]
+        return 200, {"kind": "DeploymentList", "apiVersion": "apps/v1", "items": items}
+
+    if norm == "/apis/apps/v1/deployments":
+        items = [
+            _deployment_to_k8s_object(d) for d in (state.get("deployments") or [])
+            if _labels_match(d.get("labels") or {})
+        ]
+        return 200, {"kind": "DeploymentList", "apiVersion": "apps/v1", "items": items}
+
+    if norm in ("/api", "/apis", "/healthz", "/readyz", "/livez"):
+        return 200, {"kind": "Status", "apiVersion": "v1", "status": "Success", "code": 200}
+
+    return 404, {
+        "kind": "Status", "apiVersion": "v1", "status": "Failure",
+        "message": f"Kubernetes API: unknown path {path}", "reason": "NotFound", "code": 404,
+    }
 
 
 # ---------------------------------------------------------------------------

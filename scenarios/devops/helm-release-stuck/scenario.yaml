@@ -6,36 +6,29 @@ description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for 
   Upgrade`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab. The architecture is a single lab-primary
   node exposing git repos, pipelines, artifacts, and runbooks; treat it as the production host for this
   incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Kubernetes cluster with Helm. A release is stuck in pending-upgrade after
   an upgrade failed mid-flight, blocking new upgrades until it''s rolled back or forced to complete.
-
 
   OBJECTIVE: Run helm history and identify the failed/pending revision; Roll back to the last good revision
   (or force-complete the upgrade); Verify the release returns to deployed and pods are healthy. Acceptance
   criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant git repos, pipelines, artifacts, and runbooks), changing one thing at a time. Check
   your work continuously against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -89,7 +82,6 @@ hints:
 
     3. Confirm `kubectl get pods` shows every pod Running.
 
-
     WHY: Kubernetes only reports healthy when the workload actually runs.'
 initial_state: Kubernetes cluster with Helm. A release is stuck in pending-upgrade after an upgrade failed
   mid-flight, blocking new upgrades until it's rolled back or forced to complete.
@@ -103,7 +95,7 @@ tags:
 - devops
 - fix
 - hands-on
-linked_tutorial: devops-fundamentals
+linked_tutorial: devops-engineering-zero-hero
 what_you_will_learn:
 - Run helm history and identify the failed/pending revision
 - Roll back to the last good revision (or force-complete the upgrade)

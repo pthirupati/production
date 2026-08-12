@@ -820,3 +820,464 @@ def validate_azure_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, 
     if not state.get("_preset_applied"):
         return False, "NO_VALIDATION_SCRIPT"
     return True, "Azure validation passed"
+
+
+# ---------------------------------------------------------------------------
+# `az` CLI surface
+#
+# Write commands delegate to apply_action so `broken` flags, guest bridges and
+# trace ids fire identically whether the learner clicked the portal or typed
+# the command. Unrecognized commands return rc!=0 with an az-shaped error —
+# a silent no-op would leave a learner "done" on a lab whose flag never
+# cleared, which is ungradeable.
+# ---------------------------------------------------------------------------
+
+_AZ_HINT = "Run 'az help' to see the supported command groups."
+
+
+def _az_error(message: str, *, rc: int = 1) -> dict:
+    return {"ok": False, "rc": rc, "error": message, "stdout": "", "stderr": f"ERROR: {message}"}
+
+
+def _az_ok(stdout: str, *, message: str = "") -> dict:
+    return {"ok": True, "rc": 0, "stdout": stdout, "stderr": "", "message": message or stdout}
+
+
+def _az_parse(tokens: list[str]) -> tuple[list[str], dict[str, str]]:
+    """Split az `--flag[=value]` pairs from positionals, underscoring keys.
+
+    Short aliases (`-n`, `-g`) are mapped to their long forms because the
+    scenario text and the docs use both interchangeably.
+    """
+    short = {"n": "name", "g": "resource_group", "l": "location", "o": "output"}
+    positionals: list[str] = []
+    opts: dict[str, str] = {}
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok.startswith("--") or (tok.startswith("-") and len(tok) > 1 and not tok[1].isdigit()):
+            raw = tok.lstrip("-")
+            if "=" in raw:
+                key, value = raw.split("=", 1)
+            else:
+                key = raw
+                if i + 1 < len(tokens) and not tokens[i + 1].startswith("-"):
+                    value = tokens[i + 1]
+                    i += 1
+                else:
+                    value = "true"
+            key = key.replace("-", "_")
+            opts[short.get(key, key)] = value
+        else:
+            positionals.append(tok)
+        i += 1
+    return positionals, opts
+
+
+def _az_table(headers: list[str], rows: list[list[str]]) -> str:
+    """`--output table` style: header, dashed rule, whitespace-aligned rows."""
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for idx, cell in enumerate(row):
+            widths[idx] = max(widths[idx], len(str(cell)))
+    lines = [
+        "  ".join(h.ljust(widths[i]) for i, h in enumerate(headers)).rstrip(),
+        "  ".join("-" * widths[i] for i in range(len(headers))).rstrip(),
+    ]
+    for row in rows:
+        lines.append("  ".join(str(c).ljust(widths[i]) for i, c in enumerate(row)).rstrip())
+    return "\n".join(lines)
+
+
+_AZ_HELP = """Available command groups:
+  az vm list|show|create|delete|start|stop|restart|resize
+  az vm disk attach|detach
+  az disk list|create|snapshot
+  az network nsg list|create
+  az network nsg rule create|delete|list
+  az network vnet list  |  az network vnet subnet create|list
+  az group list|create
+  az storage account list|create  |  az storage container create|list
+  az keyvault secret set|list  |  az keyvault certificate import|list
+  az role assignment create|delete|list
+"""
+
+
+def _az_vm(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    verb = args[0] if args else ""
+    rest = args[1:]
+    name = opts.get("name") or (rest[0] if rest and verb != "disk" else "")
+
+    if verb == "list":
+        rows = [[v.get("name", ""), v.get("resource_group", ""), v.get("location", ""),
+                 v.get("size", ""), v.get("power_state", "")]
+                for v in state.get("vms") or []]
+        return _az_ok(_az_table(["Name", "ResourceGroup", "Location", "Size", "PowerState"], rows))
+
+    if verb in ("show", "get-instance-view"):
+        if not name:
+            return _az_error("the following arguments are required: --name/-n")
+        vm = _find_vm(state, name)
+        if not vm:
+            return _az_error(f"The Resource 'Microsoft.Compute/virtualMachines/{name}' was not found")
+        return _az_ok("\n".join(f"{k}: {v}" for k, v in vm.items() if not k.startswith("_")))
+
+    if verb == "create":
+        if not name:
+            return _az_error("the following arguments are required: --name/-n")
+        payload = {"name": name}
+        for flag, key in (("size", "size"), ("location", "location"), ("image", "os")):
+            if opts.get(flag):
+                payload[key] = opts[flag]
+        return apply_action(session_id, "create_vm", payload)
+
+    if verb in ("delete", "start", "stop", "restart", "deallocate"):
+        if not name:
+            return _az_error("the following arguments are required: --name/-n")
+        action = {"delete": "delete_vm", "start": "start_vm", "stop": "stop_vm",
+                  "deallocate": "stop_vm", "restart": "restart_vm"}[verb]
+        return apply_action(session_id, action, {"vm_name": name})
+
+    if verb == "resize":
+        if not name:
+            return _az_error("the following arguments are required: --name/-n")
+        size = opts.get("size") or ""
+        if not size:
+            return _az_error("the following arguments are required: --size")
+        return apply_action(session_id, "resize_vm", {"vm_name": name, "size": size})
+
+    if verb == "disk" and rest:
+        sub = rest[0]
+        if sub not in ("attach", "detach"):
+            return _az_error(f"'{sub}' is not in the 'az vm disk' command group. {_AZ_HINT}")
+        vm_name = opts.get("vm_name") or opts.get("name") or ""
+        disk = opts.get("disk") or opts.get("disk_name") or (rest[1] if len(rest) > 1 else "")
+        if not vm_name:
+            return _az_error("the following arguments are required: --vm-name")
+        if not disk:
+            return _az_error("the following arguments are required: --disk")
+        action = "attach_disk" if sub == "attach" else "detach_disk"
+        return apply_action(session_id, action, {"vm_name": vm_name, "disk_name": disk})
+
+    return _az_error(f"'{verb}' is not in the 'az vm' command group. {_AZ_HINT}")
+
+
+def _az_disk(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    verb = args[0] if args else ""
+    rest = args[1:]
+    name = opts.get("name") or (rest[0] if rest else "")
+    if verb == "list":
+        rows = [[d.get("name", ""), d.get("resource_group", ""), str(d.get("size_gb", "")),
+                 d.get("sku", ""), d.get("state", ""), d.get("attached_to") or ""]
+                for d in state.get("disks") or []]
+        return _az_ok(_az_table(["Name", "ResourceGroup", "SizeGb", "Sku", "State", "AttachedTo"], rows))
+    if verb == "create":
+        if not name:
+            return _az_error("the following arguments are required: --name/-n")
+        payload = {"name": name}
+        if opts.get("size_gb"):
+            payload["size_gb"] = opts["size_gb"]
+        if opts.get("sku"):
+            payload["sku"] = opts["sku"]
+        return apply_action(session_id, "create_disk", payload)
+    if verb == "snapshot":
+        if not name:
+            return _az_error("the following arguments are required: --name/-n")
+        return apply_action(session_id, "snapshot_disk", {"disk_name": name})
+    return _az_error(f"'{verb}' is not in the 'az disk' command group. {_AZ_HINT}")
+
+
+def _az_network(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    if not args:
+        return _az_error(f"the following arguments are required: subgroup. {_AZ_HINT}")
+    sub = args[0]
+    rest = args[1:]
+
+    if sub == "nsg":
+        if rest and rest[0] == "rule":
+            rule_args = rest[1:]
+            verb = rule_args[0] if rule_args else ""
+            nsg_name = opts.get("nsg_name") or opts.get("nsg") or ""
+            if verb == "list":
+                rows = []
+                for nsg in state.get("nsgs") or []:
+                    if nsg_name and nsg.get("name") != nsg_name:
+                        continue
+                    for r in nsg.get("rules") or []:
+                        rows.append([nsg.get("name", ""), r.get("name", ""), str(r.get("priority", "")),
+                                     r.get("direction", ""), r.get("access", ""),
+                                     r.get("protocol", ""), str(r.get("destination_port", ""))])
+                return _az_ok(_az_table(
+                    ["Nsg", "Name", "Priority", "Direction", "Access", "Protocol", "Port"], rows))
+            if verb == "create":
+                if not nsg_name:
+                    return _az_error("the following arguments are required: --nsg-name")
+                rule_name = opts.get("name") or (rule_args[1] if len(rule_args) > 1 else "")
+                if not rule_name:
+                    return _az_error("the following arguments are required: --name/-n")
+                payload = {"nsg_name": nsg_name, "name": rule_name}
+                for flag, key in (
+                    ("priority", "priority"), ("direction", "direction"), ("access", "access"),
+                    ("protocol", "protocol"), ("source_address_prefixes", "source"),
+                    ("destination_port_ranges", "destination_port"),
+                ):
+                    if opts.get(flag):
+                        payload[key] = opts[flag]
+                # `--destination-port-range` (singular) is the more common form.
+                if opts.get("destination_port_range"):
+                    payload["destination_port"] = opts["destination_port_range"]
+                if opts.get("source_address_prefix"):
+                    payload["source"] = opts["source_address_prefix"]
+                return apply_action(session_id, "add_nsg_rule", payload)
+            if verb == "delete":
+                rule_name = opts.get("name") or (rule_args[1] if len(rule_args) > 1 else "")
+                if not nsg_name or not rule_name:
+                    return _az_error("the following arguments are required: --nsg-name, --name/-n")
+                return apply_action(session_id, "remove_nsg_rule", {"nsg_name": nsg_name, "name": rule_name})
+            return _az_error(f"'{verb}' is not in the 'az network nsg rule' command group. {_AZ_HINT}")
+
+        verb = rest[0] if rest else ""
+        if verb == "list":
+            rows = [[n.get("name", ""), n.get("resource_group", ""), n.get("location", ""),
+                     str(len(n.get("rules") or []))]
+                    for n in state.get("nsgs") or []]
+            return _az_ok(_az_table(["Name", "ResourceGroup", "Location", "Rules"], rows))
+        if verb == "create":
+            name = opts.get("name") or (rest[1] if len(rest) > 1 else "")
+            if not name:
+                return _az_error("the following arguments are required: --name/-n")
+            return apply_action(session_id, "create_nsg", {"name": name, "location": opts.get("location")})
+        return _az_error(f"'{verb}' is not in the 'az network nsg' command group. {_AZ_HINT}")
+
+    if sub == "vnet":
+        if rest and rest[0] == "subnet":
+            sub_args = rest[1:]
+            verb = sub_args[0] if sub_args else ""
+            if verb == "list":
+                rows = []
+                for vnet in state.get("vnets") or []:
+                    for s in vnet.get("subnets") or []:
+                        rows.append([s.get("name", ""), vnet.get("name", ""),
+                                     s.get("address_prefix", ""), s.get("nsg") or ""])
+                return _az_ok(_az_table(["Name", "Vnet", "AddressPrefix", "Nsg"], rows))
+            if verb == "create":
+                name = opts.get("name") or (sub_args[1] if len(sub_args) > 1 else "")
+                vnet_name = opts.get("vnet_name") or opts.get("vnet") or ""
+                if not name or not vnet_name:
+                    return _az_error("the following arguments are required: --name/-n, --vnet-name")
+                payload = {"name": name, "vnet": vnet_name}
+                if opts.get("address_prefixes") or opts.get("address_prefix"):
+                    payload["address_prefix"] = opts.get("address_prefixes") or opts["address_prefix"]
+                return apply_action(session_id, "create_subnet", payload)
+            return _az_error(f"'{verb}' is not in the 'az network vnet subnet' command group. {_AZ_HINT}")
+
+        verb = rest[0] if rest else ""
+        if verb == "list":
+            rows = [[v.get("name", ""), v.get("resource_group", ""),
+                     ",".join(v.get("address_space") or []) if isinstance(v.get("address_space"), list)
+                     else str(v.get("address_space") or ""),
+                     str(len(v.get("subnets") or []))]
+                    for v in state.get("vnets") or []]
+            return _az_ok(_az_table(["Name", "ResourceGroup", "AddressSpace", "Subnets"], rows))
+        return _az_error(f"'{verb}' is not in the 'az network vnet' command group. {_AZ_HINT}")
+
+    return _az_error(f"'{sub}' is not in the 'az network' command group. {_AZ_HINT}")
+
+
+def _az_storage(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    if not args:
+        return _az_error(f"the following arguments are required: subgroup. {_AZ_HINT}")
+    sub = args[0]
+    rest = args[1:]
+    verb = rest[0] if rest else ""
+
+    if sub == "account":
+        if verb == "list":
+            rows = [[s.get("name", ""), s.get("resource_group", ""), s.get("location", ""),
+                     s.get("sku", ""), s.get("kind", "")]
+                    for s in state.get("storage_accounts") or []]
+            return _az_ok(_az_table(["Name", "ResourceGroup", "Location", "Sku", "Kind"], rows))
+        if verb == "create":
+            name = opts.get("name") or ""
+            if not name:
+                return _az_error("the following arguments are required: --name/-n")
+            payload = {"name": name}
+            for flag in ("sku", "location", "resource_group", "access_tier"):
+                if opts.get(flag):
+                    payload[flag] = opts[flag]
+            return apply_action(session_id, "create_storage_account", payload)
+        return _az_error(f"'{verb}' is not in the 'az storage account' command group. {_AZ_HINT}")
+
+    if sub == "container":
+        account = opts.get("account_name") or opts.get("account") or ""
+        if verb == "list":
+            rows = []
+            for sa in state.get("storage_accounts") or []:
+                if account and sa.get("name") != account:
+                    continue
+                for c in sa.get("blob_containers") or []:
+                    rows.append([c.get("name", ""), sa.get("name", ""), c.get("public_access", "")])
+            return _az_ok(_az_table(["Name", "Account", "PublicAccess"], rows))
+        if verb == "create":
+            name = opts.get("name") or ""
+            if not name or not account:
+                return _az_error("the following arguments are required: --name/-n, --account-name")
+            payload = {"name": name, "account": account}
+            if opts.get("public_access"):
+                payload["public_access"] = opts["public_access"]
+            return apply_action(session_id, "create_blob_container", payload)
+        return _az_error(f"'{verb}' is not in the 'az storage container' command group. {_AZ_HINT}")
+
+    return _az_error(f"'{sub}' is not in the 'az storage' command group. {_AZ_HINT}")
+
+
+def _az_keyvault(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    if not args:
+        return _az_error(f"the following arguments are required: subgroup. {_AZ_HINT}")
+    sub = args[0]
+    rest = args[1:]
+    verb = rest[0] if rest else ""
+    vault = opts.get("vault_name") or opts.get("vault") or ""
+
+    if sub == "secret":
+        if verb == "list":
+            rows = []
+            for kv in state.get("key_vaults") or []:
+                if vault and kv.get("name") != vault:
+                    continue
+                for s in kv.get("secrets") or []:
+                    rows.append([s.get("name", ""), kv.get("name", ""), str(s.get("enabled", ""))])
+            return _az_ok(_az_table(["Name", "Vault", "Enabled"], rows))
+        if verb == "set":
+            name = opts.get("name") or ""
+            if not name or not vault:
+                return _az_error("the following arguments are required: --name/-n, --vault-name")
+            return apply_action(session_id, "set_secret", {"name": name, "vault": vault})
+        return _az_error(f"'{verb}' is not in the 'az keyvault secret' command group. {_AZ_HINT}")
+
+    if sub == "certificate":
+        if verb == "list":
+            rows = []
+            for kv in state.get("key_vaults") or []:
+                if vault and kv.get("name") != vault:
+                    continue
+                for c in kv.get("certificates") or []:
+                    rows.append([c.get("name", ""), kv.get("name", ""), str(c.get("expires", ""))])
+            return _az_ok(_az_table(["Name", "Vault", "Expires"], rows))
+        if verb == "import":
+            name = opts.get("name") or ""
+            if not name or not vault:
+                return _az_error("the following arguments are required: --name/-n, --vault-name")
+            return apply_action(session_id, "import_certificate", {"name": name, "vault": vault})
+        return _az_error(f"'{verb}' is not in the 'az keyvault certificate' command group. {_AZ_HINT}")
+
+    return _az_error(f"'{sub}' is not in the 'az keyvault' command group. {_AZ_HINT}")
+
+
+def _az_role(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    if not args or args[0] != "assignment":
+        return _az_error(f"'{args[0] if args else ''}' is not in the 'az role' command group. {_AZ_HINT}")
+    verb = args[1] if len(args) > 1 else ""
+    if verb == "list":
+        rows = [[r.get("id", ""), r.get("principal", ""), r.get("role", ""), r.get("scope", "")]
+                for r in state.get("role_assignments") or []]
+        return _az_ok(_az_table(["Id", "Principal", "Role", "Scope"], rows))
+    if verb == "create":
+        assignee = opts.get("assignee") or opts.get("principal") or ""
+        role = opts.get("role") or ""
+        if not assignee or not role:
+            return _az_error("the following arguments are required: --assignee, --role")
+        payload = {"principal": assignee, "role": role}
+        if opts.get("scope"):
+            payload["scope"] = opts["scope"]
+        return apply_action(session_id, "assign_role", payload)
+    if verb == "delete":
+        rid = opts.get("ids") or opts.get("id") or ""
+        if not rid:
+            return _az_error("the following arguments are required: --ids")
+        return apply_action(session_id, "remove_role_assignment", {"id": rid})
+    return _az_error(f"'{verb}' is not in the 'az role assignment' command group. {_AZ_HINT}")
+
+
+def _az_group(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    verb = args[0] if args else ""
+    if verb == "list":
+        rows = [[g.get("name", ""), g.get("location", ""), str(g.get("resources", 0))]
+                for g in state.get("resource_groups") or []]
+        return _az_ok(_az_table(["Name", "Location", "Resources"], rows))
+    if verb == "create":
+        name = opts.get("name") or ""
+        if not name:
+            return _az_error("the following arguments are required: --name/-n")
+        return apply_action(session_id, "create_resource_group",
+                            {"name": name, "location": opts.get("location") or "eastus"})
+    return _az_error(f"'{verb}' is not in the 'az group' command group. {_AZ_HINT}")
+
+
+def run_command(session_id: str, command: str) -> dict:
+    """Execute one `az ...` CLI line against the session state.
+
+    Returns a shell-shaped dict ({ok, rc, stdout, stderr}). Unrecognized
+    commands always come back rc!=0.
+    """
+    import shlex
+
+    raw = (command or "").strip()
+    if not raw:
+        return _az_error("the following arguments are required: _command_package. " + _AZ_HINT)
+
+    try:
+        tokens = shlex.split(raw)
+    except ValueError as exc:
+        return _az_error(f"Could not parse command ({exc})")
+
+    if not tokens:
+        return _az_error("the following arguments are required: _command_package. " + _AZ_HINT)
+
+    if tokens[0] != "az":
+        return _az_error(f"'{tokens[0]}' is not a recognized command. {_AZ_HINT}")
+    tokens = tokens[1:]
+    if not tokens:
+        return _az_error("the following arguments are required: _command_package. " + _AZ_HINT)
+
+    if tokens[0] in ("help", "--help", "-h"):
+        return _az_ok(_AZ_HELP)
+
+    entry = _ensure(session_id)
+    state = entry["state"]
+    _advance_lifecycle(state)
+
+    if not state.get("session", {}).get("logged_in"):
+        return _az_error(
+            "Please run 'az login' to setup account (or sign in to the Azure portal first).",
+        )
+
+    positionals, opts = _az_parse(tokens)
+    if not positionals:
+        return _az_error("the following arguments are required: _command_package. " + _AZ_HINT)
+
+    group = positionals[0]
+    args = positionals[1:]
+
+    if group == "login":
+        return _az_ok(f"Already signed in as {state['session'].get('user', '')}.")
+    if group == "vm":
+        return _az_vm(state, session_id, args, opts)
+    if group == "disk":
+        return _az_disk(state, session_id, args, opts)
+    if group == "network":
+        return _az_network(state, session_id, args, opts)
+    if group == "storage":
+        return _az_storage(state, session_id, args, opts)
+    if group == "keyvault":
+        return _az_keyvault(state, session_id, args, opts)
+    if group == "role":
+        return _az_role(state, session_id, args, opts)
+    if group == "group":
+        return _az_group(state, session_id, args, opts)
+    if group == "snapshot" and args and args[0] == "list":
+        rows = [[s.get("name", ""), s.get("source_disk", ""), str(s.get("size_gb", "")), s.get("created", "")]
+                for s in state.get("snapshots") or []]
+        return _az_ok(_az_table(["Name", "SourceDisk", "SizeGb", "Created"], rows))
+
+    return _az_error(f"'{group}' is not in the 'az' command group. {_AZ_HINT}")

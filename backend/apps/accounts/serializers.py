@@ -12,6 +12,10 @@ class RegisterSerializer(serializers.Serializer):
     last_name = serializers.CharField(required=False, allow_blank=True, max_length=30)
     # Optional. A wrong or expired code must never block a signup — see create().
     referral_code = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    # Explicit Terms/Privacy tick on the register form (audit Z4-8). Versions
+    # are still stamped from settings — the client only asserts that it showed
+    # the links; it does not choose which document version was accepted.
+    accepted_legal = serializers.BooleanField(write_only=True)
 
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
@@ -21,12 +25,20 @@ class RegisterSerializer(serializers.Serializer):
             )
         return value
 
+    def validate_accepted_legal(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                "You must accept the Terms of Service and Privacy Policy to create an account."
+            )
+        return value
+
     def create(self, validated_data):
         email = validated_data["email"]
         password = validated_data["password"]
         phone_number = validated_data.get("phone_number", "")
         first_name = validated_data.get("first_name", "")
         last_name = validated_data.get("last_name", "")
+        validated_data.pop("accepted_legal", None)
 
         user = User.objects.create_user(
             username=email,   # internally required by Django
@@ -36,11 +48,9 @@ class RegisterSerializer(serializers.Serializer):
             last_name=last_name,
         )
         # Create profile with phone number, and record which legal text this
-        # account agreed to (audit Z4-8). Signing up IS the acceptance — the
-        # register form states it — so the version is stamped here rather than
-        # behind a separate checkbox that would be one more thing to forget.
-        # Read from settings, not from the request: the client is not the
-        # authority on which version it was shown.
+        # account agreed to (audit Z4-8). The register form requires an explicit
+        # Terms/Privacy checkbox (`accepted_legal`); versions come from settings
+        # so the client cannot claim agreement to a document it was never shown.
         from django.conf import settings
         from django.utils import timezone
 

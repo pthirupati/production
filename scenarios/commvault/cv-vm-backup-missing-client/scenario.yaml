@@ -19,12 +19,10 @@ description: 'CONTEXT: A team operating Commvault backup operations has raised a
   Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline CommCell practice lab. The architecture
   is a single lab-primary node exposing CommServe, MediaAgent, backup plans, and restore
   jobs; treat it as the production host for this incident. All tools run locally —
   no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: Commvault Command Center with db01 flagged "Overdue" for
   backup health despite a correctly configured subclient and storage policy. A batch
@@ -37,13 +35,11 @@ description: 'CONTEXT: A team operating Commvault backup operations has raised a
   migrated VMs appear yet in Client Computers because they are still powered off in
   vCenter.
 
-
   OBJECTIVE: Open the VMware console (companion "Open VMware" link) and power on the
   migrated VM so it is discovered as a CommCell client; Sign in to the Commvault Command
   Center; Open Client Computers and locate db01, flagged "Overdue". Acceptance criteria:
   the change is minimal and reversible, and success means `systemctl is-active mysqld``
   returns active.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it
   and use the equivalent already on the host. Make the smallest configuration change
@@ -51,16 +47,13 @@ description: 'CONTEXT: A team operating Commvault backup operations has raised a
   backup plans, and restore jobs), changing one thing at a time. Check your work continuously
   against the objective — success means `systemctl is-active mysqld``` returns active.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active mysqld``
   returns active. Capture the before/after output as evidence. Success criteria: the
   objective''s healthy state holds on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately
   (restore the original config file / undo the edit / restart the affected component)
   and re-observe before trying another hypothesis. Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
   or fake completion with marker files — the checker validates real system state.'
@@ -120,7 +113,6 @@ hints:
 
     3. Run `systemctl restart mysqld` and confirm `systemctl is-active mysqld` succeeds.
 
-
     WHY: the grader checks real service state, not marker files.'
 summary: Discover a newly migrated VM as a CommCell client via the companion VMware
   console, then clear db01's overdue backup protection by running and completing a
@@ -136,7 +128,7 @@ tags:
 - commvault
 - backup
 - cross-technology
-linked_tutorial: commvault-fundamentals
+
 what_you_will_learn:
 - How CommCell client discovery works when backed by a VMware VSA proxy
 - Reading client Backup Health status (Protected / Overdue / Unprotected) in Client

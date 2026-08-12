@@ -15,36 +15,29 @@ description: 'CONTEXT: A security researcher filed a report against `fixitlab/ap
   open a pull request from a fork and read the repository''s `DEPLOY_TOKEN`. The token grants push access
   to the production container registry, so this is a full supply-chain compromise waiting to happen.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab. The
   repository''s workflow is `ci.yml`. All tools run locally — no paid APIs or external cloud calls are
   required.
-
 
   SYMPTOM / STARTING STATE: `ci.yml` is triggered by `pull_request_target`. That trigger runs in the BASE
   repository context, which is why it has access to repository secrets. The workflow then checks out
   `github.event.pull_request.head.sha` — the attacker''s code — and runs `npm ci`, which executes package
   lifecycle scripts. Untrusted code therefore runs in a job where `DEPLOY_TOKEN` is in scope.
 
-
   OBJECTIVE: Break the dangerous combination. The exposure requires all three of: a privileged trigger
   that carries secrets, a checkout of the untrusted fork head, and secret scope on that job. Removing
   ANY one of them closes the hole, and there is more than one correct answer. Acceptance criteria: a fork
   pull request can no longer run attacker-controlled code with `DEPLOY_TOKEN` available.
 
-
   WORK TO DO: Inspect the workflow trigger, the ref being checked out, and whether secrets are in scope.
   Decide which of the three legs to remove and justify it. Note that simply renaming the trigger while
   still handing secrets to a build of the fork head is NOT a fix.
 
-
   VERIFY: Re-run the checker and confirm the exposure is gone. Success criteria: the safe configuration
   holds on a repeat check.
 
-
   ROLLBACK: If a change makes things worse, revert that single change and re-observe before trying another
   hypothesis. Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not "fix" this by deleting the workflow or disabling CI entirely, and do not fake
   completion with marker files — the checker validates the real workflow configuration.'
@@ -101,7 +94,6 @@ hints:
 
     2. Re-run the checker.
 
-
     WHY: the grader re-derives the exposure from the live workflow — trigger, checkout ref, and secret
     scope together — so it accepts any genuinely safe configuration and rejects a cosmetic rename.'
 summary: Close a CI secret-exfiltration path where a fork pull request abuses `pull_request_target` to
@@ -118,7 +110,7 @@ tags:
 - supply-chain
 - hands-on
 - simulation
-linked_tutorial: devops-fundamentals
+linked_tutorial: devops-engineering-zero-hero
 what_you_will_learn:
 - Why `pull_request_target` carries repository secrets and `pull_request` does not
 - Why checking out `pull_request.head.sha` under a privileged trigger executes untrusted code

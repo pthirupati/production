@@ -238,10 +238,10 @@ const DISPLAY_AUTOCOMPLETE = [
 function ModalShell({ title, children, onClose }) {
   return (
     <div className="ws-modal-backdrop" onMouseDown={onClose}>
-      <div className="ws-modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="ws-modal" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
         <div className="ws-modal-head">
           <div className="font-semibold">{title}</div>
-          <button type="button" className="p-1 rounded hover:bg-slate-200" onClick={onClose}><X size={16} /></button>
+          <button type="button" className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-200" onClick={onClose} aria-label="Close dialog"><X size={16} /></button>
         </div>
         <div className="ws-modal-body">{children}</div>
       </div>
@@ -579,7 +579,7 @@ export default function WiresharkSimulator({
           [Network, 'Conversations', () => setModal('conversations')],
           [Settings, 'Capture Options', () => setModal('capture-options')],
         ].map(([Icon, title, action, klass]) => (
-          <button key={title} type="button" className={`ws-tool ${klass || ''}`} title={title} onClick={action}>
+          <button key={title} type="button" className={`ws-tool ${klass || ''}`} title={title} aria-label={title} onClick={action}>
             <Icon size={15} />
           </button>
         ))}

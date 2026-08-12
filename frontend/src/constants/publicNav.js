@@ -7,6 +7,8 @@
 export const PUBLIC_NAV_PRIMARY = [
   { to: '/pricing', label: 'Pricing' },
   { to: '/tutorials', label: 'Tutorials' },
+  { to: '/journeys', label: 'Journeys' },
+  { to: '/projects', label: 'Projects' },
   { to: '/certifications', label: 'Certifications' },
   { to: '/mock-interviews', label: 'AI Interviews' },
   { to: '/verify-certificate', label: 'Verify Certificate' },

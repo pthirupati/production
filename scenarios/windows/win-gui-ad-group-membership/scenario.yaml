@@ -16,11 +16,9 @@ description: 'CONTEXT: A team operating Windows Server has raised a ticket for `
   (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
   the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline Windows Server host. The architecture is a single
   lab-primary node exposing PowerShell, Server Manager, and AD tools; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: A domain-joined Windows Server 2022. The user jsmith is a member of Domain
 
@@ -28,28 +26,23 @@ description: 'CONTEXT: A team operating Windows Server has raised a ticket for `
 
   learner passes once jsmith is a member of Remote Desktop Users.
 
-
   OBJECTIVE: Open Active Directory Users and Computers and review jsmith''s group membership; Identify
   the correct group that grants Remote Desktop logon rights; Add jsmith to the Remote Desktop Users security
   group. Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits
   successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant PowerShell, Server Manager, and AD tools), changing one thing at a time. Check your
   work continuously against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -111,7 +104,6 @@ hints:
 
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 summary: 'Complete the windows gui: grant rdp access via security group membership windows lab and verify
@@ -124,7 +116,7 @@ tags:
 - fix
 - hands-on
 - windows
-linked_tutorial: windows-fundamentals
+linked_tutorial: windows-server-zero-hero
 what_you_will_learn:
 - Open Active Directory Users and Computers and review jsmith's group membership
 - Identify the correct group that grants Remote Desktop logon rights

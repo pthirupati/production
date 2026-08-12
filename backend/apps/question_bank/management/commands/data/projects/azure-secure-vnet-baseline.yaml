@@ -1,0 +1,33 @@
+technology_slug: azure
+title: Secure Azure VNet Baseline
+slug: azure-secure-vnet-baseline
+architecture_type: custom
+description: Build a hub-spoke VNet with NSGs and a private subnet for PaaS.
+objectives:
+- Complete the azure lab path for this project
+- Document acceptance evidence in the task checklist
+- Hand off a short runbook note
+difficulty: beginner
+estimated_hours: 3
+order: 1
+tasks:
+- jira_key: AZU1-1
+  title: Scope the environment
+  description: Inventory the starting state and constraints.
+  acceptance_criteria: Scope note lists inputs and success criteria.
+  hint: Start from the technology console overview.
+  order: 1
+- jira_key: AZU1-2
+  title: Apply the primary change
+  description: Execute the core configuration change for this project.
+  acceptance_criteria: Primary change is visible in the simulator state.
+  hint: Use the guided console for this technology.
+  order: 2
+  depends_on: AZU1-1
+- jira_key: AZU1-3
+  title: Validate and hand off
+  description: Run the check path and write a one-page handoff.
+  acceptance_criteria: Check Solution passes; handoff note attached.
+  hint: Use Check Solution after the change.
+  order: 3
+  depends_on: AZU1-2

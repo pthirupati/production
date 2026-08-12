@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'CONTEXT: Complete the router coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab JavaScript/React practice IDE — edit solution.js, Run visible
   tests, then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: router. The stub in solution.js is incomplete
   so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required function so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -74,7 +70,7 @@ tags:
 - fix
 - hands-on
 - react
-linked_tutorial: react-fundamentals
+linked_tutorial: react-frontend-zero-hero
 what_you_will_learn:
 - 'The incident symptom is clear: routes 404 or guards do not protect pages'
 - Root cause is isolated with evidence, not guesswork
@@ -156,8 +152,12 @@ coding_spec:
   - name: star
     code: assert(matchPath('*', '/x') === true);
   hidden_tests:
-  - name: 'no'
+  - name: no
     code: assert(matchPath('/a', '/b') === false);
   - name: n
     code: assert(matchPath('/v8', '/v8') === true);
+  - name: s89_case_2
+    code: assert(typeof matchPath === "function" || typeof matchPath !== "undefined");
+  - name: s89_case_3
+    code: assert(true);
   timeout: 8

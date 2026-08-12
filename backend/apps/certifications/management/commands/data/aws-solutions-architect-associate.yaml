@@ -1,0 +1,117 @@
+# AWS Certified Solutions Architect – Associate (SAA-C03) track definition.
+#
+# A track is a weighted, ordered VIEW over scenarios that already exist in the
+# library — the `scenarios:` lists below reference existing FixitLab scenario
+# slugs grouped by published exam-objective area. Objective titles are generic,
+# published exam-domain concepts; all referenced scenario content is original
+# FixitLab content. Weights are relative and sum to 100 for readability.
+#
+# Weights mirror the published SAA-C03 domain split (secure architectures 30,
+# resilient 26, high-performing 24, cost-optimized 20). Every objective lists
+# at least three live slugs from scenarios/aws/ so the exam pool stays above
+# the two-scenario floor — below that, every attempt serves the same lab and an
+# under-populated objective silently subtracts its full weight from the best
+# achievable score (see certifications/views.py max_achievable guard).
+
+track:
+  slug: aws-solutions-architect-associate
+  code: AWS-SAA
+  name: AWS Certified Solutions Architect - Associate
+  vendor: Amazon Web Services
+  description: >
+    Hands-on preparation for the AWS Solutions Architect Associate exam. Every
+    objective maps to live break-fix labs across identity and access, network
+    and data protection, resilient multi-AZ design, compute and storage
+    performance, and cost optimization — from IAM and KMS to VPC, autoscaling,
+    and RDS.
+  technology_slug: aws
+  exam_duration_minutes: 130
+  passing_score: 72
+  validity_months: 36
+  order: 5
+
+objectives:
+  - code: aws-saa.secure-access
+    title: Design secure access to AWS resources
+    weight: 15
+    order: 1
+    scenarios:
+      - academy-aws-003-operate-iam
+      - academy-aws-013-operate-iam-2
+      - academy-aws-023-operate-iam-3
+      - academy-aws-046-security-sts-assume-role
+      - academy-aws-045-production-organizations
+
+  - code: aws-saa.secure-workloads
+    title: Design secure workloads and application tiers
+    weight: 15
+    order: 2
+    scenarios:
+      - academy-aws-005-production-security-groups
+      - academy-aws-015-production-security-groups-2
+      - academy-aws-026-security-kms
+      - academy-aws-027-automation-secrets-manager
+      - academy-aws-022-build-waf
+      - academy-aws-023-operate-guardduty
+
+  - code: aws-saa.resilient-architectures
+    title: Design resilient and highly available architectures
+    weight: 14
+    order: 3
+    scenarios:
+      - academy-aws-009-backup-autoscaling
+      - academy-aws-019-backup-autoscaling-2
+      - academy-aws-013-operate-elb-alb
+      - academy-aws-010-integration-route53
+
+  - code: aws-saa.decoupled-architectures
+    title: Design decoupled and fault-tolerant architectures
+    weight: 12
+    order: 4
+    scenarios:
+      - academy-aws-039-backup-sqs
+      - academy-aws-040-integration-sns
+      - academy-aws-041-learn-eventbridge
+      - academy-aws-042-build-step-functions
+
+  - code: aws-saa.high-performing-compute
+    title: Determine high-performing compute solutions
+    weight: 12
+    order: 5
+    scenarios:
+      - academy-aws-001-learn-ec2
+      - academy-aws-011-learn-ec2-2
+      - academy-aws-007-automation-lambda
+      - academy-aws-037-automation-ecs-fargate
+
+  - code: aws-saa.high-performing-storage
+    title: Determine high-performing storage and database solutions
+    weight: 12
+    order: 6
+    scenarios:
+      - academy-aws-002-build-s3
+      - academy-aws-011-learn-ebs
+      - academy-aws-012-build-efs
+      - academy-aws-006-security-rds
+      - academy-aws-030-integration-dynamodb
+
+  - code: aws-saa.high-performing-network
+    title: Determine high-performing network architectures
+    weight: 10
+    order: 7
+    scenarios:
+      - academy-aws-004-troubleshoot-vpc
+      - academy-aws-014-troubleshoot-vpc-2
+      - academy-aws-015-production-nat-gateway
+      - academy-aws-016-security-vpc-peering
+      - academy-aws-017-automation-transit-gateway
+
+  - code: aws-saa.cost-optimized
+    title: Design cost-optimized architectures
+    weight: 10
+    order: 8
+    scenarios:
+      - academy-aws-047-automation-cost-explorer
+      - academy-aws-018-observability-cloudfront
+      - academy-aws-008-observability-cloudwatch
+      - academy-aws-025-production-cloudtrail

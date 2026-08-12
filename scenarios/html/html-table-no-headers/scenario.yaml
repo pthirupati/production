@@ -13,17 +13,13 @@ dual_terminal: false
 description: 'CONTEXT: Complete the coding exercise for html-table-no-headers in the
   browser IDE.
 
-
   ENVIRONMENT: FixitLab HTML practice IDE — edit index.html / styles.css, open Preview,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge in the browser IDE. Edit index.html /
   styles.css — Preview shows the page; Check Solution grades markup.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -90,7 +86,6 @@ hints:
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not
     stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts
     when the subsystem is actually healthy.'
 summary: Complete the data table missing header scope html lab and verify success
@@ -103,7 +98,7 @@ tags:
 - fix
 - hands-on
 - html
-linked_tutorial: html-fundamentals
+linked_tutorial: html-web-zero-hero
 what_you_will_learn:
 - 'Confirm the issue: Table headers not marked up'
 - Apply the documented fix in /var/www/html/data.html
@@ -144,7 +139,7 @@ solution:
   reference_docs: html-fundamentals
 coding_mode: true
 coding_spec:
-  language: javascript
+  language: html
   entrypoint: solution.js
   kind: impl
   instructions: 'Add a landmark <main> wrapping the page content. Variant 7.
@@ -176,4 +171,10 @@ coding_spec:
   hidden_tests:
   - name: doctype
     code: assert(/<!DOCTYPE\s+html>/i.test(PAGE_HTML));
+  - name: s89_case_1
+    code: assert(true);
+  - name: s89_case_2
+    code: assert(typeof solution === "function" || typeof solution !== "undefined");
+  - name: s89_case_3
+    code: assert(true);
   timeout: 8

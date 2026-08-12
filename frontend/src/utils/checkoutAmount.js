@@ -84,3 +84,24 @@ export function hasDisplayableGst(gst) {
   const amount = Number(gst.gst_amount)
   return Number.isFinite(amount) && amount > 0
 }
+
+/**
+ * Display amount in INR for the payment summary (audit Z1-14 remainder).
+ *
+ * Precedence, strongest first:
+ *   1. Server GST total / create-order amount (cannot be edited via `?amount=`).
+ *   2. Renew/cert bootstrap amount (also server-derived).
+ *   3. URL `?amount=` as a last-resort navigation hint only — never preferred
+ *      over a figure the server has already computed.
+ */
+export function resolveDisplayAmountInr({
+  serverTotalInr,
+  bootstrapAmountInr,
+  urlAmountInr,
+} = {}) {
+  for (const candidate of [serverTotalInr, bootstrapAmountInr, urlAmountInr]) {
+    const n = Number(candidate)
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return 0
+}

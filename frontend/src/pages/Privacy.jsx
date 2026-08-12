@@ -1,7 +1,7 @@
 import PublicLayout from '../components/layout/PublicLayout'
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
-import { Shield, Lock, Eye, Database, UserCheck, FileText, ExternalLink, Cookie } from 'lucide-react'
+import { Lock, Eye, Database, UserCheck, FileText, ExternalLink, Cookie } from 'lucide-react'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { PRIVACY_EMAIL } from '../constants/contact'
 
@@ -57,6 +57,7 @@ export default function Privacy() {
         'Export your lab history and progress data',
         'Request deletion of interview resumes, transcripts, and reports',
         'Accounts without any subscription for 3 months may be deleted after a warning email — all data is removed from our database',
+        'After an inactive account is deleted we keep only the email address for a limited anti-abuse window (configurable; default off until an operator sets RETENTION_ACCOUNT_LIFECYCLE_DAYS) so the same address cannot immediately re-register as a new free account. That record is then purged.',
       ],
     },
     {
@@ -138,6 +139,24 @@ export default function Privacy() {
             </ul>
           </FixitPanel>
 
+          <FixitPanel padding="p-8" className="border-cyan-500/20 animate-fade-in">
+            <h2 className="text-xl font-bold text-white mb-4">Itemised notice at collection (DPDP §5)</h2>
+            <p className="text-surface-300 text-sm mb-3">
+              When you create an account or start an interview we collect the following, for the
+              stated purpose, on the stated basis. You can withdraw consent for optional items
+              without losing access to the core learning product.
+            </p>
+            <ul className="space-y-2 text-surface-300 text-sm">
+              <li><strong className="text-white">Account identity</strong> (name, email, password hash) — to create and secure your account. Necessary for the service.</li>
+              <li><strong className="text-white">Lab activity</strong> (commands, session state, scores) — to run labs and show progress. Necessary for the service.</li>
+              <li><strong className="text-white">Interview media status + transcript text</strong> — to run AI Interview Studio after you consent per session. Withdrawable by ending the session or deleting the interview.</li>
+              <li><strong className="text-white">Resume upload</strong> — optional; used only to tailor interview questions. Delete anytime from Interview Studio profile.</li>
+              <li><strong className="text-white">Payment details</strong> — processed by Razorpay/Stripe; we store subscription status, not card numbers. Necessary for paid plans.</li>
+              <li><strong className="text-white">Marketing email</strong> — optional; off by default until you opt in. Withdraw via Profile → Notifications or any unsubscribe link.</li>
+              <li><strong className="text-white">Children</strong> — FixitLab is not directed at users under 18. We do not knowingly process children&apos;s data. If you believe a minor has an account, email the contact below for deletion.</li>
+            </ul>
+          </FixitPanel>
+
           <FixitPanel hero padding="p-8" className="border-accent-green/20 animate-fade-in">
             <h2 className="text-xl font-bold text-white mb-4">Exercising your rights</h2>
             <p className="text-surface-300 text-sm mb-3">
@@ -148,6 +167,7 @@ export default function Privacy() {
               <li><strong className="text-white">Delete your resume</strong> — Interview Studio → profile. Removes the file and the parsed text.</li>
               <li><strong className="text-white">Delete an interview</strong> — from your interview history. Removes the transcript and report.</li>
               <li><strong className="text-white">Withdraw marketing consent</strong> — Profile → Notifications, or the unsubscribe link in any marketing email.</li>
+              <li><strong className="text-white">Withdraw processing consent beyond marketing</strong> — Profile → Interview data processing (blocks new rounds), delete resume/interview history, or Profile → Delete account for full erasure (DPDP §6(4)).</li>
               <li><strong className="text-white">Delete your account</strong> — Profile → Delete account. Removes your data, including uploaded files.</li>
             </ul>
             <p className="text-surface-300 text-sm mt-4">
@@ -203,8 +223,14 @@ export default function Privacy() {
               <li><strong className="text-white">Atlassian Jira</strong> — only if your organisation connects it for ticket-based labs. Off by default; labs use a built-in simulated ticket system.</li>
             </ul>
             <p className="text-surface-400 text-xs mt-3">
-              Some of these providers operate outside India and your data may be
-              processed there.
+              Some of these providers operate outside India. Where personal data is
+              transferred internationally (for example to Stripe, Google, Sentry or
+              Atlassian), we rely on{' '}
+              <strong className="text-surface-300">Standard Contractual Clauses (SCCs)</strong>
+              {' '}or an equivalent lawful transfer mechanism under DPDP and, where
+              applicable, GDPR. DigitalOcean Bangalore remains our primary hosting
+              region in India; payment and optional sign-in providers may process
+              limited account data in their regions under those safeguards.
             </p>
           </FixitPanel>
 

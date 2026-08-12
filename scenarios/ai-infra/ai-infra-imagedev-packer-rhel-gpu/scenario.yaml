@@ -16,19 +16,15 @@ description: 'CONTEXT: ImageDev (PSINFRA/ImageDev) needs a RHEL-based GPU base i
   libguestfs may inspect it, then publish into MAAS as custom/rhel-gpu so Bare Metal can
   Deploy Ready nodes.
 
-
   ENVIRONMENT: AI Infrastructure Engineering lab — Packer workspace IDE, MAAS Images pane,
   Lab Terminal. No external cloud. Treat Packer→MAAS as the production image factory path.
-
 
   SYMPTOM / STARTING STATE: custom/rhel-gpu is missing from MAAS boot-resources. Ready nodes
   still deploy stock Ubuntu. ImageDev ticket blocks RHEL GPU bring-up.
 
-
   OBJECTIVE: Open Packer; validate and build the RHEL GPU template; Publish to MAAS;
   confirm Images lists custom/rhel-gpu; Deploy a Ready machine selecting that boot resource;
   leave FIXED-OK.
-
 
   VERIFY: MAAS Images shows custom/rhel-gpu; Deployed machine os references custom/rhel-gpu.'
 objectives:

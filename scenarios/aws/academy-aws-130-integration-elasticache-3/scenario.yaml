@@ -15,21 +15,17 @@ description: 'CONTEXT: A team operating AWS cloud operations has raised a ticket
   Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline AWS practice account. The architecture is a single
   lab-primary node exposing AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform;
   treat it as the production host for this incident. All tools run locally — no paid APIs or external
   cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Two systems are deployed but not fully wired together for Elasticache. Downstream
   consumers are waiting on this integration path.
-
 
   OBJECTIVE: Elasticache is connected to the adjacent system successfully; Handoff points are authenticated
   and observable; End-to-end workflow completes without manual intervention. Acceptance criteria: the
   change is minimal and reversible, and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
@@ -37,16 +33,13 @@ description: 'CONTEXT: A team operating AWS cloud operations has raised a ticket
   changing one thing at a time. Check your work continuously against the objective — success means `check.sh`
   exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -107,7 +100,6 @@ hints:
 
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 cross_technology: true
@@ -120,7 +112,7 @@ tags:
 - aws
 - do
 - hands-on
-linked_tutorial: aws-fundamentals
+linked_tutorial: aws-cloud-zero-hero
 what_you_will_learn:
 - Elasticache is connected to the adjacent system successfully
 - Handoff points are authenticated and observable

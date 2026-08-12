@@ -165,7 +165,7 @@ class InterviewRoundSerializer(serializers.ModelSerializer):
             "schedule_deadline", "started_at", "ended_at", "ends_at", "paused_at", "pass_threshold",
             "overall_score", "persona_name", "persona_voice_id", "invite_token",
             "questions_asked", "difficulty_level", "practical_lab_session_id", "is_sample",
-            "mode", "last_practical_submission", "messages", "report", "host_state",
+            "mode", "language", "last_practical_submission", "messages", "report", "host_state",
         )
 
     def get_messages(self, obj):

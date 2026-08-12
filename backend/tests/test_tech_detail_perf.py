@@ -81,7 +81,10 @@ class TechDetailPerfTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         tech_data = resp.json()["technology"]
         self.assertEqual(tech_data["scenario_count"], 9)
-        self.assertEqual(tech_data["difficulty_counts"], {"easy": 3, "medium": 3, "hard": 3})
+        self.assertEqual(
+            tech_data["difficulty_counts"],
+            {"easy": 3, "medium": 3, "hard": 3, "expert": 0},
+        )
         self.assertEqual(tech_data["categories"], ["Debug", "Deploy", "Fix"])
 
     def test_certification_only_excluded_from_counts(self):
@@ -113,7 +116,10 @@ class TechDetailPerfTest(TestCase):
         cache.clear()
         tech_data = self.client.get(self._url()).json()["technology"]
         self.assertEqual(tech_data["scenario_count"], 9)
-        self.assertEqual(tech_data["difficulty_counts"], {"easy": 3, "medium": 3, "hard": 3})
+        self.assertEqual(
+            tech_data["difficulty_counts"],
+            {"easy": 3, "medium": 3, "hard": 3, "expert": 0},
+        )
         self.assertNotIn("Secret", tech_data["categories"])
         self.assertNotIn("Hidden", tech_data["categories"])
 

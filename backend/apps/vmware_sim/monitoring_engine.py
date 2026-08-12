@@ -534,6 +534,56 @@ def eval_promql(query: str, broken: dict, t: float | None = None) -> dict:
     return {"status": "success", "data": {"resultType": "vector", "result": result}}
 
 
+def prometheus_http_api(url_or_path: str, broken: dict | None = None) -> tuple[int, dict]:
+    """Prometheus HTTP API surface for curl teaching labs (audit Y3 residual).
+
+    Routes ``/api/v1/query`` and ``/api/v1/query_range`` through :func:`eval_promql`
+    so CLI and UI cannot diverge. Returns ``(http_status, body)``.
+    """
+    from urllib.parse import parse_qs, urlparse
+
+    broken = broken or {}
+    raw = (url_or_path or "").strip()
+    if not raw:
+        return 400, {"status": "error", "error": "empty URL", "data": None}
+
+    if "://" in raw:
+        parsed = urlparse(raw)
+        path = parsed.path or "/"
+        qs = parse_qs(parsed.query)
+    elif "?" in raw:
+        path, q = raw.split("?", 1)
+        qs = parse_qs(q)
+    else:
+        path, qs = raw, {}
+
+    norm = path.rstrip("/") or "/"
+    expr = (qs.get("query") or [""])[0]
+
+    if norm.endswith("/api/v1/query"):
+        return 200, eval_promql(expr, broken)
+
+    if norm.endswith("/api/v1/query_range"):
+        # Teaching stub: same samples as instant, shaped as a one-point matrix.
+        instant = eval_promql(expr, broken)
+        if instant.get("status") != "success":
+            return 200, instant
+        matrix = []
+        for row in instant.get("data", {}).get("result") or []:
+            ts, val = row.get("value") or [0, "0"]
+            matrix.append({"metric": row.get("metric") or {}, "values": [[ts, val]]})
+        return 200, {"status": "success", "data": {"resultType": "matrix", "result": matrix}}
+
+    if norm.endswith("/-/healthy") or norm.endswith("/-/ready"):
+        return 200, {"status": "success"}
+
+    return 404, {
+        "status": "error",
+        "error": f"Prometheus HTTP API: unknown path {path}",
+        "data": None,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Alert rule evaluation.
 #
@@ -1118,6 +1168,13 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _merge_bridge_workloads(state, session_id)
         res = eval_promql(expr, broken)
         return {"ok": True, "query": expr, "result": res}
+
+    if action in ("prometheus_http", "prom_http", "http_api"):
+        # curl-shaped Prometheus HTTP API (Y3). Same evaluator as `query`.
+        _merge_bridge_workloads(state, session_id)
+        url = payload.get("url") or payload.get("path") or ""
+        status, body = prometheus_http_api(url, broken)
+        return {"ok": status < 400, "status": status, "body": body}
 
     if action == "test_datasource":
         uid = payload.get("uid")

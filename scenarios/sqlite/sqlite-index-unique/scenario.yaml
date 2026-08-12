@@ -1,8 +1,4 @@
-# Unpublished: this lab ships a bare `raise NotImplementedError` stub with no
-# starter code, no seeded fault and only a `placeholder` grader, so there is
-# nothing to diagnose and any trivial return earns XP. Set is_active: true
-# once it has real content and a grader that checks it (audit §G1).
-is_active: false
+is_active: true
 title: Add unique index for dedup
 slug: sqlite-index-unique
 technology: sqlite
@@ -11,35 +7,28 @@ description: 'CONTEXT: A team operating SQLite has raised a ticket for `Add uniq
   customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it. Business
   impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline SQLite database file. The architecture is a single
   lab-primary node exposing sqlite3 CLI, schema, WAL mode, and pragmas; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Duplicate emails slip through without a unique constraint.
-
 
   OBJECTIVE: Understand the current failure mode affecting Add unique index for dedup; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant sqlite3 CLI, schema, WAL mode, and pragmas), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -102,23 +91,65 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: Duplicate emails slip through without a unique constraint.
+  instructions: 'Duplicate emails slip through. Fix solution(conn) so it de-duplicates the existing `users`
+    table and then adds a UNIQUE index named ''idx_users_email'' on email. Keep the LOWEST id for each
+    duplicated email and delete the rest. Return the number of rows deleted. Emails differing only by
+    case are NOT duplicates here - compare them exactly.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn):\n    # BUG: creates the index without clearing existing duplicates first,\
+      \ so\n    # the CREATE fails on any table that already has them.\n    conn.execute(\"CREATE UNIQUE\
+      \ INDEX idx_users_email ON users(email)\")\n    return 0\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert solution() is not None
+  - name: duplicates are removed and counted
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ users VALUES (?,?)\", rows)\n    return conn\ndef _ids(conn):\n    return [r[0] for r in conn.execute(\"\
+      SELECT id FROM users ORDER BY id\")]\nconn = _seed([(1,'a@x'),(2,'a@x'),(3,'b@x')])\nassert solution(conn)\
+      \ == 1, solution(conn)\n"
+  - name: lowest id survives
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ users VALUES (?,?)\", rows)\n    return conn\ndef _ids(conn):\n    return [r[0] for r in conn.execute(\"\
+      SELECT id FROM users ORDER BY id\")]\nconn = _seed([(1,'a@x'),(2,'a@x'),(3,'b@x')])\nsolution(conn)\n\
+      assert _ids(conn) == [1,3], _ids(conn)\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert solution() is not None
+  - name: unique index exists afterwards
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ users VALUES (?,?)\", rows)\n    return conn\ndef _ids(conn):\n    return [r[0] for r in conn.execute(\"\
+      SELECT id FROM users ORDER BY id\")]\nconn = _seed([(1,'a@x'),(2,'a@x')])\nsolution(conn)\nidx =\
+      \ conn.execute(\"SELECT name FROM sqlite_master WHERE type='index' \"\n                   \"AND\
+      \ name='idx_users_email'\").fetchall()\nassert idx, 'idx_users_email was not created'\n"
+  - name: index really rejects a new duplicate
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ users VALUES (?,?)\", rows)\n    return conn\ndef _ids(conn):\n    return [r[0] for r in conn.execute(\"\
+      SELECT id FROM users ORDER BY id\")]\nconn = _seed([(1,'a@x'),(2,'a@x')])\nsolution(conn)\nimport\
+      \ sqlite3\ntry:\n    conn.execute(\"INSERT INTO users VALUES (99,'a@x')\")\n    raise AssertionError('duplicate\
+      \ was accepted')\nexcept sqlite3.IntegrityError:\n    pass\n"
+  - name: already-clean table deletes nothing
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ users VALUES (?,?)\", rows)\n    return conn\ndef _ids(conn):\n    return [r[0] for r in conn.execute(\"\
+      SELECT id FROM users ORDER BY id\")]\nconn = _seed([(1,'a@x'),(2,'b@x')])\nassert solution(conn)\
+      \ == 0, solution(conn)\n"
+  - name: case differences are not duplicates
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ users VALUES (?,?)\", rows)\n    return conn\ndef _ids(conn):\n    return [r[0] for r in conn.execute(\"\
+      SELECT id FROM users ORDER BY id\")]\nconn = _seed([(1,'a@x'),(2,'A@X')])\nassert solution(conn)\
+      \ == 0 and _ids(conn) == [1,2], (solution, _ids(conn))\n"
   timeout: 8
 summary: Complete the add unique index for dedup sqlite lab and verify success with the checker
 estimated_minutes: 20
@@ -129,7 +160,7 @@ tags:
 - fix
 - hands-on
 - sqlite
-linked_tutorial: sqlite-fundamentals
+linked_tutorial: sqlite-embedded-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Add unique index for dedup
 - Restore expected service behavior with a minimal, documented change

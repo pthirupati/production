@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CheckCircle2, Clock, Mic2 } from 'lucide-react'
+import { CheckCircle2, Clock, Mic2 } from '../../ui/eagerIcons'
 
 const PANELS = [
   { id: 0, badge: 'Linux lab · live', badgeColor: '#56e0b0', borderColor: 'rgba(86,224,176,.35)' },

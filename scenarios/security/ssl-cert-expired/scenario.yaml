@@ -12,15 +12,12 @@ description: 'CONTEXT: A team operating security hardening has raised a ticket f
   resolve it. Business impact: reduced service reliability and blocked users until the underlying state
   is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline hardening lab. The architecture is a single lab-primary
   node exposing SSH, firewall, TLS, audit logs, and IAM settings; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Linux server running nginx with an expired (or about-to-expire) TLS certificate
   at /etc/nginx/ssl/cert.pem, causing HTTPS validation failures.
-
 
   OBJECTIVE: Confirm the current certificate''s expiry; Generate/install a new valid certificate and key;
   Reload nginx and verify HTTPS serves a non-expired certificate; then prevent the recurrence — a renewed
@@ -29,22 +26,18 @@ description: 'CONTEXT: A team operating security hardening has raised a ticket f
   or a systemd timer. Acceptance criteria: the change is minimal and reversible, and success means HTTP
   200 from http://localhost with the monitor installed and scheduled.
 
-
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant SSH, firewall, TLS, audit logs, and IAM settings), changing one thing at a time.
   Check your work continuously against the objective — success means HTTP 200 from http://localhost.
 
-
   VERIFY: Re-run the same check the grader uses and confirm HTTP 200 from http://localhost. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -114,7 +107,6 @@ hints:
 
     4. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 summary: Complete the renew expired ssl certificate security lab and verify success with the checker
@@ -126,7 +118,7 @@ tags:
 - fix
 - hands-on
 - security
-linked_tutorial: security-fundamentals
+linked_tutorial: cybersecurity-zero-hero
 what_you_will_learn:
 - Confirm the current certificate's expiry
 - Generate/install a new valid certificate and key

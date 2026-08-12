@@ -58,3 +58,89 @@ describe('2D↔3D action parity keys', () => {
     expect(new Set(shared).size).toBe(shared.length)
   })
 })
+
+describe('LOD face-detail cull contract', () => {
+  it('ServerFaceDetail distance-culls face detail', async () => {
+    const fs = await import('fs')
+    const src = await fs.promises.readFile(
+      new URL('./DatacenterTwin3D.jsx', import.meta.url),
+      'utf8',
+    )
+    const face = src.slice(src.indexOf('function ServerFaceDetail'), src.indexOf('function RackInner'))
+    expect(face).toContain('FACE_DETAIL_MAX_DIST')
+    expect(face).toContain('FACE_HTML_MAX_DIST')
+    expect(face).toContain('distanceTo')
+    expect(face).toContain('group.current.visible')
+  })
+})
+
+describe('shadow map quality contract', () => {
+  it('high quality uses 2048² shadow map; medium keeps 1024', async () => {
+    const fs = await import('fs')
+    const src = await fs.promises.readFile(
+      new URL('./DatacenterTwin3D.jsx', import.meta.url),
+      'utf8',
+    )
+    expect(src).toContain('shadowMap: 2048')
+    expect(src).toContain('shadowMap: 1024')
+    expect(src).toContain('shadow-camera-left={-12}')
+    expect(src).toContain('shadowMapSize={qualityCfg.shadowMap}')
+  })
+})
+
+describe('bloom postprocessing contract', () => {
+  it('gates Bloom on qualityCfg.bloom and imports postprocessing', async () => {
+    const fs = await import('fs')
+    const pkg = JSON.parse(await fs.promises.readFile(
+      new URL('../../../package.json', import.meta.url),
+      'utf8',
+    ))
+    expect(pkg.dependencies['@react-three/postprocessing']).toBeTruthy()
+    const src = await fs.promises.readFile(
+      new URL('./DatacenterTwin3D.jsx', import.meta.url),
+      'utf8',
+    )
+    expect(src).toContain("@react-three/postprocessing")
+    expect(src).toContain('bloom: false')
+    expect(src).toContain('bloom: true')
+    expect(src).toContain('qualityCfg.bloom')
+    expect(src).toContain('<Bloom')
+  })
+})
+
+describe('procedural textures contract', () => {
+  it('Floor and racks use DcTextures canvas maps', async () => {
+    const fs = await import('fs')
+    const src = await fs.promises.readFile(
+      new URL('./DatacenterTwin3D.jsx', import.meta.url),
+      'utf8',
+    )
+    expect(src).toContain("from './DcTextures'")
+    expect(src).toContain('makeFloorTileTexture')
+    expect(src).toContain('makeBrushedMetalTexture')
+    const tex = await fs.promises.readFile(
+      new URL('./DcTextures.js', import.meta.url),
+      'utf8',
+    )
+    expect(tex).toContain('CanvasTexture')
+  })
+})
+
+describe('walkable 3D room types', () => {
+  it('gates 3D twin on network/mechanical/electrical/security/campus/office/ops', async () => {
+    const fs = await import('fs')
+    const src = await fs.promises.readFile(
+      new URL('./DatacenterSimulator.jsx', import.meta.url),
+      'utf8',
+    )
+    expect(src).toContain("WALKABLE_3D_ROOM_TYPES")
+    expect(src).toContain("'network'")
+    expect(src).toContain("'mechanical'")
+    expect(src).toContain("'electrical'")
+    expect(src).toContain("'security'")
+    expect(src).toContain("'campus'")
+    expect(src).toContain("'office'")
+    expect(src).toContain("'ops'")
+    expect(src).toContain('isWalkable3dRoom(currentRoom.type)')
+  })
+})

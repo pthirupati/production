@@ -293,14 +293,51 @@ _SIM_IDLE_TTL_SECONDS = 2 * 60 * 60  # 2x LAB_MAX_DURATION_MINUTES default (60m)
 # resident in more than one process at once without the cap biting in normal use.
 _SIM_MAX_SESSIONS = int(os.environ.get("SIM_MAX_SESSIONS_PER_PROCESS", "32") or 32)
 
+# Soft-evict streamless hot copies (audit Z5-1 best decision, session 92).
+#
+# Design: Redis/cache is the *authority* for engine snapshots (put / hydrate /
+# write-through / mutated_at authority). Process-local `_SIM_SESSIONS` is a hot
+# cache PLUS WebSocket stream handles — streams *must* stay process-local.
+#
+# When an entry has no live streams and has been idle beyond this soft TTL,
+# drop the local engine object after flushing to Redis. Next access rehydrates
+# from cache (same path as a cross-worker miss). This collapses multi-worker
+# hot copies for idle labs without inventing a fake “streams in Redis” design.
+#
+# Set SIM_ENGINE_SOFT_IDLE_SECONDS=0 to disable soft-evict (hard 2h TTL remains).
+_SIM_SOFT_IDLE_SECONDS = int(os.environ.get("SIM_ENGINE_SOFT_IDLE_SECONDS", "300") or 0)
+
 
 def _touch(entry: dict) -> dict:
     entry["last_access"] = time.time()
     return entry
 
 
+def _soft_evict_streamless_locked() -> int:
+    """Drop idle, streamless hot engines; Redis remains authority. Holds _SIM_LOCK."""
+    if _SIM_SOFT_IDLE_SECONDS <= 0:
+        return 0
+    cutoff = time.time() - _SIM_SOFT_IDLE_SECONDS
+    victims = [
+        sid for sid, e in _SIM_SESSIONS.items()
+        if e.get("last_access", 0) < cutoff and not (e.get("streams") or {})
+    ]
+    for sid in victims:
+        entry = _SIM_SESSIONS.pop(sid, None)
+        if not entry:
+            continue
+        _cache_put_before_drop(sid, entry)
+    if victims:
+        logger.info(
+            "Soft-evicted %d streamless sim engine(s) to Redis; %d remain local",
+            len(victims), len(_SIM_SESSIONS),
+        )
+    return len(victims)
+
+
 def _evict_idle_locked() -> int:
-    """Drop entries idle beyond the TTL. Caller must hold _SIM_LOCK."""
+    """Drop soft-idle streamless engines, then hard-TTL entries. Holds _SIM_LOCK."""
+    dropped = _soft_evict_streamless_locked()
     cutoff = time.time() - _SIM_IDLE_TTL_SECONDS
     stale = [
         sid for sid, e in _SIM_SESSIONS.items()
@@ -310,17 +347,31 @@ def _evict_idle_locked() -> int:
         entry = _SIM_SESSIONS.pop(sid, None)
         if not entry:
             continue
+        _cache_put_before_drop(sid, entry)
         for stream in (entry.get("streams") or {}).values():
             try:
                 stream.close()
             except Exception:
                 pass
+        dropped += 1
     if stale:
         logger.info(
             "Evicted %d idle simulation session(s) from this worker; %d remain",
             len(stale), len(_SIM_SESSIONS),
         )
-    return len(stale)
+    return dropped
+
+
+def _cache_put_before_drop(sid: str, entry: dict) -> None:
+    """Flush engine to shared cache before dropping the process-local copy (Z5-1)."""
+    try:
+        engine = (entry.get("state") or {}).get("engine")
+        if engine is None:
+            return
+        from .sim_persistence import cache_put_engine_snapshot
+        cache_put_engine_snapshot(str(sid), engine=engine)
+    except Exception:
+        logger.debug("cache put before drop failed for %s", sid, exc_info=True)
 
 
 def _enforce_max_locked() -> int:
@@ -339,6 +390,7 @@ def _enforce_max_locked() -> int:
         entry = _SIM_SESSIONS.pop(sid, None)
         if not entry:
             continue
+        _cache_put_before_drop(sid, entry)
         for stream in (entry.get("streams") or {}).values():
             try:
                 stream.close()
@@ -375,6 +427,7 @@ def register_sim_session(session_id: str, resource_id: str, sim_type: str, state
             "sim_type": sim_type,
             "state": state,
             "streams": {},
+            "engine_mutated_at": time.time(),
         })
         # After inserting, so the session just registered is the most recently used
         # and can never be the one evicted by its own registration.
@@ -386,12 +439,94 @@ def register_sim_session(session_id: str, resource_id: str, sim_type: str, state
     os_state = getattr(getattr(engine, "shell", None), "state", None)
     if os_state is not None:
         os_state.session_id = str(session_id)
+    # Shared-cache mirror for cross-worker rehydrate (audit Z5-1 partial).
+    if engine is not None:
+        try:
+            from .sim_persistence import cache_put_engine_snapshot
+
+            cache_put_engine_snapshot(str(session_id), engine=engine)
+        except Exception:
+            pass
 
 
 def get_sim_session(session_id: str) -> dict | None:
+    """Return the process-local session entry, or hydrate from shared cache.
+
+    Cross-worker miss path (audit Z5-1): when this uvicorn worker never saw the
+    session, try the Redis/cache engine blob before forcing a full
+    ``ensure_sim_session`` rebuild from Postgres. Live streams are still empty
+    here — the websocket reattaches on the worker that owns them.
+
+    Cache-authority path (``SIM_ENGINE_CACHE_AUTHORITY``, default on): if this
+    worker already has a hot copy but Redis holds a *newer* ``mutated_at``
+    snapshot (another worker wrote through), replace the local engine so the
+    two workers do not diverge indefinitely. Streams stay process-local.
+    """
+    sid = str(session_id)
     with _SIM_LOCK:
-        entry = _SIM_SESSIONS.get(str(session_id))
+        entry = _SIM_SESSIONS.get(sid)
+        if entry is not None:
+            entry = _touch(entry)
+            # Fall through outside the lock for optional cache refresh.
+        else:
+            entry = None
+
+    if entry is not None:
+        if os.environ.get("SIM_ENGINE_CACHE_AUTHORITY", "1") != "0":
+            try:
+                from .sim_persistence import cache_get_snapshot, restore_engine
+
+                snap = cache_get_snapshot(sid)
+                local_ts = float(entry.get("engine_mutated_at") or 0)
+                remote_ts = float((snap or {}).get("mutated_at") or 0)
+                if snap is not None and remote_ts > local_ts + 0.001:
+                    engine = restore_engine(snap)
+                    with _SIM_LOCK:
+                        cur = _SIM_SESSIONS.get(sid)
+                        if cur is not None:
+                            cur["state"] = {**(cur.get("state") or {}), "engine": engine}
+                            cur["engine_mutated_at"] = remote_ts
+                            return _touch(cur)
+            except Exception:
+                logger.debug("cache authority refresh failed for %s", sid, exc_info=True)
+        return entry
+
+    if os.environ.get("SIM_ENGINE_CACHE_HYDRATE", "1") == "0":
+        return None
+
+    try:
+        from .sim_persistence import cache_get_engine, cache_get_snapshot
+
+        engine = cache_get_engine(sid)
+        snap = cache_get_snapshot(sid) if engine is not None else None
+    except Exception:
+        return None
+    if engine is None:
+        return None
+
+    sim_type = getattr(engine, "simulation_type", None) or "generic"
+    register_sim_session(
+        sid,
+        resource_id=f"cache-hydrate:{sid}",
+        sim_type=str(sim_type),
+        state={"engine": engine},
+    )
+    with _SIM_LOCK:
+        entry = _SIM_SESSIONS.get(sid)
+        if entry is not None and snap is not None:
+            entry["engine_mutated_at"] = float(snap.get("mutated_at") or time.time())
         return _touch(entry) if entry is not None else None
+
+
+def mark_sim_engine_mutated(session_id: str) -> None:
+    """Bump local ``engine_mutated_at`` after a write-through (keeps authority honest)."""
+    sid = str(session_id)
+    now = time.time()
+    with _SIM_LOCK:
+        entry = _SIM_SESSIONS.get(sid)
+        if entry is not None:
+            entry["engine_mutated_at"] = now
+            _touch(entry)
 
 
 def get_sim_session_by_resource(resource_id: str) -> dict | None:
@@ -411,3 +546,9 @@ def drop_sim_session(session_id: str) -> None:
                     stream.close()
                 except Exception:
                     pass
+    try:
+        from .sim_persistence import cache_drop_engine
+
+        cache_drop_engine(str(session_id))
+    except Exception:
+        pass

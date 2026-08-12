@@ -109,3 +109,35 @@ export function breadcrumbSchema(trail) {
     })),
   }
 }
+
+/**
+ * BlogPosting for a published article — the missing half of Z6-7 JSON-LD.
+ * headline + datePublished are the fields Google uses for article rich results.
+ */
+export function blogPostingSchema(post) {
+  if (!post?.title || !post?.slug) return null
+  const url = `${ORIGIN}/blog/${post.slug}`
+  const description = post.excerpt || post.subtitle || undefined
+  const published = post.published_at || post.created_at || post.date || undefined
+  const modified = post.updated_at || published
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.title,
+    ...(description ? { description } : {}),
+    url,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+    ...(published ? { datePublished: published } : {}),
+    ...(modified ? { dateModified: modified } : {}),
+    author: {
+      '@type': 'Person',
+      name: post.author || post.author_name || 'FixitLab',
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'FixitLab',
+      logo: { '@type': 'ImageObject', url: `${ORIGIN}/logo.png` },
+    },
+    ...(post.category ? { articleSection: post.category } : {}),
+  }
+}

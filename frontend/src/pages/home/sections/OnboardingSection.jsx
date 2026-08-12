@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Terminal, BookOpen, Sparkles } from 'lucide-react'
+import { ArrowRight, Terminal, BookOpen, Sparkles } from '../../../ui/eagerIcons'
 import { blurIn, fadeUp, staggerContainer, viewportOnce } from '../../../ui/motion'
 
 /**

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
-import api from '../../api/client'
-import { Upload, ChevronRight, ChevronLeft, User, Briefcase, Plus, X, Sparkles } from 'lucide-react'
+import { ChevronRight, ChevronLeft, User, Briefcase, Plus, X, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { LabelWithHint } from '../../components/FieldHint'
 import { PageHeader } from '../../components/design'
 import ResumeScoreCard from '../../components/interviews/ResumeScoreCard'
+import { useFetch } from '../../hooks/useFetch'
 
 const LEVELS = [
   { id: 'junior', label: 'Junior (0–2 yrs)' },
@@ -20,7 +20,8 @@ export default function InterviewSetup() {
   const [searchParams] = useSearchParams()
   const techParam = searchParams.get('tech') || ''
   const [step, setStep] = useState(0)
-  const [technologies, setTechnologies] = useState([])
+  const { data: techData } = useFetch('/technologies/', { initialData: [] })
+  const technologies = Array.isArray(techData) ? techData : []
   const [resumeFile, setResumeFile] = useState(null)
   const [form, setForm] = useState({
     primary_technology: '',
@@ -54,7 +55,6 @@ export default function InterviewSetup() {
   }, [techParam, technologies])
 
   useEffect(() => {
-    api.get('/technologies/').then(r => setTechnologies(r.data || [])).catch(() => {})
     interviewsApi.getVoices().then(d => setVoices(d.voices || [])).catch(() => {})
     interviewsApi.getProfile().then(p => {
       if (!p) return

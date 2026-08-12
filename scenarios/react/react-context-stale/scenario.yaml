@@ -11,35 +11,28 @@ description: 'CONTEXT: A team operating React frontends has raised a ticket for 
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline React application. The architecture is a single
   lab-primary node exposing components, hooks, router, and build output; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Theme toggle does not propagate to nested routes.
-
 
   OBJECTIVE: Understand the current failure mode affecting Fix stale context value; Restore expected service
   behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test. Acceptance
   criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant components, hooks, router, and build output), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -102,7 +95,6 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
@@ -119,6 +111,12 @@ coding_spec:
   hidden_tests:
   - name: placeholder_hidden
     code: assert solution() is not None
+  - name: s89_case_1
+    code: assert(true);
+  - name: s89_case_2
+    code: assert(typeof solution === "function" || typeof solution !== "undefined");
+  - name: s89_case_3
+    code: assert(true);
   timeout: 8
 summary: Complete the fix stale context value react lab and verify success with the checker
 estimated_minutes: 20
@@ -129,7 +127,7 @@ tags:
 - fix
 - hands-on
 - react
-linked_tutorial: react-fundamentals
+linked_tutorial: react-frontend-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Fix stale context value
 - Restore expected service behavior with a minimal, documented change

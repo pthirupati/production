@@ -111,6 +111,27 @@ def finalize_lab_completion_if_ready(session) -> bool:
             completions_count=F("completions_count") + 1
         )
 
+        # Rolling average solve time so ScenarioDetail can show est vs actual
+        # (audit X7c). Only update when we have a positive elapsed; keep prior
+        # average if a session somehow has no duration.
+        if elapsed > 0:
+            scen = (
+                Scenario.objects.select_for_update()
+                .filter(pk=session.scenario.pk)
+                .only("id", "completions_count", "avg_completion_time")
+                .first()
+            )
+            if scen is not None:
+                # completions_count already includes this finalize (+1 above).
+                n = max(1, int(scen.completions_count or 1))
+                prior_n = n - 1
+                prior_avg = int(scen.avg_completion_time or 0)
+                if prior_n <= 0 or prior_avg <= 0:
+                    new_avg = elapsed
+                else:
+                    new_avg = int(((prior_avg * prior_n) + elapsed) / n)
+                Scenario.objects.filter(pk=scen.pk).update(avg_completion_time=new_avg)
+
         locked.completion_finalized = True
         locked.save(update_fields=["completion_finalized"])
         session.completion_finalized = True  # keep caller's instance in sync

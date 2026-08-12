@@ -1,17 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { awxApi } from '../../api/awx'
-import toast from 'react-hot-toast'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Play, RefreshCw, Layers, FolderGit2, Key, ListChecks, Server, AlertTriangle,
-  Calendar, Activity, CheckSquare, Users, Bell, Settings, Cpu, Package, Plus, Terminal,
+  Calendar, Activity, CheckSquare, Users, Bell, Settings, Package, Plus, Terminal,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import {
-  SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, SimTerminalLog, useSimSession,
-} from '../sim/shared'
+  SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, SimTerminalLog, useSimSession, SimLoginGateCard } from '../sim/shared'
 import {
-  AWX_SIDEBAR, AWX_DASHBOARD_STATS, AWX_JOB_LOG, AWX_HOSTS, AWX_SCHEDULES, AWX_USERS, AWX_CREDENTIAL_TYPES,
+  AWX_SIDEBAR, AWX_JOB_LOG, AWX_HOSTS, AWX_SCHEDULES, AWX_USERS, AWX_CREDENTIAL_TYPES,
   AWX_ACTIVITY, AWX_APPROVALS, AWX_ORGANIZATIONS, AWX_TEAMS, AWX_INSTANCE_GROUPS, AWX_EXEC_ENVS,
   AWX_NOTIFICATIONS, AWX_MGMT_JOBS, AWX_APPLICATIONS, AWX_SETTINGS_SECTIONS,
 } from '../../simFixtures/awx'
@@ -143,7 +141,7 @@ export default function AwxSimulator({
       <div className={simPanelRoot(embedded, 'bg-[#1a1a2e]')}>
         <LabChromeBar title="Ansible AWX" subtitle={scenario?.title || slug} accent="#EE0000" {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <SimLoginGateCard title="Sign in to Ansible AWX" onClose={onExit} className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold bg-[#EE0000] flex items-center gap-2">
               <Layers size={18} /> Ansible AWX
             </div>
@@ -176,7 +174,7 @@ export default function AwxSimulator({
                 Training credentials: <span className="font-mono text-slate-700">{AWX_LAB_USER}</span> / <span className="font-mono text-slate-700">{AWX_LAB_PASS}</span>
               </p>
             </form>
-          </div>
+          </SimLoginGateCard>
         </div>
       </div>
     )
@@ -260,7 +258,7 @@ export default function AwxSimulator({
             { key: 'inventory', label: 'Inventory', sortable: true },
             { key: 'actions', label: 'Actions', render: (jt) => (
               <div className="flex gap-1">
-                <button type="button" className="awx-btn-launch text-[10px] py-1 px-2" onClick={(e) => { e.stopPropagation(); setLaunchModal(jt) }}><Play size={12} /></button>
+                <button type="button" className="awx-btn-launch text-[10px] py-1 px-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center" onClick={(e) => { e.stopPropagation(); setLaunchModal(jt) }} aria-label={`Launch ${jt.name || 'job template'}`}><Play size={12} /></button>
               </div>
             )},
           ]} rows={inv.job_templates || []} searchKeys={['name']} />

@@ -1,17 +1,16 @@
 import { Link } from 'react-router-dom'
-import { useEffect, useState } from 'react'
 import PublicLayout from '../components/layout/PublicLayout'
 import { FixitPanel } from '../components/design'
 import { useRevealOnScroll } from '../hooks/useRevealOnScroll'
-import api from '../api/client'
 import {
-  Terminal, Shield, Cloud, Server, Users, Award, Target,
-  Zap, ArrowRight, Globe, Heart, Code, Cpu, BookOpen,
-  CheckCircle2, Github, Linkedin, Twitter, Mail,
+  Terminal, Shield, Cloud, Server, Users, Target,
+  Zap, ArrowRight, Globe, Heart, Code, Cpu,
+  CheckCircle2,
   Ticket, Bot, MessageSquare, Trophy, Sparkles, Layers,
-  GitBranch, Bookmark, BarChart3, Lock, Monitor, Brain, GraduationCap
+  GitBranch, BarChart3, Lock, Monitor, Brain, GraduationCap
 } from 'lucide-react'
 import { usePageTitle } from '../hooks/usePageTitle'
+import { useFetch } from '../hooks/useFetch'
 
 const team = [
   {
@@ -202,22 +201,12 @@ const colorMap = {
 
 export default function About() {
   usePageTitle('About', 'Why FixitLab exists: practice on real broken systems instead of watching videos.')
-  // Audit W5: this used to seed hardcoded marketing numbers (360 scenarios,
-  // 10k users). Those were both invented and stale — the live corpus is an
-  // order of magnitude larger — so a failed /stats/ call silently published
-  // wrong figures instead of admitting it could not load. Start empty and
-  // track the request state so the stat bar can say "—" rather than lie.
-  const [stats, setStats] = useState({})
-  const [statsState, setStatsState] = useState('loading') // loading | ready | error
-
-  useEffect(() => {
-    api.get('/stats/', { silentError: true })
-      .then(res => {
-        setStats(prev => ({ ...prev, ...res.data }))
-        setStatsState('ready')
-      })
-      .catch(() => setStatsState('error'))
-  }, [])
+  // Audit W5/W6: live /stats/ only — no invented marketing numbers; abort on unmount.
+  const { data: stats = {}, loading: statsLoading, error: statsError } = useFetch('/stats/', {
+    config: { silentError: true },
+    initialData: {},
+  })
+  const statsState = statsLoading ? 'loading' : statsError ? 'error' : 'ready'
 
   // Values, milestones, and team cards use `.reveal` (opacity:0 until
   // `.visible` is added). Reveal them on scroll so the page isn't blank.

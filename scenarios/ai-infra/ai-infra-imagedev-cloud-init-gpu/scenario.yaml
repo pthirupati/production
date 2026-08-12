@@ -15,12 +15,9 @@ description: 'CONTEXT: ImageDev — Packer GPU images must finish first boot via
   (DataSourceMAAS): netplan, users, nvidia-persistenced, and a post-boot gpu-sanity hook.
   AI Infra Engineering owns this image-factory path (not the application GPU course).
 
-
   ENVIRONMENT: Lab Terminal + Packer + Bare Metal. Inspect cloud-init status after deploy.
 
-
   SYMPTOM: Deployed node never reaches sshd; cloud-init stuck or missing runcmd for GPU.
-
 
   OBJECTIVE: Verify cloud-init status / datasource MAAS; ensure GPU userdata runcmd runs;
   confirm nvidia-smi after final; FIXED-OK.'

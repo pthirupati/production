@@ -145,6 +145,34 @@ class DefaultLinkedLabSlugTest(SimpleTestCase):
                     f"{topic} is still routed to the Linux users/groups lab",
                 )
 
+    def test_cloud_topics_link_to_their_own_cloud_labs(self):
+        """AWS/Azure/GCP must not be aliased back to Terraform.
+
+        These three topics once carried ``"aws"/"azure"/"gcp" -> "terraform"``
+        aliases in ``completeness.py``, so every AWS, Azure and GCP tutorial
+        shipped a Terraform lab as its hands-on link — even though
+        ``scenarios/aws/`` holds 420 scenarios of its own and azure/gcp 150
+        each. The alias entries are deliberately absent now and the glob
+        fallback resolves each topic to its own academy lab. If this test
+        fails, someone re-added the aliases: delete them, don't retarget the
+        assertion.
+        """
+        for topic, tech in (("AWS", "aws"), ("Azure", "azure"), ("GCP", "gcp")):
+            with self.subTest(topic=topic):
+                slug = default_linked_lab_slug(topic)
+                self.assertTrue(slug, f"{topic} resolved to no lab at all")
+                self.assertTrue(
+                    slug.startswith(f"academy-{tech}-"),
+                    f"{topic} resolved to {slug!r}, which is not one of its own "
+                    f"scenarios/{tech}/academy-{tech}-* labs",
+                )
+                self.assertNotIn(
+                    "terraform", slug,
+                    f"{topic} is routed back to a Terraform lab ({slug!r}) — the "
+                    f'"{tech}": "terraform" alias regression is back in '
+                    "completeness.py",
+                )
+
     def test_linux_topics_still_get_the_linux_lab(self):
         self.assertEqual(default_linked_lab_slug("Linux"), LINUX_USERS_GROUPS_LAB)
         self.assertEqual(default_linked_lab_slug("Nginx"), LINUX_USERS_GROUPS_LAB)

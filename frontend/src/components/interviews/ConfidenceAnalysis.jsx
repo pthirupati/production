@@ -7,7 +7,7 @@
  * Props: analysis — confidence_analysis object from the report.
  */
 import React from 'react'
-import { Activity, Info } from 'lucide-react'
+import { Activity, Info, Eye } from 'lucide-react'
 
 function Stat({ label, value, suffix = '' }) {
   if (value == null) return null
@@ -23,8 +23,17 @@ export default function ConfidenceAnalysis({ analysis }) {
   if (!analysis) return null
   const phraseCoach = analysis.phrase_coaching
   const hasScore = analysis.confidence_score != null
+  const proctoring = analysis.proctoring
+  const hasProctoring = Boolean(
+    proctoring
+    && (
+      (proctoring.tab_switches || 0) > 0
+      || (proctoring.paste_events || 0) > 0
+      || (proctoring.away_seconds || 0) > 0
+    ),
+  )
 
-  if (!hasScore && !phraseCoach && !analysis.round_narrative) return null
+  if (!hasScore && !phraseCoach && !analysis.round_narrative && !hasProctoring) return null
 
   const score = analysis.confidence_score
   const color = score == null ? 'text-surface-400' : score >= 75 ? 'text-emerald-400' : score >= 58 ? 'text-amber-400' : 'text-red-400'
@@ -68,6 +77,22 @@ export default function ConfidenceAnalysis({ analysis }) {
           {phraseCoach.summary_line && (
             <p className="text-xs text-surface-400 mt-2">{phraseCoach.summary_line}</p>
           )}
+        </div>
+      )}
+      {hasProctoring && (
+        <div className={`${hasScore || phraseCoach || analysis.round_narrative ? 'pt-2 border-t border-surface-800' : ''} space-y-2`}>
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <Eye size={15} className="text-amber-400" /> Session signals
+          </h3>
+          <p className="text-xs text-surface-400">
+            Reported for review — these never blocked the interview.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Stat label="Tab switches" value={proctoring.tab_switches ?? 0} />
+            <Stat label="Paste events" value={proctoring.paste_events ?? 0} />
+            <Stat label="Away (s)" value={proctoring.away_seconds != null ? Math.round(proctoring.away_seconds) : null} />
+            <Stat label="Uncredited (s)" value={proctoring.uncredited_seconds != null ? Math.round(proctoring.uncredited_seconds) : null} />
+          </div>
         </div>
       )}
       <p className="text-[10px] text-surface-600 flex items-start gap-1.5">

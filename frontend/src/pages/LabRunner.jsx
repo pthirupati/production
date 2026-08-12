@@ -13,10 +13,10 @@ import {
   Bookmark, BookmarkPlus
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { broadcastLabStopped, closeLabChildTabs, broadcastLabActivity } from '../utils/labSync'
+import { broadcastLabStopped, closeLabChildTabs } from '../utils/labSync'
 import { purgeGuestStateForLab } from '../components/vmware/linuxShell'
 import { awsSimStorageKey, hardResetAwsSim } from '../components/aws/store/awsStore'
-import { ConfirmDialog } from '../components/ConfirmModal'
+import { ConfirmDialog, useModalA11y } from '../components/ConfirmModal'
 import JiraTicketPanel from '../components/JiraTicketPanel'
 import ItsmTicketPanel from '../components/itsm/ItsmTicketPanel'
 import { itsmApi } from '../api/itsm'
@@ -49,11 +49,7 @@ import {
   LazyNmapSimulator,
   LazyWiresharkSimulator,
   LazyCicdPipelineSim,
-  LazyCommvaultSimulator,
-  LazyNetAppSimulator,
-  LazyDellEmcSimulator,
   LazyDatacenterSimulator,
-  LazySocSimulator,
   LazyAzureConsole,
   LazyGcpConsole,
   LazyCodingIDE,
@@ -378,6 +374,7 @@ export default function LabRunner() {
   // while we are mid-stop so we do not navigate before cloud teardown finishes.
   const stoppingRef = useRef(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const shortcutsPanelRef = useModalA11y(showShortcuts, () => setShowShortcuts(false))
   const [terminalFullscreen, setTerminalFullscreen] = useState(false)
   // Feature: Lab time extension
   const [extending, setExtending] = useState(false)
@@ -406,7 +403,7 @@ export default function LabRunner() {
   const [ratingHover, setRatingHover] = useState(0)
   const [ratingSubmitting, setRatingSubmitting] = useState(false)
   const [jiraComments, setJiraComments] = useState([])
-  const [jiraActivity, setJiraActivity] = useState([])
+  const [, setJiraActivity] = useState([])
   const [jiraTicket, setJiraTicket] = useState(null)
   const [jiraTransitioning, setJiraTransitioning] = useState(false)
   const { pending: jiraPendingReply, startPendingPoll: startJiraReplyPoll } = useJiraTeamReplyPoll()
@@ -1491,7 +1488,12 @@ export default function LabRunner() {
 
     return (
     <div className="flex items-center justify-center h-screen bg-surface-950">
-      <div className="text-center max-w-sm">
+      <div
+        className="text-center max-w-sm"
+        aria-live="polite"
+        aria-atomic="true"
+        role="status"
+      >
         <div className="relative mb-6">
           <div className="w-20 h-20 border-4 border-accent-cyan/20 border-t-accent-cyan rounded-full animate-spin mx-auto" />
           <div className="absolute inset-0 flex items-center justify-center">
@@ -1876,7 +1878,6 @@ export default function LabRunner() {
     : isOpenStackLab ? 'openstack'
     : null
   const solved = validationResult?.passed
-  const expired = validationResult?.expired
   const simChromeProps = {
     onHints: () => { setSidebarTab('hints'); setSidebarOpen(true) },
     onCheck: handleValidate,
@@ -1941,7 +1942,6 @@ export default function LabRunner() {
   const explicitVmwareScenario = scenario?.vmware_link === true
     || consolesInclude(scenario?.consoles, 'vmware')
   const canVmwareConsole = userHasTechAccess(techSubs, 'vmware')
-  const canDatacenterConsole = userHasTechAccess(techSubs, 'datacenter')
   const vmwareServerHref = `/vmware/${sessionId}?scenario=${scenario?.slug || ''}`
   const showSimVmwareLink = canOpenCompanionConsole(techSubs, explicitVmwareScenario, 'vmware') && (
     isAwxLab || isMonitoringLab || isWindowsGuiLab || isCommvaultLab || isTerraformSimLab
@@ -2438,14 +2438,15 @@ export default function LabRunner() {
             onClick={handleToggleBookmark}
             disabled={bookmarking}
             aria-pressed={bookmarked}
-            className="p-2 text-surface-400 hover:text-accent-amber disabled:opacity-50 transition-colors"
+            aria-label={bookmarked ? 'Remove from bookmarks' : 'Bookmark this scenario'}
+            className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400 hover:text-accent-amber disabled:opacity-50 transition-colors"
             title={bookmarked ? 'Remove from bookmarks' : 'Bookmark this scenario'}
           >
             {bookmarked
               ? <Bookmark size={16} className="text-accent-amber fill-accent-amber" />
               : <BookmarkPlus size={16} />}
           </button>
-          <button onClick={() => setShowShortcuts(true)} className="p-2 text-surface-400 hover:text-white" title="Keyboard shortcuts">
+          <button type="button" onClick={() => setShowShortcuts(true)} className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400 hover:text-white" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">
             <Keyboard size={16} />
           </button>
         </div>
@@ -2508,18 +2509,45 @@ export default function LabRunner() {
                   </div>
                   {scenario.objectives && scenario.objectives.length > 0 && (
                     <div>
-                      <h3 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Expected outcome</h3>
+                      <h3 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">
+                        Acceptance checklist
+                        {Array.isArray(validationResult?.checklist) && (
+                          <span className="ml-2 normal-case tracking-normal font-normal text-surface-500">
+                            {validationResult.checklist.filter((c) => c.done).length}/{validationResult.checklist.length}
+                          </span>
+                        )}
+                      </h3>
                       {Array.isArray(scenario.objectives) ? (
                         <ul className="space-y-1.5">
-                          {scenario.objectives.map((obj, i) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
-                              <Target size={12} className="text-accent-cyan mt-0.5 shrink-0" />
-                              <span>{typeof obj === 'string' ? obj : JSON.stringify(obj)}</span>
-                            </li>
-                          ))}
+                          {scenario.objectives.map((obj, i) => {
+                            const text = typeof obj === 'string' ? obj : JSON.stringify(obj)
+                            const fromApi = Array.isArray(validationResult?.checklist)
+                              ? validationResult.checklist.find((c) => c.id === `obj-${i}` || c.text === text)
+                              : null
+                            const done = Boolean(
+                              fromApi?.done
+                              || validationResult?.passed
+                              || guidedDone[i],
+                            )
+                            return (
+                              <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
+                                {done ? (
+                                  <CheckCircle2 size={12} className="text-accent-green mt-0.5 shrink-0" />
+                                ) : (
+                                  <span className="w-3 h-3 mt-0.5 shrink-0 rounded-full border border-surface-600" />
+                                )}
+                                <span className={done ? 'text-surface-200' : ''}>{text}</span>
+                              </li>
+                            )
+                          })}
                         </ul>
                       ) : (
                         <p className="text-sm text-surface-300 whitespace-pre-wrap">{scenario.objectives}</p>
+                      )}
+                      {!validationResult?.passed && (
+                        <p className="text-[11px] text-surface-500 mt-2">
+                          Items tick off as Check Solution confirms them. Run Check after each fix.
+                        </p>
                       )}
                     </div>
                   )}
@@ -2968,18 +2996,26 @@ export default function LabRunner() {
                       {Array.isArray(scenario.objectives) && scenario.objectives.length > 0 && !validationResult.expired && (
                         <div className="border-t border-surface-800 pt-4">
                           <h4 className="text-xs font-semibold text-surface-400 uppercase mb-2 flex items-center gap-1">
-                            <Target size={12} /> Objectives to meet
+                            <Target size={12} /> Acceptance checklist
                           </h4>
                           <ul className="space-y-1.5">
-                            {scenario.objectives.map((obj, i) => (
-                              <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
-                                <span className="w-3.5 h-3.5 mt-0.5 shrink-0 rounded-full border border-surface-600" />
-                                <span>{typeof obj === 'string' ? obj : JSON.stringify(obj)}</span>
+                            {(validationResult.checklist || scenario.objectives.map((obj, i) => ({
+                              id: `obj-${i}`,
+                              text: typeof obj === 'string' ? obj : JSON.stringify(obj),
+                              done: false,
+                            }))).map((item) => (
+                              <li key={item.id || item.text} className="flex items-start gap-2 text-sm text-surface-300">
+                                {item.done ? (
+                                  <CheckCircle2 size={12} className="text-accent-green mt-0.5 shrink-0" />
+                                ) : (
+                                  <span className="w-3.5 h-3.5 mt-0.5 shrink-0 rounded-full border border-surface-600" />
+                                )}
+                                <span>{item.text}</span>
                               </li>
                             ))}
                           </ul>
                           <p className="text-[11px] text-surface-500 mt-2">
-                            None of these are confirmed yet — fix the issue above, then run Check again. Stuck? Reveal a hint.
+                            Fix the failures above, then run Check again — confirmed items stay ticked.
                           </p>
                         </div>
                       )}
@@ -4151,8 +4187,16 @@ export default function LabRunner() {
 
       {showShortcuts && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setShowShortcuts(false)}>
-          <div className="glass-card p-6 max-w-xs w-full" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
+          <div
+            ref={shortcutsPanelRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="lab-shortcuts-title"
+            className="glass-card p-6 max-w-xs w-full outline-none"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 id="lab-shortcuts-title" className="text-base font-semibold text-white mb-4 flex items-center gap-2">
               <Keyboard size={16} className="text-accent-cyan" /> Keyboard Shortcuts
             </h3>
             <div className="space-y-2.5 text-sm">
@@ -4171,7 +4215,7 @@ export default function LabRunner() {
                 </div>
               ))}
             </div>
-            <button onClick={() => setShowShortcuts(false)} className="btn-secondary w-full mt-5 text-sm">Close</button>
+            <button type="button" onClick={() => setShowShortcuts(false)} className="btn-secondary w-full mt-5 text-sm min-h-[44px]">Close</button>
           </div>
         </div>
       )}

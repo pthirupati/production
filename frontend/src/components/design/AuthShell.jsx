@@ -1,5 +1,4 @@
-import { Link } from 'react-router-dom'
-import { Shield, Cpu, Zap } from 'lucide-react'
+import { Shield, Cpu, Zap } from '../../ui/eagerIcons'
 import FixitLogo from './FixitLogo'
 
 function DefaultIllustration() {

@@ -3,7 +3,7 @@ import { viewportOnce } from './motion'
 
 export default function ScrollReveal({
   children,
-  variant = 'fadeUp',
+  variant: _variant = 'fadeUp',
   variants,
   className = '',
   delay = 0,

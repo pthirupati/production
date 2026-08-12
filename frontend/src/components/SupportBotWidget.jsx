@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Bot, X, Send, Minimize2, MessageCircle, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { Bot, X, Send, Minimize2, MessageCircle, ThumbsUp, ThumbsDown } from '../ui/eagerIcons'
 import { supportApi } from '../api/support'
 import { useAuthStore } from '../store/authStore'
 import { currentUserScopedKey, migrateUnscopedKey } from '../utils/userScopedStorage'

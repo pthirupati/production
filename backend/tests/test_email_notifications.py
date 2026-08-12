@@ -223,6 +223,7 @@ class RegisterWithOTPTest(APITestCase):
             "password": "GoodP@ss99!",
             "session_token": "fresh-token",
             "phone_number": "+12345678901",
+            "accepted_legal": True,
         })
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertTrue(User.objects.filter(email="fresh@test.com").exists())

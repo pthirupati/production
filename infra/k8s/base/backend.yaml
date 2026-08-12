@@ -16,11 +16,26 @@ spec:
     metadata:
       labels: { app: backend }
     spec:
+      # runAsNonRoot is deliberately NOT set. The backend image (backend/
+      # Dockerfile) creates no unprivileged UID and `COPY . .` leaves /app owned
+      # by root, while startup.sh writes STATIC_ROOT=/app/staticfiles during
+      # collectstatic. Forcing a non-root UID here fails with EACCES at boot —
+      # a CrashLoopBackOff, not a clean error. Enabling it needs a Dockerfile
+      # change (create a UID, chown /app) and is tracked separately.
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: backend
           # Substituted by the deploy job: ${FIXITLAB_IMAGE_NS}/fixitlab-backend:${IMAGE_TAG}
           image: fixitlab/fixitlab-backend:latest
           imagePullPolicy: IfNotPresent
+          # Drops ambient root capabilities without changing the UID, so this is
+          # compatible with the root-owned /app above. LAB_PROVIDER=simulation
+          # in k8s (configmap.yaml) — no docker.sock, so no privileged access.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - { name: http, containerPort: 8000 }
           envFrom:
@@ -77,3 +92,49 @@ spec:
       stabilizationWindowSeconds: 30
     scaleDown:
       stabilizationWindowSeconds: 300
+---
+# Keeps the API up during voluntary disruption (node drain / cluster upgrade).
+# minAvailable is a COUNT, not a percentage: the HPA floor is 2 replicas, so 1
+# guarantees a serving pod while still letting a drain make progress. As a
+# percentage this would round against us at the minReplicas boundary.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend
+  namespace: fixitlab
+  labels: { app: backend }
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: backend }
+---
+# INGRESS-ONLY policy. Egress is intentionally left unrestricted: the backend
+# talks to managed Postgres/Redis endpoints OUTSIDE the cluster (see the host
+# comments in configmap.yaml) plus third-party HTTPS APIs. A default-deny
+# egress rule here would blackhole those as timeouts rather than errors, which
+# is far harder to diagnose than the exposure it removes.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend
+  namespace: fixitlab
+  labels: { app: backend }
+spec:
+  podSelector:
+    matchLabels: { app: backend }
+  policyTypes: [Ingress]
+  ingress:
+    # The ingress controller terminates TLS and proxies API/WS/admin traffic.
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: ingress-nginx }
+      ports:
+        - { protocol: TCP, port: 8000 }
+    # Kubelet probes and metrics scrapers are node-sourced, not pod-sourced, so
+    # they arrive with the node IP and are not matched by a pod/ns selector.
+    - ports:
+        - { protocol: TCP, port: 8000 }
+      from:
+        - ipBlock: { cidr: 10.0.0.0/8 }
+        - ipBlock: { cidr: 172.16.0.0/12 }
+        - ipBlock: { cidr: 192.168.0.0/16 }

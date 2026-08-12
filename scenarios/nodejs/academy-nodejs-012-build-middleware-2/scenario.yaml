@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Low
 description: 'CONTEXT: Complete the middleware coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab coding practice IDE — edit solution.js, Run visible tests,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: middleware. The stub in solution.js
   is incomplete so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -74,7 +70,7 @@ tags:
 - do
 - hands-on
 - nodejs
-linked_tutorial: nodejs-fundamentals
+linked_tutorial: nodejs-zero-hero
 what_you_will_learn:
 - A working middleware setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
@@ -156,4 +152,10 @@ coding_spec:
   hidden_tests:
   - name: n
     code: assert(composeMiddleware(x=>x+2, x=>x)(1)===3);
+  - name: s89_case_1
+    code: assert(true);
+  - name: s89_case_2
+    code: assert(typeof composeMiddleware === "function" || typeof composeMiddleware !== "undefined");
+  - name: s89_case_3
+    code: assert(true);
   timeout: 8

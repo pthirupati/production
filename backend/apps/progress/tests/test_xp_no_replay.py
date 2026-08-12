@@ -98,3 +98,26 @@ class XpReplayTests(TestCase):
         # Same session, finalized again — the completion_finalized lock bails out.
         finalize_lab_completion_if_ready(session)
         self.assertEqual(self._xp(), after)
+
+    def test_finalize_updates_scenario_avg_completion_time(self):
+        """X7c — rolling avg so ScenarioDetail can show est vs learners avg."""
+        from datetime import timedelta
+
+        now = timezone.now()
+        for seconds in (600, 900, 1200):
+            session = LabSession.objects.create(
+                user=self.user, scenario=self.scenario, status="COMPLETED",
+                validation_passed=True, score=100, hints_used=0,
+            )
+            # started_at is auto_now_add — set duration after create.
+            LabSession.objects.filter(pk=session.pk).update(
+                started_at=now - timedelta(seconds=seconds),
+                ended_at=now,
+            )
+            session.refresh_from_db()
+            finalize_lab_completion_if_ready(session)
+
+        self.scenario.refresh_from_db()
+        self.assertEqual(self.scenario.completions_count, 3)
+        # ((600 + 900) / 2 = 750; then (750*2 + 1200)/3 = 900)
+        self.assertEqual(self.scenario.avg_completion_time, 900)

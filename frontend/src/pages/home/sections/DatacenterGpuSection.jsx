@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Cpu, Boxes, Thermometer, Cable, Gauge } from 'lucide-react'
+import { ArrowRight, Cpu, Boxes, Thermometer, Cable, Gauge } from '../../../ui/eagerIcons'
 import DatacenterWalkAnimation from '../components/DatacenterWalkAnimation'
 import { fadeLeft, fadeRight, viewportOnce } from '../../../ui/motion'
 

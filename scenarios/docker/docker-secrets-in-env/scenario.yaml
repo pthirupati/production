@@ -15,37 +15,30 @@ description: 'CONTEXT: A routine access review found that the production databas
   plaintext, and so does `docker exec api env`. Business impact: every operator, every CI job, and every
   log shipper that captures container metadata has effectively been handed the database credential.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline Docker host. The architecture is a single lab-primary
   node exposing docker CLI, images, containers, and compose files; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: The `api` container carries `DATABASE_PASSWORD` (and the same value inside
   `DATABASE_URL`) as environment variables. The service is healthy and serving traffic — this is a
   disclosure problem, not an outage, and the service must stay up while you fix it.
-
 
   OBJECTIVE: Confirm the credential is readable via `docker inspect api`; move it to a secret mounted at
   `/run/secrets/api_db_password`; remove it from every environment variable; and confirm `api` still
   resolves the credential from the mount and is still running. Acceptance criteria: the change is minimal
   and reversible.
 
-
   WORK TO DO: A secret named `api_db_password` already holds the correct value — this is a migration, not
   a rotation, so do not invent a new password. Mount it into `api`, then remove the environment variables
   that expose it. Change one thing at a time and re-check between steps.
-
 
   VERIFY: `docker inspect api` must no longer show the value anywhere in its env list, while
   `docker exec api cat /run/secrets/api_db_password` must still return it and the container must still be
   running. Both halves are graded.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (re-mount the secret /
   restore the env var / restart the affected container) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not simply delete the environment variable — that closes the disclosure by breaking
   the service, and the checker rejects it. Do not delete or replace the secret, and do not stop the
@@ -109,7 +102,6 @@ hints:
     3. Verify both halves: `docker inspect api` no longer shows the value anywhere, and
     `docker exec api cat /run/secrets/api_db_password` still returns it.
 
-
     WHY: the checker grades both. A container that no longer leaks the credential but can no longer read
     it either is a broken service, not a fixed one — and stopping the container does not count.'
 summary: Move a database password out of a container environment variable and into a mounted secret,
@@ -122,7 +114,7 @@ tags:
 - docker
 - fix
 - hands-on
-linked_tutorial: docker-fundamentals
+linked_tutorial: docker-containers-zero-hero
 what_you_will_learn:
 - Why an environment variable is not a secret store, and exactly who can read one
 - How to find a credential that leaked into more than one variable, including inside a connection string

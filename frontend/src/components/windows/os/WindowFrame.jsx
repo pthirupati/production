@@ -78,11 +78,11 @@ export default function WindowFrame({ win, icon, children }) {
       <div className="winos-titlebar" onMouseDown={startDrag} onDoubleClick={() => toggleMaximize(win.id)}>
         <div className="winos-title"><span className="twin-icon">{icon}</span>{win.title}</div>
         <div className="winos-caption">
-          <button className="winos-cap-btn" onClick={(e) => { e.stopPropagation(); minimizeWindow(win.id) }} title="Minimize"><Minus size={15} /></button>
-          <button className="winos-cap-btn" onClick={(e) => { e.stopPropagation(); toggleMaximize(win.id) }} title="Maximize">
+          <button type="button" className="winos-cap-btn" onClick={(e) => { e.stopPropagation(); minimizeWindow(win.id) }} title="Minimize" aria-label="Minimize"><Minus size={15} /></button>
+          <button type="button" className="winos-cap-btn" onClick={(e) => { e.stopPropagation(); toggleMaximize(win.id) }} title={win.maximized ? 'Restore' : 'Maximize'} aria-label={win.maximized ? 'Restore' : 'Maximize'}>
             {win.maximized ? <Copy size={12} /> : <Square size={12} />}
           </button>
-          <button className="winos-cap-btn close" onClick={(e) => { e.stopPropagation(); closeWindow(win.id) }} title="Close"><X size={15} /></button>
+          <button type="button" className="winos-cap-btn close" onClick={(e) => { e.stopPropagation(); closeWindow(win.id) }} title="Close" aria-label="Close"><X size={15} /></button>
         </div>
       </div>
       <div className="winos-body">{children}</div>

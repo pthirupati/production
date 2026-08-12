@@ -173,14 +173,14 @@ export default function PeopleSoftSimulator({
       {/* Fluid NavBar */}
       <div className="shrink-0 text-white" style={{ background: PS_BLUE }}>
         <div className="flex items-center gap-3 px-3 py-2 border-b border-white/10">
-          <button type="button" onClick={() => setMenuOpen(true)} className="p-2 rounded hover:bg-white/10" title="Navigator"><Menu size={18} /></button>
+          <button type="button" onClick={() => setMenuOpen(true)} className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-white/10" title="Navigator" aria-label="Open navigator"><Menu size={18} /></button>
           <span className="font-semibold text-sm">PeopleSoft</span>
           <div className="flex-1 max-w-md mx-4 hidden sm:flex items-center gap-2 bg-white/10 rounded px-3 py-1.5">
             <Search size={14} className="opacity-70" />
             <input placeholder="Global Search" className="bg-transparent border-none outline-none text-sm flex-1 placeholder:text-white/50" />
           </div>
-          <button type="button" className="p-2 rounded hover:bg-white/10" title="Notifications"><Bell size={16} /></button>
-          <button type="button" className="p-2 rounded hover:bg-white/10" title="Help"><HelpCircle size={16} /></button>
+          <button type="button" className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-white/10" title="Notifications" aria-label="Notifications"><Bell size={16} /></button>
+          <button type="button" className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-white/10" title="Help" aria-label="Help"><HelpCircle size={16} /></button>
           <span className="text-xs flex items-center gap-1 opacity-90"><User size={14} /> {summary.current_oprid || 'PS'}</span>
         </div>
       </div>

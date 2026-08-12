@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bot, Zap, Sparkles, Wrench, Plug, Shuffle, GitBranch, Flag,
-  Play, RefreshCw, ArrowLeft, StopCircle, Lightbulb, XCircle, AlertTriangle,
+  Play, RefreshCw, XCircle, AlertTriangle,
   CheckCircle2, Target, Trash2, Plus, Link2, Settings2, Activity, X, ChevronRight,
 } from 'lucide-react'
 import { aimlApi } from '../../api/aiml'
@@ -279,8 +279,10 @@ function NodeCard({ node, selected, connectSrc, runStatus, onSelect, onDragStart
         </div>
         {node.type !== 'trigger' && (
           <button
-            className="text-[var(--ag-muted)] hover:text-[var(--ag-red)]"
+            type="button"
+            className="text-[var(--ag-muted)] hover:text-[var(--ag-red)] min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
             title="Delete node"
+            aria-label="Delete node"
             onClick={(e) => { e.stopPropagation(); onDelete(node.id) }}
           ><Trash2 size={13} /></button>
         )}
@@ -517,7 +519,7 @@ export default function AgentWorkflowSimulator({
             <button type="button" className="lab-chrome-btn" disabled={running} onClick={runWorkflow}>
               {running ? <RefreshCw size={13} className="animate-spin" /> : <Play size={13} />} Run
             </button>
-            <button type="button" className="lab-chrome-btn" onClick={load}><RefreshCw size={13} /></button>
+            <button type="button" className="lab-chrome-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" onClick={load} title="Refresh" aria-label="Refresh workflow"><RefreshCw size={13} /></button>
             <button type="button" className="lab-chrome-btn" onClick={resetGraph} disabled={busy}>Reset</button>
           </>
         )}
@@ -749,7 +751,7 @@ function ConfigPanel({ node, edges, nodes, catalog, onConfigure, onDisconnect, o
           </span>
           {meta.label} · {node.id}
         </div>
-        <button className="text-[var(--ag-muted)] hover:text-white" onClick={onClose}><X size={14} /></button>
+        <button type="button" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[var(--ag-muted)] hover:text-white" onClick={onClose} aria-label="Close node editor"><X size={14} /></button>
       </div>
 
       <div className="space-y-2.5">
@@ -874,8 +876,10 @@ function ConfigPanel({ node, edges, nodes, catalog, onConfigure, onDisconnect, o
                 <span className="flex-1 min-w-0 truncate">{byId[e.to]?.label || e.to}</span>
                 {node.type === 'condition' && (
                   <button
+                    type="button"
                     className="ag-badge ag-b-branch"
                     title="Flip the branch this edge fires on"
+                    aria-label={`Flip branch (currently ${e.branch || 'any'})`}
                     onClick={() => {
                       const next = e.branch === 'true' ? 'false' : 'true'
                       onDisconnect(node.id, e.to, e.branch)
@@ -883,8 +887,9 @@ function ConfigPanel({ node, edges, nodes, catalog, onConfigure, onDisconnect, o
                     }}
                   ><GitBranch size={10} /> {e.branch || 'any'}</button>
                 )}
-                <button className="text-[var(--ag-muted)] hover:text-[var(--ag-red)]"
+                <button type="button" className="text-[var(--ag-muted)] hover:text-[var(--ag-red)] min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
                         title="Remove this connection"
+                        aria-label="Remove connection"
                         onClick={() => onDisconnect(node.id, e.to, e.branch)}>
                   <Trash2 size={12} />
                 </button>

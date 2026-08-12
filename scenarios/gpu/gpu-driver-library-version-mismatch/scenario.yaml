@@ -16,11 +16,9 @@ description: 'CONTEXT: A team operating GPU operations has raised a ticket for `
   and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline GPU node. The architecture is a single lab-primary
   node exposing nvidia-smi, drivers, CUDA, and container toolkit; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: A node where nvidia-smi works but CUDA apps fail with ''CUDA driver version
   is insufficient for CUDA runtime version''; a partial package upgrade left userspace libraries ahead
@@ -28,28 +26,23 @@ description: 'CONTEXT: A team operating GPU operations has raised a ticket for `
   (or ''Failed to initialize NVML: Driver/library version mismatch''). The loaded nvidia.ko does not match
   the installed libnvidia-ml / libcuda after a partial upgrade.
 
-
   OBJECTIVE: Reproduce the mismatch and read the driver version from the kernel vs userspace libraries;
   Determine whether the kernel module or the userspace libraries are stale; Reconcile the versions (reload
   the matching module or reinstall the driver) so CUDA initializes. Acceptance criteria: the change is
   minimal and reversible, and success means `nvidia-smi` includes `NVIDIA-SMI`.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant nvidia-smi, drivers, CUDA, and container toolkit), changing one thing at a time.
   Check your work continuously against the objective — success means `nvidia-smi` includes `NVIDIA-SMI`.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
   the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -100,7 +93,6 @@ hints:
 
     3. Confirm `nvidia-smi` shows the container Up.
 
-
     WHY: the checker validates the container is actually running.'
 summary: Diagnose and fix driver / cuda library version mismatch on a datacenter GPU node and verify with
   the checker
@@ -113,7 +105,7 @@ tags:
 - gpu
 - nvidia
 - hands-on
-linked_tutorial: gpu-fundamentals
+linked_tutorial: gpu-nvidia-zero-hero
 what_you_will_learn:
 - Reproduce the mismatch and read the driver version from the kernel vs userspace libraries
 - Determine whether the kernel module or the userspace libraries are stale

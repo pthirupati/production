@@ -150,7 +150,7 @@ export default function PracticalAnswerPanel({
   const isCommand = kind === 'command'
 
   return (
-    <div className="p-3 border-t border-surface-800 bg-surface-950/40 space-y-2">
+    <div className="p-3 border-t border-surface-800 bg-surface-950/40 space-y-2" data-interview-answer="1">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-cyan-400 flex items-center gap-1">
           {isCommand ? <Terminal size={12} /> : <Code2 size={12} />}

@@ -86,7 +86,10 @@ class ReportOnlyByDefaultTests(TestCase):
         two groups both exist and neither has quietly disappeared.
         """
         report = purge_expired_personal_data()
-        privacy = {"interview_message", "async_video", "command_history", "resume"}
+        privacy = {
+            "interview_message", "async_video", "command_history", "resume",
+            "account_lifecycle",
+        }
         operational = {
             "session_recording", "lab_snapshot", "webhook_event",
             "read_notification", "incident_run",

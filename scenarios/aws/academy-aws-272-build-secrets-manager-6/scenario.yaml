@@ -16,12 +16,10 @@ description: 'CONTEXT: A team operating AWS cloud operations has raised a ticket
   resolve it. Business impact: reduced service reliability and blocked users until the underlying state
   is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline AWS practice account. The architecture is a single
   lab-primary node exposing AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform;
   treat it as the production host for this incident. All tools run locally — no paid APIs or external
   cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: Cloud CLI/API configuration on this Lab Server is broken; console and CLI
   workflows fail until repaired. Cloud Lab Server operations for Build Lab. A planted cloud CLI/API configuration
@@ -29,11 +27,9 @@ description: 'CONTEXT: A team operating AWS cloud operations has raised a ticket
   checker (cloud Lab Server health check passes (`systemctl is-failed` finds no failed units / config
   repaired)).
 
-
   OBJECTIVE: Identify the planted cloud configuration fault; Repair the cloud profile with the minimal
   change; cloud Lab Server health check passes (`systemctl is-failed` finds no failed units / config repaired).
   Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
@@ -41,16 +37,13 @@ description: 'CONTEXT: A team operating AWS cloud operations has raised a ticket
   changing one thing at a time. Check your work continuously against the objective — success means `check.sh`
   exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -111,7 +104,6 @@ hints:
 
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 summary: Complete the secrets manager — build lab aws lab and verify success with the checker
@@ -123,7 +115,7 @@ tags:
 - aws
 - do
 - hands-on
-linked_tutorial: aws-fundamentals
+linked_tutorial: aws-cloud-zero-hero
 what_you_will_learn:
 - A working Secrets Manager setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit

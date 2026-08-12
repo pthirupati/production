@@ -287,13 +287,13 @@ def _step_progress(step, done, course_tutorials):
     return (not pending), (pending[0] if pending else None), len(slugs), len(slugs) - len(pending)
 
 
-# Where each kind of content actually lives in the SPA. ``project`` is absent
-# on purpose: the backend has Projects but the frontend has no /projects/<slug>
-# route yet, so a capstone step is reported with link=None and the dashboard
-# renders it as text rather than a dead link.
+# Where each kind of content actually lives in the SPA. Capstone projects now
+# resolve to /projects/<slug> (audit §C3); keep kinds without a route out of
+# this map so the dashboard never advertises a dead link.
 _LINK_PREFIX = {
     "scenarios": "/scenarios/",
     "tutorial_course": "/tutorials/",
+    "project": "/projects/",
     "certification": "/certifications/",
 }
 
