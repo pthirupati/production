@@ -324,9 +324,10 @@ def run_auth_registration(s: Suite) -> tuple[str | None, str, str]:
 
         otp_obj = EmailVerificationOTP.objects.filter(email=email).order_by("-created_at").first()
         if otp_obj:
-            otp_code = otp_obj.code
             session_token = otp_obj.session_token
+            otp_code = EmailVerificationOTP.e2e_peek_code(session_token)
             s.record("OTP stored in DB", True)
+            s.record("OTP DB lookup", bool(otp_code), detail="" if otp_code else "e2e cache miss")
         else:
             s.record("OTP stored in DB", False, detail="No OTP row found")
 
@@ -649,7 +650,10 @@ def run_concurrent_users(s: Suite, n: int = 3):
             otp = EmailVerificationOTP.objects.filter(email=email).order_by("-created_at").first()
             if not otp:
                 return False
-            st, _ = api("POST", "/api/auth/verify-otp/", data={"session_token": otp.session_token, "code": otp.code})
+            code = EmailVerificationOTP.e2e_peek_code(otp.session_token)
+            if not code:
+                return False
+            st, _ = api("POST", "/api/auth/verify-otp/", data={"session_token": otp.session_token, "code": code})
             if st != 200:
                 return False
             st, reg = api("POST", "/api/auth/register/", data={

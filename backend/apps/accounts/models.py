@@ -177,8 +177,36 @@ class EmailVerificationOTP(models.Model):
             session_token=session_token,
             expires_at=timezone.now() + timezone.timedelta(minutes=minutes),
         )
+        # E2E / CI addresses never receive mail (should_skip_real_email). Stash the
+        # plaintext briefly in cache so in-process E2E can verify without reading a
+        # DB column we deliberately removed. Real user addresses never hit this path.
+        try:
+            from apps.notifications.email import should_skip_real_email
+            from django.core.cache import cache
+
+            if should_skip_real_email(email):
+                cache.set(
+                    f"e2e_otp:{session_token}",
+                    code,
+                    timeout=max(60, int(minutes) * 60),
+                )
+        except Exception:
+            pass
         # The plaintext code is RETURNED (to email it) and never persisted.
         return instance, code, session_token
+
+    @classmethod
+    def e2e_peek_code(cls, session_token: str) -> str | None:
+        """Return plaintext OTP for E2E only (cache-backed; never from DB)."""
+        if not session_token:
+            return None
+        try:
+            from django.core.cache import cache
+
+            code = cache.get(f"e2e_otp:{session_token}")
+            return str(code) if code else None
+        except Exception:
+            return None
 
     @classmethod
     def verify(cls, session_token, code):
