@@ -15,21 +15,17 @@ description: 'CONTEXT: A team operating AWS cloud operations has raised a ticket
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline AWS practice account. The architecture is a single
   lab-primary node exposing AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform;
   treat it as the production host for this incident. All tools run locally — no paid APIs or external
   cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: The AWS practice account is ready but Waf is not configured yet. Required
   tools may already be installed; your job is to create the configuration and bring the capability online.
-
 
   OBJECTIVE: A working Waf setup must exist by the end of this lab; Configuration should follow team conventions
   and be easy to audit; The result should pass validation without manual cleanup. Acceptance criteria:
   the change is minimal and reversible, and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
@@ -37,16 +33,13 @@ description: 'CONTEXT: A team operating AWS cloud operations has raised a ticket
   changing one thing at a time. Check your work continuously against the objective — success means `check.sh`
   exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -105,7 +98,6 @@ hints:
 
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 summary: Complete the waf — build lab aws lab and verify success with the checker
@@ -117,7 +109,7 @@ tags:
 - aws
 - do
 - hands-on
-linked_tutorial: aws-fundamentals
+linked_tutorial: aws-cloud-zero-hero
 what_you_will_learn:
 - A working Waf setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit

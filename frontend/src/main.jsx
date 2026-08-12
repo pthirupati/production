@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './styles/index.css'
+import { installGlobalErrorReporting } from './utils/reportClientError'
 
 // Self-heal stale-chunk failures. After a deploy, a browser holding an old
 // index.html requests chunk hashes that no longer exist (404) → Vite throws a
@@ -15,7 +16,6 @@ function recoverFromStaleChunk(reason) {
   // Only auto-reload if we haven't already tried in the last 10s (prevents loops).
   if (Date.now() - last < 10000) return
   sessionStorage.setItem(KEY, String(Date.now()))
-  // eslint-disable-next-line no-console
   console.warn('[fixitlab] stale chunk detected, reloading to refresh assets:', reason)
   window.location.reload()
 }
@@ -48,6 +48,13 @@ window.addEventListener('unhandledrejection', (e) => {
     recoverFromStaleChunk(msg)
   }
 })
+
+// Audit Z6-6. Registered after the stale-chunk handlers above so those still get
+// first look — a stale chunk is a deploy artefact, not a crash, and reloading is
+// the right response. Anything they do not claim is a real error and is reported.
+// This is the larger half of the blind spot: errors thrown from event handlers,
+// async callbacks and rejected promises never reach a React error boundary at all.
+installGlobalErrorReporting()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

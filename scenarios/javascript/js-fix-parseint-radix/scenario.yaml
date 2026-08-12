@@ -5,38 +5,31 @@ description: 'CONTEXT: A team operating JavaScript has raised a ticket for `Fix 
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project. The architecture is
   a single lab-primary node exposing modules, browser console, and Node tooling; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: toBase10(str) parses a decimal numeric string, but it calls parseInt(str)
   without a radix. For inputs with leading zeros this is fragile, and the intent is explicit base-10 parsing.
   Also it returns NaN silently for bad input where it should throw. Fix: always pass radix 10 and throw
   a RangeError on non-numeric input.
 
-
   OBJECTIVE: Always specify radix 10 to parseInt; Parse leading-zero strings as decimal (not octal-ish);
   Throw on input that does not parse. Acceptance criteria: the change is minimal and reversible, and success
   means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant modules, browser console, and Node tooling), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -149,7 +142,6 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 technology: javascript
 summary: Complete the fix parseint radix in tobase10 javascript lab and verify success with the checker
@@ -161,7 +153,7 @@ tags:
 - fix
 - hands-on
 - javascript
-linked_tutorial: javascript-fundamentals
+linked_tutorial: javascript-language-zero-hero
 what_you_will_learn:
 - Always specify radix 10 to parseInt
 - Parse leading-zero strings as decimal (not octal-ish)

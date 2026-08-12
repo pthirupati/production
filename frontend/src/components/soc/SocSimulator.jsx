@@ -9,8 +9,7 @@ import {
 import { simPanelRoot } from '../../utils/simLayout'
 import {
   SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, useSimSession,
-  GlobalSearch, indexSocState,
-} from '../sim/shared'
+  GlobalSearch, indexSocState, SimLoginGateCard } from '../sim/shared'
 import { renderSocV2Page } from './SocV2Panels'
 import '../../styles/sim-products.css'
 import './soc.css'
@@ -105,7 +104,7 @@ export default function SocSimulator({
       <div className={simPanelRoot(embedded, 'bg-[#0a0c12]')}>
         <LabChromeBar title="SOC Console" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-[#12141c] border border-[#232838] rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <SimLoginGateCard title="Sign in to SOC Console" onClose={onExit} className="bg-[#12141c] border border-[#232838] rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold flex items-center gap-2" style={{ background: '#1a1015' }}>
               <ShieldAlert size={18} className="text-red-400" /> FixItLab SIEM
             </div>
@@ -138,7 +137,7 @@ export default function SocSimulator({
                 Training credentials: <span className="font-mono text-slate-300">{SOC_LAB_USER}</span> / <span className="font-mono text-slate-300">{SOC_LAB_PASS}</span>
               </p>
             </form>
-          </div>
+          </SimLoginGateCard>
         </div>
       </div>
     )

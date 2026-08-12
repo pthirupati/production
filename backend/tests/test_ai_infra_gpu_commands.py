@@ -79,12 +79,37 @@ _AMD_MATRIX = (
 )
 
 
+def _healthy_gpu_engine(slug):
+    """Engine for `slug` with the driver brought up, as a learner would.
+
+    GPU-track slugs now carry a deliberate driver fault (`topic_faults.GPU_KEYWORDS`),
+    so `nvidia-smi` reports "couldn't communicate with the NVIDIA driver" on a fresh
+    session. That is correct lab behaviour — it is the break the learner is there to
+    fix — but the tests below are about the *command implementations*, which need
+    working hardware to exercise.
+
+    The fault is asserted before repairing it rather than stepped around, so this
+    covers both halves: the lab really is broken at the start, and it really does
+    come back. A test that merely picked a fault-free slug would have hidden the
+    day the injection stopped firing.
+    """
+    engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type="gpu")
+    assert "couldn't communicate" in str(engine.shell.run("nvidia-smi -L")), (
+        f"{slug} was expected to start with an injected GPU driver fault; "
+        "if the injection was narrowed, this test's premise changed"
+    )
+    for cmd in ("sudo modprobe nvidia", "sudo systemctl restart nvidia-persistenced"):
+        engine.shell.run(cmd)
+    assert "couldn't communicate" not in str(engine.shell.run("nvidia-smi -L")), (
+        f"{slug} is NOT repairable by the documented driver steps — the lab is "
+        "unsolvable, which is far worse than this test failing"
+    )
+    return engine
+
+
 class AiInfraGpuCommandsTests(SimpleTestCase):
     def test_nvidia_smi_dmon_streams_lines(self):
-        engine = UnifiedSimulationEngine(
-            scenario_slug="academy-ai-infra-003-operate-dcgm",
-            simulation_type="gpu",
-        )
+        engine = _healthy_gpu_engine("academy-ai-infra-003-operate-dcgm")
         out = engine.shell.run("nvidia-smi dmon -c 3")
         self.assertIsInstance(out, StreamedCommandResult)
         self.assertGreaterEqual(len(out.lines), 4)
@@ -95,10 +120,7 @@ class AiInfraGpuCommandsTests(SimpleTestCase):
         self.assertIn("gpu", blob.lower())
 
     def test_nvidia_smi_pmon_streams(self):
-        engine = UnifiedSimulationEngine(
-            scenario_slug="ai-infra-esc-dcgm-exporter-blank",
-            simulation_type="gpu",
-        )
+        engine = _healthy_gpu_engine("ai-infra-esc-dcgm-exporter-blank")
         out = engine.shell.run("nvidia-smi pmon -c 2")
         self.assertIsInstance(out, StreamedCommandResult)
         self.assertTrue(any("pid" in ln.lower() for ln in out.lines[:2]))
@@ -106,10 +128,7 @@ class AiInfraGpuCommandsTests(SimpleTestCase):
     def test_sku_h100_thermal_hero(self):
         sku = _resolve_gpu_sku("ai-infra-dcops-h100-gpu4-thermal")
         self.assertIn("H100", sku["name"])
-        engine = UnifiedSimulationEngine(
-            scenario_slug="ai-infra-dcops-h100-gpu4-thermal",
-            simulation_type="gpu",
-        )
+        engine = _healthy_gpu_engine("ai-infra-dcops-h100-gpu4-thermal")
         out = str(engine.shell.run("nvidia-smi -L"))
         self.assertIn("H100", out)
         self.assertIn("GPU 0:", out)
@@ -137,10 +156,7 @@ class AiInfraGpuCommandsTests(SimpleTestCase):
         self.assertIn("GPU", rocm)
 
     def test_nvidia_smi_query_sections(self):
-        engine = UnifiedSimulationEngine(
-            scenario_slug="ai-infra-maas-commission-h100",
-            simulation_type="gpu",
-        )
+        engine = _healthy_gpu_engine("ai-infra-maas-commission-h100")
         for cmd in (
             "nvidia-smi -q -d MEMORY",
             "nvidia-smi -q -d TEMPERATURE",
@@ -167,10 +183,7 @@ class AiInfraGpuCommandsTests(SimpleTestCase):
             self.assertTrue(len(out) > 10, msg=cmd)
 
     def test_nvidia_command_matrix(self):
-        engine = UnifiedSimulationEngine(
-            scenario_slug="ai-infra-maas-commission-h100",
-            simulation_type="gpu",
-        )
+        engine = _healthy_gpu_engine("ai-infra-maas-commission-h100")
         for cmd, needles in _NVIDIA_MATRIX:
             with self.subTest(cmd=cmd):
                 out = str(engine.shell.run(cmd))
@@ -191,20 +204,14 @@ class AiInfraGpuCommandsTests(SimpleTestCase):
                     self.assertIn(needle, out, msg=f"{cmd} missing {needle!r}")
 
     def test_nvlink_covers_full_gpu_count(self):
-        engine = UnifiedSimulationEngine(
-            scenario_slug="ai-infra-maas-commission-h100",
-            simulation_type="gpu",
-        )
+        engine = _healthy_gpu_engine("ai-infra-maas-commission-h100")
         out = str(engine.shell.run("nvidia-smi nvlink --status"))
         self.assertIn("GPU 7:", out)
         topo = str(engine.shell.run("nvidia-smi topo -m"))
         self.assertIn("GPU7", topo)
 
     def test_nvidia_proc_driver_sysfs(self):
-        engine = UnifiedSimulationEngine(
-            scenario_slug="ai-infra-maas-commission-h100",
-            simulation_type="gpu",
-        )
+        engine = _healthy_gpu_engine("ai-infra-maas-commission-h100")
         ver = str(engine.shell.run("cat /proc/driver/nvidia/version"))
         self.assertIn("NVRM version", ver)
         self.assertIn("550", ver)
@@ -217,3 +224,123 @@ class AiInfraGpuCommandsTests(SimpleTestCase):
         sclk = str(engine.shell.run("cat /sys/class/drm/card0/device/pp_dpm_sclk"))
         self.assertIn("Mhz", sclk)
         self.assertIn("*", sclk)
+
+    def test_dcgmi_diag_fails_from_ecc_state(self):
+        """Audit §A1 — planted ECC counters must fail GPU Memory, not always Pass."""
+        engine = _healthy_gpu_engine("academy-ai-infra-003-operate-dcgm")
+        gpus = engine.shell.state.gpus
+        self.assertTrue(gpus)
+        gpus[0].ecc_aggregate_uncorrected = 3
+        gpus[0].remap_pending = True
+        gpus[0].diag_memory_fail = True
+        out = str(engine.shell.run("dcgmi diag -r 1"))
+        self.assertIn("GPU Memory", out)
+        self.assertIn("Fail", out)
+        self.assertRegex(out, r"GPU Memory\s+\|\s+Fail")
+
+    def test_dcgmi_stats_stable_across_calls(self):
+        """Audit §A1 — dcgmi stats must not use random.randint (diagnosable)."""
+        engine = _healthy_gpu_engine("academy-ai-infra-003-operate-dcgm")
+        g = engine.shell.state.gpus[0]
+        g.power_w = 412.0
+        g.util_gpu = 77
+        g.util_mem = 41
+        g.temp_c = 63
+        a = str(engine.shell.run("dcgmi stats"))
+        b = str(engine.shell.run("dcgmi stats"))
+        self.assertEqual(a, b)
+        self.assertIn("412", a)
+        self.assertIn("77", a)
+        self.assertIn("63", a)
+
+    def test_nvlink_degraded_width_from_state(self):
+        engine = _healthy_gpu_engine("ai-infra-dcops-h100-nvlink-degraded")
+        g = engine.shell.state.gpus[0]
+        g.ensure_default_nvlink(dense=True)
+        g.nvlink_links[0] = {
+            **g.nvlink_links[0],
+            "width_gbps": 13.281,
+            "active": False,
+            "replay_errors": 42,
+        }
+        status = str(engine.shell.run("nvidia-smi nvlink --status"))
+        self.assertIn("13.281", status)
+        self.assertIn("Inactive", status)
+        errors = str(engine.shell.run("nvidia-smi nvlink -e"))
+        self.assertIn("Replay Errors: 42", errors)
+
+    def test_query_gpu_reads_planted_temp(self):
+        engine = _healthy_gpu_engine("academy-ai-infra-003-operate-dcgm")
+        engine.shell.state.gpus[0].temp_c = 71
+        out = str(
+            engine.shell.run(
+                "nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits"
+            )
+        )
+        self.assertTrue(out.strip().startswith("71"), msg=out)
+
+    def test_vllm_respects_tensor_parallel_and_oom(self):
+        engine = _healthy_gpu_engine("academy-ai-infra-003-operate-dcgm")
+        # Inventory is SKU-sized; ask for more TP than GPUs → hard error.
+        out = str(engine.shell.run(
+            "vllm serve meta-llama/Llama-3 --tensor-parallel-size 99"
+        ))
+        self.assertIn("tensor_parallel_size", out)
+        self.assertIn("larger than", out.lower())
+        # Honour a valid TP in the ready banner.
+        n = len(engine.shell.state.gpus)
+        out = str(engine.shell.run(
+            f"vllm serve meta-llama/Llama-3 --tensor-parallel-size {min(2, n)}"
+        ))
+        self.assertIn(f"tensor_parallel_size={min(2, n)}", out)
+        self.assertIn("READY", out)
+        self.assertIn("KV cache", out)
+        # Planted OOM fails with a real CUDA message.
+        engine.shell.state.gpus[0].oom = True
+        engine.shell.state.gpus[0].memory_used_mib = engine.shell.state.gpus[0].memory_total_mib
+        oom = str(engine.shell.run("vllm serve meta-llama/Llama-3 --tensor-parallel-size 1"))
+        self.assertIn("CUDA out of memory", oom)
+        self.assertIn("OutOfMemoryError", oom)
+
+    def test_vllm_kv_cache_exhausted_by_max_model_len(self):
+        engine = _healthy_gpu_engine("academy-ai-infra-003-operate-dcgm")
+        # Fill most of GPU 0 so a huge max_model_len cannot reserve KV pages.
+        g0 = engine.shell.state.gpus[0]
+        g0.memory_used_mib = max(0, int(g0.memory_total_mib) - 512)
+        out = str(engine.shell.run(
+            "vllm serve meta-llama/Llama-3 --tensor-parallel-size 1 "
+            "--gpu-memory-utilization 0.9 --max-model-len 200000"
+        ))
+        self.assertIn("KV cache", out)
+        self.assertIn("max_model_len", out)
+        self.assertNotIn("READY", out)
+
+    def test_vllm_tp_must_divide_attention_heads(self):
+        engine = _healthy_gpu_engine("academy-ai-infra-003-operate-dcgm")
+        # 8B → 32 heads; TP=3 does not divide.
+        out = str(engine.shell.run(
+            "vllm serve meta-llama/Llama-3.1-8B-Instruct --tensor-parallel-size 3"
+        ))
+        self.assertIn("attention heads", out)
+        self.assertIn("divisible", out.lower())
+        self.assertNotIn("READY", out)
+
+    def test_torchrun_nccl_hang_clears_with_ib_disable(self):
+        engine = _healthy_gpu_engine("academy-ai-infra-003-operate-dcgm")
+        engine.shell.state.nccl_hang = True
+        hung = str(engine.shell.run("torchrun --nproc_per_node=2 train.py"))
+        self.assertIn("allreduce timed out", hung)
+        self.assertIn("NCCL_IB_DISABLE", hung)
+        engine.shell.state.env["NCCL_IB_DISABLE"] = "1"
+        ok = str(engine.shell.run("torchrun --nproc_per_node=2 train.py"))
+        self.assertIn("Training completed successfully", ok)
+
+    def test_torchrun_fsdp_oom_suggests_activation_checkpointing(self):
+        engine = _healthy_gpu_engine("academy-ai-infra-003-operate-dcgm")
+        engine.shell.state.gpus[0].oom = True
+        out = str(engine.shell.run(
+            "torchrun --nproc_per_node=1 --fsdp train.py"
+        ))
+        self.assertIn("FSDP", out)
+        self.assertIn("activation checkpointing", out.lower())
+        self.assertIn("OutOfMemoryError", out)

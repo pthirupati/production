@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import api from '../api/client'
 import { labApi } from '../api/labs'
@@ -9,17 +9,20 @@ import {
   Clock, CheckCircle2, XCircle, Lightbulb, StopCircle,
   ChevronRight, Trophy, Target, Eye, FileText, AlertTriangle,
   PanelLeftClose, PanelLeftOpen, Sparkles, Timer, Keyboard, ExternalLink, Terminal, Wand2,
-  Ticket as TicketIcon, Lock, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown
+  Ticket as TicketIcon, Lock, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown, ArrowLeft,
+  Bookmark, BookmarkPlus
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { broadcastLabStopped, closeLabChildTabs, broadcastLabActivity } from '../utils/labSync'
+import { broadcastLabStopped, closeLabChildTabs } from '../utils/labSync'
 import { purgeGuestStateForLab } from '../components/vmware/linuxShell'
 import { awsSimStorageKey, hardResetAwsSim } from '../components/aws/store/awsStore'
-import { ConfirmDialog } from '../components/ConfirmModal'
+import { ConfirmDialog, useModalA11y } from '../components/ConfirmModal'
 import JiraTicketPanel from '../components/JiraTicketPanel'
 import ItsmTicketPanel from '../components/itsm/ItsmTicketPanel'
 import { itsmApi } from '../api/itsm'
+import { scenarioApi } from '../api/scenarios'
 import JiraTicketLink from '../components/JiraTicketLink'
+import { useJiraTeamReplyPoll } from '../hooks/useJiraTeamReplyPoll'
 import LabTerminal, { scheduleReadySend } from '../components/LabTerminal'
 import { LabBackendTerminalStatusBar } from '../components/linux/LinuxTerminalChrome'
 import PrimaryLabSim from '../components/lab/PrimaryLabSim'
@@ -46,11 +49,7 @@ import {
   LazyNmapSimulator,
   LazyWiresharkSimulator,
   LazyCicdPipelineSim,
-  LazyCommvaultSimulator,
-  LazyNetAppSimulator,
-  LazyDellEmcSimulator,
   LazyDatacenterSimulator,
-  LazySocSimulator,
   LazyAzureConsole,
   LazyGcpConsole,
   LazyCodingIDE,
@@ -375,6 +374,7 @@ export default function LabRunner() {
   // while we are mid-stop so we do not navigate before cloud teardown finishes.
   const stoppingRef = useRef(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const shortcutsPanelRef = useModalA11y(showShortcuts, () => setShowShortcuts(false))
   const [terminalFullscreen, setTerminalFullscreen] = useState(false)
   // Feature: Lab time extension
   const [extending, setExtending] = useState(false)
@@ -383,15 +383,30 @@ export default function LabRunner() {
   const [aiHint, setAiHint] = useState(null)
   const [aiHintLoading, setAiHintLoading] = useState(false)
   const [aiCreditsRemaining, setAiCreditsRemaining] = useState(null)
+  // Bookmarking existed on Scenarios / ScenarioDetail / Dashboard but not on the
+  // lab surface, which is exactly where a learner decides "I want to come back
+  // to this one" (audit L2339). Seeded from the scenario payload when the
+  // serializer carries it; the toggle response is authoritative after that.
+  const [bookmarked, setBookmarked] = useState(false)
+  const [bookmarking, setBookmarking] = useState(false)
+  // Whether this session actually has a terminal recording worth replaying.
+  // SessionReplay is only linked from LabHistory today (audit L2324), but it
+  // cannot be linked unconditionally at completion: the backend's replay
+  // endpoint get_or_creates an EMPTY SessionRecording for any session that
+  // never recorded one, so every GUI-simulator lab returns `events: []` and a
+  // blanket link would send half of all learners to an empty page. Probed once
+  // on completion; the link renders only on a non-empty recording.
+  const [replayAvailable, setReplayAvailable] = useState(false)
   // Feature: Scenario star rating
   const [hasRated, setHasRated] = useState(false)
   const [rating, setRating] = useState(0)
   const [ratingHover, setRatingHover] = useState(0)
   const [ratingSubmitting, setRatingSubmitting] = useState(false)
   const [jiraComments, setJiraComments] = useState([])
-  const [jiraActivity, setJiraActivity] = useState([])
+  const [, setJiraActivity] = useState([])
   const [jiraTicket, setJiraTicket] = useState(null)
   const [jiraTransitioning, setJiraTransitioning] = useState(false)
+  const { pending: jiraPendingReply, startPendingPoll: startJiraReplyPoll } = useJiraTeamReplyPoll()
   // ── ITSM (ServiceNow-style) ticket state ──
   const [itsmTicket, setItsmTicket] = useState(null)
   const [itsmMeta, setItsmMeta] = useState(null)
@@ -515,7 +530,32 @@ export default function LabRunner() {
   useEffect(() => {
     setGuidedStep(0)
     setGuidedDone({})
+    setReplayAvailable(false)
   }, [sessionId])
+
+  // Seed the bookmark pip from whatever the session payload carries. The lab
+  // session serializer does not always include is_bookmarked, so absent means
+  // "show unbookmarked" — toggling still writes the correct server-side state
+  // because the endpoint is a get_or_create/delete toggle keyed on (user, scenario).
+  useEffect(() => {
+    const sc = session?.scenario_detail || session?.scenario
+    if (sc && typeof sc.is_bookmarked === 'boolean') setBookmarked(sc.is_bookmarked)
+  }, [session])
+
+  // Probe the recording once the lab is graded, so the result panel can offer a
+  // replay link ONLY when there is something to replay. Failure is silent and
+  // simply hides the link — an unreachable review tool is a far better outcome
+  // than a link to an empty player (audit L2324).
+  useEffect(() => {
+    if (!validationResult || !sessionId) return
+    let active = true
+    labApi.getSessionReplay(sessionId)
+      .then((data) => {
+        if (active) setReplayAvailable((data?.events?.length || 0) > 0)
+      })
+      .catch(() => { if (active) setReplayAvailable(false) })
+    return () => { active = false }
+  }, [validationResult, sessionId])
 
   // Terraform IDE / Packer / companions → open overlay in this lab (mutual exclusion).
   useEffect(() => {
@@ -765,7 +805,9 @@ export default function LabRunner() {
           // the fix happens in the terminal after the VMware-side hardware change.
           const isCrossTech = Boolean(lab.scenario?.cross_technology)
           if (!isCrossTech && (lab.scenario?.simulation_type === 'vmware' || lab.scenario?.technology?.slug === 'vmware')) {
-            navigate(`/vmware-sim?session=${sessionId}&scenario=${lab.scenario?.slug || ''}`, { replace: true })
+            // replace:false so browser Back can leave the fullscreen login gate
+            // (audit §H1 — replace:true stranded learners who could not guess SSO).
+            navigate(`/vmware-sim?session=${sessionId}&scenario=${lab.scenario?.slug || ''}`, { replace: false })
             return
           }
 
@@ -905,7 +947,12 @@ export default function LabRunner() {
         toast('Lab terminated due to 30 minutes of inactivity.', { icon: '⏰', duration: 8000, ...TOAST })
         try {
           await labApi.stopLab(sessionId)
-        } catch {}
+        } catch (err) {
+          // Keep tearing down locally either way — the server-side idle reaper
+          // will collect the session. But log it: a stopLab that always fails
+          // here means sessions are leaking, and swallowing it hid that.
+          console.warn('[fixitlab] idle stopLab failed; continuing teardown:', err)
+        }
         clearSession()
         stopTimer()
         broadcastLabStopped(sessionId, 'idle')
@@ -951,6 +998,7 @@ export default function LabRunner() {
     if (!session?.jira_issue_key) return
     try {
       const { jiraApi } = await import('../api/jira')
+      const baseline = (jiraComments || []).length
       const res = await jiraApi.addComment(session.jira_issue_key, text)
       const data = res.data || res
       setJiraTicket(data)
@@ -958,21 +1006,24 @@ export default function LabRunner() {
       setJiraActivity(data?.activity || [])
 
       if (data?.team_reply?.scheduled) {
-        const delay = (data.team_reply.delay_seconds || 30) * 1000
-        toast.success(`Teams notified — reply expected in ~${data.team_reply.delay_seconds || 30}s`, { duration: 5000 })
-        const pollUntil = Date.now() + delay + 8000
-        const poll = async () => {
-          if (Date.now() > pollUntil || !session?.scenario?.id) return
-          try {
-            const fresh = await jiraApi.getScenarioTicket(session.scenario.id, { details: 1 })
+        toast.success(
+          `Teams notified — reply expected in ~${data.team_reply.delay_seconds || 30}s`,
+          { duration: 5000 },
+        )
+        const scenarioId = session?.scenario?.id
+        startJiraReplyPoll(data.team_reply, {
+          commentCount: baseline + 1,
+          reload: async () => {
+            if (!scenarioId) return baseline + 1
+            const fresh = await jiraApi.getScenarioTicket(scenarioId, { details: 1 })
             const fd = fresh.data || fresh
-            setJiraComments(fd?.recent_comments || fd?.comments || [])
+            const next = fd?.recent_comments || fd?.comments || []
+            setJiraComments(next)
             if (fd?.ticket) setJiraTicket(fd.ticket)
             setJiraActivity(fd?.activity || [])
-          } catch { /* ignore */ }
-          setTimeout(poll, 4000)
-        }
-        setTimeout(poll, delay)
+            return next.length
+          },
+        })
       } else {
         toast.success('Comment posted')
       }
@@ -1104,7 +1155,18 @@ export default function LabRunner() {
         setGuidedStep(s => Math.min(total - 1, s + 1))
         toast.success(result.message || 'Step verified — moving to the next step', { duration: 1800 })
       } else {
-        toast.error(result.message || result.error || 'Step not verified yet — complete the command in the terminal', { duration: 3500 })
+        // The backend now names the failing step and what it is still looking
+        // for (audit L2335). `output` is what the check actually saw and was
+        // being dropped on the floor here — show it under the explanation, but
+        // visually separate and clipped so a chatty validator cannot bury the
+        // guidance it is supposed to support.
+        const detail = String(result.output || '').trim()
+        const why = result.message || result.error
+          || 'Step not verified yet — complete the command in the terminal'
+        toast.error(
+          detail ? `${why}\n\n${detail.slice(0, 300)}` : why,
+          { duration: detail ? 6000 : 3500, style: { whiteSpace: 'pre-wrap' } },
+        )
       }
     } catch (err) {
       toast.error(err.response?.data?.message || err.response?.data?.error || 'Step verification failed')
@@ -1180,6 +1242,26 @@ export default function LabRunner() {
       toast.error(err.response?.data?.error || 'AI hint unavailable')
     } finally {
       setAiHintLoading(false)
+    }
+  }
+
+  const handleToggleBookmark = async () => {
+    const scenarioId = session?.scenario?.id || session?.scenario_detail?.id
+    if (!scenarioId || bookmarking) return
+    setBookmarking(true)
+    // Optimistic: the pip is a one-bit control and a round-trip lag on it feels
+    // broken. Reconciled from the response, reverted on failure.
+    const next = !bookmarked
+    setBookmarked(next)
+    try {
+      const res = await scenarioApi.toggleBookmark(scenarioId)
+      setBookmarked(res.bookmarked)
+      toast.success(res.bookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks', { duration: 1800 })
+    } catch {
+      setBookmarked(!next)
+      toast.error('Could not update bookmark')
+    } finally {
+      setBookmarking(false)
     }
   }
 
@@ -1406,7 +1488,12 @@ export default function LabRunner() {
 
     return (
     <div className="flex items-center justify-center h-screen bg-surface-950">
-      <div className="text-center max-w-sm">
+      <div
+        className="text-center max-w-sm"
+        aria-live="polite"
+        aria-atomic="true"
+        role="status"
+      >
         <div className="relative mb-6">
           <div className="w-20 h-20 border-4 border-accent-cyan/20 border-t-accent-cyan rounded-full animate-spin mx-auto" />
           <div className="absolute inset-0 flex items-center justify-center">
@@ -1791,7 +1878,6 @@ export default function LabRunner() {
     : isOpenStackLab ? 'openstack'
     : null
   const solved = validationResult?.passed
-  const expired = validationResult?.expired
   const simChromeProps = {
     onHints: () => { setSidebarTab('hints'); setSidebarOpen(true) },
     onCheck: handleValidate,
@@ -1800,6 +1886,15 @@ export default function LabRunner() {
     hintsLabel: `Hints (${hints.hints_used}/${hints.total_hints})`,
     checkDisabled: validating || solved,
     extendDisabled: extending || extensionsUsed >= 2,
+    // LabRunner is the only place that knows WHICH condition disabled these, so
+    // it names it. LabChromeControls falls back to a generic string for the
+    // simulators that still pass bare booleans (audit L2306).
+    checkDisabledReason: solved
+      ? 'Already solved — this lab is complete.'
+      : 'Checking your work…',
+    extendDisabledReason: extensionsUsed >= 2
+      ? 'No extensions left today (limit 2 per day).'
+      : 'Adding 30 minutes…',
   }
   // Companion overlays must sit above the lab sidebar (z-70) and keep Close +
   // Hints/Check/+30m/Stop — never pass embedded=true (that hid chrome).
@@ -1847,7 +1942,6 @@ export default function LabRunner() {
   const explicitVmwareScenario = scenario?.vmware_link === true
     || consolesInclude(scenario?.consoles, 'vmware')
   const canVmwareConsole = userHasTechAccess(techSubs, 'vmware')
-  const canDatacenterConsole = userHasTechAccess(techSubs, 'datacenter')
   const vmwareServerHref = `/vmware/${sessionId}?scenario=${scenario?.slug || ''}`
   const showSimVmwareLink = canOpenCompanionConsole(techSubs, explicitVmwareScenario, 'vmware') && (
     isAwxLab || isMonitoringLab || isWindowsGuiLab || isCommvaultLab || isTerraformSimLab
@@ -2129,6 +2223,50 @@ export default function LabRunner() {
     scheduleLabClose(result, slug)
   }
 
+  // Header controls for the two browser-surface layouts (Prompt Playground and
+  // Coding IDE). Both return early, BEFORE the sidebar and the terminal action
+  // bar render, so +30m and a way back to the scenario were unreachable there —
+  // Stop was the only exit (audit L445/L450/L453).
+  //
+  // Deliberately NOT wired here:
+  //  • onHints — the hints panel lives in the sidebar these layouts never mount,
+  //    so the button would open nothing.
+  //  • onCheck — PromptPlayground's "Complete Lesson" and CodingIDE's Run/Check
+  //    already grade on the backend and call onSolved. A header Check routed to
+  //    handleValidate would be a SECOND, different grader: it could report a
+  //    failure on a lesson the playground already passed, or overwrite a passed
+  //    validationResult. Grading stays with the console that owns it.
+  //
+  // Back leaves the session RUNNING on purpose — it is "step away", not "quit".
+  // Quitting is Stop, which goes through the confirm dialog and tears the
+  // session down. The timer keeps burning either way, so the label says so.
+  const browserLabHeaderControls = (
+    <>
+      <button
+        type="button"
+        onClick={handleExtendLab}
+        disabled={extending || extensionsUsed >= 2}
+        title={
+          extensionsUsed >= 2
+            ? 'No extensions left today (limit 2)'
+            : extending
+              ? 'Adding time…'
+              : `Add 30 min (${2 - extensionsUsed} left today)`
+        }
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-surface-600 text-surface-200 hover:border-accent-cyan hover:text-accent-cyan disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-surface-600 disabled:hover:text-surface-200 text-xs"
+      >
+        <Clock size={13} /> +30m
+      </button>
+      <Link
+        to={getLabExitPath(session, '', techSlugRef, scenarioSlugRef)}
+        title="Back to the scenario page — the lab keeps running and the timer keeps counting"
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-surface-600 text-surface-200 hover:border-accent-cyan hover:text-accent-cyan text-xs"
+      >
+        <ArrowLeft size={13} /> Scenario
+      </Link>
+    </>
+  )
+
   // ── Prompt Engineering layout (rule-based AI practice console, free) ──
   if (isPromptLab) {
     return (
@@ -2143,6 +2281,7 @@ export default function LabRunner() {
           </div>
           <div className="flex items-center gap-2">
             <LabTimerBadge variant="desktop" />
+            {browserLabHeaderControls}
             <button
               onClick={() => setShowStopConfirm(true)}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-red-500/30 text-red-400 bg-red-500/10 hover:bg-red-500/20 text-xs"
@@ -2193,11 +2332,15 @@ export default function LabRunner() {
                 issueKey={session.jira_issue_key}
                 issueUrl={session.jira_issue_url || `/jira/${session.jira_issue_key}`}
                 className="text-[10px]"
+                // Opened from inside a running lab, so the ticket page can send
+                // the learner back here instead of to /dashboard (audit L479).
+                sessionId={sessionId}
               />
             )}
           </div>
           <div className="flex items-center gap-2">
             <LabTimerBadge variant="desktop" />
+            {browserLabHeaderControls}
             <button
               onClick={() => setShowStopConfirm(true)}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-red-500/30 text-red-400 bg-red-500/10 hover:bg-red-500/20 text-xs"
@@ -2277,6 +2420,9 @@ export default function LabRunner() {
                 issueKey={session.jira_issue_key}
                 issueUrl={session.jira_issue_url || `/jira/${session.jira_issue_key}`}
                 className="text-[10px]"
+                // Opened from inside a running lab, so the ticket page can send
+                // the learner back here instead of to /dashboard (audit L479).
+                sessionId={sessionId}
               />
             </span>
           )}
@@ -2284,7 +2430,23 @@ export default function LabRunner() {
 
         <div className="flex items-center gap-2">
           <LabTimerBadge variant="desktop" />
-          <button onClick={() => setShowShortcuts(true)} className="p-2 text-surface-400 hover:text-white" title="Keyboard shortcuts">
+          {/* Save-for-later, right where the learner forms the intent (L2339).
+              Deliberately not in the mobile bar — that row is already tight and
+              this is a non-essential control. */}
+          <button
+            type="button"
+            onClick={handleToggleBookmark}
+            disabled={bookmarking}
+            aria-pressed={bookmarked}
+            aria-label={bookmarked ? 'Remove from bookmarks' : 'Bookmark this scenario'}
+            className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400 hover:text-accent-amber disabled:opacity-50 transition-colors"
+            title={bookmarked ? 'Remove from bookmarks' : 'Bookmark this scenario'}
+          >
+            {bookmarked
+              ? <Bookmark size={16} className="text-accent-amber fill-accent-amber" />
+              : <BookmarkPlus size={16} />}
+          </button>
+          <button type="button" onClick={() => setShowShortcuts(true)} className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400 hover:text-white" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">
             <Keyboard size={16} />
           </button>
         </div>
@@ -2347,18 +2509,45 @@ export default function LabRunner() {
                   </div>
                   {scenario.objectives && scenario.objectives.length > 0 && (
                     <div>
-                      <h3 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Expected outcome</h3>
+                      <h3 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">
+                        Acceptance checklist
+                        {Array.isArray(validationResult?.checklist) && (
+                          <span className="ml-2 normal-case tracking-normal font-normal text-surface-500">
+                            {validationResult.checklist.filter((c) => c.done).length}/{validationResult.checklist.length}
+                          </span>
+                        )}
+                      </h3>
                       {Array.isArray(scenario.objectives) ? (
                         <ul className="space-y-1.5">
-                          {scenario.objectives.map((obj, i) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
-                              <Target size={12} className="text-accent-cyan mt-0.5 shrink-0" />
-                              <span>{typeof obj === 'string' ? obj : JSON.stringify(obj)}</span>
-                            </li>
-                          ))}
+                          {scenario.objectives.map((obj, i) => {
+                            const text = typeof obj === 'string' ? obj : JSON.stringify(obj)
+                            const fromApi = Array.isArray(validationResult?.checklist)
+                              ? validationResult.checklist.find((c) => c.id === `obj-${i}` || c.text === text)
+                              : null
+                            const done = Boolean(
+                              fromApi?.done
+                              || validationResult?.passed
+                              || guidedDone[i],
+                            )
+                            return (
+                              <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
+                                {done ? (
+                                  <CheckCircle2 size={12} className="text-accent-green mt-0.5 shrink-0" />
+                                ) : (
+                                  <span className="w-3 h-3 mt-0.5 shrink-0 rounded-full border border-surface-600" />
+                                )}
+                                <span className={done ? 'text-surface-200' : ''}>{text}</span>
+                              </li>
+                            )
+                          })}
                         </ul>
                       ) : (
                         <p className="text-sm text-surface-300 whitespace-pre-wrap">{scenario.objectives}</p>
+                      )}
+                      {!validationResult?.passed && (
+                        <p className="text-[11px] text-surface-500 mt-2">
+                          Items tick off as Check Solution confirms them. Run Check after each fix.
+                        </p>
                       )}
                     </div>
                   )}
@@ -2714,7 +2903,27 @@ export default function LabRunner() {
                             onTransition={handleJiraTransition}
                             onComment={handleJiraComment}
                             transitioning={jiraTransitioning}
+                            pendingReply={jiraPendingReply}
                           />
+                        </div>
+                      )}
+
+                      {/* Review your own run. Opens in a new tab on purpose —
+                          the lab is mid-close-countdown and navigating away
+                          would lose the rest of this panel. */}
+                      {replayAvailable && (
+                        <div className="border-t border-surface-800 pt-4">
+                          <a
+                            href={`/session-replay/${sessionId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-md border border-surface-600 text-surface-200 hover:border-accent-cyan hover:text-accent-cyan text-xs font-medium transition-colors"
+                          >
+                            <Eye size={13} /> Replay this session
+                          </a>
+                          <p className="text-[10px] text-surface-500 text-center mt-1.5">
+                            Step back through every command you ran.
+                          </p>
                         </div>
                       )}
 
@@ -2787,18 +2996,26 @@ export default function LabRunner() {
                       {Array.isArray(scenario.objectives) && scenario.objectives.length > 0 && !validationResult.expired && (
                         <div className="border-t border-surface-800 pt-4">
                           <h4 className="text-xs font-semibold text-surface-400 uppercase mb-2 flex items-center gap-1">
-                            <Target size={12} /> Objectives to meet
+                            <Target size={12} /> Acceptance checklist
                           </h4>
                           <ul className="space-y-1.5">
-                            {scenario.objectives.map((obj, i) => (
-                              <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
-                                <span className="w-3.5 h-3.5 mt-0.5 shrink-0 rounded-full border border-surface-600" />
-                                <span>{typeof obj === 'string' ? obj : JSON.stringify(obj)}</span>
+                            {(validationResult.checklist || scenario.objectives.map((obj, i) => ({
+                              id: `obj-${i}`,
+                              text: typeof obj === 'string' ? obj : JSON.stringify(obj),
+                              done: false,
+                            }))).map((item) => (
+                              <li key={item.id || item.text} className="flex items-start gap-2 text-sm text-surface-300">
+                                {item.done ? (
+                                  <CheckCircle2 size={12} className="text-accent-green mt-0.5 shrink-0" />
+                                ) : (
+                                  <span className="w-3.5 h-3.5 mt-0.5 shrink-0 rounded-full border border-surface-600" />
+                                )}
+                                <span>{item.text}</span>
                               </li>
                             ))}
                           </ul>
                           <p className="text-[11px] text-surface-500 mt-2">
-                            None of these are confirmed yet — fix the issue above, then run Check again. Stuck? Reveal a hint.
+                            Fix the failures above, then run Check again — confirmed items stay ticked.
                           </p>
                         </div>
                       )}
@@ -2854,6 +3071,8 @@ export default function LabRunner() {
                   hintsLabel={simChromeProps.hintsLabel}
                   checkDisabled={simChromeProps.checkDisabled}
                   extendDisabled={simChromeProps.extendDisabled}
+                  checkDisabledReason={simChromeProps.checkDisabledReason}
+                  extendDisabledReason={simChromeProps.extendDisabledReason}
                   showTimer={false}
                   buttonClass="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-surface-600 text-surface-200 hover:border-accent-cyan hover:text-accent-cyan text-[10px] font-medium"
                   primaryClass="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-emerald-500/40 text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 text-[10px] font-semibold"
@@ -3869,19 +4088,26 @@ export default function LabRunner() {
       )}
 
       {showPackerLink && showPackerSim && (
-        <Suspense fallback={<div className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center text-sm text-sky-200">Loading Packer workspace…</div>}>
-          <LazyPackerWorkspaceIde
-            sessionId={sessionId}
-            scenario={scenario}
-            terminalSession={terminalSession}
-            terminalHost={terminalHost}
-            blockedCommands={blockedCmds}
-            isMobile={isMobile}
-            onExit={() => setShowPackerSim(false)}
-            {...simChromeProps}
-            showLabControls
-          />
-        </Suspense>
+        // Was a bare <Suspense>: a throw inside the Packer IDE escaped to the
+        // route boundary and blanked the whole lab, terminal included. Every
+        // other companion goes through LazySimPanel, which adds SimErrorBoundary
+        // so a crash is contained to this overlay and offers a retry.
+        // NOTE: do not pass `embedded` — PackerWorkspaceIde has no such prop and
+        // showLabControls is what renders Hints/Check/+30m/Stop here.
+        <LazySimPanel
+          Sim={LazyPackerWorkspaceIde}
+          name="packer"
+          label="Packer workspace"
+          sessionId={sessionId}
+          scenario={scenario}
+          terminalSession={terminalSession}
+          terminalHost={terminalHost}
+          blockedCommands={blockedCmds}
+          isMobile={isMobile}
+          onExit={() => setShowPackerSim(false)}
+          {...simChromeProps}
+          showLabControls
+        />
       )}
 
       {/* Single AWS companion mount — terraform labs already set showHostedAwsLink. */}
@@ -3961,8 +4187,16 @@ export default function LabRunner() {
 
       {showShortcuts && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setShowShortcuts(false)}>
-          <div className="glass-card p-6 max-w-xs w-full" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
+          <div
+            ref={shortcutsPanelRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="lab-shortcuts-title"
+            className="glass-card p-6 max-w-xs w-full outline-none"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 id="lab-shortcuts-title" className="text-base font-semibold text-white mb-4 flex items-center gap-2">
               <Keyboard size={16} className="text-accent-cyan" /> Keyboard Shortcuts
             </h3>
             <div className="space-y-2.5 text-sm">
@@ -3981,7 +4215,7 @@ export default function LabRunner() {
                 </div>
               ))}
             </div>
-            <button onClick={() => setShowShortcuts(false)} className="btn-secondary w-full mt-5 text-sm">Close</button>
+            <button type="button" onClick={() => setShowShortcuts(false)} className="btn-secondary w-full mt-5 text-sm min-h-[44px]">Close</button>
           </div>
         </div>
       )}

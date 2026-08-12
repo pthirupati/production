@@ -342,6 +342,21 @@ def schedule_team_replies(ticket, user_text: str, session=None) -> dict:
 
     delay = team_reply_delay_seconds()
     try:
+        from apps.jira_integration.pending_team_replies import enqueue_pending_team_reply
+
+        enqueue_pending_team_reply(
+            issue_key=ticket.issue_key,
+            session_id=session_id,
+            author=author,
+            message=message,
+            actions=[a[1] for a in actions],
+            scenario_slug=scenario_slug,
+            delay_seconds=delay,
+        )
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Failed to enqueue durable pending team reply: %s", exc)
+
+    try:
         from celery_app.tasks import deliver_jira_team_reply
 
         deliver_jira_team_reply.apply_async(
@@ -355,8 +370,17 @@ def schedule_team_replies(ticket, user_text: str, session=None) -> dict:
             },
             countdown=delay,
         )
+        logger.info(
+            "Queued team reply issue=%s author=%s delay=%ss teams=%s",
+            ticket.issue_key, author, delay, teams,
+        )
     except Exception as exc:
         logger.warning("Celery unavailable for team reply, delivering immediately: %s", exc)
+        try:
+            from apps.jira_integration.pending_team_replies import cancel_pending_for_issue
+            cancel_pending_for_issue(ticket.issue_key)
+        except Exception:
+            pass
         deliver_team_reply_now(
             ticket.issue_key, session_id, author, message, [a[1] for a in actions], scenario_slug
         )
@@ -383,6 +407,10 @@ def deliver_team_reply_now(
 
     ticket = UserScenarioJiraTicket.objects.filter(issue_key=issue_key).first()
     if not ticket:
+        logger.warning(
+            "Dropping team reply — ticket missing issue_key=%s author=%s",
+            issue_key, author,
+        )
         return
 
     engine = None

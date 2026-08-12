@@ -114,6 +114,37 @@ def _find_change(cal: dict, change_id: str | None):
     return next((c for c in cal.get("changes") or [] if c.get("id") == change_id), None)
 
 
+def window_load_advice(state: dict) -> list[dict]:
+    """Per-rack headroom advice for planning a window against live load.
+
+    Advisory only — deliberately not wired into change_freeze_blocks. Blocking
+    ops on live load would make labs that never expected a load conflict report
+    as broken instead of showing a policy message.
+    """
+    pdus = (state.get("power_chain") or {}).get("rack_pdus") or []
+    by_rack: dict = {}
+    for p in pdus:
+        rack = p.get("rack")
+        if not rack:
+            continue
+        pct = int(p.get("load_pct") or 0)
+        kw = float(p.get("load_kw") or 0)
+        prev = by_rack.get(rack)
+        if prev is None or pct > prev["load_pct"] or kw > float(prev.get("load_kw") or 0):
+            by_rack[rack] = {"rack": rack, "load_pct": pct, "load_kw": p.get("load_kw")}
+    advice = []
+    for row in by_rack.values():
+        pct = int(row["load_pct"] or 0)
+        if pct >= 85:
+            verdict = "conflict"
+        elif pct >= 70:
+            verdict = "caution"
+        else:
+            verdict = "clear"
+        advice.append({**row, "verdict": verdict})
+    return advice
+
+
 def change_freeze_blocks(state: dict, action: str) -> str | None:
     """Return error message if freeze blocks this action."""
     cal = state.get("change_calendar") or {}

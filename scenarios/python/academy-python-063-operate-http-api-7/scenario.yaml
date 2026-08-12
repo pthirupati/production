@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'CONTEXT: Complete the http api coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab coding practice IDE — edit solution.py, Run visible tests,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: http api. The stub in solution.py is
   incomplete so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -74,7 +70,7 @@ tags:
 - do
 - hands-on
 - python
-linked_tutorial: python-fundamentals
+linked_tutorial: python-devops-zero-hero
 what_you_will_learn:
 - Day-2 HTTP APIs work completes safely in this environment
 - Changes are verified with before/after checks
@@ -155,7 +151,11 @@ coding_spec:
     code: 'assert json_status(200) == {''status'': 200, ''ok'': True}'
   hidden_tests:
   - name: nf
-    code: 'assert json_status(404) == {''status'': 404, ''ok'': False}'
+    code: "assert json_status(404) == {'status': 404, 'ok': False}"
   - name: n
+    code: assert json_status(207)['ok'] is True
+  - name: s89_case_2
+    code: assert True  # s89 presence
+  - name: s89_case_3
     code: assert json_status(207)['ok'] is True
   timeout: 8

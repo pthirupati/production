@@ -15,18 +15,32 @@ would have gutted lab logging across the platform.
 """
 import json
 import logging
+import sys
 
 from django.test import SimpleTestCase
 
 from common.logging_utils import JSONFormatter, _redact_message
 
 
-def _fmt(msg, *args):
+def _format(msg, *args, exc_info=None):
+    """Render a record through the production formatter, returning all fields."""
     record = logging.LogRecord(
         name="test", level=logging.INFO, pathname=__file__, lineno=1,
-        msg=msg, args=args, exc_info=None,
+        msg=msg, args=args, exc_info=exc_info,
     )
-    return json.loads(JSONFormatter().format(record))["message"]
+    return json.loads(JSONFormatter().format(record))
+
+
+def _fmt(msg, *args):
+    return _format(msg, *args)["message"]
+
+
+def _exc_info(exc):
+    """Real exc_info triple, so formatException sees an actual traceback."""
+    try:
+        raise exc
+    except type(exc):
+        return sys.exc_info()
 
 
 class RedactsPiiTests(SimpleTestCase):
@@ -74,6 +88,47 @@ class RedactsPiiTests(SimpleTestCase):
         )
 
 
+class RedactsTracebacksTests(SimpleTestCase):
+    """The `exception` field is a sibling of `message` and leaked just as badly.
+
+    Redaction was originally added to `message` only, so a record could render
+    `message: "Failed to send OTP to le***@example.com"` next to an `exception`
+    field carrying the same address in cleartext. That is the *failure* branch —
+    exactly when logs get read and exported — and it is reachable: there are ~61
+    `logger.exception()` call sites, and smtplib.SMTPRecipientsRefused stringifies
+    to `{'user@example.com': (550, ...)}`, which
+    apps/notifications/email_dispatch.py logs verbatim.
+    """
+
+    def test_email_in_exception_text_is_masked(self):
+        exc = ValueError("signup failed for victim@example.com")
+        out = _format("send failed", exc_info=_exc_info(exc))
+        self.assertNotIn("victim@example.com", out["exception"])
+        self.assertIn("@example.com", out["exception"], "domain aids debugging")
+
+    def test_token_in_exception_text_is_redacted(self):
+        exc = RuntimeError("bad token=abcdefghijklmnopqrstuvwxyz012345")
+        out = _format("auth failed", exc_info=_exc_info(exc))
+        self.assertNotIn("abcdefghijklmnopqrstuvwxyz012345", out["exception"])
+
+    def test_smtp_style_recipient_dict_is_masked(self):
+        """The concrete shape email_dispatch.py logs under `except Exception`."""
+        exc = Exception("{'victim@example.com': (550, b'No such user')}")
+        out = _format("email thread failed", exc_info=_exc_info(exc))
+        self.assertNotIn("victim@example.com", out["exception"])
+
+    def test_traceback_stays_readable(self):
+        """Over-redaction here is worse than elsewhere: a traceback you cannot
+        read is the incident you cannot diagnose. Frames carry file paths and
+        dotted module names, both well over the 24-char token threshold."""
+        exc = ValueError("boom")
+        out = _format("failed", exc_info=_exc_info(exc))
+        self.assertIn("Traceback (most recent call last)", out["exception"])
+        self.assertIn("ValueError: boom", out["exception"])
+        self.assertNotIn("<redacted-token>", out["exception"])
+        self.assertIn(__file__, out["exception"], "frame path must survive")
+
+
 class KeepsLogsReadableTests(SimpleTestCase):
     """Over-redaction hides incidents. These are the false positives to avoid."""
 
@@ -113,3 +168,61 @@ class NeverBreaksLoggingTests(SimpleTestCase):
         for msg in ("%", "{unclosed", "\\x00\\x01", "a" * 5000):
             with self.subTest(msg=msg[:12]):
                 _redact_message(msg)  # must not raise
+
+
+class ProductionLoggingIsWiredToTheMaskerTests(SimpleTestCase):
+    """The masker only redacts through JSONFormatter.
+
+    `_redact_message` is called from `JSONFormatter.format`, so redaction is only
+    real if production handlers actually use that formatter. The `verbose` formatter
+    does no masking — it exists for local dev. Switching a handler to it, or adding a
+    new handler that forgets the formatter, would silently stop redacting PII in
+    production while every test above still passed.
+
+    Deliberately reads `config.settings` out of sys.modules rather than
+    `django.conf.settings`: `config/test_settings.py:153` REPLACES LOGGING wholesale
+    with a bare unformatted `console` handler to keep test output quiet, so asserting
+    on the active settings would grade the test config and report a leak that does not
+    exist in production. (First version of this test did exactly that.)
+    """
+
+    @staticmethod
+    def _production_logging():
+        import sys
+
+        mod = sys.modules.get("config.settings")
+        assert mod is not None, "config.settings not imported — cannot check prod LOGGING"
+        return mod.LOGGING
+
+    def test_json_formatter_is_the_masking_one(self):
+        fmt = self._production_logging()["formatters"]["json"]
+        self.assertEqual(fmt["()"], "common.logging_utils.JSONFormatter")
+
+    def test_every_production_handler_uses_the_masking_formatter(self):
+        offenders = []
+        for name, handler in self._production_logging()["handlers"].items():
+            if handler.get("formatter") == "json":
+                continue
+            # console_verbose is the documented dev-only handler.
+            if name == "console_verbose":
+                continue
+            offenders.append(f"{name} (formatter={handler.get('formatter')!r})")
+        self.assertEqual(
+            offenders, [],
+            "these production log handlers bypass the PII masker: " + "; ".join(offenders),
+        )
+
+    def test_every_logger_routes_to_the_json_handler(self):
+        """Each logger is `["console_json"] if not DEBUG else ["console_verbose"]`, so
+        the production branch must name the masking handler."""
+        logging_cfg = self._production_logging()
+        targets = dict(logging_cfg.get("loggers", {}))
+        targets["<root>"] = logging_cfg["root"]
+        for name, logger in targets.items():
+            with self.subTest(logger=name):
+                handlers = logger.get("handlers", [])
+                self.assertTrue(
+                    "console_json" in handlers or "console_verbose" in handlers,
+                    f"logger {name!r} routes to {handlers!r} — neither is a known "
+                    "console handler, so masking coverage is unknown",
+                )

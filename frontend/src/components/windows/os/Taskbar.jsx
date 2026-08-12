@@ -84,6 +84,7 @@ export default function Taskbar() {
         type="button"
         className={`winos-taskbtn ${os.taskViewOpen ? 'active' : ''}`}
         title="Task View"
+        aria-label="Task View"
         onClick={() => os.setTaskViewOpen((v) => !v)}
       >
         <LayoutGrid size={18} />
@@ -117,10 +118,10 @@ export default function Taskbar() {
       </div>
 
       <div className="winos-tray">
-        <button className="winos-tray-btn" onClick={() => setFlyout(flyout === 'hidden' ? null : 'hidden')}><ChevronUp size={14} /></button>
-        <button className="winos-tray-btn" title="Windows Defender"><Shield size={15} /></button>
-        <button className="winos-tray-btn" onClick={() => setFlyout(flyout === 'net' ? null : 'net')} title="Network"><Wifi size={15} /></button>
-        <button className="winos-tray-btn" onClick={() => setFlyout(flyout === 'vol' ? null : 'vol')} title="Volume"><Volume2 size={15} /></button>
+        <button className="winos-tray-btn" onClick={() => setFlyout(flyout === 'hidden' ? null : 'hidden')} aria-label="Show hidden icons"><ChevronUp size={14} /></button>
+        <button className="winos-tray-btn" title="Windows Defender" aria-label="Windows Defender"><Shield size={15} /></button>
+        <button className="winos-tray-btn" onClick={() => setFlyout(flyout === 'net' ? null : 'net')} title="Network" aria-label="Network"><Wifi size={15} /></button>
+        <button className="winos-tray-btn" onClick={() => setFlyout(flyout === 'vol' ? null : 'vol')} title="Volume" aria-label="Volume"><Volume2 size={15} /></button>
         <button className="winos-tray-btn winos-clock" onClick={() => setFlyout(flyout === 'cal' ? null : 'cal')}>
           <div>{now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
           <div>{now.toLocaleDateString([], { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>

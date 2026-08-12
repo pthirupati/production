@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
+import { useModalA11y } from '../../components/ConfirmModal'
 import { MessageSquare, Pin, Lock, Trash2, Search, Reply, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -11,6 +12,9 @@ export default function AdminThreads() {
   const [selectedThread, setSelectedThread] = useState(null)
   const [replyBody, setReplyBody] = useState('')
   const [replying, setReplying] = useState(false)
+
+  const closeThread = () => setSelectedThread(null)
+  const threadDialogRef = useModalA11y(!!selectedThread, closeThread)
 
   useEffect(() => { loadThreads() }, [])
 
@@ -202,8 +206,18 @@ export default function AdminThreads() {
       </div>
 
       {selectedThread && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="glass-card w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6 space-y-4">
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) closeThread() }}
+        >
+          <div
+            ref={threadDialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label={selectedThread.title}
+            className="glass-card w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6 space-y-4 outline-none"
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-white">{selectedThread.title}</h2>
@@ -212,7 +226,7 @@ export default function AdminThreads() {
                   {selectedThread.is_locked && ' · Locked'}
                 </p>
               </div>
-              <button onClick={() => setSelectedThread(null)} className="p-2 text-surface-400 hover:text-white">
+              <button type="button" onClick={closeThread} aria-label="Close thread" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center p-2 text-surface-400 hover:text-white">
                 <X size={18} />
               </button>
             </div>

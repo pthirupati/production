@@ -1,0 +1,154 @@
+title: CI Secret Exfiltration via a Fork Pull Request
+slug: devops-ci-pull-request-target-fork-pr-exfil
+technology: devops
+category: Harden
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: cicd
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Critical
+description: 'CONTEXT: A security researcher filed a report against `fixitlab/app`: any GitHub user can
+  open a pull request from a fork and read the repository''s `DEPLOY_TOKEN`. The token grants push access
+  to the production container registry, so this is a full supply-chain compromise waiting to happen.
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab. The
+  repository''s workflow is `ci.yml`. All tools run locally — no paid APIs or external cloud calls are
+  required.
+
+  SYMPTOM / STARTING STATE: `ci.yml` is triggered by `pull_request_target`. That trigger runs in the BASE
+  repository context, which is why it has access to repository secrets. The workflow then checks out
+  `github.event.pull_request.head.sha` — the attacker''s code — and runs `npm ci`, which executes package
+  lifecycle scripts. Untrusted code therefore runs in a job where `DEPLOY_TOKEN` is in scope.
+
+  OBJECTIVE: Break the dangerous combination. The exposure requires all three of: a privileged trigger
+  that carries secrets, a checkout of the untrusted fork head, and secret scope on that job. Removing
+  ANY one of them closes the hole, and there is more than one correct answer. Acceptance criteria: a fork
+  pull request can no longer run attacker-controlled code with `DEPLOY_TOKEN` available.
+
+  WORK TO DO: Inspect the workflow trigger, the ref being checked out, and whether secrets are in scope.
+  Decide which of the three legs to remove and justify it. Note that simply renaming the trigger while
+  still handing secrets to a build of the fork head is NOT a fix.
+
+  VERIFY: Re-run the checker and confirm the exposure is gone. Success criteria: the safe configuration
+  holds on a repeat check.
+
+  ROLLBACK: If a change makes things worse, revert that single change and re-observe before trying another
+  hypothesis. Never stack unverified changes.
+
+  WHAT TO AVOID: Do not "fix" this by deleting the workflow or disabling CI entirely, and do not fake
+  completion with marker files — the checker validates the real workflow configuration.'
+objectives:
+- Identify why `pull_request_target` has access to repository secrets when `pull_request` does not
+- Identify that the workflow checks out the untrusted fork head (`pull_request.head.sha`)
+- Break the privileged-trigger + untrusted-checkout + secret-scope combination
+- Confirm a fork PR can no longer reach DEPLOY_TOKEN
+initial_state: '`ci.yml` runs on `pull_request_target` with `DEPLOY_TOKEN` in scope and checks out
+  `github.event.pull_request.head.sha`, so any fork pull request can execute code with the production
+  deploy token available.'
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not change anything yet. Read `ci.yml` and answer three separate questions: (1) what event triggers
+    it, (2) which git ref does it check out, and (3) are repository secrets in scope for that job? Write
+    down all three answers before forming a theory. The bug is in how they combine, not in any one line.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the key distinction:
+
+    `pull_request` and `pull_request_target` are not interchangeable. `pull_request` runs in the FORK''s
+    context with a read-only token and no access to repository secrets — that is what makes it safe to
+    run untrusted code. `pull_request_target` runs in the BASE repository''s context, which is exactly
+    why it CAN read secrets. That privilege is safe only while the job builds trusted code.'
+- order: 3
+  cost: 25
+  content: 'WHICH SIGNAL — what makes this exploitable:
+
+    Look at the checkout ref. `github.event.pull_request.head.sha` is the attacker''s commit. Combined
+    with a privileged trigger, running `npm ci` on that ref executes attacker-controlled lifecycle scripts
+    in a job that can read `DEPLOY_TOKEN`. Any of the three legs can be removed to fix it.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — pick a leg and defend it:
+
+    1. Drop to `pull_request`: untrusted code still runs, but with no secrets. Safe.
+
+    2. Keep `pull_request_target` but check out `github.base_ref`: secrets stay, but only trusted code
+    runs. Safe.
+
+    3. Keep the trigger and the head checkout but remove secret scope from that job. Safe.
+
+    Choosing (1) or (2) is the usual production answer. Renaming the trigger while still granting secrets
+    to a build of the fork head fixes nothing.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Change exactly one leg of the combination. The simplest correct fix is to set the trigger back
+    to `pull_request` and stop granting secrets to that job.
+
+    2. Re-run the checker.
+
+    WHY: the grader re-derives the exposure from the live workflow — trigger, checkout ref, and secret
+    scope together — so it accepts any genuinely safe configuration and rejects a cosmetic rename.'
+summary: Close a CI secret-exfiltration path where a fork pull request abuses `pull_request_target` to
+  run attacker code with production credentials in scope
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic CI/CD and pull-request workflow literacy
+- Familiarity with GitHub Actions triggers
+tags:
+- devops
+- harden
+- security
+- supply-chain
+- hands-on
+- simulation
+linked_tutorial: devops-engineering-zero-hero
+what_you_will_learn:
+- Why `pull_request_target` carries repository secrets and `pull_request` does not
+- Why checking out `pull_request.head.sha` under a privileged trigger executes untrusted code
+- That the vulnerability is a combination of three conditions, any one of which can be removed
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline lab environment
+  pre_installed:
+  - bash
+  - coreutils
+  - git
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Stop fork PRs from reading DEPLOY_TOKEN
+  description: Inspect the workflow trigger, checkout ref, and secret scope; break the combination that
+    lets a fork pull request run attacker-controlled code with production credentials available.
+  background: 'This lab teaches the single most-exploited GitHub Actions misconfiguration: pairing the
+    privileged `pull_request_target` trigger with a checkout of the untrusted fork head. The grader models
+    trigger, ref, and secret scope independently so more than one correct fix is accepted.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: A fork pull request can still run untrusted code with DEPLOY_TOKEN in scope. Removing
+      the trigger name alone is not enough — check the checkout ref and the secret scope too.
+solution:
+  summary: '`pull_request_target` runs in the base-repo context and therefore has secrets; the workflow
+    then checked out the fork head and ran `npm ci`, executing attacker code with DEPLOY_TOKEN available.
+    Fix by removing any one leg of the combination — the standard answer is to run untrusted PR code on
+    `pull_request` (no secrets), or to keep `pull_request_target` but check out `github.base_ref`.'
+  files_changed:
+  - .github/workflows/ci.yml
+  commands_run:
+  - cat .github/workflows/ci.yml
+  reference_docs: devops-fundamentals

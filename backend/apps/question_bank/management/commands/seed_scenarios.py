@@ -8,6 +8,7 @@ import os
 import yaml
 from django.core.management.base import BaseCommand, CommandError
 from apps.question_bank.models import Technology, Scenario
+from apps.question_bank.linked_tutorial_map import resolve_linked_tutorial
 from apps.hints.models import Hint
 
 TECH_META = {
@@ -296,7 +297,10 @@ class Command(BaseCommand):
                         "docker_image": f"fixitlab/scenario-{data.get('slug', scenario_dir)}:latest",
                         "time_limit": data.get("time_limit", 600),
                         "max_score": data.get("max_score", 100),
-                        "is_active": True,
+                        # Honour the YAML: a lab with no gradeable objective is
+                        # shipped is_active: false so it cannot be started or award
+                        # XP until it has real content (audit §G1).
+                        "is_active": data.get("is_active", True),
                         "is_free": data.get("is_free", False),
                         "infrastructure_type": infra,
                         "docker_privileged": data.get("docker_privileged", False),
@@ -318,6 +322,11 @@ class Command(BaseCommand):
                         "consoles": consoles,
                         "lab_servers": lab_servers,
                         "certification_only": data.get("certification_only", False),
+                        # Tutorial course_slug (audit §C1). Map dangling
+                        # *-fundamentals refs to real zero-hero courses.
+                        "linked_tutorial": resolve_linked_tutorial(
+                            data.get("linked_tutorial", "")
+                        ),
                         # ITSM (ServiceNow-style) ticket flow.
                         "itsm_enabled": data.get("itsm_enabled", False),
                         "itsm_ticket_type": data.get("itsm_ticket_type", "incident"),

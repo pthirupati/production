@@ -74,6 +74,35 @@ export function amiArchMatchesInstanceType(amiArch, instanceArch) {
   return String(amiArch) === String(instanceArch)
 }
 
+// Classic/Xen families boot without ENA; Nitro (t3/t4g/c5/…) requires it.
+const XEN_CLASSIC_FAMILIES = new Set([
+  't1', 't2', 'm1', 'm2', 'm3', 'c1', 'c3', 'r3', 'i2', 'hs1',
+])
+
+export function instanceRequiresEna(instanceType) {
+  const family = String(instanceType || '').split('.')[0]
+  return Boolean(family) && !XEN_CLASSIC_FAMILIES.has(family)
+}
+
+export function amiHasEna(ami) {
+  if (!ami) return true
+  if ('ena' in ami) return Boolean(ami.ena)
+  if ('ena_support' in ami) return Boolean(ami.ena_support)
+  const manifest = ami.manifest && typeof ami.manifest === 'object' ? ami.manifest : {}
+  if ('ena' in manifest) return Boolean(manifest.ena)
+  if ('ena_driver' in manifest) return Boolean(manifest.ena_driver)
+  if ('ena_support' in manifest) return Boolean(manifest.ena_support)
+  if (Array.isArray(manifest.drivers) && manifest.drivers.length) {
+    return manifest.drivers.map((d) => String(d).toLowerCase()).includes('ena')
+  }
+  return true
+}
+
+export function amiEnaMatchesInstanceType(ami, instanceType) {
+  if (!instanceRequiresEna(instanceType)) return true
+  return amiHasEna(ami)
+}
+
 // Security-group names must be unique within a VPC.
 export function duplicateSgNameInVpc(name, vpcId, groups) {
   return (groups || []).some((g) => g.name === name && g.vpcId === vpcId)

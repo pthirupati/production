@@ -121,11 +121,6 @@ function scsiUnitToDevLetter(scsiUnit) {
   return String.fromCharCode(96 + unit + 1)
 }
 
-function scsiUnitToDevPath(scsiUnit) {
-  const letter = scsiUnitToDevLetter(scsiUnit)
-  return letter ? `/dev/sd${letter}` : null
-}
-
 /** Extra (non-boot) disks visible in the guest — mirrors vm.disks[] + hot-add pending state. */
 function guestExtraDisks(vm, shared) {
   if (!shared.diskRescanned && vm?.guest_disk_hidden) {
@@ -332,7 +327,6 @@ function createVFS(seedFn) {
     if (path === '/') return root
     const parts = path.split('/').filter(Boolean)
     let node = root
-    let curPath = ''
     for (let i = 0; i < parts.length; i++) {
       if (node.type === 'link' && followLink) {
         const tgt = resolveNode(node.target)
@@ -340,7 +334,6 @@ function createVFS(seedFn) {
         node = tgt
       }
       if (node.type !== 'dir') return null
-      curPath += '/' + parts[i]
       const child = node.children[parts[i]]
       if (!child) return null
       node = child
@@ -941,6 +934,147 @@ function seedServices() {
 }
 
 /* ------------------------------------------------------------------ *
+ * nginx config checking (backs `nginx -t` and the systemctl start gate)
+ * ------------------------------------------------------------------ */
+
+// Directives that open a block and therefore legitimately end in `{` rather
+// than `;`. Anything else at statement position must be semicolon-terminated.
+const NGINX_BLOCK_DIRECTIVES = new Set([
+  'events', 'http', 'server', 'location', 'upstream', 'mail', 'stream',
+  'if', 'map', 'types', 'limit_except', 'geo', 'split_clients', 'charset_map',
+])
+
+// A deliberately small set of real directives. Used only to flag obvious
+// typos (listn/serer_name); an unknown word alone is NOT an error, because
+// nginx has hundreds of directives and modules we do not model.
+const NGINX_KNOWN_TYPOS = {
+  listn: 'listen', lisen: 'listen', listten: 'listen',
+  serer_name: 'server_name', server_nam: 'server_name',
+  wrker_processes: 'worker_processes',
+  inclde: 'include', includ: 'include',
+  proxy_pas: 'proxy_pass',
+  roo: 'root',
+}
+
+/**
+ * Check one nginx config file's syntax.
+ *
+ * The previous gate was a single `/\blistn\b/` regex, so every other way to
+ * break a config — unclosed brace, missing semicolon, stray `}` — started
+ * cleanly and let a config lab pass with nothing fixed (audit §F1/L969).
+ * This is a real (if small) brace/terminator parser rather than a typo list.
+ *
+ * Returns an `[emerg]` string on the first error, or null when the file is OK.
+ * Errors are reported in nginx's own `... in <file>:<line>` shape so learners
+ * see a line number to go fix.
+ */
+function nginxCheckSource(path, src) {
+  let depth = 0
+  const openStack = []
+  const lines = src.split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    const lineNo = i + 1
+    // Strip comments, then split on braces so `server {` and a bare `}` are
+    // both seen as tokens regardless of spacing.
+    const line = lines[i].replace(/#.*$/, '')
+    if (!line.trim()) continue
+    const parts = line.split(/([{}])/)
+    for (let k = 0; k < parts.length; k++) {
+      const chunk = parts[k]
+      if (chunk === '{') {
+        const stmt = (parts[k - 1] || '').trim()
+        const word = stmt.split(/\s+/)[0] || ''
+        if (!stmt) {
+          return `nginx: [emerg] unexpected "{" in ${path}:${lineNo}`
+        }
+        if (word && !NGINX_BLOCK_DIRECTIVES.has(word)) {
+          const fix = NGINX_KNOWN_TYPOS[word]
+          if (fix) return `nginx: [emerg] unknown directive "${word}" in ${path}:${lineNo}`
+          // Unknown block directive: allowed, we do not model every module.
+        }
+        depth++
+        openStack.push(lineNo)
+        continue
+      }
+      if (chunk === '}') {
+        if (depth === 0) {
+          return `nginx: [emerg] unexpected "}" in ${path}:${lineNo}`
+        }
+        depth--
+        openStack.pop()
+        continue
+      }
+      // A statement chunk: everything between braces must be `;`-terminated.
+      // The tail after the last `}` on a line is often just whitespace.
+      const stmt = chunk.trim()
+      if (!stmt) continue
+      // Text immediately preceding a `{` is the block header, already handled.
+      if (parts[k + 1] === '{') continue
+      for (const piece of stmt.split(';')) {
+        const s = piece.trim()
+        if (!s) continue
+        const word = s.split(/\s+/)[0]
+        const fix = NGINX_KNOWN_TYPOS[word]
+        if (fix) return `nginx: [emerg] unknown directive "${word}" in ${path}:${lineNo}`
+        // Only the final piece can be unterminated, and only that is an error.
+        if (!stmt.trimEnd().endsWith(';') && s === stmt.split(';').pop().trim()) {
+          return `nginx: [emerg] directive "${word}" is not terminated by ";" in ${path}:${lineNo}`
+        }
+      }
+    }
+  }
+  if (depth > 0) {
+    return `nginx: [emerg] unexpected end of file, expecting "}" in ${path}:${openStack[0] || lines.length}`
+  }
+  return null
+}
+
+/* ------------------------------------------------------------------ *
+ * systemd unit file parsing (backs systemctl cat/show/enable/start)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Parse an INI-ish systemd unit file into { sections, error }.
+ *
+ * Both shells used to write real unit files into the VFS and then never read
+ * them: `systemctl cat` synthesised content from the unit NAME, so a learner's
+ * edit to ExecStart showed up in `cat` but not in `systemctl cat` (L974).
+ * Malformed units must fail closed — systemd refuses to load them, so the unit
+ * cannot become active.
+ */
+function parseUnitFile(src) {
+  const sections = {}
+  let current = null
+  const lines = src.split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i]
+    const line = raw.trim()
+    if (!line || line.startsWith('#') || line.startsWith(';')) continue
+    if (line.startsWith('[')) {
+      if (!line.endsWith(']') || line.length < 3) {
+        return { sections, error: `Invalid section header '${line}' at line ${i + 1}` }
+      }
+      current = line.slice(1, -1)
+      sections[current] = sections[current] || {}
+      continue
+    }
+    const eq = line.indexOf('=')
+    if (eq <= 0) {
+      return { sections, error: `Missing '=' in assignment '${line}' at line ${i + 1}` }
+    }
+    if (!current) {
+      return { sections, error: `Assignment '${line}' outside of section at line ${i + 1}` }
+    }
+    const key = line.slice(0, eq).trim()
+    const val = line.slice(eq + 1).trim()
+    // systemd allows repeated keys (e.g. ExecStartPre); keep the last for
+    // display purposes, which is what `systemctl show` reports for most.
+    sections[current][key] = val
+  }
+  return { sections, error: null }
+}
+
+/* ------------------------------------------------------------------ *
  * Output helpers
  * ------------------------------------------------------------------ */
 function permString(node) {
@@ -1185,7 +1319,7 @@ function aptProgressChunks(pkgs, action = 'install') {
   all.forEach((p, i) => chunks.push([`Get:${i + 1} http://archive.ubuntu.com/ubuntu jammy/main amd64 ${p} amd64 ${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1 [${pkgInfo(p).sizeK} kB]`]))
   chunks.push([`Fetched ${all.reduce((s, p) => s + pkgInfo(p).sizeK, 0)} kB in 1s (${all.reduce((s, p) => s + pkgInfo(p).sizeK, 0)} kB/s)`,
     '(Reading database ... 184221 files and directories currently installed.)'])
-  all.forEach((p, i) => chunks.push([`Selecting previously unselected package ${p}.`, `Unpacking ${p} (${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1) ...`]))
+  all.forEach((p, _i) => chunks.push([`Selecting previously unselected package ${p}.`, `Unpacking ${p} (${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1) ...`]))
   all.forEach(p => chunks.push([`Setting up ${p} (${pkgInfo(p).ver.replace(/^[0-9]+:/, '')}-1ubuntu1) ...`]))
   chunks.push(['Processing triggers for man-db (2.10.2-1) ...', 'Processing triggers for libc-bin (2.35-0ubuntu3) ...'])
   return chunks
@@ -1208,6 +1342,8 @@ export function createLinuxShell(vm, opts = {}) {
   const { vfs, services, pkgs } = shared
   const lvm = shared.lvm || (shared.lvm = createLvmState(diskGb))
   let selinuxMode = shared.selinuxMode
+  // $? / last pipeline status — mirrors backend rhel_shell exit codes (audit §F4).
+  let lastExitCode = 0
 
   const sessionUser = opts.user || 'root'
   let home = sessionUser === 'root' ? '/root' : `/home/${sessionUser}`
@@ -1226,14 +1362,6 @@ export function createLinuxShell(vm, opts = {}) {
     VISUAL: 'vim',
     HISTSIZE: '1000',
     HISTFILESIZE: '2000',
-  }
-  const aliases = {
-    ll: 'ls -alF',
-    la: 'ls -A',
-    l: 'ls -CF',
-    grep: 'grep --color=auto',
-    fgrep: 'fgrep --color=auto',
-    egrep: 'egrep --color=auto',
   }
   const history = []
   let nextPid = 19000
@@ -1306,6 +1434,90 @@ export function createLinuxShell(vm, opts = {}) {
   const readFile = (path) => {
     const node = vfs.resolveNode(abs(path))
     return node && node.type === 'file' ? node.content : null
+  }
+
+  /* ----- nginx config test (shared by `nginx -t` and the systemctl gate) ----- */
+  // Mirrors backend rhel_shell.py `_cmd_nginx`/`_nginx_config_failure` semantics so
+  // the two shells cannot diverge again: main conf first, then the include targets.
+  const NGINX_MAIN = '/etc/nginx/nginx.conf'
+  const NGINX_INCLUDES = ['/etc/nginx/conf.d/default.conf', '/etc/nginx/sites-enabled/default']
+
+  // Returns { ok, output } exactly as `nginx -t` would print it.
+  const nginxTest = () => {
+    const main = readFile(NGINX_MAIN)
+    if (main == null) {
+      return {
+        ok: false,
+        output: `nginx: [emerg] open() "${NGINX_MAIN}" failed (2: No such file or directory)`,
+      }
+    }
+    for (const [path, src] of [[NGINX_MAIN, main], ...NGINX_INCLUDES.map((p) => [p, readFile(p)])]) {
+      if (src == null) continue
+      const err = nginxCheckSource(path, src)
+      if (err) return { ok: false, output: `${err}\nnginx: configuration file ${NGINX_MAIN} test failed` }
+    }
+    return {
+      ok: true,
+      output: `nginx: the configuration file ${NGINX_MAIN} syntax is ok\nnginx: configuration file ${NGINX_MAIN} test is successful`,
+    }
+  }
+
+  /* ----- systemd unit files: read them instead of inventing them ----- */
+  const UNIT_DIRS = ['/etc/systemd/system', '/usr/lib/systemd/system', '/lib/systemd/system']
+
+  // Locate a unit's file on disk. Returns { path, src } or null when no unit
+  // file exists (systemctl cat then reports "No files found", never a fake).
+  const findUnitFile = (unit) => {
+    for (const dir of UNIT_DIRS) {
+      const path = `${dir}/${unit}.service`
+      const src = readFile(path)
+      if (src != null) return { path, src }
+    }
+    return null
+  }
+
+  // The single reason a unit cannot start, or null when it may. Every
+  // activating verb routes through this so a learner cannot bypass the gate by
+  // reaching for a different verb (start / restart / reload / enable --now).
+  const unitStartFailure = (unit, _s) => {
+    const file = findUnitFile(unit)
+    if (file) {
+      const { error } = parseUnitFile(file.src)
+      // Fail closed: systemd refuses to load a unit it cannot parse, so the
+      // unit must not end up active on the back of a malformed file.
+      if (error) {
+        return {
+          lines: [
+            `Failed to start ${unit}.service: Unit ${unit}.service is not loaded properly: Bad message.`,
+            `See "systemctl status ${unit}.service" and "journalctl -xeu ${unit}.service" for details.`,
+          ],
+          reason: `${unit}.service: Failed to parse unit file: ${error}`,
+        }
+      }
+    }
+    if (unit === 'nginx') {
+      const t = nginxTest()
+      if (!t.ok) {
+        return {
+          lines: [
+            'Job for nginx.service failed because the control process exited with error code.',
+            'See "systemctl status nginx.service" and "journalctl -xeu nginx.service" for details.',
+            ...t.output.split('\n'),
+          ],
+          reason: t.output.split('\n')[0],
+        }
+      }
+    }
+    return null
+  }
+
+  // Why a unit is currently failed, derived from live state — journalctl and
+  // `systemctl status` both read this so they cannot cite a port conflict that
+  // does not exist in the simulation (L978).
+  const unitFailureReason = (unit) => {
+    const f = unitStartFailure(unit, services[unit])
+    if (f) return f.reason
+    return `${unit}.service: Main process exited, code=exited, status=1/FAILURE`
   }
 
   const applyPipeStage = (stage, inputLines) => {
@@ -1460,7 +1672,12 @@ export function createLinuxShell(vm, opts = {}) {
         const res = run(trimmed, { noHistory: true })
         if (res.editor || res.confirm || res.stream || res.reboot || res.poweroff || res.exit || res.clear) return res
         collected = collected.concat(res.lines || [])
-        lastHadError = (res.lines || []).some(l => /No such file|not found|failed|error/i.test(l))
+        // Prefer real exitCode when present; fall back to text heuristics for
+        // older call paths that omit it.
+        lastHadError = typeof res.exitCode === 'number'
+          ? res.exitCode !== 0
+          : (res.lines || []).some(l => /No such file|not found|failed|error/i.test(l))
+        if (typeof res.exitCode === 'number') lastExitCode = res.exitCode
       }
       if (redirect) {
         const target = abs(redirect.path)
@@ -1470,7 +1687,7 @@ export function createLinuxShell(vm, opts = {}) {
         vfs.writeFile(target, redirect.append ? existing + payload + '\n' : payload + (payload ? '\n' : ''))
         collected = ['']
       }
-      return { lines: collected.length ? collected : [''], prompt: prompt() }
+      return { lines: collected.length ? collected : [''], prompt: prompt(), exitCode: lastExitCode }
     }
 
     if (hasPipeline) {
@@ -1487,7 +1704,7 @@ export function createLinuxShell(vm, opts = {}) {
         vfs.writeFile(target, redirect.append ? existing + payload + '\n' : payload + (payload ? '\n' : ''))
         pipeOut = ['']
       }
-      return { lines: pipeOut.length ? pipeOut : [''], prompt: prompt(), sideEffect: first.sideEffect }
+      return { lines: pipeOut.length ? pipeOut : [''], prompt: prompt(), sideEffect: first.sideEffect, exitCode: typeof first.exitCode === 'number' ? first.exitCode : lastExitCode }
     }
 
     const parts = work.split(/\s+/)
@@ -1497,23 +1714,26 @@ export function createLinuxShell(vm, opts = {}) {
     if (!['awk', 'gawk', 'sed'].includes(lc)) {
       args = args.map(a => a.replace(/\$\{?(\w+)\}?/g, (m, k) => (env[k] !== undefined ? env[k] : m)))
     }
-    const { flags, positional, has } = parseArgs(args)
+    const { positional, has } = parseArgs(args)
     const out = []
     let sideEffect = null
     let editor = null
+    // Default success; specific handlers override via setExit / fail paths.
+    let cmdExit = 0
+    const setExit = (code) => { cmdExit = code }
 
-    const notFound = () => out.push(`bash: ${cmd}: command not found`)
+    const notFound = () => { out.push(`bash: ${cmd}: command not found`); setExit(127) }
     const emit = (s) => { if (Array.isArray(s)) out.push(...s); else String(s).split('\n').forEach(l => out.push(l)) }
 
     /* =================== file system =================== */
-    if (!isRhel && ['dnf', 'yum', 'rpm', 'firewall-cmd'].includes(lc)) emit(`bash: ${cmd}: command not found`)
-    else if (isRhel && ['apt', 'apt-get', 'apt-cache', 'dpkg', 'dpkg-query', 'ufw'].includes(lc)) emit(`bash: ${cmd}: command not found`)
+    if (!isRhel && ['dnf', 'yum', 'rpm', 'firewall-cmd'].includes(lc)) { emit(`bash: ${cmd}: command not found`); setExit(127) }
+    else if (isRhel && ['apt', 'apt-get', 'apt-cache', 'dpkg', 'dpkg-query', 'ufw'].includes(lc)) { emit(`bash: ${cmd}: command not found`); setExit(127) }
     else if (lc === 'pwd') emit(cwd.path)
     else if (lc === 'cd') {
       const dest = abs(positional[0] || env.HOME)
       const node = vfs.resolveNode(dest)
-      if (!node) emit(`bash: cd: ${positional[0]}: No such file or directory`)
-      else if (node.type !== 'dir') emit(`bash: cd: ${positional[0]}: Not a directory`)
+      if (!node) { emit(`bash: cd: ${positional[0]}: No such file or directory`); setExit(1) }
+      else if (node.type !== 'dir') { emit(`bash: cd: ${positional[0]}: Not a directory`); setExit(1) }
       else { cwd.path = dest; env.PWD = dest }
     }
     else if (lc === 'ls' || lc === 'll' || lc === 'dir' || lc === 'vdir') {
@@ -1604,10 +1824,17 @@ export function createLinuxShell(vm, opts = {}) {
         const interpret = has('-e')
         const noNl = has('-n')
         let text = args.filter(a => a !== '-e' && a !== '-n').join(' ').replace(/^["']|["']$/g, '')
-        if (interpret) text = text.replace(/\\n/g, '\n').replace(/\\t/g, '\t')
-        // simple $VAR / ${VAR} expansion
-        text = text.replace(/\$\{?(\w+)\}?/g, (m, k) => (env[k] !== undefined ? env[k] : m))
-        emit(noNl && !text.includes('\n') ? text : text)
+        // `echo $?` — report the previous command's exit status (§F4).
+        if (text === '$?' || text === '${?}') {
+          emit(String(lastExitCode))
+        } else {
+          if (interpret) text = text.replace(/\\n/g, '\n').replace(/\\t/g, '\t')
+          // simple $VAR / ${VAR} expansion (including $? inside longer strings)
+          text = text
+            .replace(/\$\?/g, String(lastExitCode))
+            .replace(/\$\{?(\w+)\}?/g, (m, k) => (env[k] !== undefined ? env[k] : m))
+          emit(noNl && !text.includes('\n') ? text : text)
+        }
       }
     }
     else if (lc === 'touch') {
@@ -2217,30 +2444,136 @@ export function createLinuxShell(vm, opts = {}) {
         emit(['  UNIT                LOAD   ACTIVE   SUB     DESCRIPTION',
           ...Object.entries(services).map(([n, v]) => `  ${(n + '.service').padEnd(20)}loaded ${v.active.padEnd(8)}${v.active === 'active' ? 'running' : 'dead   '} ${v.desc}`)])
       } else if (sub === 'status') {
-        if (!s) emit(`Unit ${rawSvc || svc}.service could not be found.`)
+        if (!s) { emit(`Unit ${rawSvc || svc}.service could not be found.`); setExit(4) }
         else {
           const dot = s.active === 'active' ? '●' : s.active === 'failed' ? '×' : '○'
+          const unitFile = findUnitFile(svc)
+          const parsedUnit = unitFile ? parseUnitFile(unitFile.src) : null
+          const execStart = (parsedUnit && !parsedUnit.error && parsedUnit.sections.Service?.ExecStart) || `/usr/sbin/${svc}`
           emit([
             `${dot} ${svc}.service - ${s.desc}`,
-            `     Loaded: loaded (/usr/lib/systemd/system/${svc}.service; ${s.enabled}; preset: enabled)`,
+            `     Loaded: loaded (${unitFile ? unitFile.path : `/usr/lib/systemd/system/${svc}.service`}; ${s.enabled}; preset: enabled)`,
             `     Active: ${s.active} (${s.active === 'active' ? 'running' : s.active === 'failed' ? 'failed' : 'dead'}) since ${s.since}`,
             ...(s.pid ? [`   Main PID: ${s.pid} (${svc})`, `      Tasks: 3 (limit: 4915)`, `     Memory: 12.4M`] : []),
-            ...(s.active === 'failed' ? [`    Process: 3122 ExecStart=/usr/sbin/${svc} (code=exited, status=1/FAILURE)`,
-              `${svc}[3122]: nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)`] : []),
+            // Derive the failure line from live state rather than hardcoding an
+            // nginx bind error onto every failed unit (L978).
+            ...(s.active === 'failed' ? [`    Process: 3122 ExecStart=${execStart} (code=exited, status=1/FAILURE)`,
+              `${svc}[3122]: ${unitFailureReason(svc)}`] : []),
           ])
         }
       } else if (['start', 'stop', 'restart', 'reload', 'enable', 'disable', 'mask', 'unmask'].includes(sub)) {
         if (!s) emit(`Failed to ${sub} ${svc}.service: Unit ${svc}.service not found.`)
         else {
-          if (sub === 'start' || sub === 'restart' || sub === 'reload') { s.active = 'active'; s.pid = s.pid || nextPid++; s.since = 'now' }
-          else if (sub === 'stop') { s.active = 'inactive'; s.pid = null; s.since = 'now' }
-          else if (sub === 'enable') s.enabled = 'enabled'
-          else if (sub === 'disable') s.enabled = 'disabled'
-          emit('')
+          // Bringing a unit up is causal: a malformed unit file or a config that
+          // `nginx -t` rejects must leave the unit failed, whichever verb was
+          // used. Previously only `start`/`restart`/`reload` on nginx were gated,
+          // and only on a single `listn` typo (audit §F1 / L969).
+          const activating = sub === 'start' || sub === 'restart' || sub === 'reload' ||
+            ((sub === 'enable' || sub === 'unmask') && has('--now'))
+          const bringUp = () => {
+            const failure = unitStartFailure(svc, s)
+            if (failure) {
+              s.active = 'failed'; s.pid = null; s.since = 'now'
+              return failure.lines
+            }
+            s.active = 'active'; s.pid = s.pid || nextPid++; s.since = 'now'
+            return ['']
+          }
+          if (sub === 'reload' && s.active !== 'active') {
+            // reload on a stopped unit is not a valid job for systemd.
+            emit(`Failed to reload ${svc}.service: Job type reload is not applicable for unit ${svc}.service.`)
+            setExit(5)
+          } else if (sub === 'reload' && activating) {
+            // A failed reload leaves the master process serving the OLD config:
+            // the command fails, but the running unit keeps going.
+            const failure = unitStartFailure(svc, s)
+            emit(failure
+              ? [`Job for ${svc}.service failed.`,
+                `See "systemctl status ${svc}.service" and "journalctl -xeu ${svc}.service" for details.`,
+                ...failure.lines.slice(2)]
+              : '')
+            if (failure) setExit(1)
+          } else if (activating && sub !== 'enable' && sub !== 'unmask') {
+            const lines = bringUp()
+            emit(lines)
+            if (s.active === 'failed') setExit(1)
+          } else if (sub === 'stop') { s.active = 'inactive'; s.pid = null; s.since = 'now'; emit('') }
+          else if (sub === 'enable') {
+            // `enable` honours [Install]: a unit with no WantedBy cannot be
+            // enabled, so fail closed rather than reporting a bogus 'enabled'.
+            const file = findUnitFile(svc)
+            const parsed = file ? parseUnitFile(file.src) : null
+            const install = parsed && !parsed.error ? parsed.sections.Install : null
+            const wantedBy = install && (install.WantedBy || install.RequiredBy)
+            if (file && !wantedBy) {
+              emit(`The unit files have no [Install] section. They are not meant to be enabled using systemctl.`)
+            } else {
+              s.enabled = 'enabled'
+              const target = wantedBy || 'multi-user.target'
+              const lines = [`Created symlink /etc/systemd/system/${target}.wants/${svc}.service → ${file ? file.path : `/usr/lib/systemd/system/${svc}.service`}.`]
+              if (has('--now')) lines.push(...bringUp().filter(Boolean))
+              emit(lines)
+            }
+          }
+          else if (sub === 'disable') {
+            s.enabled = 'disabled'
+            if (has('--now')) { s.active = 'inactive'; s.pid = null; s.since = 'now' }
+            emit(`Removed "/etc/systemd/system/multi-user.target.wants/${svc}.service".`)
+          }
+          else emit('')
         }
-      } else if (sub === 'is-active') emit(s ? s.active : 'unknown')
-      else if (sub === 'is-enabled') emit(s ? s.enabled : 'unknown')
-      else if (sub === 'is-failed') emit(s && s.active === 'failed' ? 'failed' : 'active')
+      } else if (sub === 'cat') {
+        // Read the unit file off the VFS. It used to be synthesised from the
+        // unit NAME, so an edited ExecStart was invisible here while `cat` on
+        // the same path showed it — a convincing lie (L974).
+        const file = svc ? findUnitFile(svc) : null
+        if (!svc) emit('No unit name specified.')
+        else if (!file) emit(`No files found for ${svc}.service.`)
+        else emit([`# ${file.path}`, ...file.src.replace(/\n$/, '').split('\n')])
+      } else if (sub === 'show') {
+        // `systemctl show [-p PROP] UNIT` — the unit is the last positional.
+        const propIdx = args.findIndex((a) => a === '-p' || a === '--property')
+        const wanted = propIdx >= 0 ? (args[propIdx + 1] || '').split(',').filter(Boolean) : []
+        const showName = (positional[positional.length - 1] || '').replace(/\.service$/, '')
+        const showSvc = services[showName]
+        const file = showName ? findUnitFile(showName) : null
+        const parsed = file ? parseUnitFile(file.src) : null
+        const props = {}
+        props.Id = `${showName}.service`
+        props.Names = `${showName}.service`
+        props.Description = (parsed && !parsed.error && parsed.sections.Unit?.Description) || showSvc?.desc || `${showName}.service`
+        props.LoadState = parsed && parsed.error ? 'error' : (file || showSvc ? 'loaded' : 'not-found')
+        props.ActiveState = showSvc ? showSvc.active : 'inactive'
+        props.SubState = showSvc ? (showSvc.active === 'active' ? 'running' : showSvc.active === 'failed' ? 'failed' : 'dead') : 'dead'
+        props.UnitFileState = showSvc ? showSvc.enabled : 'not-found'
+        props.MainPID = String(showSvc?.pid || 0)
+        props.FragmentPath = file ? file.path : ''
+        if (parsed && !parsed.error) {
+          // Surface the unit file's own directives so an edit is observable here.
+          for (const [section, keys] of Object.entries(parsed.sections)) {
+            for (const [k, v] of Object.entries(keys)) {
+              if (section === 'Unit' && k === 'Description') continue
+              props[k] = v
+            }
+          }
+        }
+        if (wanted.length) emit(wanted.map((p) => `${p}=${props[p] ?? ''}`))
+        else emit(Object.entries(props).map(([k, v]) => `${k}=${v}`))
+      } else if (sub === 'is-active') {
+        // Real systemctl: active→0, inactive→3, unknown→4 (rhel_shell parity).
+        if (!s) { emit('unknown'); setExit(4) }
+        else if (s.active === 'active') emit('active')
+        else { emit(s.active); setExit(3) }
+      }
+      else if (sub === 'is-enabled') {
+        if (!s) { emit('unknown'); setExit(1) }
+        else if (s.enabled === 'enabled') emit('enabled')
+        else { emit(s.enabled); setExit(1) }
+      }
+      else if (sub === 'is-failed') {
+        if (s && s.active === 'failed') emit('failed')
+        else { emit('active'); setExit(1) }
+      }
       else if (sub === 'daemon-reload' || sub === 'reset-failed') emit('')
       else if (sub === 'list-unit-files') emit(['UNIT FILE              STATE', ...Object.entries(services).map(([n, v]) => `${(n + '.service').padEnd(22)} ${v.enabled}`)])
       else if (sub === 'get-default') emit('multi-user.target')
@@ -2258,11 +2591,15 @@ export function createLinuxShell(vm, opts = {}) {
       if (has('-u') || args.includes('-u')) {
         const uIdx = args.indexOf('-u'); const u = (args[uIdx + 1] || 'nginx').replace(/\.service$/, '')
         const s = services[u]
+        // The failure line used to be a hardcoded nginx bind error for EVERY
+        // unit, so `journalctl -u sshd` sent learners hunting a port conflict
+        // that does not exist in the simulation (L978). Derive it instead, and
+        // keep the [emerg]/FAILURE tokens any hint or validator greps for.
         emit([
           `-- Logs begin at Tue 2026-06-04 08:00:01 UTC, end at ${ds} UTC. --`,
           ...(s && s.active === 'failed'
             ? [`${ds} ${hostname} systemd[1]: Starting ${s.desc}...`,
-              `${ds} ${hostname} ${u}[3122]: nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)`,
+              `${ds} ${hostname} ${u}[3122]: ${unitFailureReason(u)}`,
               `${ds} ${hostname} systemd[1]: ${u}.service: Main process exited, code=exited, status=1/FAILURE`,
               `${ds} ${hostname} systemd[1]: ${u}.service: Failed with result 'exit-code'.`]
             : [`${ds} ${hostname} systemd[1]: Started ${(s && s.desc) || u}.`]),
@@ -2285,6 +2622,37 @@ export function createLinuxShell(vm, opts = {}) {
           `[ 1284.55] sd 2:0:${d.scsi_unit}:0: [sd${d.letter}] Attached SCSI disk`),
         '[    8.442000] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready',
       ])
+    }
+
+    /* =================== nginx =================== */
+    else if (lc === 'nginx') {
+      // Only a real command once nginx is on the box — matches backend
+      // rhel_shell.py, which gates on resolve_binary('nginx'). The seeded guest
+      // ships nginx as a known service but NOT in the base RPM list, so the
+      // service entry counts as evidence of an install too; gating on the
+      // package alone would make `nginx -t` unavailable in every nginx lab
+      // (and deleting nginx.conf must yield an [emerg], not "command not found").
+      if (!pkgs.has('nginx') && !services.nginx) { emit(`bash: nginx: command not found`); setExit(127) }
+      else if (has('-t') || has('-T')) {
+        const t = nginxTest()
+        emit(has('-T') && t.ok
+          ? [...t.output.split('\n'), ...(readFile(NGINX_MAIN) || '').replace(/\n$/, '').split('\n')]
+          : t.output.split('\n'))
+        if (!t.ok) setExit(1)
+      }
+      else if (has('-v') || has('-V')) emit('nginx version: nginx/1.20.1')
+      else if (has('-s')) {
+        const signal = args[args.indexOf('-s') + 1] || ''
+        const t = nginxTest()
+        if (!t.ok) { emit(t.output.split('\n')); setExit(1) }
+        else if (signal === 'reload' || signal === 'reopen') emit('')
+        else if (signal === 'stop' || signal === 'quit') {
+          const s = services.nginx
+          if (s) { s.active = 'inactive'; s.pid = null; s.since = 'now' }
+          emit('')
+        } else { emit(`nginx: invalid option: "-s ${signal}"`); setExit(1) }
+      }
+      else emit('')
     }
 
     /* =================== packages =================== */
@@ -2780,7 +3148,7 @@ export function createLinuxShell(vm, opts = {}) {
     else if (lc === 'man' || lc === 'info' || lc === 'apropos') emit(`What manual page do you want?\n(try '${positional[0] || 'command'} --help')`)
     else if (lc === 'tldr') emit(`# ${positional[0] || 'command'}\n(tldr page)`)
     else if (lc === 'sleep' || lc === 'true' || lc === ':' ) emit('')
-    else if (lc === 'false') return { lines: [''], prompt: prompt() }
+    else if (lc === 'false') { setExit(1); return { lines: [''], prompt: prompt(), exitCode: 1 } }
     else if (lc === 'test' || lc === '[') emit('')
     else if (lc === 'seq') { const n = parseInt(positional[0], 10) || 5; emit(Array.from({ length: Math.min(n, 50) }, (_, i) => String(i + 1))) }
     else if (lc === 'yes') emit('y')
@@ -2996,8 +3364,14 @@ export function createLinuxShell(vm, opts = {}) {
       out.push('')
     }
 
-    if (editor) return { lines: [], prompt: prompt(), editor }
-    return { lines: out.length ? out : [''], prompt: prompt(), sideEffect }
+    if (editor) return { lines: [], prompt: prompt(), editor, exitCode: 0 }
+    // Heuristic catch-all: command-not-found / explicit Failed lines that
+    // handlers forgot to setExit on still surface a non-zero status.
+    if (cmdExit === 0 && out.some((l) => /command not found|No such file or directory|Unit .+ could not be found|Failed to /i.test(l))) {
+      cmdExit = out.some((l) => /command not found/i.test(l)) ? 127 : 1
+    }
+    lastExitCode = cmdExit
+    return { lines: out.length ? out : [''], prompt: prompt(), sideEffect, exitCode: cmdExit }
   }
 
   return {
@@ -3096,7 +3470,6 @@ export const BOOT_SEQUENCE = [] // superseded by buildBootStages(); kept so old 
 // `single` => single-user / rescue mode (drops to a maintenance shell, no graphical login).
 export function buildBootStages(vm, { single = false } = {}) {
   const isRhel = guestOsFamily(vm) === 'rhel'
-  const hostname = (vm?.hostname || vm?.name || (isRhel ? 'rhel-app01' : 'ubuntu-app01')).split('.')[0]
   const memMb = vm?.memory_mb || 4096
   const cpu = vm?.cpu || 2
   const kver = isRhel ? '5.14.0-362.el9.x86_64' : KERNEL_PRIMARY

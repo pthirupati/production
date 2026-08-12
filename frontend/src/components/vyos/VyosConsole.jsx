@@ -74,11 +74,29 @@ export default function VyosConsole({
     }
   }, [sessionId, slug])
 
+  const refreshRef = useRef(refresh)
+  refreshRef.current = refresh
   useEffect(() => {
-    refresh()
-    const t = setInterval(refresh, 2000)
-    return () => clearInterval(t)
-  }, [refresh])
+    if (!sessionId) return undefined
+    // Every tick is a full getState round-trip plus a re-render of the whole
+    // dashboard, so stop the 2s poll outright while the tab is hidden rather
+    // than burning it in the background. On resume we refresh IMMEDIATELY
+    // before restarting the timer: refresh() is the only thing that
+    // repopulates dash, so waiting a further 2s would show a returning learner
+    // stale interface/BGP/commit state.
+    let t = null
+    const stop = () => { if (t) { clearInterval(t); t = null } }
+    const start = () => { if (!t) t = setInterval(() => { refreshRef.current?.() }, 2000) }
+    const onVis = () => {
+      if (document.visibilityState === 'visible') { refreshRef.current?.(); start() } else stop()
+    }
+    // refreshRef (not refresh) is deliberate: the effect must not re-run — and
+    // therefore must not drop the listener — every time refresh is re-created.
+    refreshRef.current?.()
+    if (document.visibilityState === 'visible') start()
+    document.addEventListener('visibilitychange', onVis)
+    return () => { stop(); document.removeEventListener('visibilitychange', onVis) }
+  }, [sessionId, slug])
 
   useEffect(() => {
     cliEndRef.current?.scrollIntoView({ behavior: 'smooth' })

@@ -16,11 +16,9 @@ description: 'CONTEXT: A team operating NetApp ONTAP storage has raised a ticket
   must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
   underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline ONTAP practice cluster. The architecture is a single
   lab-primary node exposing System Manager, SVMs, volumes, LUNs, and SnapMirror; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: ONTAP System Manager showing vol_web_data at 95GB used / 100GB provisioned
   (95% utilization) on aggr1, which itself has plenty of free space. No other volume in the cluster is
@@ -29,27 +27,22 @@ description: 'CONTEXT: A team operating NetApp ONTAP storage has raised a ticket
   of this incident. The aggregate hosting both volumes has ample free space, so the fix is a volume-level
   resize, not an aggregate-level rebalance.
 
-
   OBJECTIVE: Sign in to ONTAP System Manager; Open Storage > Volumes and locate vol_web_data''s 95%-utilized
   usage bar; Resize vol_web_data to a larger provisioned size. Acceptance criteria: the change is minimal
   and reversible, and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant System Manager, SVMs, volumes, LUNs, and SnapMirror), changing one thing at a time.
   Check your work continuously against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -112,7 +105,6 @@ hints:
 
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 summary: Resize the ONTAP volume that is about to hit its space-full threshold before it forces itself
@@ -127,7 +119,7 @@ tags:
 - netapp
 - ontap
 - storage
-linked_tutorial: netapp-fundamentals
+
 what_you_will_learn:
 - Reading FlexVol usage bars and space-full risk in ONTAP System Manager
 - Distinguishing a volume-capacity problem from an aggregate-capacity problem

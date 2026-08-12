@@ -16,11 +16,9 @@ description: 'CONTEXT: A team operating SOC and cybersecurity operations has rai
   engineer (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked
   users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline security operations lab. The architecture is a single
   lab-primary node exposing SIEM, EDR, tickets, and investigation timelines; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: The `nginx` service is not running (`systemctl is-active nginx` → inactive/failed).
   Dependent Integration Lab tasks cannot succeed until the unit is healthy again. Service operations lab.
@@ -28,27 +26,22 @@ description: 'CONTEXT: A team operating SOC and cybersecurity operations has rai
   workflows that depend on it. Diagnose with `systemctl status nginx` and journal logs, apply the smallest
   reliable fix, then verify with `systemctl is-active nginx`.
 
-
   OBJECTIVE: The `nginx` service is active (running); `systemctl is-active nginx`` returns active; The
   fix survives a status re-check (no marker files). Acceptance criteria: the change is minimal and reversible,
   and success means `systemctl is-active nginx` returns active.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant SIEM, EDR, tickets, and investigation timelines), changing one thing at a time. Check
   your work continuously against the objective — success means `systemctl is-active nginx` returns active.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active nginx` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -99,7 +92,6 @@ hints:
     2. Re-run `nginx -t` until it reports syntax is ok.
 
     3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
-
 
     WHY: systemd will not start nginx until `nginx -t` passes.'
 cross_technology: true

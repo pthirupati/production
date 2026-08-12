@@ -16,36 +16,29 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
   lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: A feature fix works in dev, but storage and LVM is not production ready —
   missing guardrails, runbooks, or capacity checks.
-
 
   OBJECTIVE: Day-2 storage and LVM work completes safely in this environment; Changes are verified with
   before/after checks; The system remains stable for dependent teams. Acceptance criteria: the change
   is minimal and reversible, and success means `systemctl is-active crond` returns active.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
   your work continuously against the objective — success means `systemctl is-active crond` returns active.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active crond` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -96,7 +89,6 @@ hints:
 
     3. Run `systemctl restart crond` and confirm `systemctl is-active crond` succeeds.
 
-
     WHY: the grader checks real service state, not marker files.'
 cross_technology: true
 summary: Complete the storage and lvm — production lab linux lab and verify success with the checker
@@ -108,7 +100,7 @@ tags:
 - fix
 - hands-on
 - linux
-linked_tutorial: linux-fundamentals
+linked_tutorial: linux-sysadmin-zero-hero
 what_you_will_learn:
 - Day-2 storage and LVM work completes safely in this environment
 - Changes are verified with before/after checks

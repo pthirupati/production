@@ -9,15 +9,27 @@ from typing import TYPE_CHECKING
 
 from .devops_state import DevOpsState
 from .docker_state import DockerState
-from .k8s_cluster import K8sCluster
+from .k8s_cluster import MIG_DISABLED_VALUES, K8sCluster
 from .networking_state import NetworkingState
-from .rhel_os import SimService
+from .rhel_os import SimService, build_gpu_inventory
 from .rhel_shell import RHELShell
 
 if TYPE_CHECKING:
     from .unified_sim import UnifiedSimulationEngine
 
 GPU_NAMES = ["NVIDIA A100-SXM4-40GB", "NVIDIA H100 80GB HBM3", "NVIDIA RTX 4090"]
+
+
+def _seed_gpus(engine: "UnifiedSimulationEngine", sku: dict) -> list:
+    """Ensure shell.state.gpus matches the scenario SKU; return the inventory."""
+    st = engine.shell.state
+    return st.ensure_gpu_inventory(
+        count=int(sku.get("count") or 1),
+        name=sku.get("name") or _SMI_GPU_NAME,
+        mem_mib=int(sku.get("mem_mib") or _SMI_MEM_TOTAL_MIB),
+        power_cap_w=int(sku.get("pwr_cap") or _SMI_PWR_CAP),
+        sku=str(sku.get("arch") or sku.get("pci") or "gpu"),
+    )
 
 
 def _sync_gpu_identity(engine: "UnifiedSimulationEngine", *, healthy: bool) -> None:
@@ -382,12 +394,17 @@ def _apply_gpu_sku_globals(sku: dict) -> None:
         _SMI_CUDA = sku["cuda"]
 
 
-def _render_nvidia_smi_table() -> str:
-    """Render the modern (driver 5xx) nvidia-smi summary table for the full node
-    plus a realistic compute-process table. Values wiggle per call so successive
-    runs look live, but topology (count/model/driver/mem) is fixed for the SKU."""
+def _render_nvidia_smi_table(gpus: list | None = None) -> str:
+    """Render nvidia-smi summary from per-GPU state (audit §A1 — no random.randint)."""
     now = time.strftime("%a %b %d %H:%M:%S %Y")
-    pwr_cap = _SMI_PWR_CAP
+    inventory = list(gpus or [])
+    if not inventory:
+        inventory = build_gpu_inventory(
+            count=_SMI_GPU_COUNT,
+            name=_SMI_GPU_NAME,
+            mem_mib=_SMI_MEM_TOTAL_MIB,
+            power_cap_w=_SMI_PWR_CAP,
+        )
     lines = [
         now,
         "+-----------------------------------------------------------------------------------------+",
@@ -399,28 +416,29 @@ def _render_nvidia_smi_table() -> str:
         "|=========================================+========================+======================|",
     ]
     busy = []  # (gpu_idx, mem_used) for the process table
-    for i in range(_SMI_GPU_COUNT):
-        active = random.random() < 0.6
-        util = random.randint(70, 100) if active else random.randint(0, 4)
-        mem_hi = max(12, int(_SMI_MEM_TOTAL_MIB * 0.95))
-        mem_lo = max(3, int(_SMI_MEM_TOTAL_MIB * 0.5))
-        mem_used = random.randint(mem_lo, mem_hi) if active else random.randint(3, 12)
-        temp = random.randint(58, 74) if active else random.randint(28, 36)
-        pwr = random.randint(int(pwr_cap * 0.55), pwr_cap - 10) if active else random.randint(68, 92)
-        perf = "P0"
-        bus = f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0"
-        # Fixed-width cells matching the separator (41 / 24 / 22 chars).
-        c1a = f"  {i}  {_SMI_GPU_NAME}"
+    for g in inventory:
+        i = g.index
+        util = int(g.util_gpu)
+        mem_used = int(g.memory_used_mib)
+        mem_total = int(g.memory_total_mib or _SMI_MEM_TOTAL_MIB)
+        pwr_cap = int(g.power_cap_w or _SMI_PWR_CAP)
+        temp = int(g.temp_c)
+        pwr = int(round(g.power_w))
+        ecc_u = int(g.ecc_volatile_uncorrected)
+        bus = g.pci_bus_id or f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0"
+        persist = "On" if g.persistence_mode else "Off"
+        c1a = f"  {i}  {g.name or _SMI_GPU_NAME}"
         c2a = f" {bus} Off"
-        lines.append(f"|{c1a:<33}   On  |{c2a:<24}|                    0 |")
-        c1b = f" N/A   {temp:2d}C    {perf}             {pwr:3d}W / {pwr_cap}W"
-        c2b = f"  {mem_used:6d}MiB / {_SMI_MEM_TOTAL_MIB}MiB "
+        lines.append(f"|{c1a:<33}  {persist:3s} |{c2a:<24}|{ecc_u:>21} |")
+        c1b = f" N/A   {temp:2d}C    P0             {pwr:3d}W / {pwr_cap}W"
+        c2b = f"  {mem_used:6d}MiB / {mem_total}MiB "
         c3b = f"    {util:3d}%      Default"
         lines.append(f"|{c1b:<41}|{c2b:<24}|{c3b:<22}|")
-        lines.append(f"|{'':<41}|{'':<24}|{'             Disabled':<22}|")
+        mig = "Enabled" if g.mig_mode else "Disabled"
+        lines.append(f"|{'':<41}|{'':<24}|{mig:>21} |")
         lines.append(
             "+-----------------------------------------+------------------------+----------------------+")
-        if active:
+        if util > 5 or mem_used > 64:
             busy.append((i, mem_used))
     lines.append("")
     lines.append(
@@ -435,7 +453,7 @@ def _render_nvidia_smi_table() -> str:
         "|=========================================================================================|")
     if busy:
         for gpu_idx, mem_used in busy:
-            pid = random.randint(20000, 65000)
+            pid = 24000 + gpu_idx * 17
             lines.append(
                 f"|    {gpu_idx}   N/A  N/A    {pid:7d}      C   /opt/conda/bin/python                     {mem_used:5d}MiB |")
     else:
@@ -446,10 +464,16 @@ def _render_nvidia_smi_table() -> str:
     return "\n".join(lines)
 
 
-def _render_query_gpu(line: str) -> str:
-    """Emulate `nvidia-smi --query-gpu=<fields> --format=csv[,noheader][,nounits]`
-    across all GPUs. Honors the requested field list and the csv formatting
-    modifiers so scripts that parse the output behave like on a real box."""
+def _render_query_gpu(line: str, gpus: list | None = None) -> str:
+    """Emulate `nvidia-smi --query-gpu=...` from per-GPU state (audit §A1)."""
+    inventory = list(gpus or [])
+    if not inventory:
+        inventory = build_gpu_inventory(
+            count=_SMI_GPU_COUNT,
+            name=_SMI_GPU_NAME,
+            mem_mib=_SMI_MEM_TOTAL_MIB,
+            power_cap_w=_SMI_PWR_CAP,
+        )
     m = re.search(r"--query-gpu[= ]([^\s]+)", line)
     fields = [f.strip() for f in (m.group(1) if m else "name").split(",") if f.strip()]
     fmt = re.search(r"--format[= ]([^\s]+)", line)
@@ -457,20 +481,26 @@ def _render_query_gpu(line: str) -> str:
     noheader = "noheader" in fmt_opts
     nounits = "nounits" in fmt_opts
 
-    # Optional `-i N` / `--id=N` restricts rows to one GPU.
     only_idx = None
     mi = re.search(r"(?:-i|--id)[= ]?(\d+)", line)
     if mi:
         only_idx = int(mi.group(1))
 
-    def _mem_used(i):
-        return random.randint(40000, min(78000, _SMI_MEM_TOTAL_MIB - 100)) if i % 2 == 0 else random.randint(3, 12)
+    def _g(i: int):
+        if 0 <= i < len(inventory):
+            return inventory[i]
+        return None
+
+    def _throttle_active(g, reason: str) -> str:
+        if g and reason in (g.throttle_reasons or []):
+            return "Active"
+        return "Not Active"
 
     units = {
         "index": ("", lambda i: str(i)),
-        "name": ("", lambda i: _SMI_GPU_NAME),
-        "uuid": ("", lambda i: f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"),
-        "pci.bus_id": ("", lambda i: f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0"),
+        "name": ("", lambda i: (_g(i).name if _g(i) else _SMI_GPU_NAME)),
+        "uuid": ("", lambda i: (_g(i).uuid if _g(i) else f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}")),
+        "pci.bus_id": ("", lambda i: (_g(i).pci_bus_id if _g(i) else f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0")),
         "pci.device_id": ("", lambda i: "0x2330"),
         "pci.domain": ("", lambda i: "0x0000"),
         "pci.bus": ("", lambda i: f"0x{(i + 1) * 0x10 + 1:02x}"),
@@ -484,55 +514,59 @@ def _render_query_gpu(line: str) -> str:
         "vbios_version": ("", lambda i: "96.00.74.00.01"),
         "serial": ("", lambda i: f"13207{i:08d}"),
         "board_id": ("", lambda i: f"0x{0x10DE + i:04x}"),
-        "temperature.gpu": (" C", lambda i: str(random.randint(30, 72))),
-        "temperature.memory": (" C", lambda i: str(random.randint(36, 78))),
+        "temperature.gpu": (" C", lambda i: str(_g(i).temp_c if _g(i) else 32)),
+        "temperature.memory": (" C", lambda i: str(_g(i).mem_temp_c if _g(i) else 38)),
         "fan.speed": (" %", lambda i: "[N/A]"),
-        "utilization.gpu": (" %", lambda i: str(random.randint(0, 100))),
-        "utilization.memory": (" %", lambda i: str(random.randint(0, 95))),
-        "utilization.encoder": (" %", lambda i: str(random.randint(0, 5))),
-        "utilization.decoder": (" %", lambda i: str(random.randint(0, 5))),
-        "memory.total": (" MiB", lambda i: str(_SMI_MEM_TOTAL_MIB)),
-        "memory.used": (" MiB", lambda i: str(_mem_used(i))),
-        "memory.free": (" MiB", lambda i: str(_SMI_MEM_TOTAL_MIB - _mem_used(i))),
+        "utilization.gpu": (" %", lambda i: str(_g(i).util_gpu if _g(i) else 0)),
+        "utilization.memory": (" %", lambda i: str(_g(i).util_mem if _g(i) else 0)),
+        "utilization.encoder": (" %", lambda i: "0"),
+        "utilization.decoder": (" %", lambda i: "0"),
+        "memory.total": (" MiB", lambda i: str(_g(i).memory_total_mib if _g(i) else _SMI_MEM_TOTAL_MIB)),
+        "memory.used": (" MiB", lambda i: str(_g(i).memory_used_mib if _g(i) else 0)),
+        "memory.free": (" MiB", lambda i: str(
+            (_g(i).memory_total_mib - _g(i).memory_used_mib) if _g(i) else _SMI_MEM_TOTAL_MIB
+        )),
         "memory.reserved": (" MiB", lambda i: "455"),
-        "power.draw": (" W", lambda i: f"{random.uniform(70, max(80, _SMI_PWR_CAP - 20)):.2f}"),
-        "power.limit": (" W", lambda i: f"{_SMI_PWR_CAP}.00"),
-        "power.default_limit": (" W", lambda i: f"{_SMI_PWR_CAP}.00"),
-        "power.max_limit": (" W", lambda i: f"{_SMI_PWR_CAP}.00"),
+        "power.draw": (" W", lambda i: f"{(_g(i).power_w if _g(i) else 70.0):.2f}"),
+        "power.limit": (" W", lambda i: f"{(_g(i).power_cap_w if _g(i) else _SMI_PWR_CAP)}.00"),
+        "power.default_limit": (" W", lambda i: f"{(_g(i).power_cap_w if _g(i) else _SMI_PWR_CAP)}.00"),
+        "power.max_limit": (" W", lambda i: f"{(_g(i).power_cap_w if _g(i) else _SMI_PWR_CAP)}.00"),
         "power.min_limit": (" W", lambda i: "100.00"),
-        "enforced.power.limit": (" W", lambda i: f"{_SMI_PWR_CAP}.00"),
-        "clocks.current.graphics": (" MHz", lambda i: str(random.randint(1200, 1980))),
-        "clocks.current.sm": (" MHz", lambda i: str(random.randint(1200, 1980))),
-        "clocks.current.memory": (" MHz", lambda i: str(random.choice((1593, 2619)))),
-        "clocks.current.video": (" MHz", lambda i: str(random.randint(900, 1600))),
-        "clocks.sm": (" MHz", lambda i: str(random.randint(1200, 1980))),
-        "clocks.mem": (" MHz", lambda i: str(random.choice((1593, 2619)))),
-        "clocks.gr": (" MHz", lambda i: str(random.randint(1200, 1980))),
+        "enforced.power.limit": (" W", lambda i: f"{(_g(i).power_cap_w if _g(i) else _SMI_PWR_CAP)}.00"),
+        "clocks.current.graphics": (" MHz", lambda i: str(_g(i).graphics_clock if _g(i) else 1410)),
+        "clocks.current.sm": (" MHz", lambda i: str(_g(i).sm_clock if _g(i) else 1410)),
+        "clocks.current.memory": (" MHz", lambda i: str(_g(i).mem_clock if _g(i) else 1593)),
+        "clocks.current.video": (" MHz", lambda i: str((_g(i).sm_clock if _g(i) else 1410) - 200)),
+        "clocks.sm": (" MHz", lambda i: str(_g(i).sm_clock if _g(i) else 1410)),
+        "clocks.mem": (" MHz", lambda i: str(_g(i).mem_clock if _g(i) else 1593)),
+        "clocks.gr": (" MHz", lambda i: str(_g(i).graphics_clock if _g(i) else 1410)),
         "clocks.max.sm": (" MHz", lambda i: "1980"),
         "clocks.max.memory": (" MHz", lambda i: "2619"),
         "clocks_throttle_reasons.supported": ("", lambda i: "0x00000000000001FF"),
-        "clocks_throttle_reasons.active": ("", lambda i: "0x0000000000000000"),
-        "clocks_throttle_reasons.gpu_idle": ("", lambda i: "Not Active"),
-        "clocks_throttle_reasons.sw_power_cap": ("", lambda i: "Not Active"),
-        "clocks_throttle_reasons.hw_thermal_slowdown": ("", lambda i: "Not Active"),
-        "clocks_throttle_reasons.hw_power_brake_slowdown": ("", lambda i: "Not Active"),
-        "clocks_throttle_reasons.sw_thermal_slowdown": ("", lambda i: "Not Active"),
-        "ecc.mode.current": ("", lambda i: "Enabled"),
-        "ecc.mode.pending": ("", lambda i: "Enabled"),
-        "ecc.errors.corrected.volatile.device_memory": ("", lambda i: "0"),
-        "ecc.errors.corrected.aggregate.device_memory": ("", lambda i: "0"),
-        "ecc.errors.uncorrected.volatile.device_memory": ("", lambda i: "0"),
-        "ecc.errors.uncorrected.aggregate.device_memory": ("", lambda i: "0"),
-        "ecc.errors.uncorrected.aggregate.total": ("", lambda i: "0"),
-        "ecc.errors.corrected.aggregate.total": ("", lambda i: "0"),
-        "retired_pages.single_bit_ecc.count": ("", lambda i: "0"),
-        "retired_pages.double_bit.count": ("", lambda i: "0"),
-        "retired_pages.pending": ("", lambda i: "No"),
-        "remapped_rows": ("", lambda i: "0"),
-        "remapped_rows.pending": ("", lambda i: "No"),
-        "remapped_rows.failure": ("", lambda i: "No"),
+        "clocks_throttle_reasons.active": ("", lambda i: (
+            "0x0000000000000001" if (_g(i) and _g(i).throttle_reasons) else "0x0000000000000000"
+        )),
+        "clocks_throttle_reasons.gpu_idle": ("", lambda i: _throttle_active(_g(i), "GPU_IDLE")),
+        "clocks_throttle_reasons.sw_power_cap": ("", lambda i: _throttle_active(_g(i), "SW_POWER_CAP")),
+        "clocks_throttle_reasons.hw_thermal_slowdown": ("", lambda i: _throttle_active(_g(i), "HW_THERMAL_SLOWDOWN")),
+        "clocks_throttle_reasons.hw_power_brake_slowdown": ("", lambda i: _throttle_active(_g(i), "HW_POWER_BRAKE")),
+        "clocks_throttle_reasons.sw_thermal_slowdown": ("", lambda i: _throttle_active(_g(i), "SW_THERMAL_SLOWDOWN")),
+        "ecc.mode.current": ("", lambda i: (_g(i).ecc_mode if _g(i) else "Enabled")),
+        "ecc.mode.pending": ("", lambda i: (_g(i).ecc_mode if _g(i) else "Enabled")),
+        "ecc.errors.corrected.volatile.device_memory": ("", lambda i: str(_g(i).ecc_volatile_corrected if _g(i) else 0)),
+        "ecc.errors.corrected.aggregate.device_memory": ("", lambda i: str(_g(i).ecc_aggregate_corrected if _g(i) else 0)),
+        "ecc.errors.uncorrected.volatile.device_memory": ("", lambda i: str(_g(i).ecc_volatile_uncorrected if _g(i) else 0)),
+        "ecc.errors.uncorrected.aggregate.device_memory": ("", lambda i: str(_g(i).ecc_aggregate_uncorrected if _g(i) else 0)),
+        "ecc.errors.uncorrected.aggregate.total": ("", lambda i: str(_g(i).ecc_aggregate_uncorrected if _g(i) else 0)),
+        "ecc.errors.corrected.aggregate.total": ("", lambda i: str(_g(i).ecc_aggregate_corrected if _g(i) else 0)),
+        "retired_pages.single_bit_ecc.count": ("", lambda i: str(_g(i).retired_pages_sbe if _g(i) else 0)),
+        "retired_pages.double_bit.count": ("", lambda i: str(_g(i).retired_pages_dbe if _g(i) else 0)),
+        "retired_pages.pending": ("", lambda i: ("Yes" if (_g(i) and _g(i).retired_pages_pending) else "No")),
+        "remapped_rows": ("", lambda i: str(_g(i).retired_pages_dbe if _g(i) else 0)),
+        "remapped_rows.pending": ("", lambda i: ("Yes" if (_g(i) and _g(i).remap_pending) else "No")),
+        "remapped_rows.failure": ("", lambda i: ("Yes" if (_g(i) and _g(i).remap_failure) else "No")),
         "compute_mode": ("", lambda i: "Default"),
-        "persistence_mode": ("", lambda i: "Enabled"),
+        "persistence_mode": ("", lambda i: ("Enabled" if (_g(i) is None or _g(i).persistence_mode) else "Disabled")),
         "accounting.mode": ("", lambda i: "Disabled"),
         "accounting.buffer_size": ("", lambda i: "4000"),
         "display_mode": ("", lambda i: "Disabled"),
@@ -540,9 +574,9 @@ def _render_query_gpu(line: str) -> str:
         "encoder.stats.sessionCount": ("", lambda i: "0"),
         "encoder.stats.averageFps": ("", lambda i: "0"),
         "encoder.stats.averageLatency": ("", lambda i: "0"),
-        "compute.apps.count": ("", lambda i: str(random.randint(0, 2))),
-        "count": ("", lambda i: str(_SMI_GPU_COUNT)),
-        "gpu_uuid": ("", lambda i: f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"),
+        "compute.apps.count": ("", lambda i: ("1" if (_g(i) and _g(i).util_gpu > 5) else "0")),
+        "count": ("", lambda i: str(len(inventory) or _SMI_GPU_COUNT)),
+        "gpu_uuid": ("", lambda i: (_g(i).uuid if _g(i) else f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}")),
         "inforom.ecc": ("", lambda i: "2.0"),
         "inforom.oem": ("", lambda i: "2.0"),
         "inforom.img": ("", lambda i: "G001.0000.01.03"),
@@ -553,7 +587,8 @@ def _render_query_gpu(line: str) -> str:
         for f in fields
     )
     rows = []
-    indices = [only_idx] if only_idx is not None and 0 <= only_idx < _SMI_GPU_COUNT else list(range(_SMI_GPU_COUNT))
+    n = len(inventory) or _SMI_GPU_COUNT
+    indices = [only_idx] if only_idx is not None and 0 <= only_idx < n else list(range(n))
     for i in indices:
         cells = []
         for f in fields:
@@ -565,14 +600,114 @@ def _render_query_gpu(line: str) -> str:
     return "\n".join(out)
 
 
-def _render_nvlink_status() -> str:
+def _render_nvlink_status(gpus: list | None = None) -> str:
+    inventory = list(gpus or [])
+    if not inventory:
+        inventory = build_gpu_inventory(
+            count=_SMI_GPU_COUNT,
+            name=_SMI_GPU_NAME,
+            mem_mib=_SMI_MEM_TOTAL_MIB,
+            power_cap_w=_SMI_PWR_CAP,
+        )
     lines = []
-    for i in range(_SMI_GPU_COUNT):
-        lines.append(f"GPU {i}: {_SMI_GPU_NAME}")
-        nlinks = 18 if _SMI_GPU_COUNT >= 8 else 4
-        for link in range(min(4, nlinks)):
-            lines.append(f"\t Link {link}: 26.562 GB/s")
+    for g in inventory:
+        lines.append(f"GPU {g.index}: {g.name or _SMI_GPU_NAME}")
+        g.ensure_default_nvlink(dense=len(inventory) >= 8)
+        for link in g.nvlink_links:
+            if link.get("active", True):
+                lines.append(f"\t Link {link.get('id', 0)}: {link.get('width_gbps', 26.562)} GB/s")
+            else:
+                lines.append(
+                    f"\t Link {link.get('id', 0)}: {link.get('width_gbps', 0)} GB/s (Inactive)"
+                )
     return "\n".join(lines)
+
+
+def _render_dcgmi_diag(gpus: list, level: str = "1") -> str:
+    """Render dcgmi diag results from per-GPU fail flags (audit §A1)."""
+    def _cell(fail: bool) -> str:
+        return "Fail - All" if fail else "Pass - All"
+
+    pcie = any(getattr(g, "diag_pcie_fail", False) for g in gpus)
+    mem = any(
+        getattr(g, "diag_memory_fail", False)
+        or getattr(g, "ecc_aggregate_uncorrected", 0) > 0
+        or getattr(g, "remap_pending", False)
+        for g in gpus
+    )
+    bw = any(getattr(g, "diag_bandwidth_fail", False) for g in gpus)
+    stress = any(getattr(g, "diag_stress_fail", False) for g in gpus)
+    power = any(
+        getattr(g, "diag_power_fail", False)
+        or "SW_THERMAL_SLOWDOWN" in (getattr(g, "throttle_reasons", None) or [])
+        or "HW_THERMAL_SLOWDOWN" in (getattr(g, "throttle_reasons", None) or [])
+        for g in gpus
+    )
+    # Unhealthy-without-specific-flag still fails stress so labs are not vacuously green.
+    if any(not g.healthy for g in gpus) and not any((pcie, mem, bw, stress, power)):
+        stress = True
+
+    return (
+        f"Successfully ran diagnostic (run level {level}) for group.\n"
+        "+---------------------------+------------------------------------------------+\n"
+        "|Diagnostic                 | Result                                         |\n"
+        "+===========================+================================================+\n"
+        "|-----  Deployment  --------+------------------------------------------------|\n"
+        "| Denylist                  | Pass                                           |\n"
+        "| NVML Library              | Pass                                           |\n"
+        "| CUDA Main Library         | Pass                                           |\n"
+        "| Persistence Mode          | Pass                                           |\n"
+        "|-----  Integration  -------+------------------------------------------------|\n"
+        f"| PCIe                      | {_cell(pcie):<46}|\n"
+        "|-----  Hardware  ----------+------------------------------------------------|\n"
+        f"| GPU Memory                | {_cell(mem):<46}|\n"
+        f"| Memory Bandwidth          | {_cell(bw):<46}|\n"
+        "|-----  Stress  ------------+------------------------------------------------|\n"
+        f"| Targeted Stress           | {_cell(stress):<46}|\n"
+        f"| Targeted Power            | {_cell(power):<46}|\n"
+        "+---------------------------+------------------------------------------------+"
+    )
+
+
+def _render_dcgmi_stats(gpus: list) -> str:
+    rows = "\n".join(
+        f"| {g.index:<11} | {int(round(g.power_w)):<9} | "
+        f"{int(g.util_gpu):<12} | {int(g.util_mem):<12} | "
+        f"{int(g.temp_c):<19} |"
+        for g in gpus
+    )
+    return (
+        "+-----------------------------------------------------------------------------+\n"
+        "| GPU Stats                                                                   |\n"
+        "+=============+===============================================================+\n"
+        "| GPU ID      | Power (W) | GPU Util (%) | Mem Util (%) | Temp (C)            |\n"
+        "+=============+===============================================================+\n"
+        f"{rows}\n"
+        "+=============+===============================================================+"
+    )
+
+
+def _render_dcgmi_health(gpus: list) -> str:
+    unhealthy = any(
+        (not g.healthy)
+        or g.diag_pcie_fail
+        or g.diag_memory_fail
+        or g.diag_bandwidth_fail
+        or g.diag_stress_fail
+        or g.diag_power_fail
+        or g.ecc_aggregate_uncorrected > 0
+        or g.remap_pending
+        or any(not ln.get("active", True) for ln in (g.nvlink_links or []))
+        for g in gpus
+    )
+    status = "Warning" if unhealthy else "Healthy"
+    return (
+        "+-----------------------------------------------------------------------------+\n"
+        "| Health Monitor Report                                                       |\n"
+        "+=================================+===========================================+\n"
+        f"| Overall Health                  | {status:<41}|\n"
+        "+---------------------------------+-------------------------------------------+"
+    )
 
 
 def _render_topo_matrix(kind: str = "m") -> str:
@@ -689,6 +824,7 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         low = line.strip().lower()
         # Bind SKU for this invocation so table/query helpers match the scenario.
         _apply_gpu_sku_globals(sku)
+        gpus = _seed_gpus(engine, sku)
         # GPU-specific tools always handled here. Generic kernel tools
         # (modprobe/lspci/lsmod/modinfo) are only intercepted when they
         # reference the NVIDIA driver, or when this is a GPU-focused sim — so
@@ -698,7 +834,10 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                      "reduce_scatter_perf", "broadcast_perf", "nccl-tests",
                      "vllm", "gpu-sanity", "cuda-samples", "bandwidthTest", "deviceQuery",
                      "racadm", "idracadm", "nvidia_gpu_tools.py", "nvidia_gpu_tools",
-                     "rocminfo", "radeontop", "fieldiag", "psbcheck", "dcgmprofrunner")
+                     "rocminfo", "radeontop", "fieldiag", "psbcheck", "dcgmprofrunner",
+                     "torchrun", "deepspeed", "fixitlab-fabric",
+                     "ollama", "llama-server", "llama-cli", "llama.cpp",
+                     "sglang", "trtllm-serve", "trtllm-build", "tensorrt_llm")
         kernel_tools = ("modprobe", "rmmod", "lspci", "lsmod", "modinfo")
         if any(low.startswith(c) for c in gpu_tools):
             pass
@@ -709,6 +848,8 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         else:
             return None
         healthy = engine.shell.state.gpu_healthy
+        # Re-read after seed — inventory is authoritative for count/name.
+        gpus = list(getattr(engine.shell.state, "gpus", None) or gpus)
         # Dell iDRAC / racadm — BM + DCOps TSR collection against the chassis BMC.
         if low.startswith("racadm") or low.startswith("idracadm"):
             if "getsysinfo" in low or "getsysinfo" in "".join(parts).lower():
@@ -855,24 +996,148 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 "Persistence mode .................... PASS\n"
                 "Result: ALL PASS — /tmp/gpu-sanity-report.json"
             )
-        # vLLM inference server (AI Infra — not application GPU course).
+        # vLLM inference server — TP / mem util / OOM driven by SimGPU state (§A1/A2).
+        # Inference serving tracks (§A2): Ollama / llama.cpp / SGLang / TensorRT-LLM.
+        if low.startswith("ollama"):
+            if "serve" in parts or low == "ollama serve":
+                return "ollama serve: listening on http://127.0.0.1:11434"
+            if "list" in parts:
+                return "NAME\tID\tSIZE\tMODIFIED\nllama3.1:8b\tabc123\t4.9 GB\t2 hours ago"
+            if "run" in parts or "pull" in parts:
+                model = parts[-1] if len(parts) > 1 else "llama3.1"
+                return f"ollama: pulling {model}\n>>> success\n{model} ready"
+            return "Usage: ollama serve | ollama list | ollama run <model> | ollama pull <model>"
+        if low.startswith("llama-server") or low.startswith("llama-cli") or low.startswith("llama.cpp"):
+            model = "model.gguf"
+            for i, p in enumerate(parts):
+                if p in ("-m", "--model") and i + 1 < len(parts):
+                    model = parts[i + 1]
+            if "cli" in low or low.startswith("llama-cli"):
+                return f"llama-cli: loaded {model}\n> hello\nworld\n"
+            return (
+                f"llama-server: loaded {model}\n"
+                "main: server is listening on http://127.0.0.1:8080\n"
+                "slot get_avail: id 0 | task -1 | idle"
+            )
+        if low.startswith("sglang") or "sglang.launch_server" in low or low.startswith("python -m sglang"):
+            return (
+                "sglang: Launching server\n"
+                "INFO  server ready at http://127.0.0.1:30000\n"
+                "INFO  backend=flashinfer tp=1"
+            )
+        if low.startswith("trtllm") or low.startswith("tensorrt_llm"):
+            if "build" in low:
+                return "trtllm-build: engine written to ./engine/\nBuild finished successfully."
+            return (
+                "trtllm-serve: OpenAI-compatible server on http://127.0.0.1:8000\n"
+                "TensorRT-LLM ready"
+            )
         if low.startswith("vllm"):
             if "serve" in low or "openai" in low or "--model" in low:
                 model = "meta-llama/Llama-3.1-70B-Instruct"
+                tp = min(8, len(gpus) or _SMI_GPU_COUNT)
+                gpu_mem_util = 0.90
+                max_model_len = 8192
                 for i, p in enumerate(parts):
                     if p in ("--model", "-m") and i + 1 < len(parts):
                         model = parts[i + 1]
-                        break
+                    elif p in ("--tensor-parallel-size", "-tp") and i + 1 < len(parts):
+                        try:
+                            tp = int(parts[i + 1])
+                        except ValueError:
+                            pass
+                    elif p == "--gpu-memory-utilization" and i + 1 < len(parts):
+                        try:
+                            gpu_mem_util = float(parts[i + 1])
+                        except ValueError:
+                            pass
+                    elif p == "--max-model-len" and i + 1 < len(parts):
+                        try:
+                            max_model_len = int(parts[i + 1])
+                        except ValueError:
+                            pass
+                n_gpus = len(gpus) or _SMI_GPU_COUNT
+                if tp > n_gpus:
+                    return (
+                        f"ValueError: tensor_parallel_size ({tp}) is larger than "
+                        f"the number of available GPUs ({n_gpus})."
+                    )
+                # Attention-head divisibility (audit §A2 first-week failure).
+                # Llama-3.1-70B = 64 heads; 8B = 32. Odd TP sizes must fail loudly.
+                model_l = model.lower()
+                if "70b" in model_l or "405b" in model_l:
+                    n_heads = 64
+                elif "8b" in model_l or "7b" in model_l:
+                    n_heads = 32
+                else:
+                    n_heads = 32
+                if tp > 0 and n_heads % tp != 0:
+                    return (
+                        f"ValueError: Total number of attention heads ({n_heads}) must be "
+                        f"divisible by tensor_parallel_size ({tp}). "
+                        "Choose a TP size that divides the model's head count "
+                        "(e.g. 1,2,4,8 for 32-head models)."
+                    )
+                oom = any(
+                    getattr(g, "oom", False)
+                    or int(g.memory_used_mib) >= int(g.memory_total_mib)
+                    for g in gpus
+                )
+                # Aggressive util on an already-busy node also OOMs.
+                if not oom and gpus and gpu_mem_util >= 0.98:
+                    busy = sum(1 for g in gpus if int(g.util_gpu) > 50 or int(g.memory_used_mib) > 64)
+                    if busy >= max(1, n_gpus // 2):
+                        oom = True
+                if oom:
+                    used = int(gpus[0].memory_used_mib) if gpus else 0
+                    total = int(gpus[0].memory_total_mib) if gpus else _SMI_MEM_TOTAL_MIB
+                    return (
+                        "torch.cuda.OutOfMemoryError: CUDA out of memory. "
+                        f"Tried to allocate 2.00 GiB (GPU 0; {used} MiB / {total} MiB already allocated). "
+                        "If reserved memory is >> allocated memory try setting "
+                        "max_split_size_mb to avoid fragmentation. "
+                        "Process finished with exit code 1"
+                    )
+                # KV-cache budget: max_model_len must fit in the free VRAM slice
+                # claimed by --gpu-memory-utilization (audit §A2). Teaching constant
+                # ~0.5 MiB/token approximates a 70B TP group under paged attention.
+                free_kv_mib = 0
+                slice_gpus = gpus[:tp] if gpus else []
+                if slice_gpus:
+                    for g in slice_gpus:
+                        claim = int(int(g.memory_total_mib) * gpu_mem_util)
+                        free_kv_mib += max(0, claim - int(g.memory_used_mib))
+                else:
+                    free_kv_mib = int(_SMI_MEM_TOTAL_MIB * gpu_mem_util) * max(1, tp)
+                kv_need_mib = int(max_model_len * 0.5)
+                if kv_need_mib > free_kv_mib:
+                    return (
+                        "ValueError: Free memory on device cuda:0 (the last GPU with "
+                        "enough free memory for KV cache) is less than requested. "
+                        f"Need ~{kv_need_mib} MiB for max_model_len={max_model_len} but only "
+                        f"{free_kv_mib} MiB free under gpu_memory_utilization={gpu_mem_util}. "
+                        "Lower --max-model-len or raise --gpu-memory-utilization / free VRAM. "
+                        "Process finished with exit code 1"
+                    )
                 return (
-                    f"INFO  vllm.entrypoints.openai.api_server: Starting vLLM on {_SMI_GPU_NAME} × {_SMI_GPU_COUNT}\n"
+                    f"INFO  vllm.entrypoints.openai.api_server: Starting vLLM on {_SMI_GPU_NAME} × {n_gpus}\n"
                     f"INFO  model={model}\n"
-                    "INFO  tensor_parallel_size=8\n"
+                    f"INFO  tensor_parallel_size={tp}\n"
+                    f"INFO  gpu_memory_utilization={gpu_mem_util}\n"
+                    f"INFO  max_model_len={max_model_len}\n"
+                    f"INFO  KV cache: {free_kv_mib} MiB free ({kv_need_mib} MiB reserved for max_model_len)\n"
                     "INFO  CUDA graphs captured\n"
                     "INFO  Avg prompt throughput: 1842.3 tokens/s\n"
                     "INFO  Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)\n"
                     "vllm: READY — OpenAI-compatible /v1/completions"
                 )
             if "bench" in low or "benchmark" in low:
+                if any(getattr(g, "oom", False) for g in gpus):
+                    return (
+                        "vllm bench throughput\n"
+                        "ERROR: CUDA out of memory during warm-up\n"
+                        "Result: FAIL"
+                    )
                 return (
                     "vllm bench throughput\n"
                     f"  GPUs: {_SMI_GPU_COUNT} × {_SMI_GPU_NAME}\n"
@@ -883,7 +1148,8 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 )
             return (
                 "vLLM — high-throughput LLM serving\n"
-                "Usage: vllm serve <model> --tensor-parallel-size N\n"
+                "Usage: vllm serve <model> --tensor-parallel-size N "
+                "[--gpu-memory-utilization F] [--max-model-len N]\n"
                 "       vllm bench throughput --model <model>\n"
                 "OpenAI API on :8000 when serve is running."
             )
@@ -918,16 +1184,15 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 if not healthy:
                     return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
                 rows = []
-                for i in range(_SMI_GPU_COUNT):
-                    uuid = f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"
-                    rows.append(f"GPU {i}: {_SMI_GPU_NAME} (UUID: {uuid})")
+                for g in gpus:
+                    rows.append(f"GPU {g.index}: {g.name} (UUID: {g.uuid})")
                 return "\n".join(rows)
             if "-l" in parts or "--loop" in low:
                 pass  # streaming flag — single snapshot is fine for the sim
             if "--query-gpu" in low:
                 if not healthy:
                     return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
-                return _render_query_gpu(line)
+                return _render_query_gpu(line, gpus)
             # ── nvidia-smi sub-commands (topology / nvlink / mig / -q -d <section>) ──
             # Datacenter-realistic detail views. Cosmetic only: the healthy path
             # renders a clean view; the unhealthy path mirrors a fallen-off driver.
@@ -939,13 +1204,17 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
             if "nvlink" in low:
                 if "-e" in parts or "capabilities" in low or "errors" in low:
                     lines = []
-                    for i in range(_SMI_GPU_COUNT):
-                        lines.append(f"GPU {i}: {_SMI_GPU_NAME}")
-                        lines.append("\t Link 0: Replay Errors: 0")
-                        lines.append("\t Link 0: Recovery Errors: 0")
-                        lines.append("\t Link 0: CRC Errors: 0")
+                    for g in gpus:
+                        lines.append(f"GPU {g.index}: {g.name}")
+                        g.ensure_default_nvlink(dense=len(gpus) >= 8)
+                        for link in g.nvlink_links:
+                            lid = link.get("id", 0)
+                            replay = int(link.get("replay_errors", 0))
+                            lines.append(f"\t Link {lid}: Replay Errors: {replay}")
+                            lines.append(f"\t Link {lid}: Recovery Errors: 0")
+                            lines.append(f"\t Link {lid}: CRC Errors: 0")
                     return "\n".join(lines)
-                return _render_nvlink_status()
+                return _render_nvlink_status(gpus)
             if "compute-apps" in low or "--query-compute-apps" in low:
                 return _render_compute_apps(line)
             if "--query-accounted-apps" in low or "accounted-apps" in low:
@@ -1184,35 +1453,35 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 if "pmon" in low:
                     lines.append("# gpu        pid  type    sm   mem   enc   dec   command")
                     for tick in range(samples):
-                        for gi in range(min(4, _SMI_GPU_COUNT)):
-                            pid = 12000 + gi * 10 + tick
-                            sm = random.randint(0, 98)
-                            mem = random.randint(0, 80)
+                        for g in gpus[: min(4, len(gpus))]:
+                            pid = 12000 + g.index * 10 + tick
+                            sm = max(0, min(100, int(g.util_gpu) + (tick % 3) - 1))
+                            mem = max(0, min(100, int(g.util_mem) + (tick % 2)))
                             lines.append(
-                                f"    {gi}    {pid}     C    {sm:3d}   {mem:3d}     0     0   python"
+                                f"    {g.index}    {pid}     C    {sm:3d}   {mem:3d}     0     0   python"
                             )
                     delay = 0.55
                 else:
-                    # dmon header + samples (power / util / clocks — matches nvidia-smi dmon -s puc)
+                    # dmon header + samples derived from SimGPU (stable across calls)
                     lines.append("# gpu   pwr  gtemp  mtemp     sm    mem    enc    dec  mclk  pclk")
                     lines.append("# Idx     W     C      C      %      %      %      %   MHz   MHz")
-                    for _tick in range(samples):
-                        for gi in range(min(8, _SMI_GPU_COUNT)):
-                            pwr = random.randint(80, max(120, _SMI_PWR_CAP - 50))
-                            gt = random.randint(32, 78)
-                            mt = gt + random.randint(4, 12)
-                            sm = random.randint(0, 99)
-                            mem = random.randint(0, 85)
-                            mclk = random.choice((1593, 2619))
-                            pclk = random.choice((1410, 1980))
+                    for tick in range(samples):
+                        for g in gpus[: min(8, len(gpus))]:
+                            pwr = int(round(g.power_w)) + (tick % 3)
+                            gt = int(g.temp_c) + (tick % 2)
+                            mt = int(g.mem_temp_c) + (tick % 2)
+                            sm = max(0, min(100, int(g.util_gpu) + (tick % 3) - 1))
+                            mem = max(0, min(100, int(g.util_mem)))
+                            mclk = int(g.mem_clock)
+                            pclk = int(g.sm_clock)
                             lines.append(
-                                f"    {gi}   {pwr:3d}    {gt:2d}     {mt:2d}    "
+                                f"    {g.index}   {pwr:3d}    {gt:2d}     {mt:2d}    "
                                 f"{sm:3d}    {mem:3d}      0      0  {mclk:4d}  {pclk:4d}"
                             )
                     delay = 1.0 if ("-l" in parts or "--loop" in low) else 0.55
                 return StreamedCommandResult(lines=lines, delay_s=delay)
             if healthy:
-                return _render_nvidia_smi_table()
+                return _render_nvidia_smi_table(gpus)
             return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running."
         if low.startswith("modprobe"):
             # `modprobe nvidia` loads the driver; `modprobe -r nvidia` unloads it.
@@ -1293,36 +1562,37 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 "# HELP DCGM_FI_DEV_GPU_UTIL GPU utilization (in %).",
                 "# TYPE DCGM_FI_DEV_GPU_UTIL gauge",
             ]
-            for i in range(_SMI_GPU_COUNT):
-                uuid = f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"
-                util = random.randint(0, 100)
+            for i in range(len(gpus) or _SMI_GPU_COUNT):
+                g = gpus[i] if i < len(gpus) else None
+                uuid = g.uuid if g else f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"
+                util = int(g.util_gpu) if g else 0
                 sample.append(
                     f'DCGM_FI_DEV_GPU_UTIL{{gpu="{i}",UUID="{uuid}",'
                     f'device="nvidia{i}",modelName="{_SMI_GPU_NAME}",Hostname="gpu-node"}} {util}')
             sample.append("# HELP DCGM_FI_DEV_GPU_TEMP GPU temperature (in C).")
             sample.append("# TYPE DCGM_FI_DEV_GPU_TEMP gauge")
-            for i in range(_SMI_GPU_COUNT):
-                uuid = f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"
+            for i in range(len(gpus) or _SMI_GPU_COUNT):
+                g = gpus[i] if i < len(gpus) else None
+                uuid = g.uuid if g else f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"
+                temp = int(g.temp_c) if g else 32
                 sample.append(
                     f'DCGM_FI_DEV_GPU_TEMP{{gpu="{i}",UUID="{uuid}",'
-                    f'device="nvidia{i}",modelName="{_SMI_GPU_NAME}",Hostname="gpu-node"}} {random.randint(30, 72)}')
+                    f'device="nvidia{i}",modelName="{_SMI_GPU_NAME}",Hostname="gpu-node"}} {temp}')
             return "\n".join(sample)
         if low.startswith("dcgmi") or low.startswith("dcgm"):
             if not healthy:
                 return "Error: Unable to connect to nv-hostengine. GPU driver not loaded."
             if "discovery" in low:
-                rows = [f"{_SMI_GPU_COUNT} GPUs found.",
+                rows = [f"{len(gpus)} GPUs found.",
                         "+--------+----------------------------------------------------------------------+",
                         "| GPU ID | Device Information                                                   |",
                         "+========+======================================================================+"]
-                for i in range(_SMI_GPU_COUNT):
-                    bus = f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0"
-                    rows.append(f"| {i:<6} |{(' Name: ' + _SMI_GPU_NAME):<70}|")
-                    rows.append(f"|        |{(' PCI Bus ID: ' + bus):<70}|")
+                for g in gpus:
+                    rows.append(f"| {g.index:<6} |{(' Name: ' + g.name):<70}|")
+                    rows.append(f"|        |{(' PCI Bus ID: ' + g.pci_bus_id):<70}|")
                 rows.append("+--------+----------------------------------------------------------------------+")
                 return "\n".join(rows)
             if "diag" in low:
-                # `dcgmi diag -r <1|2|3|4>` — the sim renders a clean pass run.
                 level = "1"
                 for tok in ("-r", "--run"):
                     if tok in parts:
@@ -1330,50 +1600,16 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                             level = parts[parts.index(tok) + 1]
                         except (ValueError, IndexError):
                             pass
-                return (f"Successfully ran diagnostic (run level {level}) for group.\n"
-                        "+---------------------------+------------------------------------------------+\n"
-                        "|Diagnostic                 | Result                                         |\n"
-                        "+===========================+================================================+\n"
-                        "|-----  Deployment  --------+------------------------------------------------|\n"
-                        "| Denylist                  | Pass                                           |\n"
-                        "| NVML Library              | Pass                                           |\n"
-                        "| CUDA Main Library         | Pass                                           |\n"
-                        "| Persistence Mode          | Pass                                           |\n"
-                        "|-----  Integration  -------+------------------------------------------------|\n"
-                        "| PCIe                      | Pass - All                                     |\n"
-                        "|-----  Hardware  ----------+------------------------------------------------|\n"
-                        "| GPU Memory                | Pass - All                                     |\n"
-                        "| Memory Bandwidth          | Pass - All                                     |\n"
-                        "|-----  Stress  ------------+------------------------------------------------|\n"
-                        "| Targeted Stress           | Pass - All                                     |\n"
-                        "| Targeted Power            | Pass - All                                     |\n"
-                        "+---------------------------+------------------------------------------------+")
+                return _render_dcgmi_diag(gpus, level)
             if "health" in low:
-                return ("+-----------------------------------------------------------------------------+\n"
-                        "| Health Monitor Report                                                       |\n"
-                        "+=================================+===========================================+\n"
-                        "| Overall Health                  | Healthy                                   |\n"
-                        "+---------------------------------+-------------------------------------------+")
+                return _render_dcgmi_health(gpus)
             if "stats" in low:
-                return (
-                    "+-----------------------------------------------------------------------------+\n"
-                    "| GPU Stats                                                                   |\n"
-                    "+=============+===============================================================+\n"
-                    "| GPU ID      | Power (W) | GPU Util (%) | Mem Util (%) | Temp (C)            |\n"
-                    "+=============+===============================================================+\n"
-                    + "\n".join(
-                        f"| {i:<11} | {random.randint(90, max(120, _SMI_PWR_CAP - 50)):<9} | "
-                        f"{random.randint(0, 99):<12} | {random.randint(0, 90):<12} | "
-                        f"{random.randint(30, 72):<19} |"
-                        for i in range(_SMI_GPU_COUNT)
-                    )
-                    + "\n+=============+===============================================================+"
-                )
+                return _render_dcgmi_stats(gpus)
             if "group" in low:
                 return (
                     "+-------------------+---------------------------------------------------------+\n"
                     "| Groups            |                                                          |\n"
-                    "| GROUP 0 (default) | GPUs: " + ",".join(str(i) for i in range(_SMI_GPU_COUNT)) + "\n"
+                    "| GROUP 0 (default) | GPUs: " + ",".join(str(g.index) for g in gpus) + "\n"
                     "+-------------------+---------------------------------------------------------+"
                 )
             if "modules" in low:
@@ -1562,6 +1798,15 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         # NCCL performance benchmarks (nccl-tests): all_reduce_perf / all_gather_perf …
         if any(low.startswith(c) for c in ("all_reduce_perf", "all_gather_perf",
                                            "reduce_scatter_perf", "broadcast_perf", "nccl-tests")):
+            if getattr(engine.shell.state, "nccl_hang", False):
+                env = getattr(engine.shell.state, "env", {}) or {}
+                if str(env.get("NCCL_IB_DISABLE", "")).strip() != "1":
+                    return (
+                        "NCCL WARN Bootstrap : allreduce timed out waiting for peer rank 3\n"
+                        "NCCL INFO Hint: set NCCL_DEBUG=INFO and try NCCL_IB_DISABLE=1 to "
+                        "bisect InfiniBand vs Ethernet fabric issues.\n"
+                        "Process finished with exit code 1"
+                    )
             if not healthy:
                 return ("test NCCL failure common.cu:958 'unhandled cuda error "
                         "(run with NCCL_DEBUG=INFO for details)'")
@@ -1610,6 +1855,135 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
             lines.append(f"# Avg bus bandwidth    : {peak_busbw * 0.82:.4f}")
             lines.append("#")
             return "\n".join(lines)
+        # Multi-node fabric bring-up (§A3) — required before torchrun --nnodes>1.
+        if low.startswith("fixitlab-fabric"):
+            fabric = getattr(engine.shell.state, "distributed_fabric", None)
+            if not isinstance(fabric, dict):
+                fabric = {
+                    "nnodes": 1,
+                    "cross_node_ready": False,
+                    "nodes": [{"id": "node-0", "addr": "10.150.0.10"}],
+                    "links": [],
+                }
+                engine.shell.state.distributed_fabric = fabric
+            nnodes = int(fabric.get("nnodes") or 1)
+            for i, p in enumerate(parts):
+                if p == "--nnodes" and i + 1 < len(parts):
+                    try:
+                        nnodes = int(parts[i + 1])
+                    except ValueError:
+                        pass
+                elif p.startswith("--nnodes="):
+                    try:
+                        nnodes = int(p.split("=", 1)[1])
+                    except ValueError:
+                        pass
+            nnodes = max(1, min(nnodes, 16))
+            if "up" in parts or low.endswith("up") or "enable" in parts:
+                nodes = [{"id": f"node-{i}", "addr": f"10.150.0.{10 + i}"} for i in range(nnodes)]
+                links = []
+                for i in range(nnodes):
+                    for j in range(i + 1, nnodes):
+                        links.append({"src": nodes[i]["id"], "dst": nodes[j]["id"], "media": "IB"})
+                fabric.update({
+                    "nnodes": nnodes,
+                    "cross_node_ready": nnodes > 1,
+                    "nodes": nodes,
+                    "links": links,
+                })
+                return (
+                    f"fixitlab-fabric: brought up {nnodes} node(s), {len(links)} cross-node IB links\n"
+                    f"cross_node_ready={fabric['cross_node_ready']}"
+                )
+            if "status" in parts or len(parts) == 1:
+                return (
+                    f"nnodes={fabric.get('nnodes', 1)} cross_node_ready="
+                    f"{bool(fabric.get('cross_node_ready'))} links={len(fabric.get('links') or [])}"
+                )
+            return "usage: fixitlab-fabric up --nnodes N | fixitlab-fabric status"
+        # Distributed training launcher (§A3): torchrun / DeepSpeed.
+        if low.startswith("torchrun") or low.startswith("deepspeed"):
+            nproc = min(8, len(gpus) or _SMI_GPU_COUNT)
+            nnodes = 1
+            for i, p in enumerate(parts):
+                if p in ("--nproc_per_node", "--nproc-per-node") and i + 1 < len(parts):
+                    try:
+                        nproc = int(parts[i + 1])
+                    except ValueError:
+                        pass
+                elif p.startswith("--nnodes="):
+                    try:
+                        nnodes = int(p.split("=", 1)[1])
+                    except ValueError:
+                        pass
+                elif p == "--nnodes" and i + 1 < len(parts):
+                    try:
+                        nnodes = int(parts[i + 1])
+                    except ValueError:
+                        pass
+            env = getattr(engine.shell.state, "env", {}) or {}
+            if getattr(engine.shell.state, "nccl_hang", False):
+                if str(env.get("NCCL_IB_DISABLE", "")).strip() != "1":
+                    return (
+                        f"[rank0]:[E] Watchdog caught collective hang on allreduce "
+                        f"across {nnodes} node(s) × {nproc} ranks\n"
+                        "NCCL WARN Bootstrap : allreduce timed out waiting for peer rank 3\n"
+                        "Hint: export NCCL_DEBUG=INFO and bisect with NCCL_IB_DISABLE=1\n"
+                        "Process finished with exit code 1"
+                    )
+            if getattr(engine.shell.state, "training_fp16_nan", False) and (
+                "fp16" in low or "float16" in low or "--precision=fp16" in low
+            ):
+                return (
+                    "RuntimeError: loss became NaN at step 12 under float16. "
+                    "Switch to bf16 or enable GradScaler / loss scaling.\n"
+                    "Process finished with exit code 1"
+                )
+            fsdp = "fsdp" in low or "--fsdp" in low or "fully_shard" in low
+            if fsdp and any(getattr(g, "oom", False) for g in gpus):
+                return (
+                    "torch.cuda.OutOfMemoryError: CUDA out of memory during FSDP forward. "
+                    "Enable activation checkpointing "
+                    "(--activation-checkpointing / gradient_checkpointing=True) "
+                    "or reduce micro-batch size.\n"
+                    "Process finished with exit code 1"
+                )
+            avail = len(gpus) or _SMI_GPU_COUNT
+            if nproc > avail:
+                return (
+                    f"ValueError: nproc_per_node ({nproc}) exceeds available GPUs ({avail})."
+                )
+            if nnodes > 1:
+                fabric = getattr(engine.shell.state, "distributed_fabric", None) or {}
+                if not fabric.get("cross_node_ready") or int(fabric.get("nnodes") or 1) < nnodes:
+                    return (
+                        f"RuntimeError: --nnodes={nnodes} requested but cross-node fabric is not ready "
+                        f"(have nnodes={fabric.get('nnodes', 1)}, cross_node_ready="
+                        f"{bool(fabric.get('cross_node_ready'))}).\n"
+                        f"Hint: run `fixitlab-fabric up --nnodes {nnodes}` to bring up the IB/Ethernet "
+                        "mesh between nodes (single-node still works with --nnodes=1).\n"
+                        "Process finished with exit code 1"
+                    )
+            backend = "nccl"
+            zero = "ZeRO-3" if ("zero" in low or low.startswith("deepspeed")) else "DDP"
+            if fsdp:
+                zero = "FSDP FULL_SHARD"
+            fabric_note = ""
+            if nnodes > 1:
+                fabric = getattr(engine.shell.state, "distributed_fabric", {}) or {}
+                links = fabric.get("links") or []
+                fabric_note = (
+                    f"INFO  fabric: {nnodes} nodes · {len(links)} cross-node links ready\n"
+                )
+            return (
+                f"torchrun: launching {nnodes}×{nproc} ranks backend={backend} strategy={zero}\n"
+                f"INFO  rank0: world_size={nnodes * nproc} local_rank=0\n"
+                f"{fabric_note}"
+                "INFO  NCCL INFO Connected all ranks\n"
+                "INFO  step=1 loss=2.431\n"
+                "INFO  step=10 loss=1.882\n"
+                "Training completed successfully."
+            )
         return f"{line}: OK (GPU simulation)"
     shell.register_handler(handler)
 
@@ -1736,9 +2110,11 @@ def _kube_flags(parts: list[str]) -> tuple[list[str], dict[str, str], dict[str, 
     vals: dict[str, str] = {}
     flags: dict[str, bool] = {}
     i = 0
+    # --overwrite is a boolean in kubectl; listing it here would swallow the
+    # token after it (e.g. the taint spec in `taint --overwrite k=v:NoSchedule`).
     value_flags = {"-n", "--namespace", "-o", "--output", "-f", "--filename",
                    "--replicas", "--image", "--type", "--port", "--target-port",
-                   "-l", "--selector", "--overwrite",
+                   "-l", "--selector",
                    "--min", "--max", "--cpu-percent", "--requests", "--limits"}
     while i < len(parts):
         tok = parts[i]
@@ -1786,7 +2162,109 @@ _K8S_KIND_ALIASES = {
 }
 
 
+def _parse_taint_spec(tok: str) -> tuple[str, str, str, bool] | None:
+    """Parse one `kubectl taint` spec into (key, value, effect, remove).
+
+    Accepts ``key=value:Effect``, ``key:Effect``, either with a trailing ``-``
+    to remove, and the bare ``key-`` form that removes every effect for a key.
+    Returns None for tokens that are not taint specs (i.e. node names).
+    """
+    remove = tok.endswith("-")
+    body = tok[:-1] if remove else tok
+    if not body:
+        return None
+    if ":" in body:
+        head, effect = body.rsplit(":", 1)
+    elif remove:
+        head, effect = body, ""  # `kubectl taint nodes worker-1 dedicated-`
+    else:
+        return None
+    key, _, value = head.partition("=")
+    if not key:
+        return None
+    return key, value, effect, remove
+
+
+def _kube_taint(c, pos: list[str], flags: dict[str, bool]) -> str:
+    """kubectl taint nodes NODE... KEY=VALUE:EFFECT | KEY[:EFFECT]-"""
+    args = list(pos)
+    if args and args[0].lower().rstrip("s") in ("node", "no"):
+        args = args[1:]
+    nodes: list[str] = []
+    specs: list[tuple[str, str, str, bool]] = []
+    for tok in args:
+        spec = _parse_taint_spec(tok)
+        if spec:
+            specs.append(spec)
+        else:
+            nodes.append(tok)
+    if not nodes:
+        return "error: at least one node name is required"
+    if not specs:
+        return "error: at least one taint update is required"
+
+    overwrite = flags.get("--overwrite", False)
+    out: list[str] = []
+    for node_name in nodes:
+        node = c.find_node(node_name)
+        if node is None:
+            out.append(f"Error from server (NotFound): nodes \"{node_name}\" not found")
+            continue
+        for key, value, effect, remove in specs:
+            if remove and not effect:
+                # Bare `key-` removes the key across every effect it carries.
+                matched = [t for t in node.taints if t[0] == key]
+                if not matched:
+                    out.append(f"error: taint \"{key}\" not found on node \"{node_name}\"")
+                    continue
+                out += [c.taint_node(node_name, k, v, e, remove=True)
+                        for k, v, e in list(matched)]
+                continue
+            if overwrite and not remove:
+                # --overwrite replaces an identical taint instead of erroring.
+                existing = next((t for t in node.taints
+                                 if t[0] == key and t[2] == effect), None)
+                if existing:
+                    node.taints.remove(existing)
+            out.append(c.taint_node(node_name, key, value, effect, remove=remove))
+    return "\n".join(out)
+
+
+def _kube_gpu_node_label(c, kind: str, name: str, key: str, value: str | None) -> str | None:
+    """Route GPU Operator node labels to the cluster's partitioning methods.
+
+    The operator is driven by node labels: ``nvidia.com/mig.config`` selects the
+    MIG geometry and ``nvidia.com/gpu.replicas`` the device-plugin time-slicing
+    factor. Returns None when the label is an ordinary one, so the caller falls
+    through to the generic label path.
+    """
+    if kind.rstrip("s") not in ("node", "no"):
+        return None
+    if key in ("nvidia.com/mig.config", "nvidia.com/mig-config"):
+        profile = "" if value is None or value.lower() in MIG_DISABLED_VALUES else value
+        return c.set_mig_profile(name, profile)
+    if key in ("nvidia.com/gpu.replicas", "nvidia.com/device-plugin.replicas"):
+        if value is None:
+            return c.set_gpu_time_slicing(name, 1)
+        if not value.isdigit():
+            return f"error: {key} must be an integer, got \"{value}\""
+        return c.set_gpu_time_slicing(name, int(value))
+    return None
+
+
 def _handle_kubectl(c, parts: list[str], line: str, shell: RHELShell) -> str:
+    """Dispatch a kubectl command, then let the cluster-autoscaler control loop run."""
+    out = _dispatch_kubectl(c, parts, line, shell)
+    # The cluster-autoscaler is a controller, not a command: once enabled it
+    # reacts to whatever the last command left Pending (scale up) or emptied
+    # (scale down), so it ticks after every kubectl invocation.
+    if c is not None and getattr(c, "_autoscaler", None):
+        c.reconcile_cluster_autoscaler()
+        c.scale_down_idle_nodes()
+    return out
+
+
+def _dispatch_kubectl(c, parts: list[str], line: str, shell: RHELShell) -> str:
     if len(parts) < 2:
         return "kubectl controls the Kubernetes cluster manager.\n\nUsage:\n  kubectl [command]"
     verb = parts[1]
@@ -2050,16 +2528,22 @@ def _handle_kubectl(c, parts: list[str], line: str, shell: RHELShell) -> str:
             return f"deployment.apps/{name} patched"
         return f"{kind}/{name} patched"
 
+    # ---- taint ----
+    if verb == "taint":
+        return _kube_taint(c, pos, flags)
+
     # ---- label / annotate ----
     if verb == "label":
         kind = pos[0].lower() if pos else ""
         name = pos[1] if len(pos) > 1 else ""
         for tok in pos[2:]:
             if tok.endswith("-"):
-                return c.label(kind, name, tok[:-1], None)
+                gpu = _kube_gpu_node_label(c, kind, name, tok[:-1], None)
+                return gpu if gpu is not None else c.label(kind, name, tok[:-1], None)
             if "=" in tok:
                 k, v = tok.split("=", 1)
-                return c.label(kind, name, k, v)
+                gpu = _kube_gpu_node_label(c, kind, name, k, v)
+                return gpu if gpu is not None else c.label(kind, name, k, v)
         return f"{kind}/{name} labeled"
     if verb == "annotate":
         kind = pos[0].lower() if pos else ""

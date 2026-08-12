@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ChevronRight, Globe, Box, Network, Settings as Cog } from 'lucide-react'
 import { useOS } from '../store'
-import { Dialog, Tabs, useCtxMenu } from '../ui'
+import { Dialog, useCtxMenu } from '../ui'
 
 // ── DNS Manager ─────────────────────────────────────────────────────────────
 const DNS_RECORDS = [

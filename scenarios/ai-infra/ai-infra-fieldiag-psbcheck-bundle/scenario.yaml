@@ -15,13 +15,10 @@ description: 'CONTEXT: DCOps / Bare Metal ticket — before closing an NVIDIA GP
   run fieldiag (nvidia-bug-report) and PSBCheck platform security boot bundle on the
   repaired node. AI Infra Engineering owns these BM/DCOps diagnostic commands.
 
-
   ENVIRONMENT: Lab Terminal on the repaired GPU node + Bare Metal / Datacenter twin for
   ticket context.
 
-
   SYMPTOM: FRU replaced; ticket awaiting diagnostics evidence before close.
-
 
   OBJECTIVE: Collect fieldiag / nvidia-bug-report; run psbcheck; confirm PASS; leave FIXED-OK.'
 objectives:

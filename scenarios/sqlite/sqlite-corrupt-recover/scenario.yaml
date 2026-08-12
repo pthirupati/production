@@ -1,3 +1,4 @@
+is_active: true
 title: Recover from corruption marker
 slug: sqlite-corrupt-recover
 technology: sqlite
@@ -6,35 +7,28 @@ description: 'CONTEXT: A team operating SQLite has raised a ticket for `Recover 
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline SQLite database file. The architecture is a single
   lab-primary node exposing sqlite3 CLI, schema, WAL mode, and pragmas; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Integrity check reports malformed pages.
-
 
   OBJECTIVE: Understand the current failure mode affecting Recover from corruption marker; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant sqlite3 CLI, schema, WAL mode, and pragmas), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -97,23 +91,59 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: Integrity check reports malformed pages.
+  instructions: 'An integrity check reports malformed pages. Fix solution(conn) so it returns the recovery
+    plan as a list of table names that can be salvaged, sorted ascending. A table is salvageable when
+    its row in `integrity(table_name, corrupt_pages, total_pages)` has at least one intact page (corrupt_pages
+    < total_pages). A table whose pages are entirely corrupt cannot be salvaged, and a table with zero
+    total pages is empty, not salvageable.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn):\n    # BUG: reports every table that has any corruption at all, which\
+      \ is the\n    # opposite of the salvageable set.\n    return sorted(r[0] for r in conn.execute(\n\
+      \        \"SELECT table_name FROM integrity WHERE corrupt_pages > 0\"))\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert callable(solution)
+  - name: partially corrupt table is salvageable
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE integrity (table_name TEXT, corrupt_pages INTEGER, \"\n        \"total_pages\
+      \ INTEGER);\")\n    conn.executemany(\"INSERT INTO integrity VALUES (?,?,?)\", rows)\n    return\
+      \ conn\nconn = _seed([('orders', 2, 10)])\nassert solution(conn) == ['orders'], solution(conn)\n"
+  - name: fully corrupt table is not salvageable
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE integrity (table_name TEXT, corrupt_pages INTEGER, \"\n        \"total_pages\
+      \ INTEGER);\")\n    conn.executemany(\"INSERT INTO integrity VALUES (?,?,?)\", rows)\n    return\
+      \ conn\nconn = _seed([('orders', 10, 10)])\nassert solution(conn) == [], solution(conn)\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert callable(solution)
+  - name: clean table is salvageable
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE integrity (table_name TEXT, corrupt_pages INTEGER, \"\n        \"total_pages\
+      \ INTEGER);\")\n    conn.executemany(\"INSERT INTO integrity VALUES (?,?,?)\", rows)\n    return\
+      \ conn\nconn = _seed([('users', 0, 5)])\nassert solution(conn) == ['users'], solution(conn)\n"
+  - name: empty table is not salvageable
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE integrity (table_name TEXT, corrupt_pages INTEGER, \"\n        \"total_pages\
+      \ INTEGER);\")\n    conn.executemany(\"INSERT INTO integrity VALUES (?,?,?)\", rows)\n    return\
+      \ conn\nconn = _seed([('blank', 0, 0)])\nassert solution(conn) == [], solution(conn)\n"
+  - name: no rows returns empty plan
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE integrity (table_name TEXT, corrupt_pages INTEGER, \"\n        \"total_pages\
+      \ INTEGER);\")\n    conn.executemany(\"INSERT INTO integrity VALUES (?,?,?)\", rows)\n    return\
+      \ conn\nconn = _seed([])\nassert solution(conn) == [], solution(conn)\n"
+  - name: plan is sorted and mixes cases correctly
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE integrity (table_name TEXT, corrupt_pages INTEGER, \"\n        \"total_pages\
+      \ INTEGER);\")\n    conn.executemany(\"INSERT INTO integrity VALUES (?,?,?)\", rows)\n    return\
+      \ conn\nconn = _seed([('zeta',1,4),('alpha',4,4),('mid',0,2)])\nassert solution(conn) == ['mid','zeta'],\
+      \ solution(conn)\n"
   timeout: 8
 summary: Complete the recover from corruption marker sqlite lab and verify success with the checker
 estimated_minutes: 20
@@ -124,7 +154,7 @@ tags:
 - fix
 - hands-on
 - sqlite
-linked_tutorial: sqlite-fundamentals
+linked_tutorial: sqlite-embedded-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Recover from corruption marker
 - Restore expected service behavior with a minimal, documented change

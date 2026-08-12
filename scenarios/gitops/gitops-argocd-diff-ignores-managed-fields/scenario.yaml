@@ -15,37 +15,30 @@ description: 'CONTEXT: A team operating gitops has raised a ticket for `Perpetua
   Webhook`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture is a
   single lab-primary node exposing CLI and configuration files; treat it as the production host for this
   incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: The `api-gateway` Application flips to OutOfSync seconds after every sync.
   `argocd app diff` shows a `sidecar.istio.io/status` annotation and an injected container that Git does
   not declare — a mutating webhook adds them at admission.
 
-
   OBJECTIVE: api-gateway stops flapping between Synced and OutOfSync; The mutating-webhook-injected fields
   are identified as the drift source; ignoreDifferences is scoped to only the webhook-owned fields. Acceptance
   criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant CLI and configuration files), changing one thing at a time. Check your work continuously
   against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -97,7 +90,6 @@ hints:
 
     3. Confirm `bash check.sh` shows the container Up.
 
-
     WHY: the checker validates the container is actually running.'
 summary: |-
   Diagnose and resolve perpetual outofsync from a mutating webhook in the gitops lab and verify the healthy end state
@@ -110,7 +102,7 @@ tags:
 - 'fix'
 - 'hands-on'
 - 'simulation'
-linked_tutorial: gitops-fundamentals
+linked_tutorial: argocd-gitops-zero-hero
 what_you_will_learn:
 - 'api-gateway stops flapping between Synced and OutOfSync'
 - 'The mutating-webhook-injected fields are identified as the drift source'

@@ -6,7 +6,7 @@ import {
   Terminal, Link2, Maximize2, Boxes, Lock, RefreshCw, Database, ShieldAlert,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
-import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession, SimLoginGateCard } from '../sim/shared'
 import { renderNetAppV2Page } from './NetAppV2Panels'
 import '../../styles/sim-products.css'
 import './netapp.css'
@@ -94,7 +94,7 @@ export default function NetAppSimulator({
       <div className={simPanelRoot(embedded, 'bg-[#0a2e28]')}>
         <LabChromeBar title="NetApp ONTAP System Manager" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <SimLoginGateCard title="Sign in to NetApp" onClose={onExit} className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold flex items-center gap-2" style={{ background: ACCENT }}>
               <HardDrive size={18} /> ONTAP System Manager
             </div>
@@ -127,7 +127,7 @@ export default function NetAppSimulator({
                 Training credentials: <span className="font-mono text-slate-700">{NA_LAB_USER}</span> / <span className="font-mono text-slate-700">{NA_LAB_PASS}</span>
               </p>
             </form>
-          </div>
+          </SimLoginGateCard>
         </div>
       </div>
     )

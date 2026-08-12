@@ -2463,6 +2463,56 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     return {"ok": False, "error": f"Unknown action: {action}"}
 
 
+# Per-key grader feedback. The broken dict stores bare targets (a machine id, a
+# boot-resource name, sometimes a list of them) and often just True, so the
+# value cannot be echoed the way azure_engine echoes its readable reasons.
+_BROKEN_REASONS: dict[str, str] = {
+    "machine_needs_commission": "machine {target} has not finished commissioning yet",
+    "commission_stuck": "machine {target} is stuck commissioning — reset it and redeploy",
+    "bmc_unreachable": "the BMC is still unreachable — fix its power/network configuration",
+    "container_stopped": "container {target} is still stopped — start it",
+    "vm_stopped": "VM {target} is still stopped — start it",
+    "needs_rescue_enter": "machine {target} has not been placed into rescue mode yet",
+    "needs_rescue_exit": "machine {target} is still in rescue mode — exit rescue",
+    "machine_in_rescue": "machine {target} is still in rescue mode — exit rescue",
+    "dhcp_disabled": "DHCP is still disabled on the PXE subnet — re-enable it",
+    "pxe_vlan_wrong": "the PXE subnet is still on the wrong VLAN — correct it",
+    "settings_ntp_wrong": "the NTP server setting is still wrong — correct it",
+    "settings_commissioning_incomplete": "the default commissioning settings are still incomplete",
+    "settings_proxy_required": "the HTTP proxy setting has not been configured yet",
+    "scripts_unattached": "the commissioning scripts have not been attached yet",
+    "needs_operator_user": "the operator user has not been created yet",
+    "thermal_alert": "the thermal alert has not been cleared yet",
+    "packer_image_unpublished": "the Packer image has not been published to MAAS boot resources yet",
+    "needs_custom_image_deploy": "no machine has been deployed from the custom image yet",
+    "missing_boot_resource": "boot resource {target} is still missing — build and publish it",
+    "missing_boot_resources": "boot resources {target} are still missing — build and publish them",
+}
+
+
+def _describe_broken(broken: dict) -> str:
+    """Name every outstanding objective, not just the first.
+
+    Most bare-metal presets seed two to four keys at once (commission + BMC,
+    thermal + image publish + custom deploy), so reporting only
+    next(iter(...)) would hide most of the work still remaining.
+    """
+    parts = []
+    for kind, target in broken.items():
+        template = _BROKEN_REASONS.get(kind)
+        if template is None:
+            # Unknown key: still fail CLOSED, and name the key so a missing
+            # template surfaces as a reportable gap rather than a silent pass.
+            parts.append(f"unresolved objective ({kind})")
+            continue
+        # A few keys carry a list of targets (the GPU matrix preset seeds four
+        # boot resources); render those as a readable list, not a repr.
+        if isinstance(target, (list, tuple, set)):
+            target = ", ".join(str(t) for t in target)
+        parts.append(template.format(target=target))
+    return "; ".join(parts)
+
+
 def validate_baremetal_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
     entry = _load(session_id)
     if not entry:
@@ -2476,5 +2526,5 @@ def validate_baremetal_lab(session_id: str, scenario_slug: str = "") -> tuple[bo
         _save(session_id, entry)
     broken = entry["state"].get("broken") or {}
     if broken:
-        return False, "Bare metal environment still has unresolved issues"
+        return False, f"Bare metal lab not complete: {_describe_broken(broken)}"
     return True, "Bare metal lab objectives met"

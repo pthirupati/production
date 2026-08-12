@@ -310,6 +310,301 @@ export function MonitoringPanel({ monitoring, busy, onRefresh, onLiveTick, onRep
   )
 }
 
+/** Capex / opex ledger — power × PUE + staff + bandwidth. */
+export function CostLedgerPanel({ ledger, busy, onBuy, onTick }) {
+  const L = ledger || {}
+  return (
+    <div className="dc-ops-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><Gauge size={13} /> Cost ledger</span>
+      </div>
+      <div className="dc-ticket-sum">
+        Cash ${Number(L.cash ?? 100000).toFixed(0)} · Capex ${Number(L.capex_usd || 0).toFixed(0)}
+        {' · '}Opex ${Number(L.opex_usd || 0).toFixed(0)} · {Number(L.power_kwh || 0).toFixed(1)} kWh
+      </div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onBuy?.('server_1u')}>Buy 1U server</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onBuy?.('psu')}>Buy PSU</button>
+        <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs"
+          onClick={() => onTick?.(1)}>Tick 1h opex</button>
+      </div>
+    </div>
+  )
+}
+
+/** Inspection gate before floor energize. */
+export function InspectEnergizePanel({ inspection, busy, onInspect, onEnergize }) {
+  const viol = inspection?.violations || []
+  return (
+    <div className="dc-ops-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><ShieldCheck size={13} /> Inspect / energize</span>
+      </div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onInspect?.()}>
+          Run inspection
+        </button>
+        <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onEnergize?.()}>
+          Energize floor
+        </button>
+      </div>
+      {inspection && (
+        <div className={`dc-muted${inspection.ok ? '' : ' dc-ticket-sla-hot'}`}>
+          {inspection.ok ? 'Clear to energize' : `${viol.length} violation(s)`}
+        </div>
+      )}
+      {viol.slice(0, 5).map((v, i) => (
+        <div key={i} className="dc-muted">{v.code}: {v.message}</div>
+      ))}
+    </div>
+  )
+}
+
+/** Tech tree upgrades — density / cooling / UPS / DCIM. */
+const TECH_TREE_STATIC = [
+  { id: 'high_density', name: 'Higher-density racks', cost_usd: 12000, requires: [] },
+  { id: 'liquid_cooling', name: 'Liquid cooling', cost_usd: 25000, requires: ['high_density'] },
+  { id: 'free_cooling', name: 'Free cooling', cost_usd: 18000, requires: [] },
+  { id: 'ups_efficiency', name: 'Better UPS efficiency', cost_usd: 8000, requires: [] },
+  { id: 'dcim_automation', name: 'DCIM automation', cost_usd: 15000, requires: ['ups_efficiency'] },
+  { id: 'onsite_solar', name: 'On-site solar + battery', cost_usd: 40000, requires: ['free_cooling'] },
+]
+
+export function TechTreePanel({ ownedIds, upgrades, busy, onUpgrade }) {
+  const owned = new Set(ownedIds || (upgrades || []).filter((u) => u.owned).map((u) => u.id) || [])
+  const list = (upgrades && upgrades.length)
+    ? upgrades
+    : TECH_TREE_STATIC.map((u) => {
+      const missing = (u.requires || []).filter((r) => !owned.has(r))
+      return {
+        ...u,
+        owned: owned.has(u.id),
+        available: !owned.has(u.id) && missing.length === 0,
+        missing_prereqs: missing,
+      }
+    })
+  return (
+    <div className="dc-ops-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><Boxes size={13} /> Tech tree</span>
+      </div>
+      {list.slice(0, 8).map((u) => (
+        <div key={u.id} className="dc-ticket-card">
+          <div className="dc-ticket-id">{u.name} · ${u.cost_usd}</div>
+          <div className="dc-ticket-sum">
+            {u.owned ? 'Owned' : u.available ? 'Available' : `Needs ${(u.missing_prereqs || []).join(', ')}`}
+          </div>
+          {!u.owned && (
+            <button type="button" disabled={busy || !u.available} className="dc-btn-outline dc-btn-xs"
+              onClick={() => onUpgrade?.(u.id)}>
+              Unlock
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Reputation score + second hall unlock. */
+export function ReputationPanel({ reputation, busy, onUnlockHall, onRefresh }) {
+  const r = reputation || {}
+  return (
+    <div className="dc-ops-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><Activity size={13} /> Reputation</span>
+      </div>
+      <div className="dc-ticket-sum">
+        Score {Number(r.score ?? 50).toFixed(0)} / 100 · halls {(r.halls || ['data-hall-a']).join(', ')}
+      </div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onRefresh?.()}>
+          Tick opex+rep
+        </button>
+        <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onUnlockHall?.()}>
+          Unlock second hall
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** Floor blueprint undo/redo, save/load, copy-a-row. */
+export function BlueprintPanel({ blueprint, busy, onUndo, onRedo, onSave, onLoad, onCopyRow }) {
+  const bp = blueprint || {}
+  const undoN = bp.undo_depth ?? (bp.undo || []).length
+  const redoN = bp.redo_depth ?? (bp.redo || []).length
+  const saved = bp.saved_names || Object.keys(bp.saved || {})
+  return (
+    <div className="dc-ops-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><Boxes size={13} /> Floor blueprint</span>
+      </div>
+      <div className="dc-ticket-sum">
+        undo {undoN} · redo {redoN}
+        {saved.length ? ` · saved: ${saved.join(', ')}` : ''}
+      </div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onUndo?.()}>Undo</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onRedo?.()}>Redo</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onSave?.('default')}>Save</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onLoad?.('default')}>Load</button>
+        <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onCopyRow?.(0, 2)}>
+          Copy row z0→z2
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** Upstream vendor/dependency injects — escalate/migrate/renew, not local restart. */
+export function VendorDependencyPanel({ events, busy, onInject, onRemediate }) {
+  const open = (events || []).filter((e) => e.status === 'open')
+  const first = open[0]
+  return (
+    <div className="dc-ops-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><AlertTriangle size={13} /> Vendor / deps</span>
+      </div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onInject?.('upstream_outage')}>Inject outage</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onInject?.('deprecation_deadline')}>Deprecation</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onInject?.('breaking_minor')}>Breaking minor</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onInject?.('license_expiry')}>License expiry</button>
+      </div>
+      {first && (
+        <div className="dc-ticket-card">
+          <div className="dc-ticket-id">{first.id} · {first.kind}</div>
+          <div className="dc-ticket-sum">{first.detail}</div>
+          <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+            <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs"
+              onClick={() => onRemediate?.(first.id, first.kind === 'license_expiry' ? 'renew'
+                : first.kind === 'upstream_outage' ? 'escalate' : 'migrate')}>
+              Correct remediate
+            </button>
+            <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+              onClick={() => onRemediate?.(first.id, 'restart')}>
+              Try restart (wrong)
+            </button>
+          </div>
+        </div>
+      )}
+      {!first && <div className="dc-muted">No open vendor events</div>}
+    </div>
+  )
+}
+
+/** Sealed Vault outage → unseal → auth → dynamic DB creds. */
+export function VaultLabPanel({ vault, busy, onSeal, onUnsealKey, onAuth, onIssueDb }) {
+  const v = vault || {}
+  const keys = v.unseal_keys || ['share-alpha', 'share-bravo', 'share-charlie']
+  return (
+    <div className="dc-ops-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><ShieldCheck size={13} /> Vault lab</span>
+      </div>
+      <div className="dc-ticket-sum">
+        {v.sealed === false ? 'unsealed' : 'sealed'} · service {v.service_up ? 'up' : 'down'}
+        {v.auth_method ? ` · auth ${v.auth_method}` : ''} · leases {(v.leases || []).length}
+      </div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onSeal?.()}>
+          Seal (outage)
+        </button>
+        {keys.slice(0, 3).map((k) => (
+          <button key={k} type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+            onClick={() => onUnsealKey?.(k)}>
+            Unseal {k.replace('share-', '')}
+          </button>
+        ))}
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onAuth?.({ method: 'approle', role_id: 'lab-role', secret_id: 'lab-secret' })}>
+          AppRole auth
+        </button>
+        <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onIssueDb?.()}>
+          Issue DB lease
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** Hire / dispatch staff onto ops tickets. */
+export function StaffRosterPanel({ staff, tickets, busy, onHire, onDispatch }) {
+  const openTickets = (tickets || []).filter((t) => !['resolved', 'closed'].includes(t.status))
+  return (
+    <div className="dc-ops-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><ClipboardList size={13} /> Staff roster</span>
+      </div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onHire?.({ name: 'Alex Field', role: 'field-tech', shift: 'day' })}>
+          Hire field tech
+        </button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onHire?.({ name: 'Sam Net', role: 'network-eng', shift: 'day' })}>
+          Hire network eng
+        </button>
+      </div>
+      {(staff || []).slice(0, 6).map((s) => (
+        <div key={s.id} className="dc-ticket-card">
+          <div className="dc-ticket-id">{s.name} · {s.role} · fatigue {s.fatigue ?? 0}</div>
+          <div className="dc-ticket-sum">
+            skills {(s.skills || []).join(', ')}
+            {s.assigned_ticket ? ` · on ${s.assigned_ticket}` : ' · idle'}
+          </div>
+          {openTickets[0] && (
+            <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+              onClick={() => onDispatch?.(openTickets[0].id, s.id)}>
+              Dispatch → {openTickets[0].id}
+            </button>
+          )}
+        </div>
+      ))}
+      {!(staff || []).length && <div className="dc-muted">No staff hired yet</div>}
+    </div>
+  )
+}
+
+/** Customer capacity contracts — SLA credits when under-provisioned or ticket SLA burns. */
+export function ContractsPanel({ contracts, busy, onAccept }) {
+  return (
+    <div className="dc-ops-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><Ticket size={13} /> Customer contracts</span>
+      </div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onAccept?.({ tenant: 'acme', kw: 12, u_slots: 24 })}>
+          Accept Acme 12kW / 24U
+        </button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onAccept?.({ tenant: 'globex', kw: 40, u_slots: 80 })}>
+          Accept Globex 40kW / 80U
+        </button>
+      </div>
+      {(contracts || []).slice(0, 5).map((c) => (
+        <div key={c.id} className={`dc-ticket-card${c.sla_breached ? ' dc-ticket-sla-breach' : ''}`}>
+          <div className="dc-ticket-id">{c.id} · {c.tenant} · {c.status}</div>
+          <div className="dc-ticket-sum">
+            {c.kw} kW · {c.u_slots}U · SLA {c.sla_pct}%
+            {c.sla_breached ? ' · BREACHED' : ' · OK'}
+            {' · '}credits ${Number(c.credits_owed || 0).toFixed(0)}
+          </div>
+        </div>
+      ))}
+      {!(contracts || []).length && <div className="dc-muted">No active tenant contracts</div>}
+    </div>
+  )
+}
+
 /** Extended ticketing / RMA */
 export function OpsTicketsPanel({ tickets, busy, onCreate, onAdvance }) {
   return (
@@ -328,9 +623,17 @@ export function OpsTicketsPanel({ tickets, busy, onCreate, onAdvance }) {
           onClick={() => onCreate?.('Dell', 'problem')}>Problem</button>
       </div>
       {(tickets || []).slice(0, 6).map((t) => (
-        <div key={t.id} className="dc-ticket-card">
+        <div key={t.id} className={`dc-ticket-card${t.sla_breached ? ' dc-ticket-sla-breach' : ''}`}>
           <div className="dc-ticket-id">{t.id} · {t.vendor} · {t.type || 'incident'} · {t.status}</div>
           <div className="dc-ticket-sum">{t.summary} · P{t.priority} · {t.assignee || 'unassigned'} · esc L{t.escalation || 0}</div>
+          {typeof t.sla_minutes === 'number' && (
+            <div className={`dc-muted${t.sla_breached ? ' dc-ticket-sla-hot' : ''}`}>
+              SLA {t.sla_breached
+                ? 'BREACHED'
+                : `${Math.max(0, Math.ceil((t.sla_remaining_sec || 0) / 60))}m left`}
+              {' · '}due {t.sla_due || '—'}
+            </div>
+          )}
           {t.rma && <div className="dc-muted">RMA {t.rma.rma_number} · {t.rma.part} · {t.rma.status}</div>}
           {t.rca && <div className="dc-muted">RCA: {t.rca.root_cause}</div>}
           <div className="dc-action-row mt-1">

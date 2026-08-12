@@ -1,3 +1,4 @@
+is_active: true
 title: Stop an infinite trigger loop
 slug: mysql-trigger-loop
 technology: mysql
@@ -6,35 +7,28 @@ description: 'CONTEXT: A team operating MySQL has raised a ticket for `Stop an i
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline MySQL instance. The architecture is a single lab-primary
   node exposing mysql client, InnoDB, grants, and slow query log; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: An AFTER INSERT trigger causes recursive inserts.
-
 
   OBJECTIVE: Understand the current failure mode affecting Stop an infinite trigger loop; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant mysql client, InnoDB, grants, and slow query log), changing one thing at a time.
   Check your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -97,23 +91,64 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: An AFTER INSERT trigger causes recursive inserts.
+  instructions: 'An AFTER INSERT trigger inserts back into its own table and recurses. Fix solution(conn)
+    so the audit trigger records each insert into `audit` WITHOUT re-inserting into `events`. Install
+    a trigger named ''events_audit'' that writes one audit row per inserted event, then insert the supplied
+    event ids and return the number of audit rows written.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn, event_ids):\n    # BUG: the trigger inserts back into events, so every\
+      \ insert fires the\n    # trigger again and the write recurses.\n    conn.execute(\n        \"CREATE\
+      \ TRIGGER events_audit AFTER INSERT ON events BEGIN \"\n        \"INSERT INTO events (id) VALUES\
+      \ (NEW.id + 1000); END\")\n    for eid in event_ids:\n        conn.execute(\"INSERT INTO events\
+      \ (id) VALUES (?)\", (eid,))\n    return conn.execute(\"SELECT COUNT(*) FROM audit\").fetchone()[0]\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert callable(solution)
+  - name: one audit row per event
+    code: "import sqlite3\ndef _seed():\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE events (id INTEGER PRIMARY KEY);\"\n        \"CREATE TABLE audit (audit_id\
+      \ INTEGER PRIMARY KEY AUTOINCREMENT, \"\n        \"event_id INTEGER);\")\n    return conn\nconn\
+      \ = _seed()\nassert solution(conn, [1,2,3]) == 3, solution(conn, [1,2,3])\n"
+  - name: events table holds only the real events
+    code: "import sqlite3\ndef _seed():\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE events (id INTEGER PRIMARY KEY);\"\n        \"CREATE TABLE audit (audit_id\
+      \ INTEGER PRIMARY KEY AUTOINCREMENT, \"\n        \"event_id INTEGER);\")\n    return conn\nconn\
+      \ = _seed()\nsolution(conn, [1,2,3])\nids = [r[0] for r in conn.execute('SELECT id FROM events ORDER\
+      \ BY id')]\nassert ids == [1,2,3], ids\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert callable(solution)
+  - name: no events means no audit rows
+    code: "import sqlite3\ndef _seed():\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE events (id INTEGER PRIMARY KEY);\"\n        \"CREATE TABLE audit (audit_id\
+      \ INTEGER PRIMARY KEY AUTOINCREMENT, \"\n        \"event_id INTEGER);\")\n    return conn\nconn\
+      \ = _seed()\nassert solution(conn, []) == 0, solution(conn, [])\n"
+  - name: audit references the right event ids
+    code: "import sqlite3\ndef _seed():\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE events (id INTEGER PRIMARY KEY);\"\n        \"CREATE TABLE audit (audit_id\
+      \ INTEGER PRIMARY KEY AUTOINCREMENT, \"\n        \"event_id INTEGER);\")\n    return conn\nconn\
+      \ = _seed()\nsolution(conn, [7,9])\nids = [r[0] for r in conn.execute('SELECT event_id FROM audit\
+      \ ORDER BY event_id')]\nassert ids == [7,9], ids\n"
+  - name: trigger exists under the expected name
+    code: "import sqlite3\ndef _seed():\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE events (id INTEGER PRIMARY KEY);\"\n        \"CREATE TABLE audit (audit_id\
+      \ INTEGER PRIMARY KEY AUTOINCREMENT, \"\n        \"event_id INTEGER);\")\n    return conn\nconn\
+      \ = _seed()\nsolution(conn, [1])\nt = conn.execute(\"SELECT name FROM sqlite_master WHERE type='trigger'\
+      \ \"\n                 \"AND name='events_audit'\").fetchall()\nassert t, 'events_audit trigger\
+      \ missing'\n"
+  - name: single insert does not cascade
+    code: "import sqlite3\ndef _seed():\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE events (id INTEGER PRIMARY KEY);\"\n        \"CREATE TABLE audit (audit_id\
+      \ INTEGER PRIMARY KEY AUTOINCREMENT, \"\n        \"event_id INTEGER);\")\n    return conn\nconn\
+      \ = _seed()\nsolution(conn, [1])\nn = conn.execute('SELECT COUNT(*) FROM events').fetchone()[0]\n\
+      assert n == 1, n\n"
   timeout: 8
 summary: Complete the stop an infinite trigger loop mysql lab and verify success with the checker
 estimated_minutes: 20
@@ -124,7 +159,7 @@ tags:
 - fix
 - hands-on
 - mysql
-linked_tutorial: mysql-fundamentals
+linked_tutorial: mysql-dba-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Stop an infinite trigger loop
 - Restore expected service behavior with a minimal, documented change

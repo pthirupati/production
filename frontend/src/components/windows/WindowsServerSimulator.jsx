@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  LayoutDashboard, Users, RefreshCw, Settings2, ArrowLeft, StopCircle,
-  Lightbulb, XCircle, CheckCircle2, AlertTriangle, Lock, Server,
+  LayoutDashboard, Users, RefreshCw, Settings2, ArrowLeft,
+  XCircle, CheckCircle2, AlertTriangle, Lock, Server,
   ShieldCheck, Network, Globe, HardDrive, Cpu, ChevronRight, Plus,
   Play, Square, RotateCw, Download, UserCog, FolderTree, Power, Trash2,
   FolderOpen, Wifi, Monitor, Terminal, Settings, User, KeyRound, Package,
@@ -314,7 +314,7 @@ function ServerManager({ state, busy, onAction }) {
               ['AD users', summary.ad_users ?? 0, 'info', Users],
               ['Updates pending', summary.updates_pending ?? 0, (summary.updates_pending ? 'warn' : 'ok'), Download],
               ['Services stopped', summary.services_stopped ?? 0, (summary.services_stopped ? 'bad' : 'ok'), Settings2],
-            ].map(([label, val, kind, Icon]) => (
+            ].map(([label, val, _kind, Icon]) => (
               <div key={label} className="flex items-center gap-2">
                 <Icon size={16} className="text-[#616161]" />
                 <div>

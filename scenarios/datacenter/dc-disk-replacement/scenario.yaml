@@ -16,12 +16,10 @@ description: 'CONTEXT: A team operating enterprise data center operations has ra
   on-call engineer (you) must diagnose and resolve it. Business impact: reduced service reliability and
   blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline data center practice floor. The architecture is
   a single lab-primary node exposing racks, PDUs, cooling, cabling, and physical servers; treat it as
   the production host for this incident. All tools run locally — no paid APIs or external cloud calls
   are required.
-
 
   SYMPTOM / STARTING STATE: DCIM floor view with db-prod-01 (R02-U10) showing a failed disk while every
   other component on the server reads healthy and the server remains powered on. db-prod-01''s component
@@ -29,27 +27,22 @@ description: 'CONTEXT: A team operating enterprise data center operations has ra
   — reads "Healthy". The server itself is still powered on and serving traffic; this is a live hot-swap,
   not a full outage.
 
-
   OBJECTIVE: Pan the datacenter floor to rack R02 and expand it; Click db-prod-01 (R02-U10) to open its
   component-health drawer; Locate the disk component flagged "Failed". Acceptance criteria: the change
   is minimal and reversible, and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant racks, PDUs, cooling, cabling, and physical servers), changing one thing at a time.
   Check your work continuously against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -102,7 +95,6 @@ hints:
 
     3. Confirm GPU name and memory report without errors.
 
-
     WHY: workloads need the driver to see the device.'
 summary: Replace the predictively-failing disk in db-prod-01 before it fails outright, without taking
   the production database host offline.
@@ -116,7 +108,7 @@ tags:
 - datacenter
 - hardware
 - physical
-linked_tutorial: datacenter-fundamentals
+linked_tutorial: bare-metal-datacenter-zero-hero
 what_you_will_learn:
 - Interpreting predictive-failure (SMART) disk alerts on a DCIM floor
 - Performing a proactive hot-swap disk replacement

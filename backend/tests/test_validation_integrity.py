@@ -101,12 +101,33 @@ class ValidationIntegrityTests(TestCase):
         self.assertTrue(ok, msg)
 
     def test_gpu_default_flag_is_fail_closed(self):
-        """Even a bare state with no preset must not auto-pass the GPU check."""
+        """Even a bare state with no preset must not auto-pass the GPU check.
+
+        This used to `delattr(state, "gpu_healthy")` to simulate an uninitialised
+        flag. That stopped being possible when gpu_healthy became a property over
+        the per-GPU inventory (no deleter -> AttributeError), and the same refactor
+        silently defeated the fail-closed guard it was protecting: the property
+        returns True for the default inventory, so `getattr(state, "gpu_healthy",
+        False)` could never fall back to False. A bare state therefore PASSED the
+        GPU check having done no work at all.
+        """
         state = RHELOSState(hostname="bare")
-        # Simulate a state that never had gpu_healthy initialised.
-        delattr(state, "gpu_healthy")
-        ok, _ = validate_simulation_state(state, CANONICAL_GPU_CHECK)
-        self.assertFalse(ok, "GPU check auto-passed with uninitialised flag")
+        # Sanity: the default inventory really is healthy, which is exactly why the
+        # old guard could not fire.
+        self.assertTrue(state.gpu_healthy)
+        self.assertFalse(getattr(state, "scenario_slug", ""), "bare state has no slug")
+        ok, msg = validate_simulation_state(state, CANONICAL_GPU_CHECK)
+        self.assertFalse(
+            ok, "GPU check auto-passed for a state with no scenario context"
+        )
+        self.assertIn("cannot verify", msg.lower())
+
+    def test_gpu_check_still_passes_once_a_real_lab_is_fixed(self):
+        """The fail-closed guard must not make a genuine GPU lab unsolvable."""
+        state = self._broken_state("gpu-fallen-off")
+        state.gpu_healthy = True
+        ok, msg = validate_simulation_state(state, CANONICAL_GPU_CHECK)
+        self.assertTrue(ok, f"a fixed GPU lab was refused: {msg}")
 
     def test_boot_fails_without_fix_or_boot_object(self):
         """grub check used to pass when the boot object was missing."""

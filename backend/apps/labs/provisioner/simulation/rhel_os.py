@@ -410,6 +410,119 @@ PACKAGE_SERVICES.update({
 
 
 @dataclass
+class SimGPU:
+    """One physical GPU as seen by nvidia-smi / dcgmi (audit §A1 / top-10 #6).
+
+    Renderers in ``simulation_modules`` must read these fields — not
+    ``random.randint`` — so successive queries are diagnosable and DCGM
+    subtests can fail from planted faults.
+    """
+    index: int = 0
+    name: str = "NVIDIA L4"
+    uuid: str = "GPU-00000000-0000-0000-0000-000000000001"
+    sku: str = "l4"
+    pci_bus_id: str = "00000000:01:00.0"
+    healthy: bool = True
+    memory_total_mib: int = 23034
+    memory_used_mib: int = 0
+    temp_c: int = 32
+    mem_temp_c: int = 38
+    power_w: float = 70.0
+    power_cap_w: int = 300
+    util_gpu: int = 0
+    util_mem: int = 0
+    sm_clock: int = 1410
+    mem_clock: int = 1593
+    graphics_clock: int = 1410
+    persistence_mode: bool = True
+    ecc_mode: str = "Enabled"
+    ecc_volatile_corrected: int = 0
+    ecc_volatile_uncorrected: int = 0
+    ecc_aggregate_corrected: int = 0
+    ecc_aggregate_uncorrected: int = 0
+    retired_pages_sbe: int = 0
+    retired_pages_dbe: int = 0
+    retired_pages_pending: bool = False
+    remap_pending: bool = False
+    remap_failure: bool = False
+    throttle_reasons: list = field(default_factory=list)
+    xid_events: list = field(default_factory=list)
+    mig_mode: bool = False
+    mig_instances: list = field(default_factory=list)
+    # Each link: {id, width_gbps, active, replay_errors}
+    nvlink_links: list = field(default_factory=list)
+    # dcgmi diag -r N subtest fail flags (audit §A1)
+    diag_pcie_fail: bool = False
+    diag_memory_fail: bool = False
+    diag_bandwidth_fail: bool = False
+    diag_stress_fail: bool = False
+    diag_power_fail: bool = False
+    # When True (or memory_used fills the card), CUDA allocators / vLLM report OOM.
+    oom: bool = False
+
+    def ensure_default_nvlink(self, *, dense: bool = False) -> None:
+        if self.nvlink_links:
+            return
+        n = 4 if dense else 4
+        self.nvlink_links = [
+            {"id": i, "width_gbps": 26.562, "active": True, "replay_errors": 0}
+            for i in range(n)
+        ]
+
+
+def build_gpu_inventory(
+    *,
+    count: int = 1,
+    name: str = "NVIDIA L4",
+    mem_mib: int = 23034,
+    power_cap_w: int = 300,
+    sku: str = "l4",
+    prior: list | None = None,
+) -> list:
+    """Build a per-GPU inventory, preserving fault fields from ``prior`` by index."""
+    by_idx = {g.index: g for g in (prior or [])}
+    gpus: list[SimGPU] = []
+    dense = count >= 8
+    for i in range(max(1, int(count))):
+        old = by_idx.get(i)
+        uuid = f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"
+        bus = f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0"
+        if old is not None:
+            old.name = name
+            old.uuid = uuid
+            old.sku = sku
+            old.pci_bus_id = bus
+            old.memory_total_mib = mem_mib
+            old.power_cap_w = power_cap_w
+            old.ensure_default_nvlink(dense=dense)
+            gpus.append(old)
+            continue
+        used = int(mem_mib * 0.55) if i % 2 == 0 else 8
+        g = SimGPU(
+            index=i,
+            name=name,
+            uuid=uuid,
+            sku=sku,
+            pci_bus_id=bus,
+            healthy=True,
+            memory_total_mib=mem_mib,
+            memory_used_mib=used,
+            temp_c=58 if used > 12 else 32,
+            mem_temp_c=64 if used > 12 else 38,
+            power_w=float(int(power_cap_w * 0.65) if used > 12 else 75),
+            power_cap_w=power_cap_w,
+            util_gpu=82 if used > 12 else 0,
+            util_mem=55 if used > 12 else 0,
+            sm_clock=1980 if used > 12 else 1410,
+            mem_clock=2619 if used > 12 else 1593,
+            graphics_clock=1980 if used > 12 else 1410,
+        )
+        g.ensure_default_nvlink(dense=dense)
+        gpus.append(g)
+    return gpus
+
+
+@dataclass
 class SimBlockDevice:
     """A whole disk, partition, or LV as seen by lsblk/blkid/mkfs/mount."""
     name: str                       # /dev/sdb, /dev/sdb1, /dev/mapper/rhel-data
@@ -470,7 +583,20 @@ class RHELOSState:
             "rhel-9-for-x86_64-baseos-rpms",
             "rhel-9-for-x86_64-appstream-rpms",
         }
-        self.gpu_healthy: bool = True
+        # Per-GPU inventory. ``gpu_healthy`` remains a convenience aggregate so
+        # existing presets/validators keep working (audit §A1).
+        self.gpus: list[SimGPU] = [SimGPU(index=0)]
+        # Distributed training fabric (§A3). When True, torchrun/NCCL collectives
+        # hang until the learner sets NCCL_IB_DISABLE=1 (or clears the flag).
+        self.nccl_hang: bool = False
+        self.training_fp16_nan: bool = False
+        # Multi-node fabric (§A3). --nnodes>1 requires cross_node_ready.
+        self.distributed_fabric: dict = {
+            "nnodes": 1,
+            "cross_node_ready": False,
+            "nodes": [{"id": "node-0", "addr": "10.150.0.10"}],
+            "links": [],
+        }
         self.initramfs_fixed: bool = False
         self.grub_fixed: bool = False
         self.mbr_fixed: bool = False
@@ -560,6 +686,52 @@ class RHELOSState:
         self.pending_confirm = None
         self._init_base_system()
         self._init_block_devices()
+
+    @property
+    def gpu_healthy(self) -> bool:
+        gpus = getattr(self, "gpus", None) or []
+        return all(g.healthy for g in gpus) if gpus else True
+
+    @gpu_healthy.setter
+    def gpu_healthy(self, value: bool) -> None:
+        flag = bool(value)
+        if not getattr(self, "gpus", None):
+            self.gpus = [SimGPU(index=0, healthy=flag)]
+            return
+        for g in self.gpus:
+            g.healthy = flag
+
+    def ensure_gpu_inventory(
+        self,
+        *,
+        count: int = 1,
+        name: str = "NVIDIA L4",
+        mem_mib: int = 23034,
+        power_cap_w: int = 300,
+        sku: str = "l4",
+    ) -> list:
+        """Align ``self.gpus`` with a scenario SKU while preserving planted faults."""
+        prior = list(getattr(self, "gpus", None) or [])
+        needs = (
+            len(prior) != max(1, int(count))
+            or not prior
+            or prior[0].name != name
+            or prior[0].memory_total_mib != mem_mib
+        )
+        if needs:
+            self.gpus = build_gpu_inventory(
+                count=count,
+                name=name,
+                mem_mib=mem_mib,
+                power_cap_w=power_cap_w,
+                sku=sku,
+                prior=prior,
+            )
+        else:
+            for g in prior:
+                g.power_cap_w = power_cap_w
+                g.ensure_default_nvlink(dense=count >= 8)
+        return self.gpus
 
     def _init_base_system(self) -> None:
         self.users["root"] = SimUser("root", 0, 0, "/root", "/bin/bash", "root")
@@ -1230,6 +1402,163 @@ class RHELOSState:
         self._mkdir(home)
         self.sync_passwd_files()
         return True, ""
+
+    def apply_image_manifest(self, manifest: dict | None) -> None:
+        """Seed guest OS state from a Packer/AMI content manifest (§X3).
+
+        An EC2 instance launched from a custom AMI must reflect that image's
+        packages, kernel, default user, and enabled services — not a generic
+        RHEL persona. Idempotent on digest so repeated syncs are cheap.
+        """
+        if not isinstance(manifest, dict) or not manifest:
+            return
+        digest = str(manifest.get("digest") or "")
+        if digest and getattr(self, "_applied_image_digest", None) == digest:
+            return
+
+        kernel = str(manifest.get("kernel") or "").strip()
+        if kernel:
+            self.kernel = kernel
+            self.installed_packages["kernel"] = f"kernel-{kernel}"
+            self._write_file(
+                "/proc/version",
+                f"Linux version {kernel} (mockbuild@image-factory) "
+                f"(gcc 11.4.1) #1 SMP PREEMPT_DYNAMIC\n",
+            )
+
+        os_id = str(manifest.get("os") or "").lower()
+        if "ubuntu" in os_id:
+            pretty = "Ubuntu 22.04.4 LTS"
+            self.os_release = pretty
+            self._write_file(
+                "/etc/os-release",
+                'NAME="Ubuntu"\nVERSION="22.04.4 LTS (Jammy Jellyfish)"\n'
+                'ID=ubuntu\nID_LIKE=debian\nVERSION_ID="22.04"\n'
+                f'PRETTY_NAME="{pretty}"\n',
+            )
+            self._write_file("/etc/lsb-release", "DISTRIB_ID=Ubuntu\nDISTRIB_RELEASE=22.04\n")
+        elif "rhel" in os_id or "red hat" in os_id:
+            pretty = "Red Hat Enterprise Linux 9.3 (Plow)"
+            self.os_release = pretty
+            self._write_file(
+                "/etc/os-release",
+                'NAME="Red Hat Enterprise Linux"\nVERSION="9.3 (Plow)"\n'
+                'ID="rhel"\nID_LIKE="fedora"\nVERSION_ID="9.3"\n'
+                f'PRETTY_NAME="{pretty}"\n',
+            )
+            self._write_file("/etc/redhat-release", pretty + "\n")
+
+        # Packages — catalog install when known; otherwise record an honest NVRA stub
+        # so `dpkg -l` / `rpm -qa` / `rpm -q` reflect the baked image.
+        for pkg in manifest.get("packages") or []:
+            name = str(pkg).strip()
+            if not name:
+                continue
+            if self.is_package_installed(name):
+                continue
+            try:
+                self.install_package(name)
+            except Exception:
+                self.installed_packages[name] = f"{name}-1.0.0"
+            # Common GPU CLIs must resolve even when the catalog has no entry.
+            if "nvidia" in name and "driver" in name:
+                self.installed_binaries.setdefault("nvidia-smi", "/usr/bin/nvidia-smi")
+            if name in ("datacenter-gpu-manager", "dcgm"):
+                self.installed_binaries.setdefault("dcgmi", "/usr/bin/dcgmi")
+
+        _SVC_ALIASES = {
+            "openssh-server": "sshd",
+            "ssh": "sshd",
+            "qemu-guest-agent": "qemu-guest-agent",
+        }
+        for svc in manifest.get("services_enabled") or []:
+            raw = str(svc).strip().removesuffix(".service")
+            if not raw:
+                continue
+            unit = _SVC_ALIASES.get(raw, raw)
+            existing = self.services.get(unit)
+            if existing:
+                existing.active = "active"
+                existing.enabled = "enabled"
+                existing.sub_state = "running"
+            else:
+                self.services[unit] = SimService(
+                    unit,
+                    active="active",
+                    enabled="enabled",
+                    description=f"{unit} (from image manifest)",
+                    loaded="loaded",
+                    sub_state="running",
+                )
+
+        user = str(manifest.get("default_user") or "").strip()
+        if user and user not in self.users:
+            self.add_user(user)
+            self.groups.setdefault(user, [self.users[user].uid])
+
+        cloud_ok = bool(manifest.get("cloud_init_enabled", True))
+        keys_baked = bool(manifest.get("ssh_keys_baked", True))
+        self.ssh_keys_baked = cloud_ok and keys_baked
+        self.image_manifest = dict(manifest)
+
+        if user and self.ssh_keys_baked:
+            home = self.users[user].home
+            self._mkdir(f"{home}/.ssh")
+            self._write_file(
+                f"{home}/.ssh/authorized_keys",
+                "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILabImageFactoryKey lab-key\n",
+            )
+            self._write_file(
+                "/var/log/cloud-init-output.log",
+                "ci-info: authorized keys written for user "
+                f"{user}\ncloud-init v. 23.1.2 finished at boot\n",
+            )
+        else:
+            # Golden-image failure: instance runs but SSH has nothing to auth against.
+            self._mkdir("/var/log")
+            self._write_file(
+                "/var/log/cloud-init.log",
+                "2024-01-01 00:00:01,000 - cc_ssh.py[WARNING]: "
+                "no SSH keys found in metadata; authorized_keys not written\n"
+                "2024-01-01 00:00:01,001 - util.py[WARNING]: "
+                "Running module ssh (<module 'cloudinit.config.cc_ssh'>) failed\n",
+            )
+            self._write_file(
+                "/var/log/cloud-init-output.log",
+                "Cloud-init v. 23.1.2 running 'modules:config' at boot\n"
+                "ci-info: no authorized SSH keys fingerprints found for user "
+                f"{user or 'ubuntu'}\n"
+                "Failed to apply SSH keys — connection will be refused\n",
+            )
+            sshd = self.services.get("sshd")
+            if sshd:
+                # sshd is up but auth will fail — reachability layer refuses before login.
+                sshd.active = "active"
+
+        if manifest.get("gpu_sanity_failed") or (
+            manifest.get("gpu_stack") is False
+            and any("nvidia" in str(p).lower() for p in (manifest.get("packages") or []))
+        ):
+            self.gpu_healthy = False
+        elif manifest.get("gpu_stack"):
+            self.gpu_healthy = True
+            sku = str(manifest.get("sku") or "h100")
+            # Align inventory count/name with the Packer SKU when possible.
+            try:
+                from .simulation_modules import _resolve_gpu_sku
+                resolved = _resolve_gpu_sku(sku)
+                self.ensure_gpu_inventory(
+                    count=int(resolved.get("count") or 1),
+                    name=resolved.get("name") or "NVIDIA H100 80GB HBM3",
+                    mem_mib=int(resolved.get("mem_mib") or 81559),
+                    power_cap_w=int(resolved.get("pwr_cap") or 700),
+                    sku=str(resolved.get("arch") or sku),
+                )
+            except Exception:
+                pass
+
+        if digest:
+            self._applied_image_digest = digest
 
     def set_prompt_user(self, username: str) -> bool:
         if username not in self.users:

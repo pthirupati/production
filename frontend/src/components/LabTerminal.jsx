@@ -189,8 +189,19 @@ function LabTerminal({
   }, [])
   const blockedCommandsRef = useRef(blockedCommands)
   const welcomeHintRef = useRef(welcomeHint)
+  // `onReady` joins the same always-fresh-prop idiom. Every caller passes an
+  // inline arrow (LabRunner.jsx:3522/3544/3573, TerraformWorkspaceIde.jsx:336,
+  // PackerWorkspaceIde.jsx:453), so its identity changes on every parent
+  // render. Adding it to the init effect's dep array would tear down and
+  // remount xterm + the WebSocket on each of those renders, dropping the user's
+  // shell mid-session; keeping it out of the array without a ref pinned the
+  // FIRST arrow for the effect's lifetime, so a `terminalHost` change that did
+  // not otherwise retrigger init fired readiness for the previous host and the
+  // queued command flushed into the wrong pane.
+  const onReadyRef = useRef(onReady)
   blockedCommandsRef.current = blockedCommands
   welcomeHintRef.current = welcomeHint
+  onReadyRef.current = onReady
   const xtermRef = useRef(null)
   const wsRef = useRef(null)
   const fitAddonRef = useRef(null)
@@ -286,7 +297,7 @@ function LabTerminal({
       const fireReady = () => {
         if (!readyFiredRef.current) {
           readyFiredRef.current = true
-          onReady?.()
+          onReadyRef.current?.()
         }
       }
 
@@ -595,6 +606,12 @@ function LabTerminal({
       disposed = true
       cleanup()
     }
+    // `session` is deliberately destructured into the four fields this effect
+    // actually reads (:235-237, :276) rather than listed whole: the object is a
+    // fresh identity on every poll of the session detail endpoint, so depending
+    // on it would remount the terminal every few seconds. `onReady` is read
+    // through onReadyRef for the reasons documented at its declaration.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, session?.status, session?.container_id, session?.instance_id, session?.provider, hostKey, mountReady])
 
   useEffect(() => {
@@ -692,24 +709,24 @@ function LabTerminal({
             </button>
           )
         })}
-        <button type="button" className="shrink-0 p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title="New terminal tab" onClick={addTab}>
+        <button type="button" className="shrink-0 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded text-surface-400 hover:text-white hover:bg-surface-800" title="New terminal tab" aria-label="New terminal tab" onClick={addTab}>
           <Plus size={14} />
         </button>
         <span className="flex-1" />
-        <span className="hidden md:inline text-[10px] text-surface-500 font-mono">{statusText}</span>
-        <button type="button" className={`p-1 rounded ${split ? 'text-accent-cyan bg-accent-cyan/10' : 'text-surface-400 hover:text-white hover:bg-surface-800'}`} title="Split terminal" onClick={() => setSplit((s) => !s)}>
+        <span className="hidden md:inline text-[10px] text-surface-500 font-mono" aria-live="polite">{statusText}</span>
+        <button type="button" className={`min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded ${split ? 'text-accent-cyan bg-accent-cyan/10' : 'text-surface-400 hover:text-white hover:bg-surface-800'}`} title="Split terminal" aria-label="Split terminal" aria-pressed={split} onClick={() => setSplit((s) => !s)}>
           <Columns2 size={14} />
         </button>
-        <button type="button" className="p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Decrease font size" onClick={() => setFontSize((s) => Math.max(9, s - 1))}>
+        <button type="button" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Decrease font size" aria-label="Decrease font size" onClick={() => setFontSize((s) => Math.max(9, s - 1))}>
           <Minus size={14} />
         </button>
-        <button type="button" className="p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Increase font size" onClick={() => setFontSize((s) => Math.min(20, s + 1))}>
+        <button type="button" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Increase font size" aria-label="Increase font size" onClick={() => setFontSize((s) => Math.min(20, s + 1))}>
           <Plus size={14} />
         </button>
-        <button type="button" className="p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Download session log" onClick={downloadLog}>
+        <button type="button" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Download session log" aria-label="Download session log" onClick={downloadLog}>
           <Download size={14} />
         </button>
-        <button type="button" className="p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title={fullscreen ? 'Exit full screen' : 'Full screen'} onClick={() => setFullscreen((f) => !f)}>
+        <button type="button" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded text-surface-400 hover:text-white hover:bg-surface-800" title={fullscreen ? 'Exit full screen' : 'Full screen'} aria-label={fullscreen ? 'Exit full screen' : 'Full screen'} onClick={() => setFullscreen((f) => !f)}>
           {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         </button>
       </div>
@@ -747,6 +764,14 @@ function terminalPropsEqual(prev, next) {
   if (prev.label !== next.label || prev.welcomeHint !== next.welcomeHint) return false
   if (prev.isMobile !== next.isMobile) return false
   if (prev.blockedCommands !== next.blockedCommands) return false
+  // `onReady` must be compared, even though every caller passes an inline arrow
+  // that is unequal on every parent render. Bailing out here skipped the render
+  // that refreshes `onReadyRef`, so the ref kept the arrow from mount and the
+  // terminal reported readiness for the previously-active host — the queued
+  // command then flushed into the wrong pane. Letting the render through is
+  // cheap (the xterm/WebSocket lifecycle is owned by the init effect, whose deps
+  // are unchanged here, so it does NOT re-run); only the ref assignment reruns.
+  if (prev.onReady !== next.onReady) return false
   const ps = prev.session
   const ns = next.session
   if (ps === ns) return true

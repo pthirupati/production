@@ -283,9 +283,13 @@ REST_FRAMEWORK = {
         # that automated flooding hits a wall. Per authenticated user.
         "ugc_write": "60/hour",       # threads, replies, edits
         "ugc_light": "300/hour",      # votes and reactions — cheap, high-frequency
+        "rating_write": "30/hour",    # ratings and reviews (Z3-10)
+        "client_error": "60/hour",   # browser crash reports (Z6-6)
+        "mfa_verify": "20/hour",      # 6-digit codes: brute-forceable without this (Z2-3)
         "ugc_upload": "20/hour",      # 5MB image uploads
         "ugc_report": "20/hour",      # abuse reports; enough to report a thread-storm
         "interview": "200/day",  # per user — long practice sessions
+        "contact": "5/hour",  # public contact form: writes a row AND sends mail (Z2-6)
         "strict_anon": "240/minute",  # public browsing behind NAT needs real headroom (was 60)
         # Public, anonymous "Playgrounds" (try-instantly sandboxes). Each POST
         # runs one simulated command / SQL statement / code snippet, so this is
@@ -300,7 +304,9 @@ REST_FRAMEWORK = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "FixitLab API",
-    "DESCRIPTION": "Public REST API for scenarios, labs, billing, and progress.",
+    # Internal browser BFF (JWT/cookie), not a public partner API — schema is
+    # IsAdminUser. Full apps/public_api → apps/bff rename stays a separate cut.
+    "DESCRIPTION": "FixitLab browser BFF for scenarios, labs, billing, and progress.",
     "VERSION": "2.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
@@ -492,6 +498,18 @@ FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:8080")
 OPENBADGE_SIGNING_KEY_B64 = env("OPENBADGE_SIGNING_KEY_B64", default="")
 OAUTH_CALLBACK_BASE_URL = env("OAUTH_CALLBACK_BASE_URL", default="")
 GITHUB_OAUTH_CALLBACK_URL = env("GITHUB_OAUTH_CALLBACK_URL", default="")
+# --------------------------------------------------
+# Email quota protection (audit Z6-3)
+# --------------------------------------------------
+# Marketing and transactional mail share one consumer Gmail account (~500
+# recipients/day) and the same delivery chain, so a nurture blast that exhausts the
+# quota stops OTP and password-reset delivery — an auth outage caused by a marketing
+# campaign. Marketing is refused once the day's sends reach CAP - RESERVE;
+# transactional mail keeps sending. Set the cap to 0 when moving to a real ESP with
+# no meaningful per-day limit.
+EMAIL_DAILY_SEND_CAP = env.int("EMAIL_DAILY_SEND_CAP", default=500)
+EMAIL_TRANSACTIONAL_RESERVE = env.int("EMAIL_TRANSACTIONAL_RESERVE", default=150)
+
 # When true, skip Gmail/SendGrid/SMTP delivery (E2E/CI). OTP still stored in DB.
 SKIP_EMAIL_TESTS = env.bool("SKIP_EMAIL_TESTS", default=False)
 E2E_TEST_EMAIL_SUFFIXES = ("@fixitlab-test.local",)
@@ -508,6 +526,22 @@ PAYMENT_EMAIL = env("PAYMENT_EMAIL", default="kubelearn464@gmail.com")
 SUPPORT_EMAIL = env("SUPPORT_EMAIL", default="fixitlab.techsupport@gmail.com")
 # Inbox that receives Teams/Org "Contact Sales" inquiries.
 SALES_INBOX = env("SALES_INBOX", default="fixitlab.admin@gmail.com")
+
+# DPDP grievance / data-protection contact. This is the address published in the
+# privacy policy, so it is the one a data-principal complaint and any Data
+# Protection Board correspondence arrives at — it must be a mailbox somebody reads.
+#
+# SPELLING IS DELIBERATE — "piracy", not "privacy". Confirmed with the owner
+# precisely because it reads like a typo. Do not "correct" it: mail to a
+# non-existent alias bounces silently, and a grievance channel that silently drops
+# mail is worse than none, because the policy promises a 3-working-day
+# acknowledgement. Kept in step with the frontend by
+# `tests/test_public_contact_details.py`.
+PRIVACY_EMAIL = env("PRIVACY_EMAIL", default="piracy.fixitlab@gmail.com")
+
+# Security vulnerability reports — must match SECURITY.md and
+# frontend/public/.well-known/security.txt (RFC 9116).
+SECURITY_EMAIL = env("SECURITY_EMAIL", default="security@fixitlab.in")
 
 # --------------------------------------------------
 # Maintenance Mode
@@ -576,7 +610,80 @@ MAX_CONCURRENT_LABS_PER_USER = env.int("MAX_CONCURRENT_LABS_PER_USER", default=2
 # StartLabView BEFORE provisioning so concurrent starts shed gracefully with a
 # friendly 503 instead. Counts containerful sessions in RUNNING/PROVISIONING.
 # Tune to the engine's real capacity (≈ engine RAM / per-container mem_limit).
-MAX_CONCURRENT_LABS = env.int("MAX_CONCURRENT_LABS", default=60)
+#
+# The default was 60, which the comment above describes correctly but which does
+# not match the hardware. Measured against the actual cluster (all four droplets
+# are s-2vcpu-8gb per infra/digitalocean/cluster.json):
+#
+#   8 GB - ~1.2 GB OS/dockerd = 6,992 MB usable
+#   6,992 MB / 512 MB (DOCKER_CONTAINER_MEMORY_LIMIT) = 13 containers
+#   a cap of 60 is therefore 4.6x over physical capacity
+#
+# And containers are not 1:1 with sessions: _provision_companion_hosts and
+# _provision_ssh_client each add another 512 MB container at the same limit, and a
+# jump box is attached whenever a scenario has >=2 lab hosts. A 3-host scenario is
+# 1,536 MB, so the real ceiling is lower still.
+#
+# The consequence was that the atomic 503 gate in StartLabView -- which is
+# genuinely well-built, holding pg_advisory_xact_lock across count-then-INSERT --
+# could never fire before the engine OOM-killed. A safety valve set above the
+# bursting pressure is not a safety valve.
+#
+# 12 leaves one slot of headroom for the companion/jump-box multiplier. Raise it
+# only after raising D4's RAM or lowering the per-container limit; the arithmetic
+# above is the thing to recompute, not this number in isolation.
+MAX_CONCURRENT_LABS = env.int("MAX_CONCURRENT_LABS", default=12)
+
+# --------------------------------------------------
+# Data retention (audit Z4-2)
+# --------------------------------------------------
+# The most sensitive data on the platform — candidate speech, interview reports,
+# resumes, async video, and every command typed in a lab — had no retention policy
+# and no purge path: all plaintext, kept indefinitely, alongside employer and
+# current_package_lpa. DPDP/GDPR both require a defined period.
+#
+# Each period DEFAULTS TO 0 = disabled, deliberately. Auto-deleting a paying
+# customer's interview reports because a default looked reasonable would be worse
+# than the gap it closes. While a period is 0 the purge task still runs and LOGS
+# what it *would* remove, so the retention period is chosen against real volumes
+# rather than guessed — then set the env var to enable it.
+# Legal document versions (audit Z4-8). Under DPDP/GDPR the burden of proof is
+# ours, and "they clicked a checkbox" is not evidence of *what* they agreed to —
+# consent is to a specific text. These are server-side on purpose: the client is
+# shown whatever the server currently serves, so the client is not the authority
+# on which version that was. Bump the date here whenever the corresponding page
+# changes materially; users are then asked to re-accept.
+LEGAL_TERMS_VERSION = env("LEGAL_TERMS_VERSION", default="2026-06-05")
+LEGAL_PRIVACY_VERSION = env("LEGAL_PRIVACY_VERSION", default="2026-08-08")
+
+# Bearer token for GET /api/health/metrics/ (audit Z5-17). Empty → endpoint
+# returns 404 so an unconfigured node does not publish gauges publicly.
+METRICS_TOKEN = env("METRICS_TOKEN", default="")
+
+RETENTION_INTERVIEW_MESSAGE_DAYS = env.int("RETENTION_INTERVIEW_MESSAGE_DAYS", default=0)
+RETENTION_ASYNC_VIDEO_DAYS = env.int("RETENTION_ASYNC_VIDEO_DAYS", default=0)
+RETENTION_RESUME_DAYS = env.int("RETENTION_RESUME_DAYS", default=0)
+RETENTION_COMMAND_HISTORY_DAYS = env.int("RETENTION_COMMAND_HISTORY_DAYS", default=0)
+# Post-deletion AccountLifecycleEvent.email (audit Z4-12 leftover). Basis: short
+# anti-abuse memory after inactive-account cleanup so a deleted address cannot
+# immediately re-register as a "new" free user. Same 0 = report-only discipline —
+# set RETENTION_ACCOUNT_LIFECYCLE_DAYS once volumes are known (90–365 is typical).
+RETENTION_ACCOUNT_LIFECYCLE_DAYS = env.int("RETENTION_ACCOUNT_LIFECYCLE_DAYS", default=0)
+
+# Operational growth caps (audit Z5-8). Same 0 = REPORT ONLY discipline as the
+# privacy retention above: the nightly task counts what it *would* remove against a
+# 365-day yardstick and logs it, so periods are chosen from real volumes rather than
+# guessed. These are not privacy controls — they are what keeps `pg_dump` duration
+# and single-threaded restore time (D3 is 2 vCPU, no read replica) from turning
+# unbounded table growth into hours of RTO.
+RETENTION_SESSION_RECORDING_DAYS = env.int("RETENTION_SESSION_RECORDING_DAYS", default=0)
+RETENTION_LAB_SNAPSHOT_DAYS = env.int("RETENTION_LAB_SNAPSHOT_DAYS", default=0)
+# Must comfortably exceed any gateway replay window — these rows are the durable
+# double-fulfilment guard. Do not set below ~90.
+RETENTION_WEBHOOK_EVENT_DAYS = env.int("RETENTION_WEBHOOK_EVENT_DAYS", default=0)
+RETENTION_READ_NOTIFICATION_DAYS = env.int("RETENTION_READ_NOTIFICATION_DAYS", default=0)
+RETENTION_INCIDENT_RUN_DAYS = env.int("RETENTION_INCIDENT_RUN_DAYS", default=0)
+
 DOCKER_SOCKET = env("DOCKER_SOCKET", default="unix:///var/run/docker.sock")
 DOCKER_NETWORK = env("DOCKER_NETWORK", default="fixitlab_labs")
 DOCKER_SCENARIO_IMAGE_PREFIX = env("DOCKER_SCENARIO_IMAGE_PREFIX", default="fixitlab/scenario-")
@@ -677,14 +784,24 @@ DO_SIZE = env("DO_SIZE", default="s-1vcpu-1gb")
 
 # --------------------------------------------------
 # AI Interview Studio (100% free — browser voice + rule-based AI)
+# Simulation-first, same product pattern as JIRA_SIMULATION_MODE / lab sims:
+# browser SpeechSynthesis / SpeechRecognition + in-process LLM phrasing are
+# the default. Real Piper / IndicF5 / whisper / llama.cpp hosts are optional
+# overrides when FIXITLAB_*_URL / BIN env vars are set.
 # --------------------------------------------------
 INTERVIEW_ENABLED = env.bool("INTERVIEW_ENABLED", default=True)
 INTERVIEW_VOICE_ENGINE = env("INTERVIEW_VOICE_ENGINE", default="browser")
+INTERVIEW_VOICE_SIMULATION_MODE = env.bool("INTERVIEW_VOICE_SIMULATION_MODE", default=True)
+INTERVIEW_LLM_SIMULATION_MODE = env.bool("INTERVIEW_LLM_SIMULATION_MODE", default=True)
 INTERVIEW_AV_GRACE_SECONDS = env.int("INTERVIEW_AV_GRACE_SECONDS", default=300)
 INTERVIEW_ROUND_SCHEDULE_HOURS = env.int("INTERVIEW_ROUND_SCHEDULE_HOURS", default=48)
 INTERVIEW_STAFF_FREE_BY_DEFAULT = env.bool("INTERVIEW_STAFF_FREE_BY_DEFAULT", default=True)
 INTERVIEW_ALLOW_ADMIN_OBSERVER = env.bool("INTERVIEW_ALLOW_ADMIN_OBSERVER", default=True)
 INTERVIEW_FREE_CAMPAIGNS_PER_MONTH = env.int("INTERVIEW_FREE_CAMPAIGNS_PER_MONTH", default=1)
+# Lifetime free-tier campaigns per account (Z1-12). Monthly quota still applies;
+# this stops infinite month-over-month free use on one user. New-email abuse
+# still needs fingerprinting / payment instrument — out of scope here.
+INTERVIEW_FREE_CAMPAIGNS_LIFETIME = env.int("INTERVIEW_FREE_CAMPAIGNS_LIFETIME", default=3)
 
 # Marketing nurture emails (sample → subscribe, no-sub → technology benefits)
 MARKETING_EMAILS_ENABLED = env.bool("MARKETING_EMAILS_ENABLED", default=True)
@@ -904,6 +1021,39 @@ DEFAULT_CURRENCY = env("DEFAULT_CURRENCY", default="INR")
 ENABLE_CURRENCY_CONVERSION = env.bool("ENABLE_CURRENCY_CONVERSION", default=True)
 
 # --------------------------------------------------
+# Feature flags (audit Z6-15)
+# --------------------------------------------------
+# Before this, the only kill switches were one-off booleans like
+# ENABLE_CURRENCY_CONVERSION above, so shipping anything risky meant shipping it
+# to everyone at once and rolling back the whole deploy if it misbehaved.
+#
+# FEATURES holds the defaults. Read them through `feature_enabled()` in
+# config.features -- NOT by importing this dict -- because a module-level
+# `if settings.FEATURES["x"]:` is evaluated once at import and then caches that
+# value for the life of the worker, which makes flipping a flag look like it did
+# nothing until a restart. That is the exact trap called out in the audit.
+#
+# Any FEATURE_<NAME> environment variable overrides the default below, so a flag
+# can be flipped on the droplet without a redeploy.
+_FEATURE_DEFAULTS = {
+    # Seed entry: mirrors the existing currency switch so there is one place to
+    # look. Kept in sync with ENABLE_CURRENCY_CONVERSION rather than replacing
+    # it, because that setting is already read in payment code paths.
+    "currency_conversion": ENABLE_CURRENCY_CONVERSION,
+}
+
+# Apply FEATURE_<NAME> overrides. Only declared flags are honoured, so a typo'd
+# FEATURE_* variable cannot silently invent a flag that nothing reads.
+FEATURES = {
+    name: (
+        env.bool(f"FEATURE_{name.upper()}")
+        if f"FEATURE_{name.upper()}" in os.environ
+        else default
+    )
+    for name, default in _FEATURE_DEFAULTS.items()
+}
+
+# --------------------------------------------------
 # Redis caching
 # --------------------------------------------------
 _redis_password = env("REDIS_PASSWORD", default="")
@@ -1058,3 +1208,95 @@ LOGGING = {
     },
 }
 
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Boot-time configuration checks (audit Z6-13)
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Almost every setting here is `env("NAME", default=...)`, which means a typo in an
+# env var name is silent: the process boots happily on the default. That is fine for
+# a display string and dangerous for a security control — `JWT_ALGORITHM`,
+# `SENTRY_DSN` and `ALERT_EMAIL` all behave this way today.
+#
+# The precedent is the Vault-sealed outage (docs/adr/0004): a misconfiguration that
+# does not announce itself gets discovered by users. So this fails at BOOT, before
+# any traffic is served, rather than degrading quietly.
+#
+# Two deliberate limits:
+#
+# * production only. Raising on a developer's laptop because they have no Razorpay
+#   key would make the checks something people disable, and a check people disable
+#   protects nothing.
+# * it validates what is SET, not merely that a name exists. A `DEBUG=True`
+#   production deploy or a `SECRET_KEY` left at its insecure default are the
+#   failures worth catching, and both would pass a mere presence check.
+
+def _validate_production_config():
+    """Refuse to boot on a configuration that is unsafe to serve traffic with."""
+    problems = []
+
+    if DEBUG:
+        problems.append(
+            "DEBUG is True in production — this leaks stack traces, settings and "
+            "SQL to anyone who triggers an error"
+        )
+
+    if not SECRET_KEY or len(SECRET_KEY) < 32:
+        problems.append("SECRET_KEY is missing or shorter than 32 characters")
+    if "insecure" in (SECRET_KEY or "").lower() or "change-me" in (SECRET_KEY or "").lower():
+        problems.append("SECRET_KEY still looks like a placeholder value")
+
+    if not ALLOWED_HOSTS or ALLOWED_HOSTS == ["*"]:
+        problems.append(
+            "ALLOWED_HOSTS is empty or '*' — this disables Django's Host header check"
+        )
+
+    # A typo like JWT_ALGORITHM=RS526 would otherwise fall through to the default
+    # and sign every token with an algorithm nobody chose.
+    algo = SIMPLE_JWT.get("ALGORITHM")
+    if algo not in ("RS256", "HS256"):
+        problems.append(f"JWT_ALGORITHM is {algo!r}; expected RS256 or HS256")
+    if not SIMPLE_JWT.get("SIGNING_KEY"):
+        problems.append("JWT signing key is empty — no token can be issued")
+
+    if not DATABASES.get("default", {}).get("NAME"):
+        problems.append("DATABASES['default']['NAME'] is empty")
+
+    if problems:
+        from django.core.exceptions import ImproperlyConfigured
+
+        raise ImproperlyConfigured(
+            "Refusing to start — production configuration is unsafe:\n  - "
+            + "\n  - ".join(problems)
+            + "\n\nFix the environment, or set FIXITLAB_SKIP_CONFIG_CHECK=1 to "
+              "bypass (which you should not do on a box that serves users)."
+        )
+
+
+# Warnings, not failures: these are settings whose absence degrades observability
+# or operations but does not make the platform unsafe to run. Listing them at boot
+# means "we have no error reporting" is a line in the startup log rather than
+# something discovered during an incident.
+def _warn_on_soft_config():
+    import logging
+
+    soft = {
+        "SENTRY_DSN": "no server-side error reporting",
+        "ALERT_EMAIL": "no destination for operational alerts",
+        "BUSINESS_GSTIN": "GST will not be levied (invoices show zero tax)",
+    }
+    missing = [
+        f"{name} unset — {why}"
+        for name, why in soft.items()
+        if not (globals().get(name) or "")
+    ]
+    if missing:
+        logging.getLogger("django").warning(
+            "Starting with reduced observability:\n  - %s", "\n  - ".join(missing)
+        )
+
+
+if not DEBUG and env.bool("FIXITLAB_SKIP_CONFIG_CHECK", default=False) is False:
+    _validate_production_config()
+    _warn_on_soft_config()

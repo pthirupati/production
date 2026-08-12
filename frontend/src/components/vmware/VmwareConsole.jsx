@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createLinuxShell, POST_LINES, buildGrubEntries, buildBootStages } from './linuxShell'
+import { POST_LINES, buildGrubEntries, buildBootStages } from './linuxShell'
 import { createWindowsShell, WIN_BOOT_SEQUENCE, WIN_LOGIN_HINT } from './windowsShell'
 import { LinuxTerminalTabs, LinuxTerminalStatusBar } from '../linux/LinuxTerminalChrome'
 import { useLinuxTerminalTabs } from '../linux/useLinuxTerminalTabs'
@@ -29,10 +29,6 @@ function saveConsoleState(labSessionId, vmId, snapshot) {
 
 function isWindowsGuest(vm) {
   return (vm?.guest_os || '').includes('Windows') || (vm?.guest_os_version || '').includes('Windows')
-}
-
-function guestUser(vm) {
-  return isWindowsGuest(vm) ? 'Administrator' : 'root'
 }
 
 // The pre-login banner a real Linux getty prints above the `login:` prompt

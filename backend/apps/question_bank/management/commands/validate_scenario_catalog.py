@@ -38,6 +38,95 @@ except Exception:  # pragma: no cover - defensive; keep validator importable
         "WORK TO DO:", "VERIFY:", "WHAT TO AVOID:",
     )
 
+def _known_course_slugs() -> frozenset[str]:
+    """Every course slug the tutorial seeder can create.
+
+    Read from the catalog *definitions* (plain Python lists) rather than the
+    Tutorial table on purpose: CI runs this command as a filesystem check, and
+    resolving against a DB that is empty or only partially seeded would make
+    every cross-layer reference look unresolvable and fail the build spuriously.
+    The definitions are the same source seed_tutorials writes from, so they are
+    the honest answer to "could this slug ever resolve?".
+    """
+    slugs: set[str] = set()
+    try:
+        from apps.tutorials.management.commands.course_catalog import COURSE_DEFINITIONS
+    except Exception:  # pragma: no cover - keep the validator importable
+        return frozenset()
+    definitions = list(COURSE_DEFINITIONS)
+    try:
+        from apps.tutorials.management.commands.course_catalog_tracks import EXTENDED_COURSES
+
+        definitions.extend(EXTENDED_COURSES)
+    except Exception:  # pragma: no cover - extended tracks are optional
+        pass
+    for course in definitions:
+        slug = str((course or {}).get("course_slug") or "").strip()
+        if slug:
+            slugs.add(slug)
+    return frozenset(slugs)
+
+
+def _cross_layer_gaps(
+    data: dict,
+    course_slugs: frozenset[str],
+    *,
+    check_linked_tutorial: bool = False,
+) -> list[str]:
+    """Cross-layer slug references must resolve to something that exists.
+
+    `linked_tutorial` is rendered as a "continue learning" link, and
+    validation_scenario_slug / lab_scenario_slug point from a cert/question back
+    into the scenario catalog. None of them were checked for resolution before —
+    only for presence — so a slug that names nothing produced a dead link at
+    runtime rather than a failed build.
+
+    The scenario-slug half is always on: measured 2026-08 it has zero violations
+    (no scenario declares either key yet), so it is a free regression guard.
+
+    The `linked_tutorial` half is OPT-IN via --check-linked-tutorial because it
+    currently fails 100% of the catalog. All 44 distinct values are
+    `<tech>-fundamentals` placeholders and NONE resolve to a real course slug —
+    including all 70 flagship labs the CI gate covers today, which are otherwise
+    clean. Turning it on by default would flip a green gate red on content work
+    (remapping 44 slugs, 3 of which have no target course and need a course
+    written first). Land the remap, then make this the default.
+    """
+    gaps: list[str] = []
+    if check_linked_tutorial:
+        linked = str(data.get("linked_tutorial") or "").strip()
+        if linked and course_slugs and linked not in course_slugs:
+            gaps.append(f"linked_tutorial '{linked}' does not resolve to a known course")
+
+    for key in ("validation_scenario_slug", "lab_scenario_slug"):
+        ref = str(data.get(key) or "").strip()
+        if ref and not _scenario_slug_exists(ref):
+            gaps.append(f"{key} '{ref}' does not resolve to a scenario in the catalog")
+    return gaps
+
+
+def _all_scenario_slugs() -> frozenset[str]:
+    """Slugs declared by every scenario.yaml on disk (cached for one process)."""
+    global _SCENARIO_SLUG_CACHE
+    if _SCENARIO_SLUG_CACHE is None:
+        slugs: set[str] = set()
+        for yaml_path in SCEN.glob("*/*/scenario.yaml"):
+            try:
+                loaded = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+            except (yaml.YAMLError, OSError):
+                continue
+            slugs.add(str(loaded.get("slug") or yaml_path.parent.name))
+        _SCENARIO_SLUG_CACHE = frozenset(slugs)
+    return _SCENARIO_SLUG_CACHE
+
+
+_SCENARIO_SLUG_CACHE: frozenset[str] | None = None
+
+
+def _scenario_slug_exists(slug: str) -> bool:
+    return slug in _all_scenario_slugs()
+
+
 MARKER_ONLY_RE = re.compile(r"grep\s+-q\s+FIXED-OK|FIXED-OK.*grep", re.I)
 # Truly fake completion marker: a sentinel file the learner writes by hand
 # (echo FIXED-OK > /tmp/scenario-fixed). This proves nothing about lab state.
@@ -283,7 +372,11 @@ def _ensure_schema_stubs(path: Path, data: dict) -> bool:
         changed = True
     set_missing("prerequisites", [])
     set_missing("tags", [str(data.get("technology") or _tech_from_path(path)), str(data.get("scenario_type") or "fix")])
-    set_missing("linked_tutorial", f"TODO: link-tutorial-for-{_tech_from_path(path)}")
+    # Deliberately NOT stubbed. A `TODO: link-tutorial-for-<tech>` placeholder
+    # satisfies the presence check at validate_schema_fields by construction,
+    # which is how an unresolvable cross-layer link would be laundered into a
+    # green CI run. Linking a lab to a course is content work; leave the gap
+    # visible so it stays on the backlog instead of being auto-closed.
     if len(_as_list(data.get("what_you_will_learn"))) < 3:
         data["what_you_will_learn"] = _learn_for(data, path)
         changed = True
@@ -357,8 +450,350 @@ def validate_schema_fields(data: dict, path: Path) -> list[str]:
     return gaps
 
 
-def validate_scenario_file(path: Path, *, fix_stubs: bool = False) -> list[str]:
-    """Return list of gap messages for one scenario.yaml."""
+# Extensions each declared coding_spec.language may legitimately use for its
+# entrypoint. Several languages have more than one valid extension, and the HTML
+# labs deliberately declare `javascript` with a `solution.js` grader harness
+# (see composeHtmlPreview.js) — so this map must stay permissive enough not to
+# false-positive on them.
+LANGUAGE_ENTRYPOINT_EXTS: dict[str, set[str]] = {
+    "python": {".py"},
+    "javascript": {".js", ".mjs", ".cjs", ".jsx"},
+    "js": {".js", ".mjs", ".cjs", ".jsx"},
+    "node": {".js", ".mjs", ".cjs"},
+    "nodejs": {".js", ".mjs", ".cjs"},
+    "typescript": {".ts", ".tsx"},
+    "ts": {".ts", ".tsx"},
+    "sql": {".sql"},
+    "bash": {".sh", ".bash"},
+    "shell": {".sh", ".bash"},
+    "sh": {".sh", ".bash"},
+    "java": {".java"},
+    "html": {".html", ".htm", ".js"},
+}
+
+# Languages that legitimately ship no entrypoint because there is no file to
+# execute — the prompt-engineering labs grade a text answer, not a program.
+# Measured 2026-08: 150 labs, all `language: text`, all with no `files` block at
+# all. They are graded by the Prompt Playground, so R3/R5/R6 must exempt them or
+# CI fails 150 healthy labs on day one.
+NO_ENTRYPOINT_LANGUAGES = {"text"}
+
+# R5: the *resolved runtime* must be one the server can execute.
+# Mirror apps.labs.code_exec.SUPPORTED_LANGUAGES + AUTHORING_TO_RUNTIME here so
+# the validator stays a pure-filesystem command (no Django load). Audit §Y2c:
+# ``language: html`` is legal because it resolves to the javascript runtime.
+EXECUTABLE_LANGUAGES = {"python", "javascript", "sql"}
+AUTHORING_TO_RUNTIME = {
+    "python": "python",
+    "javascript": "javascript",
+    "js": "javascript",
+    "node": "javascript",
+    "nodejs": "javascript",
+    "sql": "sql",
+    "html": "javascript",
+    "css": "javascript",
+    "react": "javascript",
+    "jsx": "javascript",
+    "typescript": "javascript",
+    "ts": "javascript",
+    "bash": "bash",
+    "shell": "bash",
+    "sh": "bash",
+    "java": "java",
+}
+
+# R4 — authoring language must be plausible for the parent technology directory.
+# Only enforced for *active* labs so unpublished placeholder cohorts (react+python)
+# stay quarantined without blocking the catalog gate. Path is scenarios/<tech>/...
+TECH_PLAUSIBLE_LANGUAGES: dict[str, frozenset[str]] = {
+    "html": frozenset({"html", "css", "javascript"}),
+    "javascript": frozenset({"javascript", "typescript"}),
+    "java": frozenset({"java"}),
+    "python": frozenset({"python"}),
+    "shell-script": frozenset({"bash", "shell", "sh"}),
+    "react": frozenset({"javascript", "react", "jsx", "typescript"}),
+    "nodejs": frozenset({"javascript", "typescript", "nodejs"}),
+    "sqlite": frozenset({"python", "sql"}),
+    "postgresql": frozenset({"python", "sql"}),
+    "mysql": frozenset({"python", "sql"}),
+    "prompt-engineering": frozenset({"text"}),
+    "ai-ml": frozenset({"python"}),
+    "data-science": frozenset({"python"}),
+}
+
+
+def _resolved_runtime(spec: dict) -> str:
+    explicit = str(spec.get("runtime") or "").strip().lower()
+    if explicit:
+        return explicit
+    lang = str(spec.get("language") or "").strip().lower()
+    return AUTHORING_TO_RUNTIME.get(lang, lang)
+
+
+def _tech_from_scenario_path(path: Path) -> str:
+    """scenarios/<tech>/<lab>/scenario.yaml → tech directory name."""
+    try:
+        parts = path.resolve().parts
+        idx = parts.index("scenarios")
+        return parts[idx + 1]
+    except (ValueError, IndexError):
+        return path.parent.parent.name
+
+
+def _language_plausible_gaps(spec: dict, path: Path, *, is_active: bool) -> list[str]:
+    """R4: coding_spec.language must match the parent technology (active labs only)."""
+    if not is_active:
+        return []
+    if str(spec.get("kind") or "").strip().lower() in HIDDEN_TEST_EXEMPT_KINDS:
+        return []
+    lang = str(spec.get("language") or "").strip().lower()
+    if not lang:
+        return []
+    tech = _tech_from_scenario_path(path)
+    allowed = TECH_PLAUSIBLE_LANGUAGES.get(tech)
+    if allowed is None:
+        return []  # technologies without a coding track — no R4 opinion
+    if lang not in allowed:
+        return [
+            f"coding_spec.language '{lang}' is not plausible for technology "
+            f"'{tech}' (expected one of: {'/'.join(sorted(allowed))})"
+        ]
+    return []
+
+
+def _spec_file_paths(spec: dict) -> list[str]:
+    """Declared file paths for a coding_spec, in declaration order.
+
+    `files` is a list of ``{path, content, readonly?}`` mappings across all 1,184
+    coding labs that declare one (measured 2026-08); tolerate a mapping form too
+    so a future schema tweak degrades to "no paths" instead of a traceback.
+    """
+    files = spec.get("files")
+    if isinstance(files, dict):
+        return [str(k) for k in files]
+    if not isinstance(files, list):
+        return []
+    paths = []
+    for entry in files:
+        if isinstance(entry, dict):
+            value = entry.get("path") or entry.get("name")
+            if value:
+                paths.append(str(value))
+    return paths
+
+
+def _coding_spec_gaps(spec: dict) -> list[str]:
+    """R1/R2/R3/R5/R6: a coding_spec must describe a lab the runtime can grade.
+
+    R1 — `language` must be declared explicitly. The frontend silently defaults
+    to python (``spec?.language || 'python'``) and the backend picks its runtime
+    image from the same field, so an omitted language means a lab is graded by
+    whichever runtime happens to be the default rather than the intended one.
+
+    R2 — the entrypoint's extension must match the declared language. A mismatch
+    routes code to the wrong runtime: ``language: python`` with
+    ``entrypoint: solution.js`` grades a JS file with the Python harness.
+
+    R3 — the entrypoint must appear in ``files``. The IDE hydrates the editor
+    from ``files`` and the grader writes the learner's buffer to ``entrypoint``;
+    if the two disagree the learner edits a file that is never executed. Measured
+    zero violations today, so this is a regression guard, not a bug fix.
+
+    R5 — the declared language must be one the server can run
+    (code_exec.SUPPORTED_LANGUAGES). A typo'd or aspirational language is only
+    caught at grade time today, i.e. by the learner.
+
+    R6 — at least one file must be editable. Every file marked
+    ``readonly: true`` is a harness; a lab made entirely of harness gives the
+    learner nowhere to type. The html labs are the near-miss case: they ship a
+    read-only ``solution.js`` grader plus editable ``index.html``/``styles.css``.
+    """
+    gaps: list[str] = []
+    if not isinstance(spec, dict):
+        return ["coding_spec is not a mapping"]
+
+    raw_lang = spec.get("language")
+    lang = str(raw_lang).strip().lower() if raw_lang else ""
+    if not lang:
+        gaps.append("coding_spec.language not declared (silently defaults to python)")
+        return gaps  # R2 cannot be judged without a declared language
+
+    entrypoint = str(spec.get("entrypoint") or "").strip()
+    file_paths = _spec_file_paths(spec)
+
+    # R5/R6 apply to any lab that actually executes code. `text` labs have no
+    # interpreter and no files by design, so they are exempt from both.
+    # R5 judges the *resolved runtime* (§Y2c), not the authoring language label.
+    if lang not in NO_ENTRYPOINT_LANGUAGES:
+        runtime = _resolved_runtime(spec)
+        if lang in LANGUAGE_ENTRYPOINT_EXTS and runtime not in EXECUTABLE_LANGUAGES:
+            # Recognised authoring language but no gradeable runtime (java/bash
+            # until those images ship). code_exec would return needs_review.
+            gaps.append(
+                f"coding_spec.language '{lang}' resolves to runtime '{runtime}' "
+                f"which has no server grader "
+                f"(executable: {'/'.join(sorted(EXECUTABLE_LANGUAGES))})"
+            )
+        if file_paths and not _has_editable_file(spec):
+            gaps.append("coding_spec.files has no editable file (every file is readonly)")
+
+    if not entrypoint:
+        if lang not in NO_ENTRYPOINT_LANGUAGES:
+            gaps.append(f"coding_spec.entrypoint missing for language '{lang}'")
+        return gaps
+
+    allowed = LANGUAGE_ENTRYPOINT_EXTS.get(lang)
+    if allowed is None:
+        # Unknown language: don't guess an extension rule, but say so — this is
+        # how a typo'd or unsupported language reaches the grader unnoticed.
+        gaps.append(f"coding_spec.language '{lang}' is not a recognised language")
+        return gaps
+
+    ext = Path(entrypoint).suffix.lower()
+    if ext not in allowed:
+        expected = "/".join(sorted(allowed))
+        gaps.append(
+            f"entrypoint '{entrypoint}' does not match language '{lang}' (expected {expected})"
+        )
+
+    # R3. Only judged when `files` is declared at all — a spec with no files
+    # block is a different (already-reported) shape, not an entrypoint mismatch.
+    if file_paths and entrypoint not in file_paths:
+        gaps.append(
+            f"coding_spec.entrypoint '{entrypoint}' is not in files[] "
+            f"(declared: {', '.join(file_paths[:4])})"
+        )
+
+    return gaps
+
+
+def _has_editable_file(spec: dict) -> bool:
+    """True when at least one declared file is not marked ``readonly``."""
+    files = spec.get("files")
+    if isinstance(files, dict):
+        files = list(files.values())
+    if not isinstance(files, list):
+        return False
+    return any(
+        isinstance(entry, dict) and not entry.get("readonly")
+        for entry in files
+    )
+
+
+# R8: a hidden test whose body is true regardless of the learner's code. These
+# award XP for doing nothing. `assert callable(solution)` is the historically
+# expensive one — it holds even when the stub body raises.
+TAUTOLOGICAL_TEST_RE = re.compile(
+    r"^\s*(assert\s+(True|1|1\s*==\s*1)\s*$"
+    r"|assert\s+callable\s*\("
+    r"|self\.assertTrue\s*\(\s*True\s*\)"
+    r"|expect\s*\(\s*true\s*\)\.(toBe|toEqual)\s*\(\s*true\s*\))",
+    re.I | re.M,
+)
+
+# kind: prompt labs are graded by the Prompt Playground, not by hidden_tests, and
+# many carry a vestigial `assert True` there. backend/tests/
+# test_grader_integrity_coding.py records that judging them produced 150 false
+# alarms, so R8 exempts them exactly as scan_grader_integrity.py does.
+HIDDEN_TEST_EXEMPT_KINDS = {"prompt"}
+
+
+def _tautological_test_gaps(hidden, spec: dict) -> list[str]:
+    """R8: reject hidden tests that pass no matter what the learner writes.
+
+    A single-statement body matching TAUTOLOGICAL_TEST_RE is decorative. Bodies
+    with additional statements are doing real work even if one line looks weak,
+    which is the false-positive trap the grader-integrity tests pin — so we only
+    flag a test whose *every* substantive line is tautological.
+
+    `kind` lives on coding_spec, not at the scenario top level — reading it from
+    the wrong level silently disables the carve-out and flags all 150 prompt labs
+    (verified by running it both ways).
+    """
+    if str(spec.get("kind") or "").strip().lower() in HIDDEN_TEST_EXEMPT_KINDS:
+        return []
+    for test in _as_list(hidden):
+        body = test.get("code") or test.get("body") or "" if isinstance(test, dict) else str(test)
+        lines = [
+            ln for ln in str(body).splitlines()
+            if ln.strip() and not ln.strip().startswith(("#", "//"))
+            and not ln.strip().startswith(("def ", "import ", "from ", "class "))
+        ]
+        if not lines:
+            continue
+        if all(TAUTOLOGICAL_TEST_RE.match(ln) for ln in lines):
+            return ["hidden test is tautological (passes without a correct solution)"]
+    return []
+
+
+def _grader_field_gaps(data: dict, spec: dict) -> list[str]:
+    """Guardrail: a `grader:` field must not resurrect ungraded labs.
+
+    No scenario declares `grader:` today. The failure mode this exists to block
+    (audit L2673) is a schema migration that adds `grader:` to the 307 labs whose
+    only containment is `is_active: false`, republishing them under a field that
+    looks more official than the tautology it replaces. Two invariants:
+
+      * declaring a grader does not exempt a lab from the hidden-test rules —
+        those still run above, so a decorative test is still a gap;
+      * a lab may not go from inactive to active purely by gaining a grader.
+        `is_active` is the containment; the grader field is not a substitute.
+    """
+    grader = data.get("grader") or spec.get("grader")
+    if not grader:
+        return []
+    gaps: list[str] = []
+    # `or ""` before str(): str(None) is the truthy "None", which would silently
+    # satisfy the check for a grader block that declares no type at all.
+    raw_type = grader.get("type") if isinstance(grader, dict) else grader
+    if not str(raw_type or "").strip():
+        gaps.append("grader declared with no type")
+    if data.get("is_active") is True and data.get("coding_mode") and not (
+        spec.get("hidden_tests") or []
+    ):
+        gaps.append("grader field cannot activate a lab that still has no hidden tests")
+    return gaps
+
+
+def _preview_gaps(data: dict, spec: dict) -> list[str]:
+    """R10: a declared preview root must be a real file in the spec.
+
+    No scenario declares `preview:` today (measured 0 of 1,334 coding labs), so
+    this rule is dormant by design — it exists so the field cannot ship
+    unvalidated. Without a declared root the IDE falls back to
+    composeHtmlPreview.preferredHtmlPath, which guesses index.html then the first
+    .html file; a typo'd root would otherwise silently degrade to that guess
+    instead of failing loudly.
+    """
+    preview = data.get("preview")
+    if not isinstance(preview, dict) or not preview.get("enabled", True):
+        return []
+    root = str(preview.get("root") or "").strip()
+    if not root:
+        return ["preview declared without preview.root"]
+    file_paths = _spec_file_paths(spec)
+    if file_paths and root not in file_paths:
+        return [f"preview.root '{root}' is not in coding_spec.files[]"]
+    return []
+
+
+def validate_scenario_file(
+    path: Path,
+    *,
+    fix_stubs: bool = False,
+    course_slugs: frozenset[str] | None = None,
+    check_linked_tutorial: bool = False,
+    min_hidden_tests: int = 0,
+) -> list[str]:
+    """Return list of gap messages for one scenario.yaml.
+
+    ``course_slugs`` is threaded in from the command so the catalog import
+    happens once per run rather than once per file; when omitted it is resolved
+    lazily so direct callers (tests, ad-hoc scripts) still get the check.
+    ``check_linked_tutorial`` is opt-in — see _cross_layer_gaps for why.
+    ``min_hidden_tests`` (session 88) ratchets impl/fix labs to N hidden cases
+    without enabling it on the default CI catalog pass.
+    """
     gaps: list[str] = []
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -372,7 +807,24 @@ def validate_scenario_file(path: Path, *, fix_stubs: bool = False) -> list[str]:
         )
 
     gaps.extend(validate_schema_fields(data, path))
+    if course_slugs is None:
+        course_slugs = _known_course_slugs()
+    gaps.extend(
+        _cross_layer_gaps(data, course_slugs, check_linked_tutorial=check_linked_tutorial)
+    )
 
+    # An explicit `slug` is the scenario's identity: seed_scenarios keys the
+    # globally-unique Scenario.slug off it, and the ACADEMY_SLUG_RE gate below
+    # decides how strictly this lab is graded. Falling back to the folder name
+    # silently invents that identity — a lab could be renamed on disk and seed as
+    # a different scenario, or dodge the academy gate. Measured 2026-08: all
+    # 7,283 scenario.yaml files declare `slug`, so this is a zero-blast-radius
+    # regression guard. We keep the folder-name fallback for the checks below so
+    # the validator stays in lockstep with the seeder's own fallback
+    # (seed_scenarios collision guard) instead of diverging and blocking CI on
+    # scenarios that seed fine.
+    if not str(data.get("slug") or "").strip():
+        gaps.append("missing slug (identity would be inferred from the folder name)")
     slug = data.get("slug") or path.parent.name
     desc = (data.get("description") or "").strip()
     if len(desc) < 80:
@@ -410,8 +862,36 @@ def validate_scenario_file(path: Path, *, fix_stubs: bool = False) -> list[str]:
     if coding_mode:
         spec = data.get("coding_spec") or {}
         hidden = spec.get("hidden_tests") or []
+        # R7. `kind: prompt` labs are graded by the Prompt Playground against the
+        # learner's text answer, not by executing hidden tests — the same
+        # carve-out scan_grader_integrity.py:339 makes. Measured 2026-08: all 100
+        # coding labs with no hidden tests are kind=prompt/language=text, so
+        # without this exemption enabling R7 catalog-wide fails 100 healthy labs.
         if not hidden:
-            gaps.append("coding lab has no hidden tests (grading is trivial)")
+            if str(spec.get("kind") or "").strip().lower() not in HIDDEN_TEST_EXEMPT_KINDS:
+                gaps.append("coding lab has no hidden tests (grading is trivial)")
+        else:
+            gaps.extend(_tautological_test_gaps(hidden, spec))
+            kind = str(spec.get("kind") or "").strip().lower()
+            if (
+                min_hidden_tests > 0
+                and kind in ("impl", "fix")
+                and len(hidden) < min_hidden_tests
+            ):
+                gaps.append(
+                    f"coding lab has {len(hidden)} hidden tests "
+                    f"(min {min_hidden_tests} for kind={kind})"
+                )
+        gaps.extend(_coding_spec_gaps(spec))
+        gaps.extend(_preview_gaps(data, spec))
+        gaps.extend(_grader_field_gaps(data, spec))
+        # R4 only for published labs — unpublished placeholders keep odd language
+        # tags without blocking the catalog gate.
+        gaps.extend(
+            _language_plausible_gaps(
+                spec, path, is_active=data.get("is_active") is True,
+            )
+        )
     elif sim_type in DEDICATED_SIM_TYPES:
         # Graded by a dedicated engine; the on-disk check.sh is not used.
         pass
@@ -445,6 +925,45 @@ class Command(BaseCommand):
             action="store_true",
             help="Only validate labs in flagship_presets.FLAGSHIP_SLUG_KIND (real-sim upgraded set)",
         )
+        parser.add_argument(
+            "--coding-only",
+            action="store_true",
+            help=(
+                "Only validate coding_mode labs. Exists because --flagship-only and "
+                "coding_mode do not overlap at all (measured: 70 flagships, 1334 coding "
+                "labs, intersection 0), so the flagship CI pass validates zero coding "
+                "labs. Run this as a second pass to cover them."
+            ),
+        )
+        parser.add_argument(
+            "--rules",
+            default="",
+            help=(
+                "Comma-separated gap substrings to fail on, instead of every gap. "
+                "Lets CI enforce the coding-spec rules across the whole catalog "
+                "before the older copy/hint gaps are fully paid down."
+            ),
+        )
+        parser.add_argument(
+            "--check-linked-tutorial",
+            action="store_true",
+            help=(
+                "Also require linked_tutorial to resolve to a real course slug. "
+                "Opt-in: every one of the 44 distinct values in the catalog is a "
+                "'<tech>-fundamentals' placeholder that resolves to nothing, so this "
+                "fails the whole catalog until that remap lands."
+            ),
+        )
+        parser.add_argument(
+            "--min-hidden-tests",
+            type=int,
+            default=0,
+            help=(
+                "When >0, coding labs with kind=impl|fix must have at least this many "
+                "hidden_tests (prompt/text kinds exempt). Use to ratchet the thin-test "
+                "corpus without failing the default CI catalog pass."
+            ),
+        )
         parser.add_argument("--fail-on-gaps", action="store_true", help="Exit 1 if any gaps found")
         parser.add_argument("--limit", type=int, default=0, help="Stop after N scenarios (smoke)")
 
@@ -458,11 +977,16 @@ class Command(BaseCommand):
 
             flagship_slugs = set(FLAGSHIP_SLUG_KIND)
         limit = int(options["limit"] or 0)
+        coding_only = bool(options["coding_only"])
+        check_linked_tutorial = bool(options["check_linked_tutorial"])
+        rule_filter = [r.strip() for r in str(options["rules"] or "").split(",") if r.strip()]
+        course_slugs = _known_course_slugs()
         total = 0
         gap_count = 0
         gap_rows: list[tuple[str, list[str]]] = []
         slug_to_files: dict[str, list[str]] = {}
 
+        min_hidden = int(options.get("min_hidden_tests") or 0)
         for tech_path in sorted(SCEN.iterdir()):
             if not tech_path.is_dir() or tech_path.name == "shared":
                 continue
@@ -473,17 +997,29 @@ class Command(BaseCommand):
                     slug = yaml_path.parent.name
                     if slug not in flagship_slugs:
                         continue
-                total += 1
-                gaps = validate_scenario_file(yaml_path, fix_stubs=fix_stubs)
-                if gaps:
-                    gap_count += 1
-                    rel = yaml_path.relative_to(ROOT)
-                    gap_rows.append((str(rel), gaps))
-                # Track slug -> files for the global duplicate-slug check below.
+                # Parsed once here and reused for both the coding filter and the
+                # duplicate-slug map below — the tree is 7k files and a second
+                # full parse pass costs ~30s.
                 try:
                     data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
                 except yaml.YAMLError:
                     data = {}
+                if coding_only and not data.get("coding_mode"):
+                    continue
+                total += 1
+                gaps = validate_scenario_file(
+                    yaml_path,
+                    fix_stubs=fix_stubs,
+                    course_slugs=course_slugs,
+                    check_linked_tutorial=check_linked_tutorial,
+                    min_hidden_tests=min_hidden,
+                )
+                if rule_filter:
+                    gaps = [g for g in gaps if any(r in g for r in rule_filter)]
+                if gaps:
+                    gap_count += 1
+                    rel = yaml_path.relative_to(ROOT)
+                    gap_rows.append((str(rel), gaps))
                 slug = str(data.get("slug") or yaml_path.parent.name)
                 slug_to_files.setdefault(slug, []).append(str(yaml_path.relative_to(ROOT)))
                 if limit and total >= limit:

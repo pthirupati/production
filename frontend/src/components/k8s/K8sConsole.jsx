@@ -7,7 +7,7 @@ import {
   Shield, Gauge, Package, Route, Hammer, FolderKanban,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
-import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession, SimLoginGateCard } from '../sim/shared'
 import { renderK8sV2Page } from './K8sV2Panels'
 import '../../styles/sim-products.css'
 import './k8s.css'
@@ -136,7 +136,7 @@ export default function K8sConsole({
       <div className={simPanelRoot(embedded, 'bg-[#1a1a2e]')}>
         <LabChromeBar title="Kubernetes Console" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <SimLoginGateCard title="Sign in to Kubernetes" onClose={onExit} className="bg-white rounded shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold flex items-center gap-2" style={{ background: ACCENT }}>
               <Layers size={18} /> Sign in to Kubernetes
             </div>
@@ -162,7 +162,7 @@ export default function K8sConsole({
                 Use lab credentials (autofill)
               </button>
             </form>
-          </div>
+          </SimLoginGateCard>
         </div>
       </div>
     )

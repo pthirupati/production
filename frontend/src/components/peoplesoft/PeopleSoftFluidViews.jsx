@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Search, Save, Plus, Minus } from 'lucide-react'
 import {
   PS_FLUID_TILES, PS_JOB_DATA, PS_BENEFITS_STEPS, PS_HEALTH_PLANS, PS_PAYCHECK, PS_PROCESS_INSTANCES,
-} from '../../mockData/peoplesoft'
+} from '../../simFixtures/peoplesoft'
 import { SimStatusBadge } from '../sim/shared'
 
 const PS_BLUE = '#1b3a5c'
@@ -76,8 +76,8 @@ export function JobDataComponent({ profile, oprid, onSave, busy }) {
     <div className="bg-white border border-slate-200 rounded shadow-sm">
       <div className="px-4 py-2 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 bg-[#f8f9fa]">
         <div className="flex items-center gap-2 text-sm">
-          <button type="button" className="p-1 rounded hover:bg-slate-200"><ChevronLeft size={16} /></button>
-          <button type="button" className="p-1 rounded hover:bg-slate-200"><ChevronRight size={16} /></button>
+          <button type="button" className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-200" aria-label="Previous employee"><ChevronLeft size={16} /></button>
+          <button type="button" className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-200" aria-label="Next employee"><ChevronRight size={16} /></button>
           <span className="font-semibold text-slate-700">Job Data</span>
           <span className="text-slate-400">·</span>
           <span className="text-slate-600">{j.emplId} — {j.name}{oprid ? ` (${oprid})` : ''}</span>
@@ -107,7 +107,7 @@ export function JobDataComponent({ profile, oprid, onSave, busy }) {
             <span className="text-[11px] uppercase text-slate-500 tracking-wide">{label}</span>
             <div className="mt-1 flex items-center gap-1">
               <input readOnly value={val} className="flex-1 border border-slate-300 rounded px-2 py-1.5 bg-slate-50 text-slate-800" />
-              {label === 'Department' && <button type="button" className="p-1.5 border rounded hover:bg-slate-100" title="Prompt"><Search size={14} /></button>}
+              {label === 'Department' && <button type="button" className="p-1.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center border rounded hover:bg-slate-100" title="Prompt" aria-label="Department prompt"><Search size={14} /></button>}
             </div>
           </label>
         ))}
@@ -361,9 +361,9 @@ export function SecurityUsers({ users = [], roles = [], busy, onAssignRole, onRe
                     {(active.roles || []).map((rid) => (
                       <span key={rid} className="text-xs px-2 py-1 rounded bg-slate-100 border border-slate-200 flex items-center gap-1">
                         {roleName(rid)}
-                        <button type="button" title="Remove role" disabled={busy}
+                        <button type="button" title="Remove role" aria-label={`Remove role ${roleName(rid)}`} disabled={busy}
                           onClick={() => onRemoveRole?.(active.oprid, rid)}
-                          className="text-slate-400 hover:text-red-600 disabled:opacity-50"><Minus size={11} /></button>
+                          className="text-slate-400 hover:text-red-600 disabled:opacity-50 min-h-[44px] min-w-[44px] inline-flex items-center justify-center"><Minus size={11} /></button>
                       </span>
                     ))}
                   </div>

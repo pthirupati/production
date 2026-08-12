@@ -15,6 +15,7 @@ debounced to 15s and could therefore lose recent work. These tests pin that
 distinction down — it is the whole safety argument for the change.
 """
 import time
+from unittest import mock
 from unittest.mock import MagicMock
 
 from django.test import SimpleTestCase
@@ -64,17 +65,24 @@ class SimSessionEvictionTests(SimpleTestCase):
         # we go would have each register() evict the previous one — which is
         # correct behaviour, but it means the registry never actually holds 50 and
         # the test would not be exercising bulk reclaim.
-        for i in range(50):
-            self._register(f"old-{i}")
-        self.assertEqual(sim_shell.sim_session_count(), 50)
-        stale_at = time.time() - (sim_shell._SIM_IDLE_TTL_SECONDS + 10)
-        for i in range(50):
-            sim_shell._SIM_SESSIONS[f"old-{i}"]["last_access"] = stale_at
-        self._register("new")
-        self.assertEqual(
-            sim_shell.sim_session_count(), 1,
-            "stale entries survived — the registry is still unbounded",
-        )
+        #
+        # The LRU count cap (_SIM_MAX_SESSIONS, audit Z5-1) would otherwise trim to
+        # 32 before the backdating even happens. This test is about the idle-TTL
+        # path, so lift the cap for its duration rather than lower the cap to suit
+        # the test — the cap being the binding constraint at 50 sessions is the
+        # point of having it.
+        with mock.patch.object(sim_shell, "_SIM_MAX_SESSIONS", 0):
+            for i in range(50):
+                self._register(f"old-{i}")
+            self.assertEqual(sim_shell.sim_session_count(), 50)
+            stale_at = time.time() - (sim_shell._SIM_IDLE_TTL_SECONDS + 10)
+            for i in range(50):
+                sim_shell._SIM_SESSIONS[f"old-{i}"]["last_access"] = stale_at
+            self._register("new")
+            self.assertEqual(
+                sim_shell.sim_session_count(), 1,
+                "stale entries survived — the registry is still unbounded",
+            )
 
     # ── active work is never touched ─────────────────────────────────────────
     def test_active_session_is_not_evicted(self):
@@ -88,10 +96,15 @@ class SimSessionEvictionTests(SimpleTestCase):
         )
 
     def test_recently_idle_session_is_not_evicted(self):
-        """Just under the TTL must survive — no off-by-one eviction."""
-        self._register("recent", idle_seconds=sim_shell._SIM_IDLE_TTL_SECONDS - 60)
-        self._register("trigger")
-        self.assertIn("recent", sim_shell._SIM_SESSIONS)
+        """Just under the hard TTL must survive — no off-by-one eviction.
+
+        Soft-evict (streamless engines idle >5m) is orthogonal and disabled here
+        so this assertion still measures the hard TTL boundary.
+        """
+        with mock.patch.object(sim_shell, "_SIM_SOFT_IDLE_SECONDS", 0):
+            self._register("recent", idle_seconds=sim_shell._SIM_IDLE_TTL_SECONDS - 60)
+            self._register("trigger")
+            self.assertIn("recent", sim_shell._SIM_SESSIONS)
 
     def test_reads_refresh_the_idle_clock(self):
         """A session being actively used must not age out mid-lab."""

@@ -4,6 +4,11 @@ import { MaasStatusBadge, PowerIcon } from './MaasStatusBadge'
 import { baremetalApi } from '../../api/baremetal'
 import MaasSettingsPages from './MaasSettingsPages'
 
+// Stable fallback for absent server state. A bare `|| []` mints a new identity
+// every render, so `SubnetsPage`'s topology memo below never hit. Frozen so an
+// accidental in-place mutation throws rather than corrupting the shared value.
+const EMPTY_ARR = Object.freeze([])
+
 function healthClass(h) {
   const v = (h || 'ok').toLowerCase()
   if (v === 'ok' || v === 'running' || v === 'healthy') return 'maas-health-ok'
@@ -739,8 +744,8 @@ export function TagsPage({ state, busy, sessionId, run }) {
 }
 
 export function SubnetsPage({ state, busy, sessionId, run }) {
-  const fabrics = state?.maas?.fabrics || []
-  const spaces = state?.maas?.spaces || []
+  const fabrics = state?.maas?.fabrics || EMPTY_ARR
+  const spaces = state?.maas?.spaces || EMPTY_ARR
   const tree = useMemo(() => {
     if (fabrics.length) {
       return fabrics.map((f) => ({
@@ -750,7 +755,7 @@ export function SubnetsPage({ state, busy, sessionId, run }) {
           const subs = (typeof v === 'object' && v.subnets)
             ? v.subnets
             : spaces.flatMap((s) => (s.subnets || []).map((cidr) => ({ cidr, space: s.name, vlan: vlanName })))
-              .filter((s) => !vlanName || true)
+              .filter((_s) => !vlanName || true)
           return { name: vlanName, subnets: subs }
         }),
       }))

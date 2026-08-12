@@ -7,6 +7,7 @@ from .views import (
     AdminTrackScenariosView,
     CertVerifyView,
     ExamDetailView,
+    ExamProctoringView,
     ExamStartView,
     ExamSubmitView,
     MyCertificatesView,
@@ -48,6 +49,11 @@ urlpatterns = [
     ),
     path("exam/<uuid:attempt_id>/", ExamDetailView.as_view(), name="cert-exam-detail"),
     path("exam/<uuid:attempt_id>/submit/", ExamSubmitView.as_view(), name="cert-exam-submit"),
+    path(
+        "exam/<uuid:attempt_id>/proctoring/",
+        ExamProctoringView.as_view(),
+        name="cert-exam-proctoring",
+    ),
     path("<slug:slug>/", TrackDetailView.as_view(), name="cert-track-detail"),
     path("<slug:slug>/exam/start/", ExamStartView.as_view(), name="cert-exam-start"),
 ]

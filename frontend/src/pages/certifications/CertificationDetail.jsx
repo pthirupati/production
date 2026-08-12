@@ -10,6 +10,7 @@ import { FixitPanel } from '../../components/design'
 import { usePageTitle } from '../../hooks/usePageTitle'
 import { useAuthStore } from '../../store/authStore'
 import { certApi } from '../../api/certifications'
+import PageBreadcrumbs from '../../components/PageBreadcrumbs'
 
 // Wait for the persisted auth store to rehydrate before trusting isAuthenticated,
 // so a logged-in user isn't wrongly bounced to /login right after page load.
@@ -133,6 +134,15 @@ export default function CertificationDetail() {
       const data = await certApi.startExam(slug)
       setExam(data)
       setResult(null)
+      // Fullscreen prompt (C5 proctoring) — request only; never block if denied.
+      try {
+        if (!document.fullscreenElement && document.documentElement?.requestFullscreen) {
+          await document.documentElement.requestFullscreen()
+          certApi.recordProctoring(data.id, 'fullscreen_entered').catch(() => {})
+        }
+      } catch {
+        certApi.recordProctoring(data.id, 'fullscreen_denied').catch(() => {})
+      }
       if (data.resumed) toast('Resumed your in-progress exam.')
       else toast.success('Timed exam started — complete the labs before time runs out.')
     } catch (err) {
@@ -147,6 +157,30 @@ export default function CertificationDetail() {
       setBusy(false)
     }
   }
+
+  // Proctoring: tab-switch / paste signals (report-only; never blocks grading).
+  useEffect(() => {
+    if (!exam?.id) return undefined
+    let t = null
+    const onVis = () => {
+      clearTimeout(t)
+      t = setTimeout(() => {
+        if (document.hidden) {
+          certApi.recordProctoring(exam.id, 'tab_switch').catch(() => {})
+        }
+      }, 400)
+    }
+    const onPaste = () => {
+      certApi.recordProctoring(exam.id, 'paste', { source: 'page' }).catch(() => {})
+    }
+    document.addEventListener('visibilitychange', onVis)
+    document.addEventListener('paste', onPaste, true)
+    return () => {
+      clearTimeout(t)
+      document.removeEventListener('visibilitychange', onVis)
+      document.removeEventListener('paste', onPaste, true)
+    }
+  }, [exam?.id])
 
   if (loading) {
     return (
@@ -204,12 +238,14 @@ export default function CertificationDetail() {
           </div>
         )}
 
-        <Link
-          to="/certifications"
-          className="text-sm text-surface-400 hover:text-accent-cyan inline-flex items-center gap-1.5 mb-6"
-        >
-          <ArrowLeft size={14} /> All certifications
-        </Link>
+        <PageBreadcrumbs
+          className="mb-6"
+          items={[
+            { label: 'Home', to: '/' },
+            { label: 'Certifications', to: '/certifications' },
+            { label: detail.name },
+          ]}
+        />
 
         {/* Overall + exam control */}
         <FixitPanel className="mb-8" padding="p-6">
@@ -260,7 +296,8 @@ export default function CertificationDetail() {
             </div>
             <p className="text-sm text-surface-400 mb-4">
               Open each lab below in a new tab and complete it. When you finish (or time runs out) the exam is
-              graded on the labs you completed during this window.
+              graded on the labs you completed during this window. Tab switches and paste events are noted on
+              your result (report-only — they do not block submission).
             </p>
             <ul className="space-y-2">
               {exam.scenarios.map((s) => (

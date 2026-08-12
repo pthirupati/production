@@ -11,10 +11,22 @@ export default function JiraTicketLink({
   allowExternalLink = false,
   onNavigate,
   openInNewTab = true,
+  // Lab session this ticket was opened from, when there is one. Opt-in on
+  // purpose: Dashboard / AdminUsers / AdminJira list tickets with no lab in
+  // play, and they must keep linking to the plain /jira/:key page. Passing it
+  // is what lets JiraTicketPage offer "Back to lab" instead of dumping the
+  // learner on /dashboard (audit L479).
+  sessionId = null,
 }) {
   if (!issueKey) return null
 
+  // Keep the base path as one unconditional template literal and append the
+  // query separately. A ternary over two `/jira/...` literals also works at
+  // runtime, but routeReachability.test.js's link extractor reads a template
+  // literal only up to its first `${` and would stop seeing this — the sole
+  // inbound link to the /jira/:issueKey route — making the route look orphaned.
   const inAppHref = `/jira/${issueKey}`
+    + (sessionId ? `?session=${encodeURIComponent(sessionId)}` : '')
   const useExternal =
     allowExternalLink &&
     issueUrl &&

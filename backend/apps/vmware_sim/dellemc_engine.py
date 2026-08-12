@@ -150,6 +150,23 @@ def _find_volume(state: dict, vol_id: str) -> dict | None:
     return next((v for v in state.get("volumes", []) if v.get("id") == vol_id), None)
 
 
+# The array reports capacity in TB while volumes are sized in GB, so all pool
+# arithmetic converts to GB first and writes used_tb back rounded to avoid
+# accumulating float noise across a lab's worth of provisioning.
+_GB_PER_TB = 1024
+
+
+def _array_free_gb(array: dict) -> int:
+    capacity_gb = float(array.get("capacity_tb", 0)) * _GB_PER_TB
+    used_gb = float(array.get("used_tb", 0)) * _GB_PER_TB
+    return int(max(0.0, capacity_gb - used_gb))
+
+
+def _charge_array(array: dict, delta_gb: int) -> None:
+    used_gb = float(array.get("used_tb", 0)) * _GB_PER_TB + delta_gb
+    array["used_tb"] = round(max(0.0, used_gb) / _GB_PER_TB, 3)
+
+
 def apply_action(session_id: str, action: str, payload: dict | None = None) -> dict:
     payload = payload or {}
     entry = _load(session_id)
@@ -181,8 +198,23 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 
     if action == "create_volume":
         size_gb = int(payload.get("size_gb") or 100)
+        if size_gb <= 0:
+            return {"ok": False, "error": "Volume size must be greater than 0GB"}
+        array = state["arrays"][0] if state.get("arrays") else None
+        if not array:
+            return {"ok": False, "error": "No array available"}
+        free_gb = _array_free_gb(array)
+        if size_gb > free_gb:
+            return {
+                "ok": False,
+                "error": (
+                    f"Array {array['id']} has only {free_gb}GB free — "
+                    f"cannot create a {size_gb}GB volume"
+                ),
+            }
         vol_id = f"{int(max((int(v['id']) for v in state.get('volumes', [])), default=0)) + 1:04d}"
         sg_name = payload.get("storage_group")
+        _charge_array(array, size_gb)
         state.setdefault("volumes", []).append({
             "id": vol_id, "size_gb": size_gb, "storage_group": sg_name,
             "status": "Ready" if sg_name else "Unmapped", "emulation": "FBA",
@@ -263,9 +295,24 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if not vol:
             return {"ok": False, "error": f"Volume {vol_id} not found"}
         new_size = int(payload.get("size_gb") or (vol.get("size_gb", 100) + 100))
-        if new_size <= vol.get("size_gb", 0):
+        current_size = int(vol.get("size_gb", 0))
+        if new_size <= current_size:
             return {"ok": False, "error": "New size must be larger"}
+        array = state["arrays"][0] if state.get("arrays") else None
+        if not array:
+            return {"ok": False, "error": "No array available"}
+        delta_gb = new_size - current_size
+        free_gb = _array_free_gb(array)
+        if delta_gb > free_gb:
+            return {
+                "ok": False,
+                "error": (
+                    f"Array {array['id']} has only {free_gb}GB free — "
+                    f"cannot expand {vol_id} by {delta_gb}GB"
+                ),
+            }
         vol["size_gb"] = new_size
+        _charge_array(array, delta_gb)
         _event(state, f"Volume {vol_id} expanded to {new_size}GB", "success")
         _save(session_id, entry)
         return {"ok": True, "message": "Volume expanded"}
@@ -340,11 +387,33 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     return {"ok": False, "error": f"Unknown action: {action}"}
 
 
+# Per-key grader feedback. The broken dict here stores bare targets (a volume
+# id, a storage-group name) and sometimes just True, so the value cannot be
+# echoed the way azure_engine echoes its human-readable reasons.
+_BROKEN_REASONS: dict[str, str] = {
+    "unmapped_volume": "volume {target} is still unmapped — add it to a storage group",
+    "needs_masking_view": "no masking view binds storage group {target} to a host and port group yet",
+    "needs_host": "the host has not been registered with its initiator yet",
+    "needs_storage_group": "the requested storage group has not been created yet",
+}
+
+
+def _describe_broken(broken: dict) -> str:
+    kind = next(iter(broken.keys()))
+    target = broken[kind]
+    template = _BROKEN_REASONS.get(kind)
+    if template is None:
+        # Unknown key: still fail CLOSED, and name the key so a missing
+        # template surfaces as a reportable gap rather than a silent pass.
+        return f"unresolved objective ({kind})"
+    return template.format(target=target)
+
+
 def validate_dellemc_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
     entry = _load(session_id)
     if not entry:
         return False, "No Dell EMC session"
     broken = entry["state"].get("broken") or {}
     if broken:
-        return False, "Dell EMC environment still has unresolved issues"
+        return False, f"Dell EMC lab not complete: {_describe_broken(broken)}"
     return True, "Dell EMC lab objectives met"

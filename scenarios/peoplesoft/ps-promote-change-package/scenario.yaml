@@ -1,0 +1,167 @@
+title: Promote a Change Package from DEV to PROD
+slug: ps-promote-change-package
+category: Fix
+description: 'CONTEXT: The Accounts Payable team raised a ticket against PeopleSoft
+  HCM 9.2. A duplicate-reimbursement defect in the PSU_EXPENSE_AE Application Engine
+  program was fixed in the development environment two sprints ago, but PROD is still
+  running the defective version and employees are being reimbursed twice. Business
+  impact: real cash is leaving the business on every expense run until the corrected
+  definition reaches PROD.
+
+  ENVIRONMENT: You are working in FixitLab''s offline PeopleSoft app server lab. The
+  architecture is a single lab-primary node exposing PIA, Process Scheduler, Integration
+  Broker, Application Designer, and Change Assistant. Three managed environments are
+  configured — DEV, TEST and PROD — each holding its own copy of the managed object
+  definitions. All tools run locally — no paid APIs or external cloud calls are required.
+
+  SYMPTOM / STARTING STATE: DEV holds PSU_EXPENSE_AE version 3, which contains the
+  fix. TEST and PROD are both still on version 2. Separately, the TEST environment
+  carries a site-local change to PSU_JOB_DATA_PAGE that the local team made by hand
+  and must not lose.
+
+  OBJECTIVE: Open the PeopleSoft (PIA) console from the lab toolbar; Build an Application
+  Designer change project containing PSU_EXPENSE_AE; Cut a Change Assistant change
+  package from that project; Run a compare report against the target environment and
+  read the outcome for each object; Apply the package to TEST and then to PROD, in
+  that order. Acceptance criteria: PROD runs PSU_EXPENSE_AE version 3 or later, the
+  TEST customisation of PSU_JOB_DATA_PAGE still exists, and success means `check.sh`
+  exits successfully.
+
+  WORK TO DO: Migration follows a strict path — a package is built in DEV, applied
+  to TEST, and only then promoted to PROD. Change Assistant will refuse a promotion
+  that skips an environment, and it will refuse to overwrite an object that was customised
+  in the target. If the compare report flags a customisation conflict, resolve it deliberately:
+  keep the local definition (which drops that object from the package) or accept the
+  incoming definition (which discards the local change). Change one thing at a time
+  and re-read the compare report after each decision.
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully.
+  Confirm PROD reports the corrected version and that the TEST customisation survived.
+  Capture the compare report before and after as evidence. Success criteria: the objective''s
+  healthy state holds on a repeat check, not just once.
+
+  ROLLBACK: If an apply makes things worse, roll that package back out of the affected
+  environment before trying another approach — the rollback restores the exact definitions
+  the apply overwrote. Never stack unverified promotions.
+
+  WHAT TO AVOID: Do not force a promotion past a conflict you have not read, do not
+  promote straight to PROD, and do not fake completion with marker files — the checker
+  validates real environment state.'
+difficulty: medium
+lab_mode: simulation
+simulation_type: peoplesoft
+technology: peoplesoft
+jira_priority: High
+time_limit: 1800
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- Open the PeopleSoft (PIA) console from the lab toolbar
+- Build an Application Designer change project containing PSU_EXPENSE_AE
+- Cut a Change Assistant change package from that project
+- Run a compare report and read the per-object outcome
+- Resolve the PSU_JOB_DATA_PAGE customisation conflict without losing the local change
+- Apply the package to TEST and then promote it to PROD
+initial_state: A PeopleSoft HCM 9.2 environment where DEV holds PSU_EXPENSE_AE version
+  3 with the reimbursement fix while TEST and PROD are still on version 2, and TEST
+  carries a site-local customisation of PSU_JOB_DATA_PAGE.
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not promote anything yet. First read the current state of all three environments
+    and note the version of PSU_EXPENSE_AE in each. This lab is about the PeopleSoft
+    migration path — Application Designer change projects, Change Assistant change
+    packages, compare reports, and the DEV to TEST to PROD promotion order. Identify
+    exactly which environments are behind before you build anything.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the migration method:
+
+    Work in the documented order: (1) build a change project in DEV over the objects
+    you actually intend to ship, (2) cut a change package from that project — the
+    package freezes the DEV definitions at cut time, (3) run a compare report against
+    the target environment and read the action column for each object, (4) apply to
+    TEST, (5) promote to PROD. A compare row marked as a customisation means the target
+    changed that object locally and the promotion will be refused until you resolve
+    it.'
+- order: 3
+  cost: 20
+  content: 'NARROW — the conflict:
+
+    Scope the change project to just PSU_EXPENSE_AE and the conflict never arises,
+    because PSU_JOB_DATA_PAGE is not in the payload. If you did include the page,
+    resolve the conflict explicitly: keeping the customisation drops that object from
+    the package and leaves the local definition intact, while accepting the incoming
+    definition overwrites the local work. The ticket says the local change must survive.'
+- order: 4
+  cost: 30
+  content: 'RESOLVE — the promotion:
+
+    Apply the package to TEST first. Change Assistant enforces the path, so an attempt
+    to promote straight from DEV to PROD is rejected with a message naming the environment
+    you skipped. Once TEST carries the corrected version, promote the same package
+    to PROD and re-read both environments to confirm the version landed and the TEST
+    customisation is still present.'
+summary: Promote a corrected Application Engine definition from DEV through TEST to
+  PROD with Change Assistant without destroying a site customisation
+estimated_minutes: 30
+xp_reward: 200
+prerequisites:
+- Basic peoplesoft literacy
+- Familiarity with PeopleSoft security and Process Scheduler labs
+tags:
+- fix
+- hands-on
+- peoplesoft
+- migration
+- change-assistant
+linked_tutorial: peoplesoft-zero-hero
+what_you_will_learn:
+- How Application Designer change projects group managed definitions for migration
+- How a Change Assistant change package freezes definitions at cut time
+- How to read a compare report and tell an upgrade from a site customisation
+- Why promotion follows a strict DEV to TEST to PROD order
+- How to resolve a customisation conflict without losing local work
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PeopleSoft app server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline lab environment
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - peoplesoft
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Promote a Change Package from DEV to PROD
+  description: Build a change project over PSU_EXPENSE_AE, cut a change package, compare
+    it against the target environments, and promote it through TEST to PROD while
+    preserving the TEST customisation of PSU_JOB_DATA_PAGE.
+  background: This peoplesoft lab teaches the managed migration path — build, compare,
+    apply, promote — and why each gate exists.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Confirm PROD runs PSU_EXPENSE_AE version
+      3 and that the TEST customisation of PSU_JOB_DATA_PAGE still exists.
+solution:
+  summary: Build an Application Designer change project over PSU_EXPENSE_AE, cut a
+    Change Assistant package from it, run the compare report, apply the package to
+    TEST, then promote the same package to PROD. Scoping the project to PSU_EXPENSE_AE
+    keeps the TEST customisation of PSU_JOB_DATA_PAGE out of the payload so it survives
+    untouched.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: peoplesoft-fundamentals
+hosted_as: peoplesoft

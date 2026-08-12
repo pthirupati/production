@@ -1,3 +1,4 @@
+is_active: true
 title: Reclaim space after mass delete
 slug: sqlite-vacuum
 technology: sqlite
@@ -6,35 +7,28 @@ description: 'CONTEXT: A team operating SQLite has raised a ticket for `Reclaim 
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline SQLite database file. The architecture is a single
   lab-primary node exposing sqlite3 CLI, schema, WAL mode, and pragmas; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: File size unchanged after deleting millions of rows.
-
 
   OBJECTIVE: Understand the current failure mode affecting Reclaim space after mass delete; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant sqlite3 CLI, schema, WAL mode, and pragmas), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -97,23 +91,58 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: File size unchanged after deleting millions of rows.
+  instructions: 'The file never shrinks after a mass delete because free pages are retained. Fix solution(conn)
+    so it reports whether a VACUUM is worth running: return the reclaimable fraction as a float (freelist_count
+    / page_count) from the `dbstat` table, rounded to 2 decimals. Return 0.0 when the database has no
+    pages at all rather than dividing by zero.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn):\n    # BUG: divides by the freelist instead of the total page count\
+      \ and has no\n    # zero guard, so the ratio is inverted and an empty db explodes.\n    page_count,\
+      \ freelist = conn.execute(\n        \"SELECT page_count, freelist_count FROM dbstat\").fetchone()\n\
+      \    return round(page_count / freelist, 2)\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert callable(solution)
+  - name: half-free database reports 0.5
+    code: "import sqlite3\ndef _seed(page_count, freelist_count):\n    conn = sqlite3.connect(':memory:')\n\
+      \    conn.executescript(\n        \"CREATE TABLE dbstat (page_count INTEGER, freelist_count INTEGER);\"\
+      )\n    conn.execute(\"INSERT INTO dbstat VALUES (?,?)\", (page_count, freelist_count))\n    return\
+      \ conn\nconn = _seed(100, 50)\nassert solution(conn) == 0.5, solution(conn)\n"
+  - name: compact database reports 0.0
+    code: "import sqlite3\ndef _seed(page_count, freelist_count):\n    conn = sqlite3.connect(':memory:')\n\
+      \    conn.executescript(\n        \"CREATE TABLE dbstat (page_count INTEGER, freelist_count INTEGER);\"\
+      )\n    conn.execute(\"INSERT INTO dbstat VALUES (?,?)\", (page_count, freelist_count))\n    return\
+      \ conn\nconn = _seed(100, 0)\nassert solution(conn) == 0.0, solution(conn)\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert callable(solution)
+  - name: empty database does not divide by zero
+    code: "import sqlite3\ndef _seed(page_count, freelist_count):\n    conn = sqlite3.connect(':memory:')\n\
+      \    conn.executescript(\n        \"CREATE TABLE dbstat (page_count INTEGER, freelist_count INTEGER);\"\
+      )\n    conn.execute(\"INSERT INTO dbstat VALUES (?,?)\", (page_count, freelist_count))\n    return\
+      \ conn\nconn = _seed(0, 0)\nassert solution(conn) == 0.0, solution(conn)\n"
+  - name: ratio is rounded to two decimals
+    code: "import sqlite3\ndef _seed(page_count, freelist_count):\n    conn = sqlite3.connect(':memory:')\n\
+      \    conn.executescript(\n        \"CREATE TABLE dbstat (page_count INTEGER, freelist_count INTEGER);\"\
+      )\n    conn.execute(\"INSERT INTO dbstat VALUES (?,?)\", (page_count, freelist_count))\n    return\
+      \ conn\nconn = _seed(3, 1)\nassert solution(conn) == 0.33, solution(conn)\n"
+  - name: fully free database reports 1.0
+    code: "import sqlite3\ndef _seed(page_count, freelist_count):\n    conn = sqlite3.connect(':memory:')\n\
+      \    conn.executescript(\n        \"CREATE TABLE dbstat (page_count INTEGER, freelist_count INTEGER);\"\
+      )\n    conn.execute(\"INSERT INTO dbstat VALUES (?,?)\", (page_count, freelist_count))\n    return\
+      \ conn\nconn = _seed(10, 10)\nassert solution(conn) == 1.0, solution(conn)\n"
+  - name: ratio never exceeds one
+    code: "import sqlite3\ndef _seed(page_count, freelist_count):\n    conn = sqlite3.connect(':memory:')\n\
+      \    conn.executescript(\n        \"CREATE TABLE dbstat (page_count INTEGER, freelist_count INTEGER);\"\
+      )\n    conn.execute(\"INSERT INTO dbstat VALUES (?,?)\", (page_count, freelist_count))\n    return\
+      \ conn\nconn = _seed(200, 7)\nassert 0.0 <= solution(conn) <= 1.0, solution(conn)\n"
   timeout: 8
 summary: Complete the reclaim space after mass delete sqlite lab and verify success with the checker
 estimated_minutes: 20
@@ -124,7 +153,7 @@ tags:
 - fix
 - hands-on
 - sqlite
-linked_tutorial: sqlite-fundamentals
+linked_tutorial: sqlite-embedded-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Reclaim space after mass delete
 - Restore expected service behavior with a minimal, documented change

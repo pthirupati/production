@@ -27,6 +27,15 @@ export const certApi = {
     return data
   },
 
+  /** Report-only integrity signal (tab switch / paste / fullscreen). Never blocks. */
+  async recordProctoring(id, event, extra = {}) {
+    const { data } = await api.post(`/certifications/exam/${id}/proctoring/`, {
+      event,
+      ...extra,
+    }, { silentError: true })
+    return data
+  },
+
   async myCertificates() {
     const { data } = await api.get('/certifications/certificates/')
     return data

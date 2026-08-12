@@ -15,8 +15,14 @@ def _sign_payload(secret: str, body: bytes) -> str:
     return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
 
-def _post_org_webhook(org, event: str, payload: dict) -> bool:
-    """POST JSON to org.webhook_url with HMAC signature. Returns True on 2xx."""
+def _post_org_webhook(org, event: str, payload: dict, addresses=None) -> bool:
+    """POST JSON to org.webhook_url with HMAC signature. Returns True on 2xx.
+
+    ``addresses`` are the IPs that url_safety already vetted for this hostname.
+    When present the request is pinned to them, so the resolver never runs a
+    second time and there is no DNS-rebinding window between validation and the
+    socket. Callers that have validated should always pass them.
+    """
     if not org.webhook_url:
         return False
 
@@ -36,7 +42,32 @@ def _post_org_webhook(org, event: str, payload: dict) -> bool:
         headers["X-FixitLab-Signature"] = _sign_payload(org.webhook_secret, body)
 
     try:
-        resp = requests.post(org.webhook_url, data=body, headers=headers, timeout=5)
+        # allow_redirects=False is load-bearing, not a preference. validate_outbound_url()
+        # only vets the URL we are about to request; requests follows redirects by default,
+        # so an org owner could point the webhook at a public host they control and have it
+        # answer 302 → http://169.254.169.254/. requests would follow that to instance
+        # metadata and the entire SSRF guard would be bypassed without ever storing an
+        # unsafe URL. A webhook receiver has no legitimate need to redirect us.
+        # It also bounds the pin below: a redirect would target a hostname these
+        # addresses were never validated for.
+        if addresses:
+            from .url_safety import pinned_session
+
+            with pinned_session(addresses) as session:
+                resp = session.post(
+                    org.webhook_url, data=body, headers=headers, timeout=5,
+                    allow_redirects=False,
+                )
+        else:
+            resp = requests.post(
+                org.webhook_url, data=body, headers=headers, timeout=5, allow_redirects=False
+            )
+        if resp.is_redirect or resp.is_permanent_redirect:
+            logger.warning(
+                "Org webhook %s → %s returned redirect %s; refusing to follow",
+                org.slug, event, resp.status_code,
+            )
+            return False
         if not resp.ok:
             logger.warning("Org webhook %s → %s returned %s", org.slug, event, resp.status_code)
         return resp.ok
@@ -62,23 +93,25 @@ def deliver_org_webhook(self, org_id: str, event: str, payload: dict) -> bool:
 
     The URL is re-validated here as well as at write time: a hostname that was
     public when it was saved can be repointed at a private address later, and
-    this is the last gate before the socket is opened.
+    this is the last gate before the socket is opened. The addresses this
+    validation resolved are handed to the request so the name is not looked up
+    again — otherwise the gate and the socket could see different answers.
     """
     from .models import Organization
-    from .url_safety import UnsafeURLError, validate_outbound_url
+    from .url_safety import UnsafeURLError, validate_and_resolve
 
     org = Organization.objects.filter(id=org_id).first()
     if not org or not org.webhook_url:
         return False
     try:
-        validate_outbound_url(org.webhook_url)
+        _, addresses = validate_and_resolve(org.webhook_url)
     except UnsafeURLError as exc:
         # Do not retry — a private target will still be private next time.
         logger.warning(
             "Refusing org webhook for org=%s event=%s: %s", org.slug, event, exc
         )
         return False
-    return _post_org_webhook(org, event, payload)
+    return _post_org_webhook(org, event, payload, addresses=addresses)
 
 
 def fire_org_webhook(org, event: str, payload: dict) -> bool:
@@ -99,9 +132,9 @@ def fire_org_webhook(org, event: str, payload: dict) -> bool:
             getattr(org, "slug", "?"), event, exc,
         )
         try:
-            from .url_safety import UnsafeURLError, validate_outbound_url
+            from .url_safety import validate_and_resolve
 
-            validate_outbound_url(org.webhook_url)
+            _, addresses = validate_and_resolve(org.webhook_url)
         except Exception:
             return False
-        return _post_org_webhook(org, event, payload)
+        return _post_org_webhook(org, event, payload, addresses=addresses)

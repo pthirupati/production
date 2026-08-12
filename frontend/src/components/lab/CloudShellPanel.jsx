@@ -168,10 +168,10 @@ export default function CloudShellPanel({
           <span style={{ opacity: 0.5 }}>/home/cloudshell</span>
         </span>
         <span style={{ display: 'flex', gap: 8 }}>
-          <button type="button" onClick={() => setMaximized((m) => !m)} style={{ background: 'none', border: 0, color: '#aaa', cursor: 'pointer' }}>
+          <button type="button" onClick={() => setMaximized((m) => !m)} style={{ background: 'none', border: 0, color: '#aaa', cursor: 'pointer' }} aria-label={maximized ? 'Restore cloud shell' : 'Maximize cloud shell'}>
             {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
-          <button type="button" onClick={onClose} style={{ background: 'none', border: 0, color: '#aaa', cursor: 'pointer' }}>
+          <button type="button" onClick={onClose} style={{ background: 'none', border: 0, color: '#aaa', cursor: 'pointer' }} aria-label="Close cloud shell">
             <X size={15} />
           </button>
         </span>

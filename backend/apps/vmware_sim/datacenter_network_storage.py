@@ -124,7 +124,43 @@ def enrich_network(network: dict) -> dict:
         "default_gw": "10.0.0.1",
         "prefixes": ["10.10.0.0/16", "10.20.0.0/16", "10.30.0.0/24"],
     })
+    network["cable_topology"] = build_cable_topology(network)
     return network
+
+
+def build_cable_topology(network: dict) -> list[dict]:
+    """Derive real switch↔endpoint links from port ``connected_to`` (audit D14).
+
+    Prefer this over geometry-synthesized cables: a down port or missing peer
+    produces no link. Media is inferred from speed (fiber ≥25G, else copper).
+    """
+    links: list[dict] = []
+    switches = network.get("switches") or []
+    for sw in switches:
+        sw_id = sw.get("id") or sw.get("hostname") or "switch"
+        role = "spine" if "core" in str(sw_id).lower() else "leaf"
+        for port in sw.get("ports") or []:
+            peer = port.get("connected_to")
+            if not peer or port.get("status") != "up":
+                continue
+            speed = str(port.get("speed") or "")
+            media = "fiber" if any(x in speed.upper() for x in ("25G", "40G", "100G", "400G")) else "copper"
+            peer_is_switch = any(
+                peer == (o.get("id") or o.get("hostname")) for o in switches
+            )
+            links.append({
+                "id": f"{sw_id}-p{port.get('port')}-{peer}",
+                "from": sw_id,
+                "from_port": port.get("port"),
+                "to": peer,
+                "to_port": None,
+                "speed": speed or None,
+                "media": media,
+                "vlan": port.get("vlan"),
+                "role": "spine-leaf" if peer_is_switch else "access",
+                "from_role": role,
+            })
+    return links
 
 
 def run_switch_cli(sw: dict, command: str) -> list[str]:

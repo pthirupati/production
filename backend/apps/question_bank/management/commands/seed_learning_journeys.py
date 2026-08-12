@@ -216,6 +216,172 @@ JOURNEYS = [
              "description": "Lead a live, timed incident in the multiplayer War-Room / Incident Director and produce a postmortem."},
         ],
     },
+    {
+        "slug": "aws-cloud-beginner",
+        "title": "AWS Cloud Beginner",
+        "role_label": "Junior Cloud Engineer",
+        "level": "beginner",
+        "primary_tech": "aws",
+        "description": (
+            "Start from zero AWS. Learn the core platform, then ramp through "
+            "EC2 → S3 → IAM labs and a second wave of VPC, security groups, and "
+            "CloudWatch before you call yourself cloud-ready."
+        ),
+        "steps": [
+            {"kind": "tutorial_course", "title": "Learn the platform: AWS Cloud Zero-to-Hero",
+             "ref": "aws-cloud-zero-hero", "est": 540,
+             "description": "Core AWS: EC2, S3, VPC networking, and IAM — the foundation every cloud role builds on."},
+            {"kind": "scenarios", "title": "Warm-up labs: EC2 → S3 → IAM",
+             "refs": ["academy-aws-001-learn-ec2",
+                      "academy-aws-002-build-s3",
+                      "academy-aws-003-operate-iam"], "est": 120,
+             "description": "Difficulty-ordered starter labs — launch compute, store objects, and operate IAM."},
+            {"kind": "scenarios", "title": "Level up: VPC, security groups & CloudWatch",
+             "refs": ["academy-aws-004-troubleshoot-vpc",
+                      "academy-aws-005-production-security-groups",
+                      "academy-aws-008-observability-cloudwatch"], "est": 120,
+             "description": "Harden networking and start watching what your resources actually do."},
+            {"kind": "scenarios", "title": "Keep going: Lambda automation & backups",
+             "refs": ["academy-aws-007-automation-lambda",
+                      "academy-aws-009-backup-autoscaling"], "est": 90,
+             "description": "Touch serverless automation and autoscaling backup patterns."},
+            {"kind": "milestone", "title": "Milestone: AWS Cloud Beginner",
+             "est": None,
+             "description": "You can navigate core AWS services — compute, storage, identity, networking, and basic observability."},
+        ],
+    },
+    {
+        "slug": "python-devops-beginner",
+        "title": "Python Beginner",
+        "role_label": "Junior Python Developer",
+        "level": "beginner",
+        "primary_tech": "python",
+        "description": (
+            "Go from zero Python to a job-ready junior. Learn the DevOps-flavored "
+            "Python course, ramp through venv → files → HTTP API labs, then "
+            "level up with testing, logging, and exceptions."
+        ),
+        "steps": [
+            {"kind": "tutorial_course", "title": "Learn the language: Python DevOps Zero-to-Hero",
+             "ref": "python-devops-zero-hero", "est": 540,
+             "description": "Python for operators and builders: environments, scripts, APIs, and packaging."},
+            {"kind": "scenarios", "title": "Warm-up labs: venv → files → HTTP API",
+             "refs": ["academy-python-001-learn-venv",
+                      "academy-python-002-build-files",
+                      "academy-python-003-operate-http-api"], "est": 120,
+             "description": "Difficulty-ordered starter labs — virtualenvs, file I/O, and a small HTTP API."},
+            {"kind": "scenarios", "title": "Level up: testing, logging & exceptions",
+             "refs": ["academy-python-004-troubleshoot-testing",
+                      "academy-python-005-production-logging",
+                      "academy-python-006-security-exceptions"], "est": 120,
+             "description": "Prove behavior with tests, log like production, and handle failures safely."},
+            {"kind": "project", "title": "Build a real CLI from scratch",
+             "ref": "python-cli-fundamentals", "est": 180,
+             "description": "Guided project: ship a small Python CLI with arguments, errors, and usable output."},
+            {"kind": "milestone", "title": "Milestone: Python Beginner",
+             "est": None,
+             "description": "You can set up environments, write scripts and small APIs, and ship a basic Python CLI."},
+        ],
+    },
+    {
+        "slug": "docker-containers-beginner",
+        "title": "Docker Beginner",
+        "role_label": "Junior Container Engineer",
+        "level": "beginner",
+        "primary_tech": "docker",
+        "description": (
+            "Learn containers from first principles. Work through Docker "
+            "Zero-to-Hero, ramp images → Dockerfile → Compose, then harden with "
+            "volumes, networks, and healthchecks."
+        ),
+        "steps": [
+            {"kind": "tutorial_course", "title": "Learn containers: Docker Zero-to-Hero",
+             "ref": "docker-containers-zero-hero", "est": 540,
+             "description": "Images, containers, Dockerfiles, volumes, networking, and Compose."},
+            {"kind": "scenarios", "title": "Warm-up labs: images → Dockerfile → Compose",
+             "refs": ["academy-docker-001-learn-images-layers",
+                      "academy-docker-002-build-dockerfile",
+                      "academy-docker-003-operate-compose"], "est": 120,
+             "description": "Difficulty-ordered starter labs — layers, building images, and multi-service Compose."},
+            {"kind": "scenarios", "title": "Level up: volumes, networks & healthchecks",
+             "refs": ["academy-docker-004-troubleshoot-volumes",
+                      "academy-docker-005-production-networks",
+                      "academy-docker-006-security-healthchecks"], "est": 120,
+             "description": "Persist data, wire networks, and keep containers honest with healthchecks."},
+            {"kind": "project", "title": "Ship your first containerized app",
+             "ref": "docker-fundamentals", "est": 180,
+             "description": "Guided project: containerize an app end-to-end with a sensible image and run story."},
+            {"kind": "milestone", "title": "Milestone: Docker Beginner",
+             "est": None,
+             "description": "You can build images, run Compose stacks, and troubleshoot common container failures."},
+        ],
+    },
+    {
+        "slug": "security-hardening-beginner",
+        "title": "Security Beginner",
+        "role_label": "Junior Security Engineer",
+        "level": "beginner",
+        "primary_tech": "security",
+        "description": (
+            "Build security fundamentals hands-on. Learn cybersecurity basics, "
+            "ramp SSH hardening → firewall → TLS, then level up with secrets, "
+            "audit, and IAM before a first hardened-host project."
+        ),
+        "steps": [
+            {"kind": "tutorial_course", "title": "Learn the discipline: Cybersecurity Zero-to-Hero",
+             "ref": "cybersecurity-zero-hero", "est": 540,
+             "description": "Core security mindset: hardening, network controls, TLS, secrets, and least privilege."},
+            {"kind": "scenarios", "title": "Warm-up labs: SSH → firewall → TLS",
+             "refs": ["academy-security-001-learn-ssh-hardening",
+                      "academy-security-002-build-firewall",
+                      "academy-security-003-operate-tls"], "est": 120,
+             "description": "Difficulty-ordered starter labs — lock down SSH, build a firewall, and operate TLS."},
+            {"kind": "scenarios", "title": "Level up: secrets, audit & IAM",
+             "refs": ["academy-security-004-troubleshoot-secrets",
+                      "academy-security-005-production-audit",
+                      "academy-security-006-security-iam"], "est": 120,
+             "description": "Find leaked secrets, read audit trails, and tighten identity."},
+            {"kind": "project", "title": "Harden a host from zero",
+             "ref": "security-fundamentals", "est": 180,
+             "description": "Guided project: apply baseline hardening to a real host-shaped environment."},
+            {"kind": "milestone", "title": "Milestone: Security Beginner",
+             "est": None,
+             "description": "You can harden SSH, firewalls, and TLS and reason about secrets and least privilege."},
+        ],
+    },
+    {
+        "slug": "ai-data-beginner",
+        "title": "AI & Data Beginner",
+        "role_label": "Junior AI / Data Practitioner",
+        "level": "beginner",
+        "primary_tech": "ai-ml",
+        "description": (
+            "Start the AI and data path. Learn AI infrastructure fundamentals, "
+            "work a dataset lab plus a data-cleaning lab, then level up with "
+            "features, training, joins, and groupbys."
+        ),
+        "steps": [
+            {"kind": "tutorial_course", "title": "Learn the stack: AI Infrastructure Zero-to-Hero",
+             "ref": "ai-infrastructure-zero-hero", "est": 540,
+             "description": "How models, datasets, and serving pieces fit together in a practical AI stack."},
+            {"kind": "tutorial_course", "title": "Learn the craft: Data Science Zero-to-Hero",
+             "ref": "data-science-zero-hero", "est": 540,
+             "description": "Cleaning, joins, aggregations, and the everyday data workflow beside the model path."},
+            {"kind": "scenarios", "title": "Warm-up labs: dataset + data cleaning",
+             "refs": ["academy-ai-ml-001-learn-dataset",
+                      "academy-data-science-001-learn-cleaning"], "est": 90,
+             "description": "First hands-on: load and understand a dataset, then clean real messy data."},
+            {"kind": "scenarios", "title": "Level up: features, training, joins & groupby",
+             "refs": ["academy-ai-ml-002-build-features",
+                      "academy-ai-ml-003-operate-training",
+                      "academy-data-science-002-build-joins",
+                      "academy-data-science-003-operate-groupby"], "est": 150,
+             "description": "Build features, run a training loop, and practice joins/groupbys on tabular data."},
+            {"kind": "milestone", "title": "Milestone: AI & Data Beginner",
+             "est": None,
+             "description": "You can load datasets, clean tabular data, build basic features, and follow a simple training path."},
+        ],
+    },
 ]
 
 

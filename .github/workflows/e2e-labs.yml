@@ -221,24 +221,3 @@ jobs:
           retention-days: 14
 
   # ─── Aggregate result + notify ────────────────────────────────────────────
-  notify:
-    name: Notify Slack
-    runs-on: ubuntu-latest
-    needs: [all-scenarios-e2e, simulation-labs, lab-ui-playwright]
-    if: always()
-    steps:
-      - uses: actions/checkout@v4
-      - name: Determine overall status
-        id: status
-        run: |
-          RESULTS="${{ needs.all-scenarios-e2e.result }} ${{ needs.simulation-labs.result }} ${{ needs.lab-ui-playwright.result }}"
-          if echo "$RESULTS" | grep -qE "failure|cancelled"; then
-            echo "status=failure" >> "$GITHUB_OUTPUT"
-          else
-            echo "status=success" >> "$GITHUB_OUTPUT"
-          fi
-      - uses: ./.github/actions/notify-slack
-        with:
-          status: ${{ steps.status.outputs.status }}
-          workflow: "E2E Labs"
-          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}

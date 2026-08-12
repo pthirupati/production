@@ -3,6 +3,7 @@ from datetime import timedelta
 from unittest.mock import patch, MagicMock
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import make_password
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status
@@ -140,9 +141,13 @@ class SendOTPAPITest(APITestCase):
 
 class VerifyOTPAPITest(APITestCase):
     def _create_otp(self, code="654321", minutes=2):
+        # OTPs are stored hashed (audit Z4-11), so a fixture has to hash too —
+        # assigning the plaintext would make every verify fail for the wrong reason.
+        from django.contrib.auth.hashers import make_password
+
         return EmailVerificationOTP.objects.create(
             email="verify@test.com",
-            code=code,
+            code_hash=make_password(code),
             session_token="sess-token-xyz",
             expires_at=timezone.now() + timedelta(minutes=minutes),
         )
@@ -190,7 +195,7 @@ class RegisterWithOTPTest(APITestCase):
         )
         EmailVerificationOTP.objects.create(
             email="taken@test.com",
-            code="111111",
+            code_hash=make_password("111111"),
             verified=True,
             session_token="verified-token",
             expires_at=timezone.now() + timedelta(minutes=5),
@@ -208,7 +213,7 @@ class RegisterWithOTPTest(APITestCase):
         mock_welcome.delay = MagicMock()
         EmailVerificationOTP.objects.create(
             email="fresh@test.com",
-            code="222222",
+            code_hash=make_password("222222"),
             verified=True,
             session_token="fresh-token",
             expires_at=timezone.now() + timedelta(minutes=5),
@@ -218,6 +223,7 @@ class RegisterWithOTPTest(APITestCase):
             "password": "GoodP@ss99!",
             "session_token": "fresh-token",
             "phone_number": "+12345678901",
+            "accepted_legal": True,
         })
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertTrue(User.objects.filter(email="fresh@test.com").exists())

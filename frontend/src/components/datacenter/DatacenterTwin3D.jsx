@@ -3,22 +3,485 @@
  * Camera intro, rack doors, LED/power pulse, fans, cable packets, airflow.
  */
 import {
-  Suspense, cloneElement, isValidElement, useEffect, useMemo, useRef, useState,
+  Suspense, cloneElement, isValidElement, useCallback, useEffect, useMemo, useRef, useState,
 } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import {
   OrbitControls, Html, Environment, Lightformer, ContactShadows, RoundedBox, Float, Bvh,
 } from '@react-three/drei'
 import { Physics, RigidBody } from '@react-three/rapier'
-import { motion } from 'framer-motion'
+import { EffectComposer, Bloom, SSAO, Vignette, Noise } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { StatusLed, InteractiveCable, CablePhysicsBits } from './DcCableSystem'
+import { dcSfx } from './DcAmbientAudio'
 import PhysicsSafe from './PhysicsSafe'
+import { captureCanvasPng } from './DcShare'
+import { DistanceCullingHtml, HTML_LABEL_MAX_DIST } from './DcLod'
+import { makeBrushedMetalTexture, makeFloorTileTexture } from './DcTextures'
+
+export { captureCanvasPng, renderFloorPlanPng } from './DcShare'
+export { DistanceCullingHtml, HTML_LABEL_MAX_DIST } from './DcLod'
 
 const RACK_W = 0.6
 const RACK_D = 1.05
 const RACK_H = 2.0
 const U_H = RACK_H / 42
+
+/** Eye height in metres. Kept as a constant so the head-bob write order in
+ *  WalkController is obviously "set Y first, then read it" (audit D3). */
+export const EYE_Y = 1.55
+
+/** Max simulated step. An alt-tab, GC pause or a breakpoint yields a multi-second
+ *  `dt`; at sprint speed that is a 30m+ jump which tunnels the player through every
+ *  wall and rack in one frame. 0.1s ≈ 10fps — slow motion below that beats teleport. */
+export const MAX_FRAME_DT = 0.1
+export const clampDt = (dt) => (Number.isFinite(dt) ? Math.max(0, Math.min(MAX_FRAME_DT, dt)) : 0)
+
+/** Mouse-look tuning. Radians per pixel of `movementX/Y`; the historical hardcoded
+ *  value was 0.0026 on both axes, which stays the default so existing muscle memory
+ *  survives. Y is separately scalable + invertible — an accessibility requirement,
+ *  not a nicety (vestibular sensitivity, and inverted-Y is a hard preference). */
+export const DEFAULT_LOOK = { sensitivity: 0.0026, yScale: 1, invertY: false }
+const LOOK_STORAGE_KEY = 'fixitlab.dc.look'
+
+export function readLookSettings(storage) {
+  const fallback = { ...DEFAULT_LOOK }
+  try {
+    const raw = storage?.getItem?.(LOOK_STORAGE_KEY)
+    if (!raw) return fallback
+    const parsed = JSON.parse(raw)
+    const sens = Number(parsed?.sensitivity)
+    const yScale = Number(parsed?.yScale)
+    return {
+      // Clamp to a sane band: 0 sensitivity is an unrecoverable soft-lock and
+      // huge values make the camera unusable with no in-world way back.
+      sensitivity: Number.isFinite(sens) ? Math.max(0.0004, Math.min(0.012, sens)) : DEFAULT_LOOK.sensitivity,
+      yScale: Number.isFinite(yScale) ? Math.max(0.25, Math.min(2.5, yScale)) : DEFAULT_LOOK.yScale,
+      invertY: !!parsed?.invertY,
+    }
+  } catch {
+    return fallback
+  }
+}
+
+export function writeLookSettings(storage, look) {
+  try { storage?.setItem?.(LOOK_STORAGE_KEY, JSON.stringify(look)) } catch { /* private mode */ }
+}
+
+/** Remappable walk actions. Arrow keys stay as always-on aliases so muscle memory
+ *  for the controls table still works after a rebind. */
+export const DEFAULT_BINDS = {
+  forward: 'KeyW',
+  back: 'KeyS',
+  left: 'KeyA',
+  right: 'KeyD',
+  jump: 'Space',
+  crouch: 'KeyC',
+  sprint: 'ShiftLeft',
+  interact: 'KeyE',
+}
+const BINDS_STORAGE_KEY = 'fixitlab.dc.binds'
+const BIND_ACTIONS = Object.keys(DEFAULT_BINDS)
+
+export function readBinds(storage) {
+  const fallback = { ...DEFAULT_BINDS }
+  try {
+    const raw = storage?.getItem?.(BINDS_STORAGE_KEY)
+    if (!raw) return fallback
+    const parsed = JSON.parse(raw)
+    const next = { ...DEFAULT_BINDS }
+    for (const action of BIND_ACTIONS) {
+      const code = parsed?.[action]
+      if (typeof code === 'string' && /^[A-Za-z0-9]+$/.test(code) && code.length <= 24) {
+        next[action] = code
+      }
+    }
+    return next
+  } catch {
+    return fallback
+  }
+}
+
+export function writeBinds(storage, binds) {
+  try { storage?.setItem?.(BINDS_STORAGE_KEY, JSON.stringify({ ...DEFAULT_BINDS, ...binds })) } catch { /* private mode */ }
+}
+
+/** Codes the walk controller must swallow (preventDefault) while unlocked keys scroll. */
+export function walkKeySet(binds = DEFAULT_BINDS) {
+  return new Set([
+    binds.forward, binds.back, binds.left, binds.right,
+    binds.jump, binds.crouch, binds.sprint, binds.interact,
+    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+    'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'Space',
+  ])
+}
+
+/** Keys the walk controller owns. Anything held here must be swallowed
+ *  (preventDefault) while in-game or Space/arrows scroll the page underneath. */
+export const WALK_KEYS = walkKeySet(DEFAULT_BINDS)
+
+export function movementIntent(keys, binds = DEFAULT_BINDS) {
+  return {
+    forward: !!(keys?.[binds.forward] || keys?.ArrowUp),
+    back: !!(keys?.[binds.back] || keys?.ArrowDown),
+    left: !!(keys?.[binds.left] || keys?.ArrowLeft),
+    right: !!(keys?.[binds.right] || keys?.ArrowRight),
+  }
+}
+
+/** Merge keyboard + gamepad binary intents (OR). */
+export function mergeIntent(a = {}, b = {}) {
+  return {
+    forward: !!(a.forward || b.forward),
+    back: !!(a.back || b.back),
+    left: !!(a.left || b.left),
+    right: !!(a.right || b.right),
+  }
+}
+
+/** Shared hold state for on-screen touch D-pad (WalkController merges each frame). */
+export const touchHoldRef = {
+  current: {
+    forward: false, back: false, left: false, right: false,
+    jump: false, sprint: false,
+    lookLeft: false, lookRight: false, lookUp: false, lookDown: false,
+  },
+}
+
+export function setTouchHold(partial) {
+  touchHoldRef.current = { ...touchHoldRef.current, ...partial }
+}
+
+export function clearTouchHold() {
+  touchHoldRef.current = {
+    forward: false, back: false, left: false, right: false,
+    jump: false, sprint: false,
+    lookLeft: false, lookRight: false, lookUp: false, lookDown: false,
+  }
+}
+
+/** Look deltas from on-screen look-stick holds (pixels-equivalent per frame). */
+export function touchLookDelta(hold = touchHoldRef.current, scale = 2.4) {
+  const h = hold || {}
+  return {
+    dx: ((h.lookRight ? 1 : 0) - (h.lookLeft ? 1 : 0)) * scale,
+    dy: ((h.lookDown ? 1 : 0) - (h.lookUp ? 1 : 0)) * scale,
+  }
+}
+
+/** Shared gyro look sample written by deviceorientation listener, read in useFrame. */
+export const gyroLookRef = { current: { dx: 0, dy: 0 } }
+
+/**
+ * Convert DeviceOrientationEvent into a look delta using relative beta/gamma change.
+ * `prevRef` stores the last sample so absolute orientation doesn't slam yaw on enable.
+ */
+export function deviceOrientationLookDelta(event, prevRef, scale = 0.35) {
+  if (!event || prevRef == null) return { dx: 0, dy: 0 }
+  const beta = Number(event.beta)
+  const gamma = Number(event.gamma)
+  if (!Number.isFinite(beta) || !Number.isFinite(gamma)) return { dx: 0, dy: 0 }
+  if (!prevRef.current) {
+    prevRef.current = { beta, gamma }
+    return { dx: 0, dy: 0 }
+  }
+  const dx = (gamma - prevRef.current.gamma) * scale
+  const dy = (beta - prevRef.current.beta) * scale
+  prevRef.current = { beta, gamma }
+  // Clamp so a single noisy sample cannot spin the camera.
+  return {
+    dx: Math.max(-8, Math.min(8, dx)),
+    dy: Math.max(-8, Math.min(8, dy)),
+  }
+}
+
+/** iOS requires a user-gesture permission grant for deviceorientation. */
+export async function requestGyroPermission(
+  DOE = typeof window !== 'undefined' ? window.DeviceOrientationEvent : undefined,
+) {
+  try {
+    if (DOE && typeof DOE.requestPermission === 'function') {
+      const state = await DOE.requestPermission()
+      return state === 'granted'
+    }
+    return typeof window !== 'undefined' && 'DeviceOrientationEvent' in window
+  } catch {
+    return false
+  }
+}
+
+export function prefersCoarsePointer(mq = typeof window !== 'undefined' ? window.matchMedia : null) {
+  try {
+    return !!mq?.('(pointer: coarse)')?.matches
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Standard gamepad → walk intent + look deltas.
+ * Left stick: move. Right stick: look. A/Cross (0): jump. LT/L2 (6) or B (1): crouch.
+ * RT/R2 (7) or LB (4): sprint.
+ */
+export function gamepadSample(pad, deadzone = 0.22) {
+  const empty = {
+    intent: { forward: false, back: false, left: false, right: false },
+    lookDx: 0,
+    lookDy: 0,
+    jump: false,
+    crouch: false,
+    sprint: false,
+  }
+  if (!pad || !pad.connected) return empty
+  const ax = Array.isArray(pad.axes) ? pad.axes : []
+  const btns = Array.isArray(pad.buttons) ? pad.buttons : []
+  const pressed = (i) => !!(btns[i] && (btns[i].pressed || (btns[i].value || 0) > 0.5))
+  const stick = (v) => (Math.abs(v) < deadzone ? 0 : v)
+  const lx = stick(Number(ax[0]) || 0)
+  const ly = stick(Number(ax[1]) || 0)
+  const rx = stick(Number(ax[2]) || 0)
+  const ry = stick(Number(ax[3]) || 0)
+  return {
+    intent: {
+      forward: ly < -deadzone,
+      back: ly > deadzone,
+      left: lx < -deadzone,
+      right: lx > deadzone,
+    },
+    lookDx: rx * 14,
+    lookDy: ry * 14,
+    jump: pressed(0),
+    crouch: pressed(1) || pressed(6),
+    sprint: pressed(7) || pressed(4),
+  }
+}
+
+/** Sprint reads the bound sprint key plus either Shift so arrow-key players still sprint. */
+export const isSprinting = (keys, binds = DEFAULT_BINDS) => !!(
+  keys?.[binds.sprint] || keys?.ShiftLeft || keys?.ShiftRight
+)
+
+export const PITCH_LIMIT = 1.25
+
+/** Pure mouse-look integration so the sensitivity/invert-Y contract is testable
+ *  without a WebGL context. Returns clamped {yaw, pitch}. */
+export function applyLook({ yaw, pitch }, movementX, movementY, look = DEFAULT_LOOK) {
+  const s = look.sensitivity ?? DEFAULT_LOOK.sensitivity
+  const yDir = look.invertY ? -1 : 1
+  const nextYaw = yaw - movementX * s
+  const nextPitch = pitch - movementY * s * (look.yScale ?? 1) * yDir
+  return {
+    yaw: nextYaw,
+    pitch: Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, nextPitch)),
+  }
+}
+
+/** True when a keystroke belongs to a text-entry surface rather than the game.
+ *  Without this, WASD types into every input in the surrounding app because the
+ *  listener is on `window`. */
+export function isTypingTarget(target) {
+  if (!target || typeof target !== 'object') return false
+  const tag = (target.tagName || '').toUpperCase()
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
+  if (target.isContentEditable) return true
+  return false
+}
+
+/** Grid position of rack `index` on the hall floor. Declared here rather than beside
+ *  RackMesh because buildHallColliders() must use the *same* function the racks are
+ *  rendered from — a second copy of this formula is how colliders drift off the
+ *  visuals. */
+function rackPosition(index) {
+  return {
+    x: (index % 4) * 1.4 - 2.1,
+    z: Math.floor(index / 4) * -2.2 - 0.5,
+  }
+}
+
+/** Player capsule radius in metres — shoulder half-width, not a point. Aisles are
+ *  1.4m rack-pitch minus 0.6m rack width ≈ 0.8m clear, so 0.28 leaves ~0.24m either
+ *  side: tight enough to feel like a real aisle, wide enough not to snag. */
+export const PLAYER_RADIUS = 0.28
+
+/** Soft bounds of the walkable volume. Was the *only* movement constraint before
+ *  colliders existed; it stays as the outer backstop so a resolution bug can never
+ *  eject the player into the void. */
+export const HALL_BOUNDS = { minX: -8.5, maxX: 7.5, minZ: -5.5, maxZ: 6.5 }
+
+/** Head/floor clamp. `maxY` is the soffit underside (2.35 - 0.04) minus a little,
+ *  so a jump cannot punch through the ceiling now that Y is no longer pinned. */
+export const CROUCH_EYE_Y = 0.95
+export const CEILING_Y = 2.25
+export const JUMP_SPEED = 3.5
+export const GRAVITY = 9.81
+
+/**
+ * Axis-aligned collider boxes for the static hall, derived from the *same*
+ * constants the meshes are rendered from. Every entry is {minX,maxX,minZ,maxZ}
+ * in world space, already inflated by the player radius is NOT applied here —
+ * resolveWalk() inflates at test time so one collider list serves any radius.
+ *
+ * `doorOpen` removes the mantrap leaf: badge-in physically opens the door. This is
+ * the only collider that is ever conditional, and it is deliberately the one thing
+ * standing between the corridor and the hall (audit L544).
+ */
+export function buildHallColliders({ rackCount = 0, cracCount = 0, doorOpen = false } = {}) {
+  const boxes = []
+  const box = (id, cx, cz, w, d) => boxes.push({
+    id,
+    minX: cx - w / 2,
+    maxX: cx + w / 2,
+    minZ: cz - d / 2,
+    maxZ: cz + d / 2,
+  })
+
+  // Racks — RackMesh at rackPosition(i), RACK_W x RACK_D footprint.
+  for (let i = 0; i < rackCount; i += 1) {
+    const { x, z } = rackPosition(i)
+    box(`rack-${i}`, x, z, RACK_W, RACK_D)
+  }
+
+  // CRAC units — CracUnits group at [-6.2, 0, -2], each child at z = -i * 1.4,
+  // RoundedBox args [0.9, 1.4, 0.7] → 0.9 wide x 0.7 deep.
+  for (let i = 0; i < cracCount; i += 1) {
+    box(`crac-${i}`, -6.2, -2 - i * 1.4, 0.9, 0.7)
+  }
+
+  // CorridorShell static geometry, mirroring the meshes one-for-one.
+  box('reception-wall', -7.2, 5.2, 3.2, 0.12)
+  box('corridor-wall-x', -3.8, 2.4, 0.12, 5.5)
+  box('corridor-wall-z', 0.2, 3.6, 7.5, 0.12)
+  box('reception-desk', -5.5, 4.0, 1.4, 0.55)
+  box('mdf-cage', 6.4, -1.2, 1.8, 2.2)
+
+  // Mantrap leaf. The door group sits at [-3.9, ?, 4.35] with the leaf offset
+  // +0.55 in x and 1.1 wide, so closed it spans x -3.8..-2.8 at z 4.35.
+  if (!doorOpen) box('mantrap-door', -2.8 + -0.55, 4.35, 1.1, 0.14)
+
+  return boxes
+}
+
+/**
+ * Capsule-vs-AABB resolution with independent X then Z passes.
+ *
+ * Resolving both axes together makes the player stick on every wall they brush;
+ * resolving them independently is what produces the "slide along the wall" feel.
+ * Each axis is applied, then tested and pushed back out on that axis alone, so a
+ * diagonal into a wall keeps the tangential component.
+ *
+ * Pure and dependency-free so the whole contract is testable without WebGL.
+ */
+export function resolveWalk(from, delta, colliders = [], radius = PLAYER_RADIUS, bounds = HALL_BOUNDS) {
+  const hits = (x, z) => colliders.some((c) => (
+    x > c.minX - radius && x < c.maxX + radius
+    && z > c.minZ - radius && z < c.maxZ + radius
+  ))
+
+  let { x, z } = from
+
+  // X pass — reject only the X component, leaving Z free to slide.
+  const tryX = x + (delta.x || 0)
+  if (!hits(tryX, z)) x = tryX
+
+  // Z pass — re-tested against the *already resolved* X, otherwise a corner lets
+  // the player squeeze diagonally through the gap between two boxes.
+  const tryZ = z + (delta.z || 0)
+  if (!hits(x, tryZ)) z = tryZ
+
+  // Outer backstop. Kept after resolution so it is authoritative: a collider
+  // overlap bug can slow the player down but can never push them out of the world.
+  x = Math.max(bounds.minX, Math.min(bounds.maxX, x))
+  z = Math.max(bounds.minZ, Math.min(bounds.maxZ, z))
+  return { x, z }
+}
+
+/**
+ * Vertical player state: crouch (hold Ctrl/C) and jump (Space).
+ *
+ * Returns the new {y, vy, crouching}. Eye height eases toward the crouch/stand
+ * target so the transition reads as a body movement rather than a teleport, while
+ * an airborne player is fully ballistic. Ceiling is clamped so jump cannot leave
+ * the room — the old X/Z-only bounds gave no vertical containment at all.
+ */
+export function stepVertical({ y, vy = 0, grounded = true }, keys = {}, dt = 0, binds = DEFAULT_BINDS) {
+  const crouchCode = binds.crouch || DEFAULT_BINDS.crouch
+  const jumpCode = binds.jump || DEFAULT_BINDS.jump
+  const crouching = !!(keys.ControlLeft || keys.ControlRight || keys[crouchCode])
+  const standY = crouching ? CROUCH_EYE_Y : EYE_Y
+
+  let nextVy = vy
+  let nextY = y
+  let nextGrounded = grounded
+
+  if (grounded && keys[jumpCode] && !crouching) {
+    // No jump out of a crouch: it reads as a bug when the head is already low and
+    // it is the usual way players clip into rack tops.
+    nextVy = JUMP_SPEED
+    nextGrounded = false
+  }
+
+  if (!nextGrounded) {
+    nextVy -= GRAVITY * dt
+    nextY += nextVy * dt
+    if (nextY <= standY) { nextY = standY; nextVy = 0; nextGrounded = true }
+  } else {
+    // Grounded: ease the eye toward the stand/crouch height.
+    nextY += (standY - nextY) * Math.min(1, dt * 11)
+    nextVy = 0
+  }
+
+  if (nextY > CEILING_Y) { nextY = CEILING_Y; nextVy = Math.min(0, nextVy) }
+  return { y: nextY, vy: nextVy, grounded: nextGrounded, crouching }
+}
+
+/** Where the player stands when there is nothing valid to restore. Matches the
+ *  cinematic camera's landing point so the intro and a cold start agree. */
+export const SAFE_SPAWN = { x: 5.2, z: 4.5, yaw: 0 }
+const POS_STORAGE_KEY = 'fixitlab.dc.pos'
+
+/**
+ * Validate a restored player position against the CURRENT geometry.
+ *
+ * A saved position is only as good as the layout it was saved in: racks move when
+ * the scenario changes, so a naive restore can drop the player inside a rack or
+ * outside the room. Anything out of bounds or overlapping a collider falls back to
+ * SAFE_SPAWN rather than being nudged — a nudge can land in another collider.
+ */
+export function sanitizeSpawn(saved, colliders = [], bounds = HALL_BOUNDS, radius = PLAYER_RADIUS) {
+  const x = Number(saved?.x)
+  const z = Number(saved?.z)
+  const yaw = Number(saved?.yaw)
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return { ...SAFE_SPAWN }
+  if (x < bounds.minX || x > bounds.maxX || z < bounds.minZ || z > bounds.maxZ) return { ...SAFE_SPAWN }
+  const blocked = colliders.some((c) => (
+    x > c.minX - radius && x < c.maxX + radius && z > c.minZ - radius && z < c.maxZ + radius
+  ))
+  if (blocked) return { ...SAFE_SPAWN }
+  return { x, z, yaw: Number.isFinite(yaw) ? yaw : 0 }
+}
+
+/** Namespaced per room AND per session: one room's coordinates applied to another
+ *  spawns the player in a wall, and two concurrent labs must not share a spot. */
+export const playerPosKey = (sessionId, roomId) => (
+  `${POS_STORAGE_KEY}.${sessionId || 'anon'}.${roomId || 'data-hall-a'}`
+)
+
+export function readPlayerPos(storage, sessionId, roomId) {
+  try {
+    const raw = storage?.getItem?.(playerPosKey(sessionId, roomId))
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+export function writePlayerPos(storage, sessionId, roomId, pos) {
+  try {
+    storage?.setItem?.(playerPosKey(sessionId, roomId), JSON.stringify({
+      x: pos?.x, z: pos?.z, yaw: pos?.yaw,
+    }))
+  } catch { /* private mode */ }
+}
 
 /** AR HUD overlay cycle — Off / Thermal / Power / Network (key `V`). */
 const AR_MODES = ['off', 'thermal', 'power', 'network']
@@ -264,61 +727,208 @@ function ThermalHaze({ stress = 0, ticketHeat = 0 }) {
 }
 
 /** First-person hall walk (WASD + mouse look) with cinematic head-bob. Orbit disabled while active. */
-function WalkController({ enabled, paused = false, posRef }) {
+function WalkController({
+  enabled, paused = false, posRef, look = DEFAULT_LOOK, binds = DEFAULT_BINDS,
+  onPointerLockChange, colliders = [],
+  spawn = null, onPosCommit,
+}) {
   const { camera, gl } = useThree()
   const keys = useRef({})
   const yaw = useRef(0)
   const pitch = useRef(-0.12)
-  const pos = useRef(new THREE.Vector3(5.2, 1.55, 4.5))
+  const pos = useRef(new THREE.Vector3(5.2, EYE_Y, 4.5))
   const bobPhase = useRef(0)
   const bobAmount = useRef(0)
+  const vy = useRef(0)
+  const grounded = useRef(true)
+  const spawnRef = useRef(spawn)
+  spawnRef.current = spawn
+  const onPosCommitRef = useRef(onPosCommit)
+  onPosCommitRef.current = onPosCommit
+  // Same ref trick as `paused`/`look`: colliders is a new array whenever the rack
+  // list re-renders, and it must not tear down the listener effect.
+  const collidersRef = useRef(colliders)
+  collidersRef.current = colliders
+  // `paused` and `look` live in refs so the listener effect does NOT depend on them.
+  // Previously `paused` was in the dep array, so every pause-menu toggle tore down
+  // and rebuilt all four listeners AND re-copied the camera from pos.current,
+  // discarding in-flight look state.
+  const pausedRef = useRef(paused)
+  pausedRef.current = paused
+  const lookRef = useRef(look)
+  lookRef.current = look
+  const bindsRef = useRef(binds)
+  bindsRef.current = binds
 
   useEffect(() => {
     if (!enabled) return undefined
-    const down = (e) => { keys.current[e.code] = true }
+    const canvas = gl.domElement
+    const down = (e) => {
+      // window-level listener: never steal keys from a text field in the
+      // surrounding app, and never let Space/arrows scroll the page under us.
+      if (isTypingTarget(e.target)) return
+      keys.current[e.code] = true
+      if (walkKeySet(bindsRef.current).has(e.code) && !pausedRef.current) e.preventDefault()
+    }
     const up = (e) => { keys.current[e.code] = false }
     const move = (e) => {
-      if (paused) return
-      if (document.pointerLockElement !== gl.domElement) return
-      yaw.current -= e.movementX * 0.0026
-      pitch.current = Math.max(-1.25, Math.min(1.25, pitch.current - e.movementY * 0.0026))
+      if (pausedRef.current) return
+      if (document.pointerLockElement !== canvas) return
+      const next = applyLook(
+        { yaw: yaw.current, pitch: pitch.current },
+        e.movementX || 0,
+        e.movementY || 0,
+        lookRef.current,
+      )
+      yaw.current = next.yaw
+      pitch.current = next.pitch
     }
-    const click = () => { if (!paused) gl.domElement.requestPointerLock?.() }
+    // Held keys survive an alt-tab otherwise: the keyup fires on the OTHER window
+    // and you come back drifting forward forever.
+    const clearKeys = () => { keys.current = {} }
+    const onVisibility = () => { if (document.hidden) clearKeys() }
+    const click = () => { if (!pausedRef.current) canvas.requestPointerLock?.() }
+    // Single source of truth for "do we have the mouse". The browser eats Esc to
+    // release the lock, and tab/window switches release it silently; without this
+    // the player is left with live WASD and a dead mouse and no indication why.
+    const onLockChange = () => {
+      const locked = document.pointerLockElement === canvas
+      if (!locked) clearKeys()
+      onPointerLockChange?.(locked)
+    }
+    const onLockError = () => {
+      // Chrome throws SecurityError for a lock request with no user gesture and
+      // reports it here, not as a rejected promise.
+      onPointerLockChange?.(false)
+    }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
-    window.addEventListener('mousemove', move)
-    gl.domElement.addEventListener('click', click)
+    // Bound to the canvas, not window: pointer-lock movement events target the
+    // locked element, and an unlocked stray mousemove elsewhere must not steer.
+    canvas.addEventListener('mousemove', move)
+    canvas.addEventListener('click', click)
+    window.addEventListener('blur', clearKeys)
+    document.addEventListener('visibilitychange', onVisibility)
+    document.addEventListener('pointerlockchange', onLockChange)
+    document.addEventListener('pointerlockerror', onLockError)
+    // Restore the saved spot for this room. Already sanitized against the current
+    // collider set by the caller, so it can be trusted here.
+    if (spawnRef.current) {
+      pos.current.set(spawnRef.current.x, EYE_Y, spawnRef.current.z)
+      yaw.current = spawnRef.current.yaw || 0
+    }
     camera.position.copy(pos.current)
-    // Auto-grab mouse look on walk start (game FPS feel); browsers may still
-    // require a click if gesture policy blocks programmatic lock.
-    const lockId = setTimeout(() => {
-      try { if (!paused) gl.domElement.requestPointerLock?.() } catch { /* */ }
-    }, 120)
+    // No programmatic auto-lock: a requestPointerLock() with no user gesture
+    // throws SecurityError in Chrome and used to be swallowed, so the first entry
+    // into walk mode silently had no mouse look. The click-to-play overlay
+    // (ImmersiveMenu / canvas click) is the only lock entry point now.
+    onPointerLockChange?.(document.pointerLockElement === canvas)
     return () => {
-      clearTimeout(lockId)
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
-      window.removeEventListener('mousemove', move)
-      gl.domElement.removeEventListener('click', click)
+      canvas.removeEventListener('mousemove', move)
+      canvas.removeEventListener('click', click)
+      window.removeEventListener('blur', clearKeys)
+      document.removeEventListener('visibilitychange', onVisibility)
+      document.removeEventListener('pointerlockchange', onLockChange)
+      document.removeEventListener('pointerlockerror', onLockError)
       try { document.exitPointerLock?.() } catch { /* */ }
+      // Save on the way out — leaving walk mode, unmounting and navigating away
+      // all funnel through this teardown, so there is no separate exit path to miss.
+      // The lint rule guards against reading a STALE DOM node here; `pos` is a
+      // plain Vector3 and the value at teardown is precisely what must be saved.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      onPosCommitRef.current?.({ x: pos.current.x, z: pos.current.z, yaw: yaw.current })
     }
-  }, [enabled, camera, gl, paused])
+  }, [enabled, camera, gl, onPointerLockChange])
 
-  useFrame((_, dt) => {
+  useFrame((_, rawDt) => {
     if (!enabled) return
     if (paused) { keys.current = {}; return }
-    const sprinting = !!keys.current.ShiftLeft
+    const dt = clampDt(rawDt)
+    // Gamepad (first connected pad) OR'd with keyboard — mobile/touch still residual.
+    let padSample = null
+    try {
+      const pads = typeof navigator !== 'undefined' ? navigator.getGamepads?.() : null
+      const pad = pads && (pads[0] || pads[1] || pads[2] || pads[3])
+      if (pad) padSample = gamepadSample(pad)
+    } catch { /* Secure context / permissions */ }
+    if (padSample && (padSample.lookDx || padSample.lookDy) && document.pointerLockElement === gl.domElement) {
+      const next = applyLook(
+        { yaw: yaw.current, pitch: pitch.current },
+        padSample.lookDx,
+        padSample.lookDy,
+        lookRef.current,
+      )
+      yaw.current = next.yaw
+      pitch.current = next.pitch
+    }
+    // Touch look-stick works without pointer lock (phones can't capture mouse look).
+    const tLook = touchLookDelta(touchHoldRef.current)
+    if (tLook.dx || tLook.dy) {
+      const next = applyLook(
+        { yaw: yaw.current, pitch: pitch.current },
+        tLook.dx,
+        tLook.dy,
+        lookRef.current,
+      )
+      yaw.current = next.yaw
+      pitch.current = next.pitch
+    }
+    const gLook = gyroLookRef.current
+    if (gLook && (gLook.dx || gLook.dy)) {
+      const next = applyLook(
+        { yaw: yaw.current, pitch: pitch.current },
+        gLook.dx,
+        gLook.dy,
+        lookRef.current,
+      )
+      yaw.current = next.yaw
+      pitch.current = next.pitch
+      // Consume so a stalled sensor does not keep drifting.
+      gyroLookRef.current = { dx: 0, dy: 0 }
+    }
+    const padKeys = padSample ? {
+      ...(padSample.jump ? { [bindsRef.current.jump]: true } : {}),
+      ...(padSample.crouch ? { [bindsRef.current.crouch]: true } : {}),
+      ...(padSample.sprint ? { [bindsRef.current.sprint]: true } : {}),
+    } : {}
+    const touchKeys = {
+      ...(touchHoldRef.current.jump ? { [bindsRef.current.jump]: true } : {}),
+      ...(touchHoldRef.current.sprint ? { [bindsRef.current.sprint]: true } : {}),
+    }
+    const mergedKeys = { ...keys.current, ...padKeys, ...touchKeys }
+    const sprinting = isSprinting(mergedKeys, bindsRef.current)
+      || !!(padSample?.sprint)
+      || !!touchHoldRef.current.sprint
     const speed = (sprinting ? 6.1 : 3.15) * dt
     const forward = new THREE.Vector3(-Math.sin(yaw.current), 0, -Math.cos(yaw.current))
     const right = new THREE.Vector3(Math.cos(yaw.current), 0, -Math.sin(yaw.current))
     let moving = false
-    if (keys.current.KeyW || keys.current.ArrowUp) { pos.current.addScaledVector(forward, speed); moving = true }
-    if (keys.current.KeyS || keys.current.ArrowDown) { pos.current.addScaledVector(forward, -speed); moving = true }
-    if (keys.current.KeyA || keys.current.ArrowLeft) { pos.current.addScaledVector(right, -speed); moving = true }
-    if (keys.current.KeyD || keys.current.ArrowRight) { pos.current.addScaledVector(right, speed); moving = true }
-    // Soft bounds inside hall + corridor
-    pos.current.x = Math.max(-8.5, Math.min(7.5, pos.current.x))
-    pos.current.z = Math.max(-5.5, Math.min(6.5, pos.current.z))
+    // Accumulate the whole frame's intent into one delta, then resolve it ONCE.
+    // Resolving per-key would test W and D against the geometry separately and
+    // let a diagonal slip through a corner that neither axis alone can pass.
+    const delta = new THREE.Vector3()
+    const intent = mergeIntent(
+      mergeIntent(
+        movementIntent(keys.current, bindsRef.current),
+        padSample?.intent,
+      ),
+      touchHoldRef.current,
+    )
+    if (intent.forward) { delta.addScaledVector(forward, speed); moving = true }
+    if (intent.back) { delta.addScaledVector(forward, -speed); moving = true }
+    if (intent.left) { delta.addScaledVector(right, -speed); moving = true }
+    if (intent.right) { delta.addScaledVector(right, speed); moving = true }
+
+    const solved = resolveWalk(
+      { x: pos.current.x, z: pos.current.z },
+      delta,
+      collidersRef.current,
+      PLAYER_RADIUS,
+    )
+    pos.current.x = solved.x
+    pos.current.z = solved.z
 
     // Game-style boot-fall head-bob — stronger while sprinting.
     const bobFreq = sprinting ? 15.5 : 9.5
@@ -330,29 +940,24 @@ function WalkController({ enabled, paused = false, posRef }) {
     const sway = Math.cos(bobPhase.current * 0.5) * bobAmount.current * 0.7
     // Soft procedural footfall when bob crosses zero (raised-floor thump feel).
     if (moving && Math.sin(prevPhase) <= 0 && Math.sin(bobPhase.current) > 0) {
-      try {
-        const AC = window.AudioContext || window.webkitAudioContext
-        if (AC) {
-          const ctx = WalkController._ac || (WalkController._ac = new AC())
-          if (ctx.state === 'suspended') ctx.resume?.()
-          const o = ctx.createOscillator()
-          const g = ctx.createGain()
-          o.type = 'sine'
-          o.frequency.value = sprinting ? 95 : 78
-          g.gain.value = 0.0001
-          o.connect(g)
-          g.connect(ctx.destination)
-          const t = ctx.currentTime
-          g.gain.exponentialRampToValueAtTime(sprinting ? 0.028 : 0.016, t + 0.01)
-          g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09)
-          o.start(t)
-          o.stop(t + 0.1)
-        }
-      } catch { /* autoplay / no audio */ }
+      // Routed through the shared ambience bus rather than a private AudioContext:
+      // a second context ignored the mute toggle and burned one of the browser's
+      // small per-tab context budget. Null when audio is disarmed or muted.
+      try { dcSfx()?.footstep(sprinting) } catch { /* no audio */ }
     }
 
+    // Y must be written BEFORE it is read, or the camera renders last frame's
+    // eye height. Now that crouch/jump exist this is real jitter, not theory.
+    const vert = stepVertical(
+      { y: pos.current.y, vy: vy.current, grounded: grounded.current },
+      mergedKeys,
+      dt,
+      bindsRef.current,
+    )
+    pos.current.y = vert.y
+    vy.current = vert.vy
+    grounded.current = vert.grounded
     camera.position.set(pos.current.x + sway, pos.current.y + bob, pos.current.z)
-    pos.current.y = 1.55
     camera.rotation.order = 'YXZ'
     camera.rotation.y = yaw.current
     camera.rotation.x = pitch.current + bob * 0.28
@@ -404,30 +1009,116 @@ function HallDust({ count = 80 }) {
   )
 }
 
-/** "E" key fires a synthetic click at the crosshair (screen center) so mouse-locked
- *  players can interact with racks / portals / cables without unlocking the pointer. */
-function CrosshairInteract({ enabled }) {
-  const { gl } = useThree()
-  useEffect(() => {
-    if (!enabled) return undefined
-    const handler = (e) => {
-      if (e.code !== 'KeyE') return
-      if (document.pointerLockElement !== gl.domElement) return
-      const rect = gl.domElement.getBoundingClientRect()
-      const cx = rect.left + rect.width / 2
-      const cy = rect.top + rect.height / 2
-      const opts = { clientX: cx, clientY: cy, bubbles: true, cancelable: true }
-      gl.domElement.dispatchEvent(new MouseEvent('click', opts))
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [enabled, gl])
+/** Walk up an object's ancestors looking for the nearest `userData.interact`
+ *  descriptor. Interactables tag a *group*, but the raycaster hits a child mesh. */
+export function findInteractable(object, maxDepth = 8) {
+  let node = object
+  let depth = 0
+  while (node && depth < maxDepth) {
+    if (node.userData?.interact) return { node, ...node.userData.interact }
+    node = node.parent
+    depth += 1
+  }
   return null
 }
 
-/** Raised floor: 600mm tiles + perforated cold-aisle openings. */
+export const MAX_INTERACT_DISTANCE = 3.2
+
+/** Beyond this distance (metres) ServerFaceDetail hides LED/fan/Html detail —
+ *  cheap LOD so far racks don't pay Html + ~13 meshes per server every frame. */
+export const FACE_DETAIL_MAX_DIST = 10
+export const FACE_HTML_MAX_DIST = HTML_LABEL_MAX_DIST
+
+/** Crosshair interaction. Casts a REAL ray from screen center every few frames to
+ *  find what you are aiming at, publishes the label for the `[E]` prompt, and runs
+ *  that object's action on E.
+ *
+ *  This replaces a synthetic `MouseEvent` dispatched at canvas center, which
+ *  bypassed R3F's raycaster ordering and picked drei `<Html>` overlays instead of
+ *  the world geometry behind them. It also no longer silently no-ops when the
+ *  pointer is unlocked — `onPrompt` reports why nothing happened. */
+function CrosshairInteract({
+  enabled, paused = false, locked = true, onPrompt, binds = DEFAULT_BINDS,
+}) {
+  const { camera, scene } = useThree()
+  const raycaster = useMemo(() => new THREE.Raycaster(), [])
+  const center = useMemo(() => new THREE.Vector2(0, 0), [])
+  const target = useRef(null)
+  const accum = useRef(0)
+  const lastLabel = useRef(undefined)
+  const bindsRef = useRef(binds)
+  bindsRef.current = binds
+
+  const publish = (next) => {
+    if (lastLabel.current === next) return
+    lastLabel.current = next
+    onPrompt?.(next)
+  }
+
+  useFrame((_, rawDt) => {
+    if (!enabled) return
+    if (paused) { target.current = null; publish(null); return }
+    if (!locked) {
+      // Not a silent no-op any more: tell the player the mouse is unlocked so
+      // "E does nothing" is explainable rather than a bug report.
+      target.current = null
+      publish({ kind: 'locked', label: 'Click to resume mouse look' })
+      return
+    }
+    // Raycast at ~15Hz, not 60 — the crosshair target only has to be fresh enough
+    // for a prompt, and BVH raycasts against the whole hall are not free.
+    accum.current += clampDt(rawDt)
+    if (accum.current < 0.066) return
+    accum.current = 0
+    raycaster.setFromCamera(center, camera)
+    raycaster.far = MAX_INTERACT_DISTANCE
+    const hits = raycaster.intersectObjects(scene.children, true)
+    for (let i = 0; i < hits.length; i += 1) {
+      const found = findInteractable(hits[i].object)
+      if (found && hits[i].distance <= MAX_INTERACT_DISTANCE) {
+        target.current = found
+        publish({ kind: 'target', label: found.label })
+        return
+      }
+    }
+    target.current = null
+    publish(null)
+  })
+
+  useEffect(() => {
+    if (!enabled) return undefined
+    const handler = (e) => {
+      if (e.code !== bindsRef.current.interact) return
+      if (paused || isTypingTarget(e.target)) return
+      const hit = target.current
+      if (hit?.action) hit.action()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [enabled, paused])
+
+  useEffect(() => () => onPrompt?.(null), [onPrompt])
+  return null
+}
+
+/** Interact prompt under the crosshair — key comes from the active bind map. */
+function InteractPrompt({ prompt, interactKey = 'E' }) {
+  if (!prompt) return null
+  const unlocked = prompt.kind === 'locked'
+  return (
+    <div className={`dc-3d-interact-prompt${unlocked ? ' dc-3d-interact-prompt-warn' : ''}`}>
+      {!unlocked && <kbd>{interactKey}</kbd>} {prompt.label}
+    </div>
+  )
+}
+
+/** Raised floor: 600mm tiles + perforated cold-aisle openings (procedural maps). */
 function Floor() {
   const mat = useRef()
+  const { solidMap, perfMap } = useMemo(() => ({
+    solidMap: makeFloorTileTexture({ perforated: false }),
+    perfMap: makeFloorTileTexture({ perforated: true }),
+  }), [])
   const tiles = useMemo(() => {
     const list = []
     for (let gx = -10; gx <= 10; gx++) {
@@ -463,6 +1154,7 @@ function Floor() {
         <mesh key={t.key} position={[t.x, 0.01, t.z]} receiveShadow>
           <boxGeometry args={[0.58, 0.04, 0.58]} />
           <meshStandardMaterial
+            map={t.perforated ? perfMap : solidMap}
             color={t.perforated ? '#243044' : '#1a2030'}
             roughness={t.perforated ? 0.55 : 0.88}
             metalness={t.perforated ? 0.35 : 0.12}
@@ -475,8 +1167,38 @@ function Floor() {
   )
 }
 
-/** Overhead LED fixtures along cold aisles. */
-function CeilingLights() {
+/** Strobing red beacon + hall wash for a thermal / power emergency. Real halls
+ *  run a visual alarm precisely because the aisles are too loud for an audible one. */
+function AlarmLighting({ level = 0 }) {
+  const strobeA = useRef()
+  const strobeB = useRef()
+  const wash = useRef()
+  useFrame(({ clock }) => {
+    if (level <= 0) return
+    // ~1.4Hz rotating-beacon sweep rather than a hard flash: staying under 3
+    // flashes/sec keeps this outside the photosensitive band WCAG 2.3.1 flags.
+    const s = (Math.sin(clock.elapsedTime * 8.8) + 1) / 2
+    const pulse = level * (0.25 + s * 0.75)
+    if (strobeA.current) strobeA.current.intensity = pulse * 3.2
+    if (strobeB.current) strobeB.current.intensity = pulse * 3.2
+    if (wash.current) wash.current.intensity = level * 0.55
+  })
+  if (level <= 0) return null
+  return (
+    <group>
+      <pointLight ref={strobeA} position={[-3.2, 3.1, -1.6]} color="#ef4444" distance={11} decay={2} intensity={0} />
+      <pointLight ref={strobeB} position={[3.2, 3.1, -3.8]} color="#ef4444" distance={11} decay={2} intensity={0} />
+      {/* Constant red fill so the hall still reads "in alarm" between strobe peaks. */}
+      <ambientLight ref={wash} color="#7f1d1d" intensity={0} />
+    </group>
+  )
+}
+
+/** Overhead LED fixtures along cold aisles.
+ *  Emissive strips + two real lights, NOT one pointLight per fixture: ten forward-
+ *  rendered point lights multiply every material's shader permutation and push at
+ *  WebGL's uniform limit. The strips carry the look; the two lights supply falloff. */
+function CeilingLights({ alarm = 0 }) {
   const fixtures = useMemo(() => {
     const list = []
     for (let x = -5; x <= 5; x += 2.5) {
@@ -484,6 +1206,9 @@ function CeilingLights() {
     }
     return list
   }, [])
+  // House lights dim and shift red under alarm.
+  const tubeColor = alarm > 0.15 ? '#fecaca' : '#f8fafc'
+  const tubeEmissive = alarm > 0.15 ? '#fca5a5' : '#e2e8f0'
   return (
     <group>
       {fixtures.map(([x, y, z], i) => (
@@ -495,15 +1220,18 @@ function CeilingLights() {
           <mesh position={[0, -0.04, 0]}>
             <boxGeometry args={[1.25, 0.02, 0.18]} />
             <meshStandardMaterial
-              color="#f8fafc"
-              emissive="#e2e8f0"
-              emissiveIntensity={0.85}
+              color={tubeColor}
+              emissive={tubeEmissive}
+              emissiveIntensity={0.85 * (1 - alarm * 0.45)}
               toneMapped={false}
             />
           </mesh>
-          <pointLight color="#e8f0ff" intensity={0.35} distance={8} decay={2} position={[0, -0.2, 0]} />
         </group>
       ))}
+      {/* Two aisle lights replace ten per-fixture lights. */}
+      <pointLight color="#e8f0ff" intensity={1.5 * (1 - alarm * 0.5)} distance={16} decay={2} position={[0, 3.1, -1.6]} />
+      <pointLight color="#e8f0ff" intensity={1.5 * (1 - alarm * 0.5)} distance={16} decay={2} position={[0, 3.1, -3.8]} />
+      <AlarmLighting level={alarm} />
     </group>
   )
 }
@@ -540,14 +1268,20 @@ function AirflowParticles({ count = 180, stress = 0 }) {
     [count],
   )
 
-  useFrame((_, dt) => {
+  const driftT = useRef(0)
+  useFrame((_, rawDt) => {
     const mesh = ref.current
     if (!mesh) return
+    // Clamped + accumulated: an unclamped dt after an alt-tab flung every particle
+    // past the respawn ceiling in one step, and performance.now() kept advancing the
+    // lateral drift phase while useFrame was paused.
+    const dt = clampDt(rawDt)
+    driftT.current += dt
     const pos = mesh.geometry.attributes.position.array
     const boost = 1 + stress * 1.8
     for (let i = 0; i < count; i++) {
       pos[i * 3 + 1] += speeds[i] * dt * boost
-      pos[i * 3] += Math.sin(performance.now() * 0.001 + i) * 0.002 * boost
+      pos[i * 3] += Math.sin(driftT.current + i) * 0.002 * boost
       if (pos[i * 3 + 1] > 2.4) {
         pos[i * 3 + 1] = 0.05
         pos[i * 3] = (Math.random() - 0.5) * 10
@@ -594,11 +1328,11 @@ function CracUnits({ cooling = [] }) {
               />
             </RoundedBox>
             <FanSpinner position={[0.2, 0.35, 0.38]} powered={!failed} />
-            <Html position={[0, 0.85, 0]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
+            <DistanceCullingHtml position={[0, 0.85, 0]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
               <div className={`dc-3d-label ${failed ? 'dc-3d-label-hot' : ''}`}>
                 {c.id} · {c.temp_c ?? '—'}°C
               </div>
-            </Html>
+            </DistanceCullingHtml>
           </group>
         )
       })}
@@ -654,49 +1388,187 @@ function FanSpinner({ position, powered, rpmScale = 1, fault = false }) {
   )
 }
 
+/** PDU load as 0..1+ fraction of breaker rating (prefers kW / load_pct over fabricated amps). */
+export function pduLoadFraction(pdu = {}) {
+  const rating = Number(pdu.rating_kw)
+  const loadKw = Number(pdu.load_kw)
+  if (Number.isFinite(rating) && rating > 0 && Number.isFinite(loadKw)) {
+    return Math.max(0, loadKw / rating)
+  }
+  const pct = Number(pdu.load_pct)
+  if (Number.isFinite(pct)) return Math.max(0, pct / 100)
+  return Math.min(1, (Number(pdu.load_amps) || Number(pdu.amps) || 12) / 32)
+}
+
+/** Amp/kW meter label for PDU Html chip. */
+export function pduMeterLabel(pdu = {}) {
+  if (pdu.status === 'tripped' || pdu.breaker === 'open') return 'PDU TRIP'
+  const loadKw = Number(pdu.load_kw)
+  const rating = Number(pdu.rating_kw)
+  const derate = Number(pdu.continuous_derate_kw)
+  if (Number.isFinite(loadKw) && Number.isFinite(rating) && rating > 0) {
+    const pct = Math.round((loadKw / rating) * 100)
+    const derateHint = Number.isFinite(derate) && derate > 0 && loadKw > derate * 0.95
+      ? ' · 80%'
+      : ''
+    return `${loadKw.toFixed(1)}/${rating}kW ${pct}%${derateHint}`
+  }
+  return `${Math.round(pduLoadFraction(pdu) * 100)}%`
+}
+
+/** Pair A/B feed PDUs per rack for dual-strip rendering. */
+export function pdusForRack(pdus = [], rackId) {
+  const matches = (pdus || []).filter((p) => p.rack === rackId)
+  const feedA = matches.find((p) => (p.feed || 'A').toUpperCase() === 'A'
+    || (!p.feed && !String(p.id || '').endsWith('-B')))
+    || matches[0]
+    || {}
+  const feedB = matches.find((p) => (p.feed || '').toUpperCase() === 'B'
+    || String(p.id || '').endsWith('-B'))
+    || (feedA.id ? { ...feedA, id: `${feedA.id}-B`, feed: 'B', load_kw: 0, load_pct: 0 } : null)
+  return { feedA, feedB }
+}
+
+/** Short outlet→PSU whip segments from each PDU strip into the rack chassis. */
+export function buildPduPsuCables(racks = [], pdus = []) {
+  const out = []
+  ;(racks || []).forEach((rack, i) => {
+    const { x, z } = rackPosition(i)
+    const { feedA, feedB } = pdusForRack(pdus, rack.id)
+    ;[
+      { pdu: feedA, side: 1, key: 'A' },
+      ...(feedB ? [{ pdu: feedB, side: -1, key: 'B' }] : []),
+    ].forEach(({ pdu, side, key }) => {
+      if (!pdu || !pdu.id) return
+      const tripped = pdu.status === 'tripped' || pdu.breaker === 'open'
+      out.push({
+        id: `whip-${rack.id}-${key}`,
+        from: [x + side * (RACK_W / 2 + 0.08), RACK_H * 0.55, z],
+        to: [x + side * (RACK_W / 2 - 0.02), RACK_H * 0.35, z + RACK_D * 0.15],
+        feed: key,
+        tripped,
+      })
+    })
+  })
+  return out
+}
+
+function PduPsuCables({ racks = [], pdus = [] }) {
+  const cables = useMemo(() => buildPduPsuCables(racks, pdus), [racks, pdus])
+  return (
+    <group>
+      {cables.map((c) => {
+        const mid = [
+          (c.from[0] + c.to[0]) / 2,
+          (c.from[1] + c.to[1]) / 2 - 0.04,
+          (c.from[2] + c.to[2]) / 2,
+        ]
+        const pts = [new THREE.Vector3(...c.from), new THREE.Vector3(...mid), new THREE.Vector3(...c.to)]
+        const curve = new THREE.CatmullRomCurve3(pts)
+        const geo = new THREE.TubeGeometry(curve, 8, 0.012, 5, false)
+        return (
+          <mesh key={c.id} geometry={geo}>
+            <meshStandardMaterial
+              color={c.tripped ? '#7f1d1d' : '#334155'}
+              emissive={c.tripped ? '#ef4444' : c.feed === 'B' ? '#38bdf8' : '#22c55e'}
+              emissiveIntensity={c.tripped ? 0.4 : 0.15}
+              metalness={0.4}
+              roughness={0.55}
+            />
+          </mesh>
+        )
+      })}
+    </group>
+  )
+}
+
+/** Horizontal patch panel near the MDF spine — residual after ToR-in-rack. */
+function PatchPanel({ position = [4.15, 1.05, -1.2], ports = 24 }) {
+  return (
+    <group position={position}>
+      <RoundedBox args={[0.85, 0.28, 0.12]} radius={0.01} castShadow>
+        <meshStandardMaterial color="#111827" metalness={0.55} roughness={0.4} />
+      </RoundedBox>
+      {Array.from({ length: ports }).map((_, i) => {
+        const col = i % 12
+        const row = Math.floor(i / 12)
+        const x = -0.36 + col * 0.06
+        const y = 0.05 - row * 0.08
+        return (
+          <mesh key={i} position={[x, y, 0.07]}>
+            <boxGeometry args={[0.04, 0.035, 0.02]} />
+            <meshStandardMaterial
+              color="#0f172a"
+              emissive={i % 3 === 0 ? '#38bdf8' : '#22c55e'}
+              emissiveIntensity={0.45}
+            />
+          </mesh>
+        )
+      })}
+      <Html position={[0, 0.22, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
+        <div className="dc-3d-label">Patch · {ports}p</div>
+      </Html>
+    </group>
+  )
+}
+
 function PduStrips({ racks = [], pdus = [], onSelectPdu, arMode = 'off' }) {
   const powerBoost = arMode === 'power'
   return (
     <group>
       {racks.map((rack, i) => {
         const { x, z } = rackPosition(i)
-        const pdu = pdus.find((p) => p.rack === rack.id) || {}
-        const tripped = pdu.status === 'tripped' || pdu.breaker === 'open'
-        const load = Math.min(1, (pdu.load_amps || pdu.amps || 12) / 32)
-        return (
-          <group key={`pdu-${rack.id}`} position={[x + RACK_W / 2 + 0.08, RACK_H / 2, z]}>
-            <mesh
-              castShadow
-              onClick={(e) => { e.stopPropagation(); onSelectPdu?.(pdu.id || rack.id) }}
+        const { feedA, feedB } = pdusForRack(pdus, rack.id)
+        const strips = [
+          { pdu: feedA, side: 1, key: 'A' },
+          ...(feedB ? [{ pdu: feedB, side: -1, key: 'B' }] : []),
+        ]
+        return strips.map(({ pdu, side, key }) => {
+          const tripped = pdu.status === 'tripped' || pdu.breaker === 'open'
+          const load = Math.min(1.2, pduLoadFraction(pdu))
+          const overDerate = Number.isFinite(Number(pdu.continuous_derate_kw))
+            && Number(pdu.load_kw) > Number(pdu.continuous_derate_kw)
+          return (
+            <group
+              key={`pdu-${rack.id}-${key}`}
+              position={[x + side * (RACK_W / 2 + 0.08), RACK_H / 2, z]}
             >
-              <boxGeometry args={[0.09, RACK_H * 0.92, 0.14]} />
-              <meshStandardMaterial
-                color={tripped ? '#7f1d1d' : '#1e293b'}
-                emissive={tripped ? '#ef4444' : '#22c55e'}
-                emissiveIntensity={tripped ? 0.55 : (powerBoost ? 0.4 : 0.12)}
-                metalness={0.65}
-              />
-            </mesh>
-            {/* C13/C19 outlet LEDs along the strip */}
-            {Array.from({ length: 12 }).map((_, oi) => {
-              const oy = -RACK_H * 0.4 + oi * (RACK_H * 0.78 / 11)
-              const lit = !tripped && oi / 12 < load + 0.15
-              return (
-                <mesh key={oi} position={[0.05, oy, 0.04]}>
-                  <boxGeometry args={[0.02, 0.035, 0.03]} />
-                  <meshStandardMaterial
-                    color={lit ? '#0f172a' : '#334155'}
-                    emissive={tripped ? '#ef4444' : lit ? '#22c55e' : '#000'}
-                    emissiveIntensity={tripped ? 0.7 : lit ? (powerBoost ? 0.85 : 0.45) : (powerBoost ? 0.12 : 0)}
-                  />
-                </mesh>
-              )
-            })}
-            <Html distanceFactor={8} position={[0.12, RACK_H * 0.42, 0]} style={{ pointerEvents: 'none' }}>
-              <div className="dc-3d-chip">{tripped ? 'PDU TRIP' : `${Math.round(load * 100)}%`}</div>
-            </Html>
-          </group>
-        )
+              <mesh
+                castShadow
+                onClick={(e) => { e.stopPropagation(); onSelectPdu?.(pdu.id || rack.id) }}
+              >
+                <boxGeometry args={[0.09, RACK_H * 0.92, 0.14]} />
+                <meshStandardMaterial
+                  color={tripped ? '#7f1d1d' : overDerate ? '#7c2d12' : '#1e293b'}
+                  emissive={tripped ? '#ef4444' : overDerate ? '#f97316' : '#22c55e'}
+                  emissiveIntensity={tripped ? 0.55 : (powerBoost ? 0.4 : 0.12)}
+                  metalness={0.65}
+                />
+              </mesh>
+              {Array.from({ length: 12 }).map((_, oi) => {
+                const oy = -RACK_H * 0.4 + oi * (RACK_H * 0.78 / 11)
+                const lit = !tripped && oi / 12 < load + 0.15
+                return (
+                  <mesh key={oi} position={[side * 0.05, oy, 0.04]}>
+                    <boxGeometry args={[0.02, 0.035, 0.03]} />
+                    <meshStandardMaterial
+                      color={lit ? '#0f172a' : '#334155'}
+                      emissive={tripped ? '#ef4444' : lit ? (overDerate ? '#f97316' : '#22c55e') : '#000'}
+                      emissiveIntensity={tripped ? 0.7 : lit ? (powerBoost ? 0.85 : 0.45) : (powerBoost ? 0.12 : 0)}
+                    />
+                  </mesh>
+                )
+              })}
+              <DistanceCullingHtml
+                distanceFactor={8}
+                position={[side * 0.12, RACK_H * 0.42, 0]}
+                style={{ pointerEvents: 'none' }}
+              >
+                <div className="dc-3d-chip">{key} · {pduMeterLabel(pdu)}</div>
+              </DistanceCullingHtml>
+            </group>
+          )
+        })
       })}
     </group>
   )
@@ -739,28 +1611,63 @@ function RackDoor({ open, side = 'left' }) {
 /** Per-U chassis with drive-bay LEDs, dual PSU glow, NIC activity, fans.
  *  Steam-style tray slide-in on mount: chassis rails in from the aisle, then
  *  seat with staggered LED cascade (power → drives → NIC). */
+/** Front face centre-Y and box height for a chassis, honouring multi-U models.
+ *  `u_slot` is the BOTTOM U (DCIM convention), so a 2U server at U10 occupies
+ *  U10-U11 and its centre sits half a U higher than a 1U in the same slot.
+ *  The 3D layer used to ignore `u_height` entirely, drawing every 4U GPU box as 1U. */
+export function chassisMetrics(server, uh = U_H) {
+  const uHeight = Math.max(1, Math.min(12, Math.round(Number(server?.u_height) || 1)))
+  const slot = Math.max(1, Number(server?.u_slot) || 1)
+  const height = uh * uHeight * 0.9
+  const y = (slot - 1) * uh + (uh * uHeight) / 2 + 0.05
+  return { uHeight, slot, height, y }
+}
+
+/** Which of a rack's 42 U are unoccupied, given the chassis in it. Drives the
+ *  blanking panels (an unbroken cold/hot aisle seal is real DC practice) and the
+ *  free-U readout. */
+export function freeUSlots(servers = [], totalU = 42) {
+  const taken = new Set()
+  servers.forEach((s) => {
+    const { slot, uHeight } = chassisMetrics(s)
+    for (let u = slot; u < slot + uHeight; u += 1) taken.add(u)
+  })
+  const free = []
+  for (let u = 1; u <= totalU; u += 1) if (!taken.has(u)) free.push(u)
+  return free
+}
+
 function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
   const meshRef = useRef()
-  const installStart = useRef(performance.now())
+  // Simulated install clock, advanced by clamped `dt` rather than wall-clock
+  // performance.now(). useFrame does not tick while the tab is hidden, so a
+  // wall-clock delta made the whole slide-in complete invisibly during an alt-tab
+  // and you returned to already-seated trays.
+  const installT = useRef(0)
   const geo = useMemo(() => new THREE.BoxGeometry(RACK_W * 0.88, U_H * 0.9, RACK_D * 0.72), [])
   const mat = useMemo(() => new THREE.MeshStandardMaterial({ metalness: 0.45, roughness: 0.35, vertexColors: true }), [])
+  // R3F disposes what it created via JSX, but useMemo'd GPU resources are ours.
+  // The twin unmounts on every 2D/3D toggle and room switch, so this leaked per toggle.
+  useEffect(() => () => geo.dispose(), [geo])
+  useEffect(() => () => mat.dispose(), [mat])
   const dummy = useMemo(() => new THREE.Object3D(), [])
   const color = useMemo(() => new THREE.Color(), [])
   const count = servers.length
   const seatZ = useRef(new Float32Array(Math.max(count, 1)))
   const [hoverIdx, setHoverIdx] = useState(null)
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, rawDt) => {
     const mesh = meshRef.current
     if (!mesh || !count) return
+    installT.current += clampDt(rawDt) * 1000
     const pulse = 0.08 + Math.sin(clock.elapsedTime * 2.5) * 0.04
-    const now = performance.now()
+    const now = installT.current
     servers.forEach((s, i) => {
       const failed = Object.values(s.components || {}).some((x) => x !== 'healthy')
       const powered = s.power_state === 'on'
-      const y = ((s.u_slot || 1) - 1) * U_H + U_H * 0.5 + 0.05
+      const { y, uHeight } = chassisMetrics(s)
       const delay = i * 160
-      const u = Math.min(1, Math.max(0, (now - installStart.current - delay) / 850))
+      const u = Math.min(1, Math.max(0, (now - delay) / 850))
       const e = 1 - (1 - u) ** 3
       const slide = (1 - e) * 0.62
       seatZ.current[i] = -0.04 + slide
@@ -769,7 +1676,9 @@ function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
       dummy.position.set(0, y + bob, seatZ.current[i])
       // Slight nose-up while sliding, then level on the rails.
       dummy.rotation.x = (1 - e) * -0.12
-      dummy.scale.set(hoverBoost, hoverBoost, (0.92 + e * 0.08) * hoverBoost)
+      // Base geometry is exactly 1U tall, so Y-scale IS the chassis U height —
+      // this is what makes a 2U/4U box actually look 2U/4U.
+      dummy.scale.set(hoverBoost, uHeight * hoverBoost, (0.92 + e * 0.08) * hoverBoost)
       dummy.updateMatrix()
       mesh.setMatrixAt(i, dummy.matrix)
       if (failed) color.set('#ef4444')
@@ -786,9 +1695,8 @@ function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
 
   if (!count) return null
   const hovered = hoverIdx != null ? servers[hoverIdx] : null
-  const hoverY = hovered
-    ? ((hovered.u_slot || 1) - 1) * U_H + U_H * 0.5 + 0.05
-    : 0
+  const hoverY = hovered ? chassisMetrics(hovered).y + chassisMetrics(hovered).height / 2 : 0
+  const free = freeUSlots(servers)
   return (
     <group>
       <instancedMesh
@@ -822,6 +1730,8 @@ function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
             <div className="dc-3d-nameplate-host">{hovered.hostname || hovered.id}</div>
             <div className="dc-3d-nameplate-meta">
               U{hovered.u_slot || '—'}
+              {chassisMetrics(hovered).uHeight > 1 ? `–${(hovered.u_slot || 1) + chassisMetrics(hovered).uHeight - 1}` : ''}
+              {` (${chassisMetrics(hovered).uHeight}U)`}
               {hovered.service_tag ? ` · ${hovered.service_tag}` : ''}
               {hovered.vendor ? ` · ${hovered.vendor}` : ''}
               {' · '}
@@ -838,19 +1748,33 @@ function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
           </div>
         </Html>
       )}
+      {/* Blanking panels over every empty U. Real halls seal the unused U or the
+          hot aisle short-circuits back through the rack face; an unbroken column
+          of black also reads as a *populated* rack instead of a floating stack. */}
+      {free.map((u) => (
+        <mesh key={`blank-${u}`} position={[0, (u - 1) * U_H + U_H * 0.5 + 0.05, RACK_D * 0.36]}>
+          <boxGeometry args={[RACK_W * 0.86, U_H * 0.88, 0.012]} />
+          <meshStandardMaterial color="#0b0f16" metalness={0.15} roughness={0.85} />
+        </mesh>
+      ))}
+      <DistanceCullingHtml position={[0, RACK_H + 0.06, RACK_D * 0.5]} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
+        <div className="dc-3d-label">{42 - free.length}U used · {free.length}U free</div>
+      </DistanceCullingHtml>
       {servers.map((s, i) => {
         const failed = Object.values(s.components || {}).some((x) => x !== 'healthy')
         const diskFail = (s.components || {}).disk === 'failed' || (s.components || {}).disk === 'degraded'
         const powered = s.power_state === 'on'
-        const y = ((s.u_slot || 1) - 1) * U_H + U_H * 0.5 + 0.05
+        const m = chassisMetrics(s)
         return (
           <ServerFaceDetail
             key={s.id}
             server={s}
             index={i}
-            y={y}
+            // Faceplate detail hangs off the BOTTOM U of the chassis so a 4U box
+            // does not float its LEDs at its vertical centre.
+            y={(m.slot - 1) * U_H + U_H * 0.5 + 0.05}
             seatZRef={seatZ}
-            installStart={installStart}
+            installTRef={installT}
             failed={failed}
             diskFail={diskFail}
             powered={powered}
@@ -864,17 +1788,28 @@ function ServerStack({ servers, onSelect, animBoost = 1, onOpenBmc }) {
 
 /** Faceplate LEDs / fans that track chassis tray Z during install slide. */
 function ServerFaceDetail({
-  server: s, index: i, y, seatZRef, installStart, failed, diskFail, powered, animBoost,
+  server: s, index: i, y, seatZRef, installTRef, failed, diskFail, powered, animBoost,
 }) {
   const group = useRef()
+  const htmlRef = useRef()
+  const { camera } = useThree()
+  const worldPos = useMemo(() => new THREE.Vector3(), [])
   useFrame(() => {
     if (!group.current) return
     const z = seatZRef.current[i] ?? -0.04
     group.current.position.set(0, y, z)
     const delay = i * 160
-    const u = Math.min(1, Math.max(0, (performance.now() - installStart.current - delay) / 850))
+    // Same simulated clock as the instanced trays — see ServerStack.installT.
+    const u = Math.min(1, Math.max(0, ((installTRef?.current ?? 0) - delay) / 850))
     // Cascade: power LED → drives → NIC glow after seat.
     group.current.userData.ledGate = u
+    // Distance LOD — cull face detail (and Html earlier) when far from camera.
+    group.current.getWorldPosition(worldPos)
+    const dist = camera.position.distanceTo(worldPos)
+    group.current.visible = dist <= FACE_DETAIL_MAX_DIST
+    if (htmlRef.current) {
+      htmlRef.current.visible = dist <= FACE_HTML_MAX_DIST
+    }
   })
   const ledGate = 1 // StatusLed reads powered; gate via powered && seated approx in children
   return (
@@ -919,20 +1854,15 @@ function ServerFaceDetail({
         rpmScale={0.85}
         fault={(s.components || {}).fan === 'failed'}
       />
-      <Html distanceFactor={10} position={[0, U_H * 0.35, RACK_D * 0.4]} style={{ pointerEvents: 'none' }}>
-        <div className="dc-3d-chip dc-3d-chip-sm">{s.hostname || s.id}</div>
-      </Html>
+      <group ref={htmlRef}>
+        <Html distanceFactor={10} position={[0, U_H * 0.35, RACK_D * 0.4]} style={{ pointerEvents: 'none' }}>
+          <div className="dc-3d-chip dc-3d-chip-sm">{s.hostname || s.id}</div>
+        </Html>
+      </group>
       {/* unused gate reserved for future cascade timing */}
       <mesh visible={false} userData={{ ledGate }} />
     </group>
   )
-}
-
-function rackPosition(index) {
-  return {
-    x: (index % 4) * 1.4 - 2.1,
-    z: Math.floor(index / 4) * -2.2 - 0.5,
-  }
 }
 
 function RackInner({
@@ -958,14 +1888,23 @@ function RackInner({
   const rackEmissiveIntensity = anyFail
     ? 0.28
     : (open ? 0.08 : 0.02) + (thermalOn ? arThermalLevel * 0.35 : 0)
+  const metalMap = useMemo(() => makeBrushedMetalTexture({ base: '#475569' }), [])
 
   return (
     <group
       ref={group}
+      // Crosshair registry entry — drives the `[E]` prompt and the real raycast.
+      userData={{
+        interact: {
+          label: `Open rack ${rack.name || rack.id}`,
+          action: () => onSelectRack?.(rack.id),
+        },
+      }}
       onClick={(e) => { e.stopPropagation(); onSelectRack?.(rack.id) }}
     >
       <RoundedBox args={[RACK_W, RACK_H, RACK_D]} radius={0.02} castShadow receiveShadow>
         <meshStandardMaterial
+          map={metalMap}
           color={rackColor}
           metalness={0.55}
           roughness={0.35}
@@ -975,11 +1914,11 @@ function RackInner({
       </RoundedBox>
       <mesh position={[-RACK_W / 2 + 0.02, 0, 0]}>
         <boxGeometry args={[0.03, RACK_H * 0.98, RACK_D * 0.95]} />
-        <meshStandardMaterial color="#334155" metalness={0.7} />
+        <meshStandardMaterial map={metalMap} color="#334155" metalness={0.7} roughness={0.4} />
       </mesh>
       <mesh position={[RACK_W / 2 - 0.02, 0, 0]}>
         <boxGeometry args={[0.03, RACK_H * 0.98, RACK_D * 0.95]} />
-        <meshStandardMaterial color="#334155" metalness={0.7} />
+        <meshStandardMaterial map={metalMap} color="#334155" metalness={0.7} roughness={0.4} />
       </mesh>
       <RackDoor open={open} side="left" />
       <RackDoor open={open} side="right" />
@@ -1003,11 +1942,15 @@ function RackMesh({
   const tip = rack.physics?.tip_risk === 'high'
   const { x, z } = rackPosition(index)
   const wrap = useRef()
-  const start = useRef(performance.now() + index * 110)
+  // Simulated elapsed ms, advanced by clamped dt. Wall-clock deltas ran the drop-in
+  // while the tab was hidden (useFrame is paused), so every rack was already seated
+  // on return. Negative start = the per-rack stagger.
+  const introT = useRef(-index * 110)
 
-  useFrame(() => {
+  useFrame((_, rawDt) => {
     if (!wrap.current) return
-    const u = Math.min(1, Math.max(0, (performance.now() - start.current) / 950))
+    introT.current += clampDt(rawDt) * 1000
+    const u = Math.min(1, Math.max(0, introT.current / 950))
     const e = 1 - (1 - u) ** 3
     wrap.current.position.set(x, RACK_H / 2 - (1 - e) * 1.15, z)
     wrap.current.scale.setScalar(0.88 + e * 0.12)
@@ -1205,11 +2148,22 @@ function TicketWaypoint({ ticket, racks, serversByRack, onSelectServer }) {
     ref.current.rotation.y = clock.elapsedTime * 1.2
   })
   if (!pos) return null
-  const hot = /critical|high/i.test(ticket?.priority || '')
+  const hot = Boolean(ticket?.sla_breached) || /critical|high/i.test(ticket?.priority || '')
+  const slaLabel = ticket?.sla_breached
+    ? 'SLA!'
+    : (typeof ticket?.sla_remaining_sec === 'number'
+      ? `${Math.max(0, Math.ceil(ticket.sla_remaining_sec / 60))}m`
+      : '')
   return (
     <group
       ref={ref}
       position={pos}
+      userData={{
+        interact: {
+          label: `Open ticket ${ticket?.id || ''}`.trim(),
+          action: () => { if (ticket?.asset_id) onSelectServer?.(ticket.asset_id) },
+        },
+      }}
       onClick={(e) => {
         e.stopPropagation()
         if (ticket?.asset_id) onSelectServer?.(ticket.asset_id)
@@ -1227,11 +2181,13 @@ function TicketWaypoint({ ticket, racks, serversByRack, onSelectServer }) {
           roughness={0.4}
         />
       </mesh>
-      <Html center distanceFactor={8} style={{ pointerEvents: 'none' }}>
+      <DistanceCullingHtml center distanceFactor={8} style={{ pointerEvents: 'none' }}>
         <div className={`dc-3d-label ${hot ? 'dc-3d-label-hot' : ''}`}>
-          {(ticket.id || 'TKT').slice(0, 12)} · {(ticket.summary || ticket.title || 'fault').slice(0, 28)}
+          {(ticket.id || 'TKT').slice(0, 12)}
+          {slaLabel ? ` · ${slaLabel}` : ''}
+          {' · '}{(ticket.summary || ticket.title || 'fault').slice(0, 22)}
         </div>
-      </Html>
+      </DistanceCullingHtml>
     </group>
   )
 }
@@ -1244,7 +2200,10 @@ function RoomPortal({ position, label, roomId, onEnterRoom, color = '#38bdf8' })
     matRef.current.emissiveIntensity = 0.25 + Math.sin(clock.elapsedTime * 2) * 0.12
   })
   return (
-    <group position={position}>
+    <group
+      position={position}
+      userData={{ interact: { label: `Enter ${label}`, action: () => onEnterRoom?.({ id: roomId, name: label }) } }}
+    >
       <mesh
         castShadow
         onClick={(e) => {
@@ -1264,9 +2223,9 @@ function RoomPortal({ position, label, roomId, onEnterRoom, color = '#38bdf8' })
           roughness={0.35}
         />
       </mesh>
-      <Html position={[0, 1.25, 0.1]} center distanceFactor={10} style={{ pointerEvents: 'none' }}>
+      <DistanceCullingHtml position={[0, 1.25, 0.1]} center distanceFactor={10} style={{ pointerEvents: 'none' }}>
         <div className="dc-3d-label dc-3d-portal-label" style={{ '--portal-color': color }}>{label}</div>
-      </Html>
+      </DistanceCullingHtml>
     </group>
   )
 }
@@ -1281,7 +2240,10 @@ function BadgeDesk({ badgedIn, onBadgeIn }) {
   })
   if (badgedIn) return null
   return (
-    <group position={[-4.55, 0, 4.75]}>
+    <group
+      position={[-4.55, 0, 4.75]}
+      userData={{ interact: { label: 'Badge in at the mantrap', action: () => onBadgeIn?.() } }}
+    >
       <mesh castShadow receiveShadow position={[0, 0.5, 0]}>
         <boxGeometry args={[0.55, 1.0, 0.4]} />
         <meshStandardMaterial color="#1e293b" metalness={0.4} roughness={0.55} />
@@ -1356,8 +2318,19 @@ function SceneContent({
   onSelectServer, onSelectRack, onOpenBmc, onUnplugCable, onPlugCable, physicsEnabled, onFps, animBoost, intro,
   walkMode = false, tickets = [], doorOpen = false, onEnterRoom, walkPaused = false, posRef,
   arMode = 'off', badgedIn = false, onBadgeIn, nocMetrics = {},
-  dustCount = 90,
+  dustCount = 90, shadowMapSize = 1024, look = DEFAULT_LOOK, binds = DEFAULT_BINDS, onPointerLockChange, pointerLocked = false, onInteractPrompt,
+  spawn = null, onPosCommit,
 }) {
+  // Collider list is derived from the same counts the meshes are rendered from —
+  // racks.map(...) and cooling.slice(0, 4) — so it cannot drift from the visuals.
+  // doorOpen (badge-in) is the one dynamic collider: until you badge in, the
+  // mantrap leaf is solid and the hall is genuinely unreachable on foot.
+  const walkColliders = useMemo(() => buildHallColliders({
+    rackCount: (racks || []).length,
+    cracCount: Math.min(4, (cooling || []).length),
+    doorOpen,
+  }), [racks, cooling, doorOpen])
+
   const thermalStress = useMemo(() => {
     const units = cooling || []
     if (!units.length) return 0
@@ -1365,6 +2338,15 @@ function SceneContent({
     const hot = units.filter((c) => Number(c.temp_c) > 28).length
     return Math.min(1, failed / units.length + hot * 0.15)
   }, [cooling])
+
+  // Alarm state = thermal runaway OR a lost power path. Deliberately latched above
+  // a threshold rather than tracking stress linearly: a hall that pulses faintly red
+  // for a single warm CRAC teaches the player to ignore the alarm.
+  const alarmLevel = useMemo(() => {
+    const breakerOpen = (pdus || []).some((p) => p.status === 'tripped' || p.breaker === 'open')
+    if (thermalStress < 0.45 && !breakerOpen) return 0
+    return Math.min(1, Math.max(breakerOpen ? 0.7 : 0, thermalStress))
+  }, [thermalStress, pdus])
 
   const ticketHeat = useMemo(() => {
     const open = (tickets || []).filter((t) => !['closed', 'resolved'].includes((t.status || '').toLowerCase()))
@@ -1396,16 +2378,48 @@ function SceneContent({
 
   const switchCount = (network?.switches || []).length
   const mdfPos = useMemo(() => new THREE.Vector3(5.5, 1.05, -1.2), [])
+  const topology = network?.cable_topology || []
 
   const cables = useMemo(() => {
     const links = []
+    const serverIndex = {}
+    racks.forEach((rack, i) => {
+      const { x: sx, z: sz } = rackPosition(i)
+      ;(serversByRack[rack.id] || []).forEach((s, si) => {
+        const uy = ((s.u_slot || (si + 1)) - 1) * U_H - RACK_H / 2 + U_H / 2 + RACK_H / 2
+        serverIndex[s.id] = new THREE.Vector3(sx + RACK_W * 0.22, uy, sz + RACK_D / 2)
+        if (s.hostname) serverIndex[s.hostname] = serverIndex[s.id]
+      })
+    })
+
+    // Prefer port-map topology from the engine (D14) over synthetic backbone.
+    if (topology.length) {
+      topology.forEach((t) => {
+        const toPos = serverIndex[t.to]
+        if (!toPos) return // switch↔switch / unknown peers stay in data, not drawn yet
+        const fromRack = racks.findIndex((r) => (serversByRack[r.id] || []).some((s) => s.id === t.to || s.hostname === t.to))
+        const { x: sx, z: sz } = fromRack >= 0 ? rackPosition(fromRack) : { x: 0, z: 0 }
+        links.push({
+          id: t.id,
+          serverId: t.to,
+          cableId: t.id,
+          cableType: t.media === 'fiber' ? 'Fiber-LC' : 'Cat6A',
+          from: toPos,
+          to: new THREE.Vector3(sx, 1.55, sz + RACK_D / 2 + 0.08),
+          loose: false,
+          interactive: false,
+          label: `${t.from}:${t.from_port} → ${t.to}`,
+        })
+      })
+    }
+
     racks.forEach((rack, i) => {
       const { x: sx, z: sz } = rackPosition(i)
       const srvList = serversByRack[rack.id] || []
       const tray = new THREE.Vector3(sx, 2.45, -1.6)
 
-      // Plant backbone: rack → tray → MDF (always visible wiring)
-      if (switchCount > 0 || i <= 8) {
+      // Plant backbone only when no real topology (legacy visual fill).
+      if (!topology.length && (switchCount > 0 || i <= 8)) {
         links.push({
           id: `${rack.id}-backbone`,
           serverId: srvList[0]?.id,
@@ -1432,6 +2446,7 @@ function SceneContent({
         const port = new THREE.Vector3(sx + RACK_W * 0.22, uy, sz + RACK_D / 2)
         const hwCables = s.hardware?.cables || []
         if (!hwCables.length) {
+          if (topology.length) return // topology already drew the access link
           links.push({
             id: `${s.id}-nic0`,
             serverId: s.id,
@@ -1462,7 +2477,7 @@ function SceneContent({
       })
     })
     return links
-  }, [racks, serversByRack, switchCount, mdfPos])
+  }, [racks, serversByRack, switchCount, mdfPos, topology])
 
   const cableAnchors = useMemo(
     () => cables.filter((c) => c.loose).map((c) => [
@@ -1477,13 +2492,40 @@ function SceneContent({
     <>
       <FpsMeter onFps={onFps} />
       {!walkMode && <CameraIntro enabled={intro} cinematic />}
-      <WalkController enabled={walkMode} paused={walkPaused} posRef={posRef} />
-      <CrosshairInteract enabled={walkMode && !walkPaused} />
+      <WalkController
+        enabled={walkMode}
+        paused={walkPaused}
+        posRef={posRef}
+        look={look}
+        binds={binds}
+        onPointerLockChange={onPointerLockChange}
+        colliders={walkColliders}
+        spawn={spawn}
+        onPosCommit={onPosCommit}
+      />
+      <CrosshairInteract
+        enabled={walkMode}
+        paused={walkPaused}
+        locked={pointerLocked}
+        binds={binds}
+        onPrompt={onInteractPrompt}
+      />
       <color attach="background" args={['#070a10']} />
       {/* Tight fog sells depth in first-person — hall falls off like a game level */}
       <fog attach="fog" args={['#070a10', walkMode ? 5.5 : 10, walkMode ? 18 : 28]} />
       <ambientLight intensity={0.22} />
-      <directionalLight castShadow position={[6, 10, 4]} intensity={1.05} shadow-mapSize={[1024, 1024]} />
+      <directionalLight
+        castShadow
+        position={[6, 10, 4]}
+        intensity={1.05}
+        shadow-mapSize={[shadowMapSize, shadowMapSize]}
+        shadow-camera-left={-12}
+        shadow-camera-right={12}
+        shadow-camera-top={12}
+        shadow-camera-bottom={-12}
+        shadow-camera-far={30}
+        shadow-bias={-0.0002}
+      />
       <directionalLight position={[-4, 6, -6]} intensity={0.4} color="#94a3b8" />
       <PulsingLight />
       <HallEnvironment />
@@ -1508,28 +2550,41 @@ function SceneContent({
             onSelectServer={onSelectServer}
           />
         ))}
-      <CeilingLights />
+      <CeilingLights alarm={alarmLevel} />
       <CableTray />
       <HotAisleGlow z={-1.6} />
       <HotAisleGlow z={-3.8} />
       <ThermalHaze stress={thermalStress} ticketHeat={ticketHeat} />
+      {/* Fixed particle budget. Count used to scale with thermalStress (220 × up to
+          2.4×, plus a second 80-particle system), so the frame rate was worst exactly
+          during a thermal crisis — the moment the player most needs to read the hall.
+          Stress is now expressed through velocity and colour inside AirflowParticles,
+          which costs nothing extra. */}
       {animBoost > 0 && (
         <AirflowParticles
-          count={Math.round(220 * animBoost * (1 + thermalStress * 1.4))}
+          count={Math.round(220 * animBoost)}
           stress={thermalStress}
-        />
-      )}
-      {animBoost > 0 && thermalStress > 0.2 && (
-        <AirflowParticles
-          count={Math.round(80 * animBoost)}
-          stress={1}
         />
       )}
       <CracUnits cooling={cooling} />
       <PduStrips racks={racks} pdus={pdus} arMode={arMode} />
+      <PduPsuCables racks={racks} pdus={pdus} />
 
       <TorSwitch position={[5.5, 0.95, -1.2]} label="MDF / Spine" ports={48} />
-      <TorSwitch position={[5.5, 1.25, -1.2]} label="Leaf / ToR agg" ports={36} />
+      <TorSwitch position={[5.5, 1.25, -1.2]} label="Leaf / Agg" ports={36} />
+      <PatchPanel position={[4.15, 1.05, -1.2]} ports={24} />
+      {/* Per-rack ToR — audit residual: ToR belongs in each rack, not only the MDF corner. */}
+      {racks.map((rack, i) => {
+        const { x, z } = rackPosition(i)
+        return (
+          <TorSwitch
+            key={`tor-${rack.id}`}
+            position={[x, RACK_H + 0.18, z]}
+            label={`ToR · ${rack.name || rack.id}`}
+            ports={24}
+          />
+        )
+      })}
 
       <Bvh firstHitOnly>
         {racks.map((rack, i) => (
@@ -1596,10 +2651,79 @@ function CoachMark({ show }) {
   )
 }
 
+/** On-screen D-pad for coarse-pointer (phone/tablet) walk — residual polish after gamepad. */
+export function TouchWalkPad({ active, onRequestGyro }) {
+  useEffect(() => () => clearTouchHold(), [])
+  if (!active) return null
+  const hold = (key) => (e) => {
+    e.preventDefault()
+    setTouchHold({ [key]: true })
+  }
+  const release = (key) => (e) => {
+    e.preventDefault()
+    setTouchHold({ [key]: false })
+  }
+  const btn = (key, label, className) => (
+    <button
+      key={key}
+      type="button"
+      className={`dc-3d-touch-btn ${className || ''}`}
+      aria-label={label}
+      onPointerDown={hold(key)}
+      onPointerUp={release(key)}
+      onPointerLeave={release(key)}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {label}
+    </button>
+  )
+  return (
+    <div className="dc-3d-touch-pad" data-testid="dc-touch-pad" aria-label="Touch walk controls">
+      <div className="dc-3d-touch-dpad">
+        <span />
+        {btn('forward', '▲', 'dc-3d-touch-n')}
+        <span />
+        {btn('left', '◀', 'dc-3d-touch-w')}
+        <span className="dc-3d-touch-hub" />
+        {btn('right', '▶', 'dc-3d-touch-e')}
+        <span />
+        {btn('back', '▼', 'dc-3d-touch-s')}
+        <span />
+      </div>
+      <div className="dc-3d-touch-actions">
+        {btn('sprint', 'Sprint', 'dc-3d-touch-sprint')}
+        {btn('jump', 'Jump', 'dc-3d-touch-jump')}
+        {onRequestGyro && (
+          <button
+            type="button"
+            className="dc-3d-touch-btn dc-3d-touch-gyro"
+            aria-label="Enable gyroscope look"
+            onClick={(e) => { e.preventDefault(); onRequestGyro?.() }}
+          >
+            Gyro
+          </button>
+        )}
+      </div>
+      <div className="dc-3d-touch-look" aria-label="Look stick">
+        <span />
+        {btn('lookUp', '⌃', 'dc-3d-touch-look-n')}
+        <span />
+        {btn('lookLeft', '‹', 'dc-3d-touch-look-w')}
+        <span className="dc-3d-touch-hub" />
+        {btn('lookRight', '›', 'dc-3d-touch-look-e')}
+        <span />
+        {btn('lookDown', '⌄', 'dc-3d-touch-look-s')}
+        <span />
+      </div>
+    </div>
+  )
+}
+
 /** Always-visible control strip — Steam Data Center players always see how to move. */
 function ControlsHud({ walkMode, quality, onQuality }) {
   return (
     <div className="dc-3d-controls-hud" aria-label="3D controls">
+
       <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span>
       <span>Mouse look{walkMode ? ' (click canvas)' : ''}</span>
       <span><kbd>Shift</kbd> sprint</span>
@@ -1655,7 +2779,7 @@ const RADAR_PORTALS = [
 
 /** Lightweight top-down radar tip — player dot + the four room-portal beacons,
  *  plus a "you are here" room label above the ring. */
-function Minimap({ posRef, currentRoomLabel = 'Data Hall A' }) {
+function Minimap({ posRef, currentRoomLabel = 'Data Hall A', rackCount = 0 }) {
   const dotRef = useRef()
   useEffect(() => {
     let raf
@@ -1665,16 +2789,39 @@ function Minimap({ posRef, currentRoomLabel = 'Data Hall A' }) {
         const pz = 50 + Math.max(-1, Math.min(1, posRef.current.z / 7)) * 42
         dotRef.current.style.left = `${px}%`
         dotRef.current.style.top = `${pz}%`
+        // Heading was already tracked in posRef.yaw and simply never drawn, so the
+        // dot could not tell you which way you were facing. World yaw 0 faces -Z
+        // (up on the map), and screen rotation runs the opposite way from world yaw.
+        dotRef.current.style.transform =
+          `translate(-50%, -50%) rotate(${-(posRef.current.yaw || 0) * (180 / Math.PI)}deg)`
       }
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [posRef])
+  // Same layout function the 3D hall uses, so the map cannot drift from the world.
+  const rackDots = useMemo(
+    () => Array.from({ length: rackCount }, (_, i) => ({ i, ...rackPosition(i) })),
+    [rackCount],
+  )
   return (
     <div className="dc-3d-minimap" aria-hidden>
       <div className="dc-3d-minimap-label">{currentRoomLabel}</div>
       <div className="dc-3d-minimap-ring" />
+      {/* Hall walls — without them the ring is an abstract circle with no geometry
+          to orient against. Matches the WalkController soft bounds. */}
+      <div className="dc-3d-minimap-walls" />
+      {rackDots.map((r) => (
+        <span
+          key={`mm-rack-${r.i}`}
+          className="dc-3d-minimap-rack"
+          style={{
+            left: `${50 + Math.max(-1, Math.min(1, r.x / 9)) * 42}%`,
+            top: `${50 + Math.max(-1, Math.min(1, r.z / 7)) * 42}%`,
+          }}
+        />
+      ))}
       {RADAR_PORTALS.map((p) => (
         <span
           key={p.id}
@@ -1742,27 +2889,187 @@ function FieldKitHud({
   )
 }
 
-/** Esc-triggered pause menu — accessible exit from pointer-locked immersive mode. */
-function ImmersiveMenu({ open, onResume, onExitImmersive, onExitTo2D, badgedIn }) {
+/** Full controls reference. Previously the only onboarding was a 5.2s toast shown
+ *  once per mount, with no way to ever re-read it. */
+export const CONTROL_BINDINGS = [
+  { keys: ['W', 'A', 'S', 'D'], action: 'Move (arrow keys also work)', rebind: ['forward', 'left', 'back', 'right'] },
+  { keys: ['Mouse'], action: 'Look — click the hall once to capture the pointer' },
+  { keys: ['Shift'], action: 'Sprint (either shift)', rebind: ['sprint'] },
+  { keys: ['Space'], action: 'Jump', rebind: ['jump'] },
+  { keys: ['Ctrl', 'C'], action: 'Crouch — get under the cable tray / read low U', rebind: ['crouch'] },
+  { keys: ['E'], action: 'Interact with whatever the crosshair names', rebind: ['interact'] },
+  { keys: ['V'], action: 'Cycle AR overlay — Off / Thermal / Power / Network' },
+  { keys: ['1', '2', '3', '4'], action: 'Fast-travel: Dock · Reception · MDF · NOC' },
+  { keys: ['Esc'], action: 'Pause menu (releases the mouse)' },
+]
+
+function codeLabel(code) {
+  if (!code) return '?'
+  if (code.startsWith('Key')) return code.slice(3)
+  if (code.startsWith('Digit')) return code.slice(5)
+  if (code === 'Space') return 'Space'
+  if (code.startsWith('Shift')) return 'Shift'
+  if (code.startsWith('Control')) return 'Ctrl'
+  if (code.startsWith('Arrow')) return code.replace('Arrow', '')
+  return code
+}
+
+function ControlsPanel({ look, onLookChange, binds = DEFAULT_BINDS, onBindsChange }) {
+  const [capturing, setCapturing] = useState(null)
+  useEffect(() => {
+    if (!capturing) return undefined
+    const onKey = (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.code === 'Escape') { setCapturing(null); return }
+      const next = { ...binds, [capturing]: e.code }
+      onBindsChange?.(next)
+      setCapturing(null)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [capturing, binds, onBindsChange])
+
+  return (
+    <div className="dc-3d-controls-panel">
+      <table className="dc-3d-controls-table">
+        <tbody>
+          {CONTROL_BINDINGS.map((b) => (
+            <tr key={b.action}>
+              <th scope="row">
+                {(b.rebind || []).length
+                  ? b.rebind.map((action) => (
+                    <button
+                      key={action}
+                      type="button"
+                      className={`dc-3d-rebind${capturing === action ? ' dc-3d-rebind-hot' : ''}`}
+                      onClick={() => setCapturing(action)}
+                      title={`Click then press a key to rebind ${action}`}
+                    >
+                      <kbd>{capturing === action ? '…' : codeLabel(binds[action])}</kbd>
+                    </button>
+                  ))
+                  : b.keys.map((k) => <kbd key={k}>{k}</kbd>)}
+              </th>
+              <td>{b.action}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button
+        type="button"
+        className="dc-3d-menu-btn"
+        onClick={() => onBindsChange?.({ ...DEFAULT_BINDS })}
+      >
+        Reset keybinds
+      </button>
+      <label className="dc-3d-controls-row" htmlFor="dc-3d-sens">
+        <span>Mouse sensitivity</span>
+        <input
+          id="dc-3d-sens"
+          type="range"
+          min="0.0004"
+          max="0.012"
+          step="0.0002"
+          value={look.sensitivity}
+          onChange={(e) => onLookChange({ ...look, sensitivity: Number(e.target.value) })}
+        />
+        <output>{(look.sensitivity * 1000).toFixed(1)}</output>
+      </label>
+      <label className="dc-3d-controls-row" htmlFor="dc-3d-yscale">
+        <span>Vertical scale</span>
+        <input
+          id="dc-3d-yscale"
+          type="range"
+          min="0.25"
+          max="2.5"
+          step="0.05"
+          value={look.yScale}
+          onChange={(e) => onLookChange({ ...look, yScale: Number(e.target.value) })}
+        />
+        <output>{look.yScale.toFixed(2)}×</output>
+      </label>
+      <label className="dc-3d-controls-row" htmlFor="dc-3d-inverty">
+        <span>Invert Y axis</span>
+        <input
+          id="dc-3d-inverty"
+          type="checkbox"
+          checked={look.invertY}
+          onChange={(e) => onLookChange({ ...look, invertY: e.target.checked })}
+        />
+      </label>
+    </div>
+  )
+}
+
+/** Esc-triggered pause menu — accessible exit from pointer-locked immersive mode.
+ *  Doubles as the click-to-resume surface: the browser releases the pointer on Esc
+ *  and only a user gesture can take it back, so "Resume walking" is that gesture. */
+function ImmersiveMenu({
+  open, onResume, onExitImmersive, onExitTo2D, onPhoto, badgedIn,
+  look = DEFAULT_LOOK, onLookChange, binds = DEFAULT_BINDS, onBindsChange,
+}) {
+  const [tab, setTab] = useState('menu')
+  // Always reopen on the menu tab — landing in Controls after an emergency Esc
+  // would bury the Resume button.
+  useEffect(() => { if (open) setTab('menu') }, [open])
   if (!open) return null
   return (
     <div className="dc-3d-menu-backdrop" onClick={onResume}>
       <div className="dc-3d-menu" onClick={(e) => e.stopPropagation()}>
         <div className="dc-3d-menu-title">Paused</div>
-        <button type="button" className="dc-3d-menu-btn dc-3d-menu-btn-primary" onClick={onResume}>
-          Resume walking
-        </button>
-        <button type="button" className="dc-3d-menu-btn" onClick={onExitImmersive}>
-          Exit immersive mode
-        </button>
-        <button type="button" className="dc-3d-menu-btn" onClick={onExitTo2D}>
-          Switch to 2D floor
-        </button>
+        {tab === 'controls' ? (
+          <>
+            <ControlsPanel
+              look={look}
+              onLookChange={onLookChange}
+              binds={binds}
+              onBindsChange={onBindsChange}
+            />
+            <button type="button" className="dc-3d-menu-btn" onClick={() => setTab('menu')}>
+              Back
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="dc-3d-menu-btn dc-3d-menu-btn-primary" onClick={onResume}>
+              Resume walking
+            </button>
+            <button type="button" className="dc-3d-menu-btn" onClick={() => setTab('controls')}>
+              Controls &amp; sensitivity
+            </button>
+            {onPhoto && (
+              <button type="button" className="dc-3d-menu-btn" onClick={onPhoto}>
+                Photo mode — save PNG
+              </button>
+            )}
+            <button type="button" className="dc-3d-menu-btn" onClick={onExitImmersive}>
+              Exit immersive mode
+            </button>
+            <button type="button" className="dc-3d-menu-btn" onClick={onExitTo2D}>
+              Switch to 2D floor
+            </button>
+          </>
+        )}
         <div className="dc-3d-menu-hint">
           {badgedIn ? 'Badged in' : 'Not badged in'} · 1 Dock · 2 Reception · 3 MDF · 4 NOC · V AR
         </div>
       </div>
     </div>
+  )
+}
+
+/** Explicit "click to play" gesture surface. Replaces the illegal programmatic
+ *  auto-lock: Chrome throws SecurityError for requestPointerLock() without a user
+ *  gesture, which used to be swallowed, leaving walk mode with no mouse look and
+ *  no explanation. */
+function ClickToPlay({ show, onEngage }) {
+  if (!show) return null
+  return (
+    <button type="button" className="dc-3d-clicktoplay" onClick={onEngage}>
+      <span className="dc-3d-clicktoplay-title">Click to capture mouse look</span>
+      <span className="dc-3d-clicktoplay-sub">WASD to move · Esc for the pause menu</span>
+    </button>
   )
 }
 
@@ -1811,7 +3118,11 @@ export default function DatacenterTwin3D({
   const [animBoost, setAnimBoost] = useState(1)
   const [intro, setIntro] = useState(true)
   const [walkMode, setWalkMode] = useState(false)
-  const [fps, setFps] = useState(0)
+  // FPS is written straight into a DOM text node — see fpsElRef usage below.
+  const fpsElRef = useRef(null)
+  const setFps = useMemo(() => (n) => {
+    if (fpsElRef.current) fpsElRef.current.textContent = String(n)
+  }, [])
   // Steam-class default: start immersive (game view) — heavy chrome stays collapsed.
   const [immersive, setImmersive] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -1823,16 +3134,85 @@ export default function DatacenterTwin3D({
     } catch { /* ignore */ }
     return 'med'
   })
+  const [coarsePointer, setCoarsePointer] = useState(() => prefersCoarsePointer())
+  const [gyroOn, setGyroOn] = useState(false)
+  useEffect(() => {
+    const mq = typeof window !== 'undefined' ? window.matchMedia('(pointer: coarse)') : null
+    if (!mq) return undefined
+    const sync = () => setCoarsePointer(!!mq.matches)
+    sync()
+    mq.addEventListener?.('change', sync)
+    return () => mq.removeEventListener?.('change', sync)
+  }, [])
   // AR HUD overlay cycle (Off / Thermal / Power / Network) — key `V`.
   const [arModeIdx, setArModeIdx] = useState(0)
   // Field kit HUD state — ESD wrist-strap toggle + cosmetic parts-cart marker.
   const [esdOn, setEsdOn] = useState(true)
   const [cartOpen, setCartOpen] = useState(false)
   const [esdToast, setEsdToast] = useState(false)
+  // Mouse-look preferences (sensitivity / vertical scale / invert-Y) persist per
+  // browser — an accessibility setting nobody wants to redial every session.
+  const [look, setLook] = useState(() => readLookSettings(
+    typeof window !== 'undefined' ? window.localStorage : null,
+  ))
+  const [binds, setBinds] = useState(() => readBinds(
+    typeof window !== 'undefined' ? window.localStorage : null,
+  ))
+  // Authoritative pointer-lock state, fed by pointerlockchange/error. Drives both
+  // the click-to-play overlay and the "E does nothing because you're unlocked" prompt.
+  const [pointerLocked, setPointerLocked] = useState(false)
+  const [interactPrompt, setInteractPrompt] = useState(null)
   const autoWalkStarted = useRef(false)
   const coachShown = useRef(false)
-  const posRef = useRef({ x: 5.2, z: 4.5, yaw: 0 })
+  const posRef = useRef({ x: SAFE_SPAWN.x, z: SAFE_SPAWN.z, yaw: 0 })
+
+  // Restore where the player was standing in THIS room, validated against the
+  // colliders the current rack layout produces — a scenario with a different rack
+  // count would otherwise respawn them inside a cabinet.
+  const spawn = useMemo(() => sanitizeSpawn(
+    readPlayerPos(
+      typeof window !== 'undefined' ? window.localStorage : null,
+      access?.session_id,
+      currentRoomLabel,
+    ),
+    buildHallColliders({
+      rackCount: racks.length,
+      cracCount: Math.min(4, cooling.length),
+      doorOpen: true,
+    }),
+  ), [access?.session_id, currentRoomLabel, racks.length, cooling.length])
+
+  const commitPos = useCallback((p) => {
+    writePlayerPos(
+      typeof window !== 'undefined' ? window.localStorage : null,
+      access?.session_id,
+      currentRoomLabel,
+      p,
+    )
+  }, [access?.session_id, currentRoomLabel])
+
   const prevSelectedRef = useRef(null)
+  const canvasElRef = useRef(null)
+
+  const updateLook = (next) => {
+    setLook(next)
+    writeLookSettings(typeof window !== 'undefined' ? window.localStorage : null, next)
+  }
+
+  const updateBinds = (next) => {
+    setBinds(next)
+    writeBinds(typeof window !== 'undefined' ? window.localStorage : null, next)
+  }
+
+  const takePhoto = useCallback(() => {
+    captureCanvasPng(canvasElRef.current, { filename: `fixitlab-dc-${Date.now()}.png` })
+  }, [])
+
+  // Called from a real user gesture (menu Resume / click-to-play), which is the
+  // only context in which requestPointerLock is legal.
+  const engagePointerLock = () => {
+    try { canvasElRef.current?.requestPointerLock?.() } catch { /* gesture policy */ }
+  }
 
   const arMode = AR_MODES[arModeIdx] || 'off'
 
@@ -1873,10 +3253,27 @@ export default function DatacenterTwin3D({
 
   const inGame = immersive && walkMode
 
+  useEffect(() => {
+    if (!gyroOn || !inGame) return undefined
+    const prev = { current: null }
+    const onOrient = (e) => {
+      gyroLookRef.current = deviceOrientationLookDelta(e, prev)
+    }
+    window.addEventListener('deviceorientation', onOrient)
+    return () => {
+      window.removeEventListener('deviceorientation', onOrient)
+      gyroLookRef.current = { dx: 0, dy: 0 }
+    }
+  }, [gyroOn, inGame])
+
   const qualityCfg = useMemo(() => {
-    if (quality === 'low') return { dpr: [1, 1], dust: 40, shadows: false, anim: 0.65 }
-    if (quality === 'high') return { dpr: [1, 2], dust: 160, shadows: true, anim: 1 }
-    return { dpr: [1, 1.5], dust: 90, shadows: true, anim: 1 }
+    if (quality === 'low') {
+      return { dpr: [1, 1], dust: 40, shadows: false, anim: 0.65, shadowMap: 1024, bloom: false, ssao: false, vignette: false, noise: false }
+    }
+    if (quality === 'high') {
+      return { dpr: [1, 2], dust: 160, shadows: true, anim: 1, shadowMap: 2048, bloom: true, ssao: true, vignette: true, noise: true }
+    }
+    return { dpr: [1, 1.5], dust: 90, shadows: true, anim: 1, shadowMap: 1024, bloom: true, ssao: false, vignette: true, noise: false }
   }, [quality])
 
   const selectedServer = useMemo(() => {
@@ -1918,12 +3315,32 @@ export default function DatacenterTwin3D({
     onExitTo2D?.()
   }
 
+  // Resume = the user gesture that takes the pointer back. Esc released it (the
+  // browser does that itself, we cannot prevent it), so closing the menu without
+  // re-locking is what used to strand the player with live WASD and a dead mouse.
+  const resumeWalking = () => {
+    setMenuOpen(false)
+    if (inGame) engagePointerLock()
+  }
+
+  // Losing the pointer means losing mouse look, so surface the pause menu rather
+  // than leaving a half-controllable player. Deliberately one-directional: this
+  // only ever OPENS the menu. Esc below is also open-only, and only `resumeWalking`
+  // closes it — otherwise the unlock-triggered open and an Esc toggle race each
+  // other and the menu reopens itself on every unlock.
+  const handlePointerLockChange = useMemo(() => (locked) => {
+    setPointerLocked(locked)
+    if (!locked) setMenuOpen((m) => m || true)
+  }, [])
+
   // In-world room hotkeys (1-4) + AR overlay cycle (V) + Esc pause menu — no tab bar needed while immersive.
   useEffect(() => {
     if (!immersive || intro) return undefined
     const handler = (e) => {
       if (e.code === 'Escape') {
-        setMenuOpen((m) => !m)
+        // Open-only. The browser has already released the pointer by the time we
+        // see this; the menu is the click-to-resume surface.
+        setMenuOpen(true)
         return
       }
       if (menuOpen) return
@@ -1939,12 +3356,7 @@ export default function DatacenterTwin3D({
   }, [immersive, intro, menuOpen, onEnterRoom])
 
   return (
-    <motion.div
-      className={`dc-3d-root${immersive ? ' dc-3d-immersive' : ''}`}
-      initial={{ opacity: 0, scale: 0.985 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.55, ease: 'easeOut' }}
-    >
+    <div className={`dc-3d-root dc-3d-root-enter${immersive ? ' dc-3d-immersive' : ''}`}>
       <div className="dc-3d-toolbar">
         <span className="dc-twin-title">3D Lab Twin · Walk mode</span>
         <label className="dc-3d-toggle">
@@ -1992,8 +3404,12 @@ export default function DatacenterTwin3D({
           </button>
         )}
         <span className="dc-muted">
-          ~{fps || '—'} FPS · {inGame
-            ? 'click canvas to look · WASD · Shift sprint · Esc menu'
+          {/* Ref-driven text node: setState here re-rendered <Canvas>'s children,
+              so the entire SceneContent tree reconciled once per second. */}
+          ~<span ref={fpsElRef}>—</span> FPS · {inGame
+            ? (pointerLocked
+              ? 'WASD · Shift sprint · E interact · Esc menu'
+              : 'click the hall to capture mouse look')
             : walkMode
               ? 'WASD ready'
               : 'cinematic enter → auto Walk'}
@@ -2008,6 +3424,15 @@ export default function DatacenterTwin3D({
         {inGame && <div className="dc-3d-aisle-fog" aria-hidden />}
         {inGame && <div className="dc-3d-hud-crosshair" aria-hidden />}
         <ControlsHud walkMode={walkMode} quality={quality} onQuality={setQualityPersist} />
+        {inGame && (
+          <TouchWalkPad
+            active={coarsePointer}
+            onRequestGyro={async () => {
+              const ok = await requestGyroPermission()
+              setGyroOn(!!ok)
+            }}
+          />
+        )}
         {physicsNote && (
           <div className="dc-3d-physics-note" role="status">
             Physics off ({physicsNote}) — hall still walkable
@@ -2027,8 +3452,14 @@ export default function DatacenterTwin3D({
             <div>1 Dock · 2 Reception · 3 MDF · 4 NOC · V AR overlay · Esc menu</div>
           </div>
         )}
-        {inGame && <Minimap posRef={posRef} currentRoomLabel={currentRoomLabel} />}
+        {inGame && (
+          <Minimap posRef={posRef} currentRoomLabel={currentRoomLabel} rackCount={racks.length} />
+        )}
         {inGame && <CoachMark show={showCoach} />}
+        {inGame && pointerLocked && !menuOpen && (
+          <InteractPrompt prompt={interactPrompt} interactKey={codeLabel(binds.interact)} />
+        )}
+        <ClickToPlay show={inGame && !pointerLocked && !menuOpen} onEngage={engagePointerLock} />
         {immersive && !intro && <ArModeChip mode={arMode} />}
         {immersive && !intro && (
           <FieldKitHud
@@ -2058,7 +3489,12 @@ export default function DatacenterTwin3D({
         <ImmersiveMenu
           open={menuOpen}
           badgedIn={badgedIn}
-          onResume={() => setMenuOpen(false)}
+          look={look}
+          onLookChange={updateLook}
+          binds={binds}
+          onBindsChange={updateBinds}
+          onPhoto={takePhoto}
+          onResume={resumeWalking}
           onExitImmersive={exitImmersive}
           onExitTo2D={exitTo2D}
         />
@@ -2073,6 +3509,9 @@ export default function DatacenterTwin3D({
               failIfMajorPerformanceCaveat: false,
             }}
             onCreated={({ gl }) => {
+              // Kept so the root can request pointer lock from a user gesture
+              // (menu Resume / click-to-play) without reaching into R3F internals.
+              canvasElRef.current = gl.domElement
               try {
                 gl.setClearColor('#070a10')
               } catch { /* ignore */ }
@@ -2103,7 +3542,14 @@ export default function DatacenterTwin3D({
                   intro={intro}
                   walkMode={walkMode}
                   walkPaused={menuOpen}
+                  look={look}
+                  binds={binds}
+                  pointerLocked={pointerLocked}
+                  onPointerLockChange={handlePointerLockChange}
+                  onInteractPrompt={setInteractPrompt}
                   posRef={posRef}
+                  spawn={spawn}
+                  onPosCommit={commitPos}
                   tickets={tickets}
                   doorOpen={badgedIn}
                   onEnterRoom={onEnterRoom}
@@ -2112,6 +3558,7 @@ export default function DatacenterTwin3D({
                   onBadgeIn={onBadgeIn}
                   nocMetrics={nocMetrics}
                   dustCount={qualityCfg.dust}
+                  shadowMapSize={qualityCfg.shadowMap}
                 />
               )}
             >
@@ -2137,7 +3584,14 @@ export default function DatacenterTwin3D({
                       intro={intro}
                       walkMode={walkMode}
                       walkPaused={menuOpen}
+                      look={look}
+                      binds={binds}
+                      pointerLocked={pointerLocked}
+                      onPointerLockChange={handlePointerLockChange}
+                      onInteractPrompt={setInteractPrompt}
                       posRef={posRef}
+                      spawn={spawn}
+                      onPosCommit={commitPos}
                       tickets={tickets}
                       doorOpen={badgedIn}
                       onEnterRoom={onEnterRoom}
@@ -2146,6 +3600,7 @@ export default function DatacenterTwin3D({
                       onBadgeIn={onBadgeIn}
                       nocMetrics={nocMetrics}
                       dustCount={qualityCfg.dust}
+                  shadowMapSize={qualityCfg.shadowMap}
                     />
                   </Physics>
                 </Suspense>
@@ -2169,7 +3624,14 @@ export default function DatacenterTwin3D({
                   intro={intro}
                   walkMode={walkMode}
                   walkPaused={menuOpen}
+                  look={look}
+                  binds={binds}
+                  pointerLocked={pointerLocked}
+                  onPointerLockChange={handlePointerLockChange}
+                  onInteractPrompt={setInteractPrompt}
                   posRef={posRef}
+                  spawn={spawn}
+                  onPosCommit={commitPos}
                   tickets={tickets}
                   doorOpen={badgedIn}
                   onEnterRoom={onEnterRoom}
@@ -2178,12 +3640,38 @@ export default function DatacenterTwin3D({
                   onBadgeIn={onBadgeIn}
                   nocMetrics={nocMetrics}
                   dustCount={qualityCfg.dust}
+                  shadowMapSize={qualityCfg.shadowMap}
                 />
               )}
             </PhysicsSafe>
+            {(qualityCfg.bloom || qualityCfg.ssao || qualityCfg.vignette || qualityCfg.noise) && (
+              <EffectComposer multisampling={0} enableNormalPass={qualityCfg.ssao}>
+                {qualityCfg.bloom && (
+                  <Bloom luminanceThreshold={0.82} intensity={0.55} mipmapBlur />
+                )}
+                {qualityCfg.ssao && (
+                  <SSAO
+                    samples={12}
+                    radius={0.18}
+                    intensity={25}
+                    luminanceInfluence={0.45}
+                    worldDistanceThreshold={24}
+                    worldDistanceFalloff={8}
+                    worldProximityThreshold={0.6}
+                    worldProximityFalloff={0.2}
+                  />
+                )}
+                {qualityCfg.vignette && (
+                  <Vignette offset={0.28} darkness={0.55} />
+                )}
+                {qualityCfg.noise && (
+                  <Noise opacity={0.035} premultiply />
+                )}
+              </EffectComposer>
+            )}
           </Canvas>
         </Suspense>
       </div>
-    </motion.div>
+    </div>
   )
 }

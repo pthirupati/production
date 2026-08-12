@@ -6,7 +6,7 @@ import {
   Play, Square, Trash2, RotateCw, Plus, Download, Hexagon, KeyRound, Archive, Terminal, Info, Eraser, Activity,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
-import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession, SimLoginGateCard } from '../sim/shared'
 import { renderDockerV2Page } from './DockerV2Panels'
 import '../../styles/sim-products.css'
 import './docker.css'
@@ -30,6 +30,85 @@ const SIDEBAR = [
   { key: 'secrets', label: 'Secrets & Configs', icon: KeyRound },
   { key: 'registry', label: 'Registry', icon: Archive },
 ]
+
+/**
+ * Expanded container row: the two surfaces this console previously had no way to
+ * show or edit. Env vars are printed verbatim — `docker inspect` hands them to
+ * anyone who can reach the daemon, and seeing that is the point of the secrets
+ * lab. Mounted secrets show their target path only; the value is readable solely
+ * from inside the container (`exec` → `cat /run/secrets/<name>`).
+ */
+function ContainerDetails({ container, sessionId, busy, run }) {
+  const env = container.env || []
+  const mounts = container.secretMounts || []
+  return (
+    <div className="grid md:grid-cols-2 gap-4 p-1">
+      <div>
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+          Environment ({env.length})
+        </h4>
+        {env.length === 0 ? (
+          <p className="text-xs text-slate-500">No environment variables.</p>
+        ) : (
+          <ul className="space-y-1">
+            {env.map((entry) => {
+              const idx = entry.indexOf('=')
+              const key = idx === -1 ? entry : entry.slice(0, idx)
+              const value = idx === -1 ? '' : entry.slice(idx + 1)
+              return (
+                <li key={key} className="flex items-start gap-2 bg-white border border-slate-200 rounded px-2 py-1">
+                  <div className="min-w-0 flex-1 font-mono text-[11px] leading-relaxed">
+                    <span className="font-semibold text-slate-700">{key}</span>
+                    <span className="text-slate-400">=</span>
+                    <span className="text-slate-600 break-all">{value}</span>
+                  </div>
+                  <button type="button" title={`Remove ${key}`} className="docker-btn-ghost shrink-0 text-[11px]"
+                    disabled={busy}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      run(() => dockerApi.unsetContainerEnv(sessionId, container.shortName, key), `Removed ${key}`)
+                    }}>
+                    <Trash2 size={11} className="inline mr-0.5" />Remove
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+      <div>
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+          Mounted secrets ({mounts.length})
+        </h4>
+        {mounts.length === 0 ? (
+          <p className="text-xs text-slate-500">
+            None. Mount one from <span className="font-medium">Secrets &amp; Configs</span> to give this
+            container a credential without putting it in the environment.
+          </p>
+        ) : (
+          <ul className="space-y-1">
+            {mounts.map((m) => (
+              <li key={m.secret} className="flex items-center gap-2 bg-white border border-slate-200 rounded px-2 py-1">
+                <div className="min-w-0 flex-1 text-[11px] leading-relaxed">
+                  <div className="font-semibold text-slate-700">{m.secret}</div>
+                  <div className="font-mono text-slate-500 break-all">{m.target} · mode {m.mode || '0400'}</div>
+                </div>
+                <button type="button" title={`Unmount ${m.secret}`} className="docker-btn-ghost shrink-0 text-[11px]"
+                  disabled={busy}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    run(() => dockerApi.unmountSecret(sessionId, container.shortName, m.secret), 'Unmounted')
+                  }}>
+                  Unmount
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function containerTone(state) {
   if (state === 'running') return 'success'
@@ -106,7 +185,7 @@ export default function DockerConsole({
       <div className={simPanelRoot(embedded, 'bg-[#0d1117]')}>
         <LabChromeBar title="Docker Host Console" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <SimLoginGateCard title="Sign in to Docker" onClose={onExit} className="bg-white rounded shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold flex items-center gap-2" style={{ background: ACCENT }}>
               <Container size={18} /> Sign in to Docker Host
             </div>
@@ -132,7 +211,7 @@ export default function DockerConsole({
                 Use lab credentials (autofill)
               </button>
             </form>
-          </div>
+          </SimLoginGateCard>
         </div>
       </div>
     )
@@ -188,34 +267,44 @@ export default function DockerConsole({
               { key: 'cpu', label: 'CPU %', render: (r) => r.cpuPercent ?? 0 },
               { key: 'mem', label: 'Mem', render: (r) => `${r.memUsageMb ?? 0} / ${r.memLimitMb ?? 0} MB` },
               {
+                key: 'config', label: 'Env / Secrets',
+                render: (r) => (
+                  <span className="text-xs text-slate-600 whitespace-nowrap">
+                    {(r.env || []).length} env
+                    <span className="text-slate-300 mx-1">·</span>
+                    {(r.secretMounts || []).length} mounted
+                  </span>
+                ),
+              },
+              {
                 key: 'actions', label: 'Actions',
                 render: (r) => (
                   <div className="flex gap-1 flex-wrap">
-                    <button type="button" title="Start" className="p-1 rounded hover:bg-slate-100" disabled={busy || r.state === 'running'}
+                    <button type="button" title="Start" aria-label="Start container" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy || r.state === 'running'}
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.startContainer(sessionId, r.shortName), 'Started') }}>
                       <Play size={14} />
                     </button>
-                    <button type="button" title="Stop" className="p-1 rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
+                    <button type="button" title="Stop" aria-label="Stop container" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.stopContainer(sessionId, r.shortName), 'Stopped') }}>
                       <Square size={14} />
                     </button>
-                    <button type="button" title="Restart" className="p-1 rounded hover:bg-slate-100" disabled={busy}
+                    <button type="button" title="Restart" aria-label="Restart container" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy}
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.restartContainer(sessionId, r.shortName), 'Restarted') }}>
                       <RotateCw size={14} />
                     </button>
-                    <button type="button" title="Exec" className="p-1 rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
+                    <button type="button" title="Exec" aria-label="Exec into container" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.execContainer(sessionId, r.shortName, 'sh'), 'Exec OK') }}>
                       <Terminal size={14} />
                     </button>
-                    <button type="button" title="Inspect" className="p-1 rounded hover:bg-slate-100" disabled={busy}
+                    <button type="button" title="Inspect" aria-label="Inspect container" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy}
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.inspectContainer(sessionId, r.shortName), 'Inspected') }}>
                       <Info size={14} />
                     </button>
-                    <button type="button" title="Stats" className="p-1 rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
+                    <button type="button" title="Stats" aria-label="Container stats" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy || r.state !== 'running'}
                       onClick={(e) => { e.stopPropagation(); run(() => dockerApi.statsContainer(sessionId, r.shortName), 'Stats OK') }}>
                       <Activity size={14} />
                     </button>
-                    <button type="button" title="Connect network" className="p-1 rounded hover:bg-slate-100" disabled={busy}
+                    <button type="button" title="Connect network" aria-label="Connect network" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy}
                       onClick={(e) => {
                         e.stopPropagation()
                         setConnectOpen(r.shortName)
@@ -223,7 +312,7 @@ export default function DockerConsole({
                       }}>
                       <Network size={14} />
                     </button>
-                    <button type="button" title="Remove" className="p-1 rounded hover:bg-slate-100" disabled={busy}
+                    <button type="button" title="Remove" aria-label={`Remove container ${r.shortName}`} className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-slate-100" disabled={busy}
                       onClick={(e) => {
                         e.stopPropagation()
                         run(() => dockerApi.removeContainer(sessionId, r.shortName, r.state === 'running'), 'Removed')
@@ -235,7 +324,13 @@ export default function DockerConsole({
               },
             ]}
             rows={containers}
+            expandRow={(r) => (
+              <ContainerDetails container={r} sessionId={sessionId} busy={busy} run={run} />
+            )}
           />
+          <p className="text-xs text-slate-500 mt-2">
+            Select a container to view its environment variables and mounted secrets.
+          </p>
         </div>
       )
     }

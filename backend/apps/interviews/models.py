@@ -205,12 +205,28 @@ class InterviewRound(models.Model):
     av_compliant = models.BooleanField(default=False)
     av_warning_started_at = models.DateTimeField(null=True, blank=True)
     practical_lab_session_id = models.UUIDField(null=True, blank=True)
+    # Camera/mic/transcript consent (audit Z4-5). The UI has always required an
+    # explicit checkbox before the round can start, but nothing recorded it — so we
+    # processed biometric-adjacent data with no evidence consent was ever given.
+    # Under DPDP/GDPR the burden of proof is ours, and "the button was disabled
+    # without it" is not evidence. Storing the version matters as much as the
+    # timestamp: consent is to a specific text, so a later policy rewrite must not
+    # silently re-interpret what someone agreed to.
+    consent_granted_at = models.DateTimeField(null=True, blank=True)
+    consent_policy_version = models.CharField(max_length=32, blank=True, default="")
     # Parity: one-way async video mode runs ALONGSIDE the live interview. Async
     # rounds present prompts the candidate records answers to (MediaRecorder).
     mode = models.CharField(
         max_length=16,
         default="live",
         choices=[("live", "Live"), ("async_video", "One-way async video")],
+    )
+    # Candidate interview language for ASR/TTS (audit L5221). Maps to BCP-47
+    # locales in the client: en→en-US, hi→hi-IN, te→te-IN.
+    language = models.CharField(
+        max_length=8,
+        default="en",
+        choices=[("en", "English"), ("hi", "Hindi"), ("te", "Telugu")],
     )
     metadata = models.JSONField(default=dict, blank=True)
     # WS7: the most recent PASSED inline practical submission (command/code text +

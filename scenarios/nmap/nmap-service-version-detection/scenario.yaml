@@ -6,36 +6,29 @@ description: 'CONTEXT: A team operating network scanning has raised a ticket for
   and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline scanning lab. The architecture is a single lab-primary
   node exposing nmap CLI, targets, and scan output; treat it as the production host for this incident.
   All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: web01:80 is known to be open but its service is reported only as the generic
   "http". A version-detection scan is required to reveal the underlying server product and version.
-
 
   OBJECTIVE: Open the Nmap console from the lab toolbar (Open Nmap); Run service/version detection against
   web01 port 80 (nmap -sV -p 80 10.10.10.10); Identify the HTTP server software (nginx) and its version.
   Acceptance criteria: the change is minimal and reversible, and success means HTTP 200 from http://localhost.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant nmap CLI, targets, and scan output), changing one thing at a time. Check your work
   continuously against the objective — success means HTTP 200 from http://localhost.
 
-
   VERIFY: Re-run the same check the grader uses and confirm HTTP 200 from http://localhost. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -97,7 +90,6 @@ hints:
 
     3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
 
-
     WHY: systemd will not start nginx until `nginx -t` passes.'
 summary: Complete the detect the web server software and version nmap lab and verify success with the
   checker
@@ -109,7 +101,7 @@ tags:
 - fix
 - hands-on
 - nmap
-linked_tutorial: nmap-fundamentals
+linked_tutorial: nmap-zero-hero
 what_you_will_learn:
 - Open the Nmap console from the lab toolbar (Open Nmap)
 - Run service/version detection against web01 port 80 (nmap -sV -p 80 10.10.10.10)

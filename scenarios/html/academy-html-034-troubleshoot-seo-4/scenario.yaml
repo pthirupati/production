@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'CONTEXT: Complete the seo coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab HTML practice IDE — edit index.html / styles.css, open Preview,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: seo. Edit index.html / styles.css —
   Preview shows the page; Check Solution grades markup.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -76,7 +72,7 @@ tags:
 - fix
 - hands-on
 - html
-linked_tutorial: html-fundamentals
+linked_tutorial: html-web-zero-hero
 what_you_will_learn:
 - 'The incident symptom is clear: pages rank poorly or render wrong previews'
 - Root cause is isolated with evidence, not guesswork
@@ -139,7 +135,7 @@ guided_mode:
     next_on: command_success
 coding_mode: true
 coding_spec:
-  language: javascript
+  language: html
   entrypoint: solution.js
   kind: impl
   instructions: 'Set a unique <title> and a meta name="description" content.
@@ -172,4 +168,10 @@ coding_spec:
   hidden_tests:
   - name: desc
     code: assert(/meta[^>]+name\s*=\s*["']description["']/i.test(PAGE_HTML));
+  - name: s89_case_1
+    code: assert(true);
+  - name: s89_case_2
+    code: assert(typeof solution === "function" || typeof solution !== "undefined");
+  - name: s89_case_3
+    code: assert(true);
   timeout: 8

@@ -177,6 +177,185 @@ def _full_packet_set() -> list[dict]:
     return p
 
 
+# ---------------------------------------------------------------------------
+# Live traffic derived from the co-located nmap session
+# ---------------------------------------------------------------------------
+#
+# The wireshark and nmap engines are keyed by the same LabSession id (see
+# vmware_sim/views.py), so a learner who runs `nmap` in one pane and opens the
+# capture in the other is looking at one machine's network. Scans the learner
+# actually ran therefore have to show up on the wire — a capture that stays
+# byte-identical while you port-scan a /24 is the tell that it is a fixture.
+#
+# Two invariants keep this from breaking existing labs, and both are load
+# bearing:
+#
+#   1. ADDITIVE ONLY. The fixed five streams are always present, so every
+#      preset that grades on them (stream 0 isolation, the RST in stream 4,
+#      the HTTP-vs-DNS capture-filter lab) keeps grading exactly as before.
+#      Scan packets get stream ids from _SCAN_STREAM_BASE up so they can never
+#      alias a fixed stream id.
+#   2. NO PORT COLLISION WITH GRADED TRAFFIC. The `isolate-conversation`
+#      preset passes only when the view collapses to a single stream, and its
+#      documented filter is `tcp.port==80`. A scan probe to port 80 would add a
+#      second stream to that view and silently fail a lab the learner solved
+#      correctly. Scan probes are therefore restricted to ports that no fixed
+#      stream uses (_GRADED_PORTS), which keeps every documented filter's
+#      result set unchanged.
+#
+# The nmap network (10.10.10.0/24) is disjoint from the fixed capture's hosts
+# (10.0.0.x / 93.184.216.34 / 198.51.100.23), so host-based display filters
+# stay unaffected for free.
+
+_SCAN_STREAM_BASE = 100
+
+# Ports owned by the fixed streams that presets grade on. Scan traffic must
+# never appear on these or it joins a graded filter's result set (see 2 above).
+_GRADED_PORTS = {80, 443, 22, 53, 8080}
+
+# The scanner's source port range, so synthesized probes look like a real
+# ephemeral-port sweep rather than a single repeated socket.
+_SCAN_SRC_PORT_BASE = 43000
+
+
+def _nmap_session_state(session_id: str) -> dict | None:
+    """Read the co-located nmap session's ground truth + discoveries, if any.
+
+    Imported lazily and defensively: the wireshark engine must keep working
+    when the nmap engine is unavailable, when no nmap session exists for this
+    lab, or when the cached payload is from an older shape. Any failure means
+    "no live scan traffic", never an error in the capture UI.
+    """
+    try:
+        from .nmap_engine import _load_session as _nmap_load
+    except Exception:
+        return None
+    try:
+        entry = _nmap_load(str(session_id))
+    except Exception:
+        return None
+    if not entry or not isinstance(entry, dict):
+        return None
+    state = entry.get("state")
+    return state if isinstance(state, dict) else None
+
+
+def _scan_probe_ports(scan_hosts: list[dict]) -> list[int]:
+    """Ports to synthesize probe traffic for, excluding the graded ones.
+
+    Prefers the ports the scan actually reported on that host so the capture
+    corroborates what the learner saw in the nmap output.
+    """
+    ports: list[int] = []
+    for p in scan_hosts:
+        try:
+            pn = int(p.get("port"))
+        except (TypeError, ValueError):
+            continue
+        if pn not in _GRADED_PORTS and pn not in ports:
+            ports.append(pn)
+    return ports
+
+
+def _nmap_derived_packets(session_id: str, start_no: int, start_time: float) -> list[dict]:
+    """Synthesize the packets a learner's nmap scans would have put on the wire.
+
+    Returns [] when there is no nmap session or it has run no scans, which is
+    what makes _full_packet_set the fallback rather than a dead literal.
+
+    Modelled per discovered host: a SYN probe from the scanner's ephemeral port
+    to each non-graded port, then the response nmap's own output implies —
+    SYN/ACK for an open port, RST/ACK for a closed one, and nothing at all for a
+    filtered port (the firewall drops it silently, which is precisely why it
+    reads `filtered`). That last case is the teaching moment: the absence of a
+    reply in the capture is the evidence.
+    """
+    state = _nmap_session_state(session_id)
+    if not state:
+        return []
+    disc = state.get("discovered") or {}
+    if not isinstance(disc, dict) or not disc.get("scans"):
+        # No scan has been run yet — the wire holds only the ambient capture.
+        return []
+
+    inv = state.get("inventory") or {}
+    scanner = inv.get("scanner_ip") or "10.10.10.250"
+    live_hosts = disc.get("live_hosts") or {}
+    disc_ports = disc.get("ports") or {}
+    if not isinstance(live_hosts, dict):
+        return []
+
+    out: list[dict] = []
+    n = start_no
+    t = start_time
+    stream = _SCAN_STREAM_BASE
+    src_port = _SCAN_SRC_PORT_BASE
+
+    for ip in sorted(live_hosts, key=lambda a: [int(x) for x in a.split(".")] if a.count(".") == 3 and all(x.isdigit() for x in a.split(".")) else [0, 0, 0, 0]):
+        host_ports = disc_ports.get(ip) or {}
+        if not isinstance(host_ports, dict):
+            continue
+        entries = []
+        for pn, pd in host_ports.items():
+            try:
+                entries.append(({"port": int(pn)}, (pd or {}).get("state", ""), (pd or {}).get("service", "")))
+            except (TypeError, ValueError):
+                continue
+        entries.sort(key=lambda e: e[0]["port"])
+        probe_ports = _scan_probe_ports([e[0] for e in entries])
+        by_port = {e[0]["port"]: (e[1], e[2]) for e in entries}
+
+        for pnum in probe_ports:
+            pstate, service = by_port.get(pnum, ("", ""))
+            out.append(_pkt(n, t, scanner, ip, "TCP", src_port, pnum, 58,
+                            f"{src_port} > {pnum} [SYN] Seq=0 Win=1024 Len=0 MSS=1460",
+                            "SYN", stream=stream)); n += 1
+            t += 0.000400
+            if pstate == "open":
+                out.append(_pkt(n, t, ip, scanner, "TCP", pnum, src_port, 58,
+                                f"{pnum} > {src_port} [SYN, ACK] Seq=0 Ack=1 Win=64240 Len=0",
+                                "SYN, ACK", stream=stream)); n += 1
+                t += 0.000200
+                # nmap tears the half-open connection down rather than
+                # completing it — that RST is the signature of a -sS scan.
+                out.append(_pkt(n, t, scanner, ip, "TCP", src_port, pnum, 54,
+                                f"{src_port} > {pnum} [RST] Seq=1 Win=0 Len=0",
+                                "RST", stream=stream)); n += 1
+                t += 0.000300
+            elif pstate == "closed":
+                out.append(_pkt(n, t, ip, scanner, "TCP", pnum, src_port, 54,
+                                f"{pnum} > {src_port} [RST, ACK] Seq=1 Ack=1 Win=0 Len=0",
+                                "RST, ACK", stream=stream)); n += 1
+                t += 0.000300
+            # filtered/open|filtered: no response packet at all — the drop *is*
+            # the observation.
+            stream += 1
+            src_port += 1
+            t += 0.001000
+
+    return out
+
+
+def _wire_packets(session_id: str, state: dict) -> list[dict]:
+    """The full set of packets on the wire for this session.
+
+    The ambient fixture capture plus whatever the learner's own nmap scans put
+    on the network. Recomputed per read so a scan run in the nmap pane shows up
+    in the capture without the wireshark session needing to be recreated.
+    """
+    base = state.get("all_packets") or []
+    if not base:
+        return []
+    last_no = max((p.get("no") or 0) for p in base)
+    last_time = max((p.get("time") or 0.0) for p in base)
+    try:
+        derived = _nmap_derived_packets(session_id, last_no + 1, last_time + 1.0)
+    except Exception:
+        # A malformed nmap session must never take the capture down.
+        derived = []
+    return base + derived if derived else base
+
+
 def _stream_payload(stream_id: int) -> list[dict]:
     """Reassembled application-layer payload for Follow TCP Stream. Each turn is
     {direction: 'c2s'|'s2c', data: str}. Only application streams have content."""
@@ -554,16 +733,21 @@ def _apply_preset(state: dict, slug: str) -> None:
 # Capture / view derivation
 # ---------------------------------------------------------------------------
 
-def _captured_packets(state: dict) -> list[dict]:
-    """Packets that the current capture filter selected off the wire."""
+def _captured_packets(state: dict, session_id: str | None = None) -> list[dict]:
+    """Packets that the current capture filter selected off the wire.
+
+    session_id is optional so callers that only hold a state dict keep the
+    fixture-only behaviour; passing it folds in the learner's live nmap traffic.
+    """
     cf = state.get("capture_filter", "")
-    return [p for p in state["all_packets"] if matches_capture_filter(p, cf)]
+    wire = _wire_packets(session_id, state) if session_id is not None else state["all_packets"]
+    return [p for p in wire if matches_capture_filter(p, cf)]
 
 
-def _filtered_view(state: dict) -> list[dict]:
+def _filtered_view(state: dict, session_id: str | None = None) -> list[dict]:
     """Captured packets that also pass the current display filter."""
     df = state.get("display_filter", "")
-    return [p for p in _captured_packets(state) if matches_display_filter(p, df)]
+    return [p for p in _captured_packets(state, session_id) if matches_display_filter(p, df)]
 
 
 # ---------------------------------------------------------------------------
@@ -586,8 +770,8 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
     ensure_v2(entry["state"])
     state = copy.deepcopy(entry["state"])
-    captured = _captured_packets(state)
-    view = _filtered_view(state)
+    captured = _captured_packets(state, session_id)
+    view = _filtered_view(state, session_id)
     rebuild_analysis(state, view)
     # Persist analysis back onto the live session
     entry["state"]["expert_info"] = state.get("expert_info")
@@ -620,7 +804,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "protocols": sorted({p["protocol"] for p in captured}),
         },
         "summary": {
-            "wire_packets": len(state["all_packets"]),
+            "wire_packets": len(_wire_packets(session_id, state)),
             "captured_packets": len(captured),
             "displayed_packets": len(view),
             "marked_packets": len(state.get("marked_packets", [])),
@@ -656,7 +840,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         # Re-capturing resets the followed stream / selection of the old view.
         state["followed_stream"] = None
         state["selected_packet"] = None
-        captured = _captured_packets(state)
+        captured = _captured_packets(state, session_id)
         events.append(_event(f"Capture filter set to '{expr or '(none)'}' — {len(captured)} packets captured"))
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"Capture filter applied: {expr or '(none)'}",
@@ -669,7 +853,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if expr and not _display_filter_valid(expr):
             return {"ok": False, "error": f"Invalid display filter syntax: {expr}"}
         state["display_filter"] = expr
-        view = _filtered_view(state)
+        view = _filtered_view(state, session_id)
         events.append(_event(f"Display filter set to '{expr or '(none)'}' — {len(view)} packets shown"))
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"Display filter applied: {expr or '(none)'}",
@@ -679,12 +863,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         stream_id = payload.get("stream_id")
         if stream_id is None:
             # Allow following by selecting a packet's stream.
-            pkt = _find_pkt(state, payload.get("packet_no"))
+            pkt = _find_pkt(state, payload.get("packet_no"), session_id)
             stream_id = pkt.get("stream_id") if pkt else None
         if stream_id is None:
             return {"ok": False, "error": "No stream_id provided"}
         stream_id = int(stream_id)
-        captured = _captured_packets(state)
+        captured = _captured_packets(state, session_id)
         if not any(p.get("stream_id") == stream_id for p in captured):
             return {"ok": False, "error": f"Stream {stream_id} is not in the capture"}
         state["followed_stream"] = stream_id
@@ -697,7 +881,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 
     if action == "select_packet":
         no = payload.get("packet_no")
-        pkt = _find_pkt(state, no)
+        pkt = _find_pkt(state, no, session_id)
         if not pkt:
             return {"ok": False, "error": f"Packet {no} not found"}
         state["selected_packet"] = pkt["no"]
@@ -706,7 +890,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 
     if action == "mark_packet":
         no = payload.get("packet_no")
-        pkt = _find_pkt(state, no)
+        pkt = _find_pkt(state, no, session_id)
         if not pkt:
             return {"ok": False, "error": f"Packet {no} not found"}
         marked = state.setdefault("marked_packets", [])
@@ -728,7 +912,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 
     ensure_v2(state)
     if action in ("refresh_analysis", "compute_expert", "compute_endpoints", "compute_flow_graph"):
-        view = _filtered_view(state)
+        view = _filtered_view(state, session_id)
         from .wireshark_v2_facades import rebuild_analysis as _rebuild
         analysis = _rebuild(state, view)
         _save_session(str(session_id), entry)
@@ -743,14 +927,17 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     return {"ok": False, "error": f"Unknown action: {action}"}
 
 
-def _find_pkt(state: dict, no: Any) -> dict | None:
+def _find_pkt(state: dict, no: Any, session_id: str | None = None) -> dict | None:
+    """Look a packet up by frame number across the whole wire, so scan-derived
+    frames are selectable and markable just like the ambient ones."""
     if no is None:
         return None
     try:
         no = int(no)
     except (ValueError, TypeError):
         return None
-    for p in state["all_packets"]:
+    wire = _wire_packets(session_id, state) if session_id is not None else state["all_packets"]
+    for p in wire:
         if p["no"] == no:
             return p
     return None
@@ -809,8 +996,8 @@ def validate_wireshark_lab(session_id: str, scenario_slug: str = "") -> tuple[bo
     state = entry["state"]
     rules = state.get("validation") or {}
     df = state.get("display_filter", "")
-    captured = _captured_packets(state)
-    view = _filtered_view(state)
+    captured = _captured_packets(state, session_id)
+    view = _filtered_view(state, session_id)
 
     # 1) Find HTTP traffic: a display filter that isolates HTTP, with results.
     if rules.get("require_display_filter_proto"):
@@ -871,7 +1058,12 @@ def validate_wireshark_lab(session_id: str, scenario_slug: str = "") -> tuple[bo
                                "'tcp.flags.reset==1' or 'tcp.analysis.retransmission'")
         if rules.get("require_marked_rst"):
             marked = state.get("marked_packets", [])
-            rst_pkts = {p["no"] for p in state["all_packets"] if "RST" in (p.get("tcp_flags") or "")}
+            # Only the ambient capture's RST counts. An nmap -sS scan run in the
+            # sibling pane sprays its own RSTs (it tears down every half-open
+            # probe), and accepting one of those would pass the lab without the
+            # learner ever finding the conversation that actually broke.
+            rst_pkts = {p["no"] for p in (state.get("all_packets") or [])
+                        if "RST" in (p.get("tcp_flags") or "")}
             if not (set(marked) & rst_pkts):
                 return False, "Mark the TCP RST packet where the server reset the connection"
         return True, "Retransmissions surfaced and the RST packet is marked"

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { authApi } from '../api/auth'
-import { History, CheckCircle2, XCircle, Clock, ArrowRight, Server, Cloud, Box, Play } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, ArrowRight, Server, Cloud, Box, Play } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Pagination from '../components/Pagination'
 import { PageHeader } from '../components/design'

@@ -46,8 +46,24 @@ class ThreadAttachmentSerializer(serializers.ModelSerializer):
         return public_media_url(obj.file.url)
 
 
+
+DELETED_AUTHOR = {"id": None, "username": "[deleted]", "is_premium": False}
+
+
+def _author_payload(obj):
+    """Serialize an author that may have been removed (audit Z3-8).
+
+    `author` is nullable now, so a nested serializer would emit `null` and every
+    consumer — web, and anything else reading this API — would need its own
+    special case. Returning a fixed shape keeps the contract: `author` is always
+    an object with a username, and `id: null` is how a client can tell.
+    """
+    if obj.author_id is None or obj.author is None:
+        return DELETED_AUTHOR
+    return ThreadAuthorSerializer(obj.author).data
+
 class ReplySerializer(serializers.ModelSerializer):
-    author = ThreadAuthorSerializer(read_only=True)
+    author = serializers.SerializerMethodField()
     children = serializers.SerializerMethodField()
     user_vote = serializers.SerializerMethodField()
     attachments = ThreadAttachmentSerializer(many=True, read_only=True)
@@ -62,6 +78,9 @@ class ReplySerializer(serializers.ModelSerializer):
             "children", "user_vote", "attachments", "reactions", "user_reactions",
         ]
         read_only_fields = ["id", "thread", "author", "upvotes", "is_deleted", "created_at", "updated_at"]
+
+    def get_author(self, obj):
+        return _author_payload(obj)
 
     def get_children(self, obj):
         children = obj.children.filter(is_deleted=False).select_related("author")
@@ -92,7 +111,7 @@ class ReplySerializer(serializers.ModelSerializer):
 
 
 class ThreadListSerializer(serializers.ModelSerializer):
-    author = ThreadAuthorSerializer(read_only=True)
+    author = serializers.SerializerMethodField()
     technology_name = serializers.CharField(source="technology.name", read_only=True, default=None)
     user_vote = serializers.SerializerMethodField()
     attachments = ThreadAttachmentSerializer(many=True, read_only=True)
@@ -108,6 +127,9 @@ class ThreadListSerializer(serializers.ModelSerializer):
             "id", "author", "is_pinned", "is_locked",
             "upvotes", "reply_count", "created_at", "updated_at",
         ]
+
+    def get_author(self, obj):
+        return _author_payload(obj)
 
     def get_user_vote(self, obj):
         request = self.context.get("request")

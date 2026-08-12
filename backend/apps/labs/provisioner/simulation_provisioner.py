@@ -558,8 +558,14 @@ def ensure_sim_session(lab_session) -> dict | None:
     slug = scenario.slug
     snapshot = getattr(lab_session, "simulation_snapshot", None) or {}
     fresh = True
-    if snapshot and snapshot.get("version") == 1:
-        from .simulation.sim_persistence import restore_engine
+    # Prefer shared-cache blob (other worker) over empty/stale local, then DB JSONB.
+    from .simulation.sim_persistence import cache_get_engine, restore_engine
+
+    cached = cache_get_engine(session_id)
+    if cached is not None:
+        engine = cached
+        fresh = False
+    elif snapshot and snapshot.get("version") == 1:
         restored = restore_engine(snapshot)
         if restored:
             engine = restored
@@ -1222,7 +1228,13 @@ class SimulationProvisioner:
             try:
                 lab_session = LabSession.objects.get(container_id=resource_id)
                 az_ensure(str(lab_session.id), slug)
-                return validate_azure_lab(str(lab_session.id), slug)
+                _az_ok, _az_msg = validate_azure_lab(str(lab_session.id), slug)
+                # NO_VALIDATION_SCRIPT means the keyword-driven preset seeded no
+                # console objective for this slug (117 of 147 academy-azure-*).
+                # Fall through to the terminal sentinel sweep, which DOES plant a
+                # per-slug broken file — same treatment academy-aws-* already gets.
+                if not (not _az_ok and _az_msg == "NO_VALIDATION_SCRIPT"):
+                    return _az_ok, _az_msg
             except LabSession.DoesNotExist:
                 return False, "Azure simulation session not found"
         # Google Cloud Console (Compute Engine, VPC firewall, Persistent Disks).
@@ -1240,9 +1252,39 @@ class SimulationProvisioner:
             try:
                 lab_session = LabSession.objects.get(container_id=resource_id)
                 gcp_ensure(str(lab_session.id), slug)
-                return validate_gcp_lab(str(lab_session.id), slug)
+                _gcp_ok, _gcp_msg = validate_gcp_lab(str(lab_session.id), slug)
+                # Unseeded slug → terminal sentinel path, as for azure above.
+                if not (not _gcp_ok and _gcp_msg == "NO_VALIDATION_SCRIPT"):
+                    return _gcp_ok, _gcp_msg
             except LabSession.DoesNotExist:
                 return False, "GCP simulation session not found"
+        # OpenStack Horizon / CLI (Nova / Neutron / Cinder). Keyword overlays
+        # seed broken markers for attach/power/launch labs; unmapped slugs
+        # fall through to the terminal sentinel (audit §G6).
+        _raw_os_type = sim_type
+        if not _raw_os_type or _raw_os_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _os_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_os_type = (getattr(_os_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_os_type = ""
+        if (
+            _raw_os_type == "openstack"
+            or low_slug.startswith(("openstack-", "academy-openstack-", "nova-", "cinder-", "neutron-"))
+        ):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.openstack_engine import (
+                validate_openstack_lab, _ensure as os_ensure,
+            )
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                os_ensure(str(lab_session.id), slug)
+                _os_ok, _os_msg = validate_openstack_lab(str(lab_session.id), slug)
+                if not (not _os_ok and _os_msg == "NO_VALIDATION_SCRIPT"):
+                    return _os_ok, _os_msg
+            except LabSession.DoesNotExist:
+                return False, "OpenStack simulation session not found"
         # Monitoring (Grafana / Prometheus observability). Legacy simulation_type
         # "monitoring"/"loki"/"alertmanager"/"promql" normalize to grafana/prometheus;
         # gate on the normalized persona, the RAW scenario type, or the slug. The
@@ -1277,7 +1319,7 @@ class SimulationProvisioner:
         # failing-job faults) that only the CicdPipelineSim frontend can clear
         # via its own apply_action calls — and CicdPipelineSim is 100% local
         # React state today; it never calls the backend (see
-        # docs/gap-analysis.md G-06). A previous version of this dispatcher
+        # docs/gap-analysis-infra.md G-06). A previous version of this dispatcher
         # intercepted every scenario whose simulation_type=="devops" OR whose
         # slug started with devops-/cicd-/pipeline-/gitlab-ci-/github-actions-
         # and routed it to validate_cicd_lab — but EVERY scenario in the devops
@@ -1331,9 +1373,16 @@ class SimulationProvisioner:
             except LabSession.DoesNotExist:
                 return False, "Bare metal simulation session not found"
         # AWS console simulator: sim_type "aws" OR aws-/ec2-/s3-/iam- slug.
-        # Academy packs (academy-aws-*) are terminal FIXED-OK labs — do NOT
-        # intercept them here (same class of bug as G-06 cicd_engine). Console
-        # heroes keep validate_aws_lab.
+        # Academy packs (academy-aws-*) used to be excluded wholesale because no
+        # slug had a console objective. aws_engine._apply_academy_preset now
+        # authors per-slug broken markers for 224 of the 420 packs, so those are
+        # graded here against real console state. The remaining packs are
+        # services this console models as read-only inventory
+        # (aws_engine._ACADEMY_UNMAPPED_OK): they seed no marker, so
+        # validate_aws_lab returns NO_VALIDATION_SCRIPT and we fall through to
+        # the terminal sentinel sweep below — same treatment academy-azure-*
+        # gets. Falling through (not returning) is what keeps an unmapped pack
+        # solvable instead of stranded.
         _raw_aws_type = sim_type
         if not _raw_aws_type or _raw_aws_type == "generic":
             from apps.labs.models import LabSession
@@ -1342,18 +1391,30 @@ class SimulationProvisioner:
                 _raw_aws_type = (getattr(_aws_session.scenario, "simulation_type", "") or "")
             except LabSession.DoesNotExist:
                 _raw_aws_type = ""
-        _is_aws_academy = low_slug.startswith("academy-aws-")
-        if not _is_aws_academy and (
-            _raw_aws_type == "aws" or low_slug.startswith(("aws-", "ec2-", "s3-", "iam-"))
-        ):
+        if _raw_aws_type == "aws" or low_slug.startswith(("aws-", "ec2-", "s3-", "iam-", "academy-aws-")):
             from apps.labs.models import LabSession
             from apps.vmware_sim.aws_engine import validate_aws_lab, _ensure as aws_ensure
             try:
                 lab_session = LabSession.objects.get(container_id=resource_id)
                 aws_ensure(str(lab_session.id), slug)
-                return validate_aws_lab(str(lab_session.id), slug)
+                _aws_ok, _aws_msg = validate_aws_lab(str(lab_session.id), slug)
+                # Unmapped academy packs return NO_VALIDATION_SCRIPT so we can
+                # fall through to the terminal FIXED-OK sentinel. Returning that
+                # message here would strand ~196 read-only-inventory packs
+                # (audit measure-before-edit: the comment promised fallthrough;
+                # an earlier edit returned unconditionally and broke it).
+                if not (
+                    (not _aws_ok)
+                    and _aws_msg == "NO_VALIDATION_SCRIPT"
+                    and low_slug.startswith("academy-aws-")
+                ):
+                    return _aws_ok, _aws_msg
             except LabSession.DoesNotExist:
-                return False, "AWS simulation session not found"
+                # No DB-backed session (ephemeral/preview provisioning). Academy
+                # packs still have a terminal sentinel to grade against, so fall
+                # through rather than stranding them on a dispatch-only error.
+                if not low_slug.startswith("academy-aws-"):
+                    return False, "AWS simulation session not found"
         script = resolve_simulation_validation_script(slug, validation_script or "")
         if engine and hasattr(engine, "state"):
             return validate_simulation_state(engine.state, script, engine=engine)

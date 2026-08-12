@@ -201,6 +201,18 @@ TICKET_TYPES = (
 )
 
 
+# Priority → response target (minutes). Mirrors ITSM SLA_MINUTES with string keys
+# the twin UI already uses (medium/high/critical).
+OPS_SLA_MINUTES = {
+    "critical": 60,
+    "high": 240,
+    "medium": 480,
+    "moderate": 480,
+    "low": 1440,
+    "planning": 2880,
+}
+
+
 def build_ops_ticket(
     *,
     vendor: str,
@@ -211,9 +223,14 @@ def build_ops_ticket(
     summary: str,
     service_tag: str | None = None,
     priority: str = "medium",
+    now_ts: float | None = None,
 ) -> dict:
     vendor = vendor if vendor in SUPPORT_VENDORS else (vendor or "Dell")
-    tid = f"{vendor[:4].upper()}-{ticket_type[:3].upper()}-{int(time.time()) % 100000:05d}"
+    created_ts = float(now_ts if now_ts is not None else time.time())
+    tid = f"{vendor[:4].upper()}-{ticket_type[:3].upper()}-{int(created_ts) % 100000:05d}"
+    pri = (priority or "medium").lower()
+    sla_minutes = int(OPS_SLA_MINUTES.get(pri, OPS_SLA_MINUTES["medium"]))
+    due_ts = created_ts + sla_minutes * 60
     return {
         "id": tid,
         "type": ticket_type if ticket_type in TICKET_TYPES else "incident",
@@ -222,9 +239,14 @@ def build_ops_ticket(
         "hostname": hostname,
         "component": component,
         "status": "open",
-        "priority": priority,
+        "priority": pri,
         "summary": summary,
-        "created": _now(),
+        "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(created_ts)),
+        "created_ts": created_ts,
+        "sla_minutes": sla_minutes,
+        "sla_due": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(due_ts)),
+        "sla_remaining_sec": sla_minutes * 60,
+        "sla_breached": False,
         "service_tag": service_tag,
         "assignee": None,
         "escalation": 0,
@@ -232,6 +254,84 @@ def build_ops_ticket(
         "rca": None,
         "maintenance_window": None,
         "history": [{"time": _now(), "event": "created"}],
+    }
+
+
+def refresh_ticket_sla(ticket: dict, now_ts: float | None = None) -> dict:
+    """Recompute remaining/breach for an open ticket. Resolved/closed stay frozen."""
+    now = float(now_ts if now_ts is not None else time.time())
+    if ticket.get("status") in ("resolved", "closed"):
+        ticket["sla_remaining_sec"] = 0
+        return ticket
+    pri = str(ticket.get("priority") or "medium").lower()
+    sla_minutes = int(ticket.get("sla_minutes") or OPS_SLA_MINUTES.get(pri, 480))
+    ticket["sla_minutes"] = sla_minutes
+    created_ts = float(ticket.get("created_ts") or 0)
+    if not created_ts:
+        # Legacy tickets created before the SLA clock — treat as freshly opened.
+        created_ts = now
+        ticket["created_ts"] = created_ts
+    due_ts = created_ts + sla_minutes * 60
+    ticket["sla_due"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(due_ts))
+    remaining = int(due_ts - now)
+    ticket["sla_remaining_sec"] = max(0, remaining)
+    was = bool(ticket.get("sla_breached"))
+    ticket["sla_breached"] = remaining < 0
+    if ticket["sla_breached"] and not was:
+        hist = ticket.setdefault("history", [])
+        hist.insert(0, {"time": _now(), "event": "sla_breached"})
+    return ticket
+
+
+def refresh_all_ticket_slas(state: dict, now_ts: float | None = None) -> list[dict]:
+    """Tick every open ops ticket's SLA clock. Returns newly breached tickets."""
+    newly: list[dict] = []
+    for ticket in state.get("tickets") or []:
+        before = bool(ticket.get("sla_breached"))
+        refresh_ticket_sla(ticket, now_ts=now_ts)
+        if ticket.get("sla_breached") and not before:
+            newly.append(ticket)
+    return newly
+
+
+# Above this share of the rack breaker, pulling a redundant feed during a visit
+# risks tripping the remaining one — the classic "maintenance caused the outage".
+_WINDOW_LOAD_WARN_PCT = 70
+_WINDOW_LOAD_BLOCK_PCT = 85
+
+
+def assess_window_load(facility: dict | None, asset_id: str | None = None, rack: str | None = None) -> dict:
+    """Judge a maintenance window against what the floor is actually carrying.
+
+    Deliberately advisory: it returns a verdict and a reason, and never vetoes
+    an action. Hard-blocking ops on live load would make labs that never
+    expected a load conflict look broken rather than show a policy message.
+    """
+    facility = facility or {}
+    it_kw = float(facility.get("it_kw") or 0.0)
+    racks = facility.get("rack_loads") or {}
+    target = rack
+    if not target and asset_id:
+        # Asset ids look like srv-r03-u08 → rack R03.
+        parts = str(asset_id).split("-")
+        if len(parts) >= 2 and parts[1][:1].lower() == "r":
+            target = parts[1].upper()
+    rack_pct = int(racks.get(target) or 0) if target else 0
+    if rack_pct >= _WINDOW_LOAD_BLOCK_PCT:
+        verdict, reason = "conflict", (
+            f"{target} is at {rack_pct}% of breaker — shed load or schedule off-peak "
+            "before pulling a feed"
+        )
+    elif rack_pct >= _WINDOW_LOAD_WARN_PCT:
+        verdict, reason = "caution", f"{target} at {rack_pct}% of breaker — no headroom for a feed loss"
+    else:
+        verdict, reason = "clear", "Load within safe margin for the window"
+    return {
+        "rack": target,
+        "rack_load_pct": rack_pct,
+        "it_kw_at_schedule": round(it_kw, 2),
+        "load_verdict": verdict,
+        "load_reason": reason,
     }
 
 
@@ -245,6 +345,10 @@ def advance_ticket(ticket: dict, action: str, **kwargs) -> dict:
     elif action == "escalate":
         ticket["escalation"] = int(ticket.get("escalation") or 0) + 1
         ticket["priority"] = "critical" if ticket["escalation"] >= 2 else "high"
+        ticket["sla_minutes"] = OPS_SLA_MINUTES.get(ticket["priority"], 60)
+        # Escalate tightens the remaining window from *now*, not the original open.
+        ticket["created_ts"] = time.time()
+        refresh_ticket_sla(ticket)
         hist.insert(0, {"time": _now(), "event": f"escalated L{ticket['escalation']}"})
     elif action == "ship_rma":
         ticket["type"] = "rma"
@@ -272,13 +376,19 @@ def advance_ticket(ticket: dict, action: str, **kwargs) -> dict:
         hist.insert(0, {"time": _now(), "event": f"rma:{rma_number}"})
     elif action == "schedule_visit":
         ticket["type"] = "field_visit"
-        ticket["maintenance_window"] = {
+        window = {
             "start": kwargs.get("start") or _now(),
             "duration_min": int(kwargs.get("duration_min") or 120),
             "engineer": kwargs.get("engineer") or "field-eng-01",
         }
+        # The window is only meaningful if it knows what the floor is doing.
+        window.update(assess_window_load(kwargs.get("facility"), ticket.get("asset_id"), kwargs.get("rack")))
+        ticket["maintenance_window"] = window
         ticket["status"] = "scheduled"
-        hist.insert(0, {"time": _now(), "event": "field_visit_scheduled"})
+        hist.insert(0, {
+            "time": _now(),
+            "event": f"field_visit_scheduled:{window['load_verdict']}",
+        })
     elif action == "add_rca":
         ticket["rca"] = {
             "root_cause": kwargs.get("root_cause") or "Component wear-out",

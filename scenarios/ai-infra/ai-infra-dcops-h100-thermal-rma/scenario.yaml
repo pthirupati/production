@@ -14,17 +14,13 @@ jira_priority: Critical
 description: 'CONTEXT: DCOps ticket — H100 node thermal trip. Vendor RMA parts must land at the dock,
   get received, staged, installed in the repair bay, then burn-in before the ops ticket closes.
 
-
   ENVIRONMENT: AI Infrastructure Engineering Datacenter twin (3D hall + campus rooms) + Lab Terminal.
   Use NOC tickets, Loading Dock, Warehouse/Spares, Repair bay, Burn-in.
 
-
   SYMPTOM / STARTING STATE: Thermal alert on an H100 chassis. Ops ticket open. No dock ASN yet.
-
 
   OBJECTIVE: Select the failed server; advance ticket with ship_rma; Arrive/Receive FRU at dock (kit
   stages for asset); Install kit in Repair bay; run Burn-in; close ticket; mark FIXED-OK.
-
 
   VERIFY: Ticket closed; kit installed; burn-in pass; thermal clear.'
 objectives:

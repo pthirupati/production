@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import api from '../api/client'
 import { Sparkles } from 'lucide-react'
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
+import { useFetch } from '../hooks/useFetch'
 
 const TAG_META = {
   New: { color: 'text-accent-green', bg: 'bg-accent-green/14', border: 'border-accent-green/30', dot: '#56e0b0' },
@@ -193,18 +193,11 @@ function ReleaseCard({ release, index }) {
 }
 
 export default function Changelog() {
-  const [changelog, setChangelog] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-
-  useEffect(() => {
-    api.get('/config/', { silentError: true })
-      .then(res => {
-        setChangelog(res.data?.platform_config?.changelog || res.data?.changelog || null)
-      })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
-  }, [])
+  const { data: config, loading, error } = useFetch('/config/', {
+    config: { silentError: true },
+    initialData: null,
+  })
+  const changelog = config?.platform_config?.changelog || config?.changelog || null
 
   const releases = useMemo(() => {
     if (loading) return []
@@ -215,7 +208,7 @@ export default function Changelog() {
     return FALLBACK_RELEASES
   }, [changelog, loading])
 
-  const usingFallback = !loading && !changelog
+  const usingFallback = !loading && (!changelog || error)
 
   return (
     <MarketingPageShell

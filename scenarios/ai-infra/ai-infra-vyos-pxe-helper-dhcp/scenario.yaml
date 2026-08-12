@@ -14,18 +14,14 @@ jira_priority: High
 description: 'CONTEXT: Bare Metal / DCOps reports PXE enlist failing — nodes never get DHCP offers on
   the PXE helper VLAN. Networking owns the VyOS underlay that serves DHCP for MAAS PXE.
 
-
   ENVIRONMENT: AI Infrastructure Engineering lab terminal with VyOS CLI (configure / commit / compare /
   rollback / show system commit). MAAS Bare Metal console for enlist verification.
-
 
   SYMPTOM / STARTING STATE: VyOS DHCP for the PXE helper network is misconfigured or uncommitted.
   MAAS Enlist (PXE) stalls. A bad commit may need rollback.
 
-
   OBJECTIVE: Enter VyOS configure mode; set/fix DHCP for the PXE helper subnet; commit; verify with
   compare/show; if broken, rollback; confirm MAAS can Enlist a node; mark FIXED-OK.
-
 
   VERIFY: vyos show / commit history healthy; MAAS sees a New/Ready enlist path.'
 objectives:

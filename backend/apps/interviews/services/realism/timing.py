@@ -21,7 +21,10 @@ _PERSONA_BASE: dict[str, tuple[float, float]] = {
     "leadership": (0.80, 2.00),
 }
 
-_MIN_MS = 500
+# Floor is the audit's ~300ms target, not the old 500ms. It only binds once
+# scoring has already eaten the think-time budget below it; a fast turn still
+# samples the full persona window, so the "is typing…" cue never flickers.
+_MIN_MS = 300
 _MAX_MS = 3500
 
 
@@ -82,10 +85,17 @@ def compute_thinking_delay_ms(
     jitter = 1.0 + r.uniform(-0.15, 0.15)
     delay_ms = int(base_s * 1000 * jitter)
 
-    # Cap total perceived latency if scoring already took a while (risk #11).
-    if scoring_elapsed_ms is not None and scoring_elapsed_ms > 1500:
-        over = float(scoring_elapsed_ms) - 1500.0
-        delay_ms = int(delay_ms * max(0.35, 1.0 - over / 4000.0))
+    # Subtract work already done, don't just scale it down.
+    #
+    # base_s models the interviewer's TOTAL time-to-respond, but the candidate
+    # has already been waiting through scoring by the time this delay starts —
+    # so the old "scale by a factor above a 1500ms threshold" rule charged them
+    # twice and left 0.9–2.6s of pure dead air on every turn (measured over the
+    # persona windows). Treating scoring as part of the same think-time budget
+    # means a slow turn now feels no slower than a fast one, which is both more
+    # honest to the model and what the audit's latency budget asks for.
+    if scoring_elapsed_ms is not None and scoring_elapsed_ms > 0:
+        delay_ms -= int(scoring_elapsed_ms)
 
     return max(_MIN_MS, min(_MAX_MS, delay_ms))
 

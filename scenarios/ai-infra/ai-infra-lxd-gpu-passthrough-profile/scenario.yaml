@@ -15,13 +15,10 @@ description: 'CONTEXT: PSINFRA / Bare Metal / LXD ticket — inference pods need
   NVIDIA GPU passthrough (nvidia.runtime + physical GPU device). AI Infra Engineering owns LXD
   on MAAS-deployed GPU nodes; this is not the application GPU course.
 
-
   ENVIRONMENT: Lab Terminal with LXD (`lxc` / `lxd`) + Bare Metal for host context.
-
 
   SYMPTOM: Containers start without GPU; nvidia-smi inside guest fails. Profile gpu-passthrough missing
   or incomplete.
-
 
   OBJECTIVE: Inspect `lxc profile show gpu-passthrough`; create/fix profile; launch a container with
   the profile; verify GPU path; FIXED-OK.'

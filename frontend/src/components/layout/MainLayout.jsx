@@ -2,8 +2,8 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { useThemeStore } from '../../store/themeStore'
 import {
-  LayoutDashboard, Target, Trophy, User, LogOut, Shield, Menu, X, Bookmark, Layers, Sun, Moon, History, Award, MessageSquare, Search, Mic2, CreditCard, Bot,
-} from 'lucide-react'
+  LayoutDashboard, Target, Trophy, User, LogOut, Shield, Menu, X, Bookmark, Layers, Sun, Moon, History, Award, MessageSquare, Search, Mic2, CreditCard, Bot, MonitorPlay, Route, FolderKanban,
+} from '../../ui/eagerIcons'
 import { useState, useEffect, useRef } from 'react'
 import NotificationBell from './NotificationBell'
 import SupportBotWidget from '../SupportBotWidget'
@@ -12,10 +12,19 @@ import { authApi } from '../../api/auth'
 import { PlatformBanners } from '../PlatformBanners'
 import CampaignBanner from '../CampaignBanner'
 import { FixitLogo } from '../design'
+import { useFetch } from '../../hooks/useFetch'
+import { useModalA11y } from '../ConfirmModal'
 
 const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/technologies', icon: Layers, label: 'Technologies' },
+  // /simulators is an authenticated route whose only inbound link used to be the
+  // anonymous public nav ("Lab Consoles"), so logged-out users bounced to /login
+  // and logged-in users never saw it. Sits next to Technologies because every
+  // card on the page links to /technologies/:slug.
+  { path: '/simulators', icon: MonitorPlay, label: 'Lab Consoles' },
+  { path: '/journeys', icon: Route, label: 'Journeys' },
+  { path: '/projects', icon: FolderKanban, label: 'Projects' },
   { path: '/scenarios', icon: Target, label: 'All Scenarios' },
   { path: '/interviews', icon: Mic2, label: 'Interviews' },
   { path: '/leaderboard', icon: Trophy, label: 'Leaderboard' },
@@ -115,14 +124,15 @@ function SidebarContent({ navVisible, location, user, theme, toggleTheme, handle
             <p className="text-xs text-surface-500 truncate">{user?.email}</p>
           </div>
           <button
+            type="button"
             onClick={toggleTheme}
-            className="p-1.5 text-surface-400 hover:text-accent-amber transition-colors rounded-lg hover:bg-surface-800 shrink-0"
+            className="p-1.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400 hover:text-accent-amber transition-colors rounded-lg hover:bg-surface-800 shrink-0"
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
           >
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
           <NotificationBell />
-          <button onClick={handleLogout} className="p-1.5 text-surface-500 hover:text-accent-red transition-colors shrink-0" aria-label="Logout">
+          <button type="button" onClick={handleLogout} className="p-1.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-accent-red transition-colors shrink-0" aria-label="Logout">
             <LogOut size={16} />
           </button>
         </div>
@@ -132,37 +142,50 @@ function SidebarContent({ navVisible, location, user, theme, toggleTheme, handle
 }
 
 export default function MainLayout() {
-  const { user, logout } = useAuthStore()
+  const { user } = useAuthStore()
   const { theme, toggleTheme } = useThemeStore()
   const location = useLocation()
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [platformConfig, setPlatformConfig] = useState(null)
+  const mobileNavRef = useModalA11y(mobileOpen, () => setMobileOpen(false))
+  const { data: platformConfig } = useFetch('/config/', {
+    config: { silentError: true },
+    initialData: null,
+  })
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const searchRef = useRef(null)
+  const searchInputRef = useRef(null)
+  const shortcutsPanelRef = useModalA11y(showShortcuts, () => setShowShortcuts(false))
   const navVisible = navItems.filter(item =>
     item.path !== '/interviews' || platformConfig?.interview_enabled !== false
   )
   const showInterviewPromo = platformConfig?.interview_enabled !== false
-
-  useEffect(() => {
-    api.get('/config/', { silentError: true }).then(res => setPlatformConfig(res.data)).catch(() => {})
-  }, [])
 
   const isLabRoute = location.pathname.startsWith('/lab/')
   const isInterviewRoute = /^\/interviews\/(room|round|async)\//.test(location.pathname)
   const isFullscreenRoute = isLabRoute || isInterviewRoute
 
   useEffect(() => {
-    if (!searchQuery || searchQuery.length < 2) { setSearchResults(null); return }
+    if (!searchQuery || searchQuery.length < 2) {
+      setSearchResults(null)
+      return undefined
+    }
+    const controller = new AbortController()
     const timer = setTimeout(() => {
-      api.get(`/search/?q=${encodeURIComponent(searchQuery)}`)
+      api.get(`/search/?q=${encodeURIComponent(searchQuery)}`, { signal: controller.signal })
         .then(res => setSearchResults(res.data))
-        .catch(() => setSearchResults({ scenarios: [], users: [] }))
+        .catch((err) => {
+          if (controller.signal.aborted || err?.code === 'ERR_CANCELED') return
+          setSearchResults({ scenarios: [], users: [] })
+        })
     }, 300)
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
   }, [searchQuery])
 
   useEffect(() => {
@@ -174,6 +197,30 @@ export default function MainLayout() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Global Cmd/Ctrl+K focuses search; `?` opens the app shortcut sheet (X7a).
+  useEffect(() => {
+    if (isFullscreenRoute) return undefined
+    const onKey = (e) => {
+      const tag = e.target?.tagName
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        if (typing && e.target === searchInputRef.current) return
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        setSearchOpen(true)
+        return
+      }
+
+      if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey && !typing) {
+        e.preventDefault()
+        setShowShortcuts((open) => !open)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isFullscreenRoute])
 
   const handleLogout = async () => {
     await authApi.logout()
@@ -210,11 +257,19 @@ export default function MainLayout() {
       </aside>
 
       {/* Mobile sidebar overlay */}
-      <aside className={`
-        lg:hidden fixed inset-y-0 left-0 z-50 w-[248px] flex flex-col h-screen fx-sidebar
+      <aside
+        ref={mobileNavRef}
+        tabIndex={mobileOpen ? -1 : undefined}
+        role={mobileOpen ? 'dialog' : undefined}
+        aria-modal={mobileOpen ? 'true' : undefined}
+        aria-label={mobileOpen ? 'Main navigation' : undefined}
+        aria-hidden={!mobileOpen}
+        className={`
+        lg:hidden fixed inset-y-0 left-0 z-50 w-[248px] flex flex-col h-screen fx-sidebar outline-none
         transform transition-transform duration-300
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
+      `}
+      >
         <SidebarContent
           navVisible={navVisible}
           location={location}
@@ -238,7 +293,7 @@ export default function MainLayout() {
           <div className="overflow-x-auto">
             <div className="min-w-max lg:min-w-0">
               <div className="lg:hidden flex items-center gap-3 px-4 py-3">
-                <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-surface-400" aria-label="Toggle menu">
+                <button type="button" onClick={() => setMobileOpen(!mobileOpen)} className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400" aria-label={mobileOpen ? 'Close menu' : 'Open menu'}>
                   {mobileOpen ? <X size={20} /> : <Menu size={20} />}
                 </button>
                 <FixitLogo to="/dashboard" size="sm" />
@@ -253,18 +308,22 @@ export default function MainLayout() {
               <div className="relative flex-1 max-w-[380px]">
                 <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
                 <input
+                  ref={searchInputRef}
                   type="text"
-                  placeholder="Search scenarios, technologies…"
+                  placeholder="Search scenarios, technologies… (⌘K)"
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true) }}
                   onFocus={() => setSearchOpen(true)}
+                  aria-keyshortcuts="Meta+K Control+K"
                   className="fx-input"
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => { setSearchQuery(''); setSearchResults(null); setSearchOpen(false) }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-500 hover:text-surface-300"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-surface-300"
+                    aria-label="Clear search"
+                    title="Clear search"
                   >
                     <X size={14} />
                   </button>
@@ -297,6 +356,16 @@ export default function MainLayout() {
 
               <div className="hidden lg:flex items-center gap-2.5 shrink-0">
                 <button
+                  type="button"
+                  onClick={() => setShowShortcuts(true)}
+                  className="w-10 h-10 rounded-[11px] flex items-center justify-center bg-white/[0.04] border border-white/10 text-white/70 hover:bg-white/[0.09] transition-colors text-sm font-semibold"
+                  aria-label="Keyboard shortcuts"
+                  title="Keyboard shortcuts (?)"
+                >
+                  ?
+                </button>
+                <button
+                  type="button"
                   onClick={toggleTheme}
                   className="w-10 h-10 rounded-[11px] flex items-center justify-center bg-white/[0.04] border border-white/10 text-white/70 hover:bg-white/[0.09] transition-colors"
                   aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
@@ -337,6 +406,55 @@ export default function MainLayout() {
         </main>
       </div>
       <SupportBotWidget />
+
+      {showShortcuts && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setShowShortcuts(false)}
+          role="presentation"
+        >
+          <div
+            ref={shortcutsPanelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="app-shortcuts-title"
+            className="w-full max-w-md rounded-xl border border-white/10 bg-surface-900 p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <h2 id="app-shortcuts-title" className="text-base font-semibold text-white m-0">
+                Keyboard shortcuts
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowShortcuts(false)}
+                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400 hover:text-white"
+                aria-label="Close shortcuts"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <ul className="space-y-2.5 text-sm text-surface-300 m-0 p-0 list-none">
+              {[
+                ['⌘ / Ctrl + K', 'Focus global search'],
+                ['?', 'Toggle this shortcut sheet'],
+                ['Esc', 'Close dialogs and menus'],
+              ].map(([keys, desc]) => (
+                <li key={keys} className="flex items-center justify-between gap-4">
+                  <span>{desc}</span>
+                  <kbd className="shrink-0 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-medium text-white/80">
+                    {keys}
+                  </kbd>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 mb-0 text-xs text-surface-500">
+              Inside a lab, press <kbd className="px-1 rounded border border-white/10">?</kbd> for
+              lab-specific bindings. AWS and datacenter consoles have their own sheets.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

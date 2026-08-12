@@ -11,6 +11,10 @@
 # Vault runs here (D1) so it is reachable at http://<D1-private-ip>:8200 from D2/D4.
 # Redis (6379) and RabbitMQ (5672) bind on the VPC interface; the DO firewall
 # (scripts/ci-setup-firewalls.sh) restricts those ports to the D2 private IP.
+#
+# EDGE_BIND_IP (optional): host interface for the published 8200/6379/5672. Unset
+# means 0.0.0.0 and the cloud firewall is the only control — set it to this
+# droplet's private IP in .env.production to add the kernel as a second one.
 
 # HashiCorp Vault — see docker-compose.vault.yml. On the edge node Vault must also
 # publish 8200 on the private interface so D2/D4 can reach it for AppRole login.
@@ -22,12 +26,28 @@ services:
   vault:
     # Publish 8200 so app/labs droplets can reach Vault over the VPC.
     # Firewall restricts source to D2/D4 private IPs.
+    #
+    # This is the worst port in the topology to leave on 0.0.0.0: Vault serves the
+    # secret store over plaintext HTTP (infra/vault/config.hcl sets tls_disable = 1),
+    # so the cloud firewall is the ONLY thing between it and the public interface.
+    # Setting EDGE_BIND_IP=<D1 private IP> in .env.production binds it to the VPC
+    # address so a firewall control-plane failure alone is not sufficient.
+    #
+    # Opt-in default `${EDGE_BIND_IP:-0.0.0.0}` remains for local/dev, but
+    # `scripts/ci-wire-cluster-env.py` now writes EDGE_BIND_IP=<EDGE_PRIVATE_IP>
+    # into the cluster env so production edge deploys bind Vault/Redis/Rabbit
+    # to the VPC address (audit O5).
     ports:
-      - "8200:8200"
+      - "${EDGE_BIND_IP:-0.0.0.0}:8200:8200"
     networks:
       fixitlab_net:
         aliases:
           - vault
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   gateway:
     build:
@@ -45,8 +65,10 @@ services:
       - "80:80"
       - "443:443"
     depends_on:
+      # Upgraded from service_started now that frontend-prod has a real healthcheck:
+      # the gateway proxies to it, so "container exists" was never the useful gate.
       frontend-prod:
-        condition: service_started
+        condition: service_healthy
     volumes:
       - static_volume:/static
       - media_volume:/media:ro
@@ -59,15 +81,53 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    # nginx serving static + proxying; memory is worker connection buffers, not
+    # content. 512M bounds a runaway without touching normal operation.
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   certbot:
-    image: certbot/certbot:latest
+    # Pinned by digest (certbot 5.7.0, resolved 2026-08). Tradeoff taken knowingly:
+    # `:latest` auto-tracked ACME protocol changes, and this pin does not — so this
+    # image needs a periodic deliberate bump, and the cert-expiry healthcheck below
+    # is what makes a stale/broken certbot visible instead of silent.
+    image: certbot/certbot:latest@sha256:34ee91d2f43008eb78a007d22f23ed4b2eaa9a454cb27ca2c042b49527a695b4
     volumes:
       - certbot_www:/var/www/certbot
       - certbot_certs:/etc/letsencrypt
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 43200 & wait $${!}; done'"
+    # Checks the OUTPUT, not the process. certbot here is a sleep loop, so "process
+    # alive" is nearly meaningless — the failure that matters is a cert quietly
+    # aging out because renew has been erroring for weeks. This fails once the live
+    # cert is inside 10 days of expiry (renewal normally happens at 30), so the
+    # signal appears with three weeks of runway rather than at the outage.
+    # Passes when no cert exists yet: on a fresh edge node certbot has not issued
+    # one, and reporting unhealthy there would be noise, not a problem.
+    healthcheck:
+      test: ["CMD-SHELL", "! ls /etc/letsencrypt/live/*/cert.pem >/dev/null 2>&1 || openssl x509 -checkend 864000 -noout -in $$(ls /etc/letsencrypt/live/*/cert.pem | head -1)"]
+      interval: 12h
+      timeout: 15s
+      retries: 2
+      start_period: 60s
+    # Sleeps for 12h at a stretch and shells out to certbot; 256M is headroom.
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend-prod:
     build:
@@ -76,7 +136,37 @@ services:
     image: ${FIXITLAB_IMAGE_NS:-fixitlab}/fixitlab-frontend:${IMAGE_TAG:-latest}
     networks:
       - fixitlab_net
+    # The gateway `depends_on: frontend-prod` only waits for service_started, so a
+    # container that is up but serving nothing still satisfies it. Fetching / proves
+    # nginx is actually answering — curl is present in nginx:alpine (verified; the
+    # image ships /usr/bin/curl, so no wget fallback is needed).
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    # Static SPA: drop privileges escalation; keep root only for :80 bind inside
+    # the overlay network (gateway proxies here). Writable paths nginx needs are
+    # tmpfs so the rootfs can stay read-only.
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=16m,mode=755
+      - /var/run:size=8m,mode=755
+      - /tmp:size=8m,mode=1777
+    # Static build served by nginx — the assets are on disk, not in RAM.
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:7-alpine
@@ -85,24 +175,39 @@ services:
       - .env.production
     command: >
       sh -c "redis-server
-      --maxmemory 1gb
-      --maxmemory-policy allkeys-lru
+      --maxmemory 2gb
+      --maxmemory-policy volatile-lru
       --requirepass $${REDIS_PASSWORD:-fixitlab_redis_secret}
       --tcp-backlog 511
       --timeout 300"
     ports:
-      # Reachable from D2 over the VPC; firewall limits source to D2 private IP
-      - "6379:6379"
+      # Reachable from D2 over the VPC; firewall limits source to D2 private IP.
+      # Same EDGE_BIND_IP opt-in as Vault above; see that comment.
+      - "${EDGE_BIND_IP:-0.0.0.0}:6379:6379"
     networks:
       - fixitlab_net
     volumes:
       - redis_data:/data
+    # MUST stay above the `--maxmemory 2gb` set in the command above. Redis's own
+    # limit triggers volatile-lru eviction — a graceful, recoverable degradation.
+    # A cgroup limit at or below it converts that into an OOM kill, so the
+    # container dies instead of evicting, i.e. the hardening causes the outage.
+    # 2.5G covers maxmemory plus copy-on-write during RDB fork and client buffers.
+    deploy:
+      resources:
+        limits:
+          memory: 2560M
     healthcheck:
       test: ["CMD", "sh", "-c", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 10s
       timeout: 3s
       retries: 3
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -112,13 +217,33 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-fixitlab}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-fixitlab_rabbit_secret}
+      # Tell RabbitMQ how much RAM it actually has — see the deploy.resources note
+      # below for why the default is wrong under a cgroup limit. Must be kept in
+      # sync with deploy.resources.limits.memory (1G = 1073741824).
+      # NOT RABBITMQ_VM_MEMORY_HIGH_WATERMARK: that variable is rejected outright
+      # by this image ("deprecated environment variables detected") and the broker
+      # refuses to boot — verified against rabbitmq:3-management-alpine.
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit total_memory_available_override_value 1073741824"
     ports:
-      # AMQP for D2 celery over the VPC; firewall limits source to D2 private IP
-      - "5672:5672"
+      # AMQP for D2 celery over the VPC; firewall limits source to D2 private IP.
+      # Same EDGE_BIND_IP opt-in as Vault above; see that comment.
+      - "${EDGE_BIND_IP:-0.0.0.0}:5672:5672"
     networks:
       - fixitlab_net
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    # The limit alone would have been a trap. RabbitMQ's 0.4 high-watermark is 0.4
+    # of what it BELIEVES total RAM is, and it does not read the cgroup. Measured:
+    # `docker run --memory 1g rabbitmq:3-management-alpine` logged "Memory high
+    # watermark set to 4806 MiB ... of 12016 MiB total" — it sized against the HOST.
+    # So a bare 1G limit means the broker never throttles and is simply OOM-killed,
+    # converting publisher back-pressure (recoverable) into broker death (not).
+    # With the override above it logs "409 MiB of 1024 MiB" and throttles correctly.
+    # FixitLab queues carry short-lived task messages, so 1G is ample.
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 15s
@@ -126,6 +251,11 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   static_volume:

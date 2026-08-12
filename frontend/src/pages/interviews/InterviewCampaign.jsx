@@ -124,7 +124,7 @@ export default function InterviewCampaign() {
       )}
 
       <div className="space-y-3">
-        {(campaign.rounds || []).map((round, i) => {
+        {(campaign.rounds || []).map((round) => {
           const locked = round.status === 'locked'
           const passed = round.status === 'passed'
           const canSchedule = ['schedulable', 'scheduled'].includes(round.status)

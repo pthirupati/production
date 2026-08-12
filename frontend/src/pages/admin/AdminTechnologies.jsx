@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
-import { Plus, Edit2, Trash2, X, Save, Cpu, Tag, WrenchIcon, AlertTriangle, Mail, Users, ChevronRight } from 'lucide-react'
+import { useModalA11y } from '../../components/ConfirmModal'
+import { Plus, Edit2, Trash2, X, Save, Cpu, Tag, WrenchIcon, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const COLOR_OPTIONS = [
@@ -18,6 +19,7 @@ const EMPTY_FORM = { name: '', slug: '', icon: '', description: '', color: 'cyan
 export default function AdminTechnologies() {
   const [technologies, setTechnologies] = useState([])
   const [tags, setTags] = useState([])
+  const [tagsFailed, setTagsFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -37,17 +39,33 @@ export default function AdminTechnologies() {
   const [maintenanceForm, setMaintenanceForm] = useState({ enabled: false, message: '', scheduled_start: '', scheduled_end: '' })
   const [maintenanceLoading, setMaintenanceLoading] = useState(false)
 
+  const closeForm = () => setShowForm(false)
+  const closeDelete = () => { setDeleteTarget(null); setDeleteConfirmName('') }
+  const closeMaintenance = () => setMaintenanceTech(null)
+  const closeTagForm = () => setShowTagForm(false)
+  const formDialogRef = useModalA11y(showForm, closeForm)
+  const deleteDialogRef = useModalA11y(!!deleteTarget, closeDelete)
+  const maintenanceDialogRef = useModalA11y(!!maintenanceTech, closeMaintenance)
+  const tagDialogRef = useModalA11y(showTagForm, closeTagForm)
+
   useEffect(() => { loadData() }, [])
 
   const loadData = async () => {
     setLoading(true)
     try {
-      const [t, tg] = await Promise.all([
+      const [tSettled, tgSettled] = await Promise.allSettled([
         adminApi.getTechnologies(),
-        adminApi.getTags().catch(() => []),
+        adminApi.getTags(),
       ])
-      setTechnologies(t)
-      setTags(tg)
+      if (tSettled.status === 'fulfilled') setTechnologies(tSettled.value)
+      else console.error(tSettled.reason)
+      if (tgSettled.status === 'fulfilled') {
+        setTags(tgSettled.value || [])
+        setTagsFailed(false)
+      } else {
+        setTags([])
+        setTagsFailed(true)
+      }
     } catch { console.error } finally { setLoading(false) }
   }
 
@@ -190,11 +208,21 @@ export default function AdminTechnologies() {
 
           {/* Add/Edit form modal */}
           {showForm && (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
-              <div className="glass-card p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
+              onMouseDown={(e) => { if (e.target === e.currentTarget) closeForm() }}
+            >
+              <div
+                ref={formDialogRef}
+                tabIndex={-1}
+                role="dialog"
+                aria-modal="true"
+                aria-label={editingId ? 'Edit Technology' : 'New Technology'}
+                className="glass-card p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto outline-none"
+              >
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-lg font-semibold text-white">{editingId ? 'Edit Technology' : 'New Technology'}</h2>
-                  <button onClick={() => setShowForm(false)} className="text-surface-500 hover:text-white"><X size={20} /></button>
+                  <button type="button" onClick={closeForm} aria-label="Close technology form" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-white"><X size={20} /></button>
                 </div>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -259,8 +287,8 @@ export default function AdminTechnologies() {
                   </label>
                 </div>
                 <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-surface-800">
-                  <button onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
-                  <button onClick={handleSave} className="btn-primary flex items-center gap-2"><Save size={16} /> {editingId ? 'Update' : 'Create'}</button>
+                  <button type="button" onClick={closeForm} className="btn-secondary">Cancel</button>
+                  <button type="button" onClick={handleSave} className="btn-primary flex items-center gap-2"><Save size={16} /> {editingId ? 'Update' : 'Create'}</button>
                 </div>
               </div>
             </div>
@@ -268,9 +296,18 @@ export default function AdminTechnologies() {
 
           {/* Force-delete confirmation modal */}
           {deleteTarget && (
-            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center">
-              <div className="glass-card p-6 w-full max-w-md mx-4 border border-accent-red/30">
-                <div className="flex items-center gap-3 mb-4">
+            <div
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center"
+              onMouseDown={(e) => { if (e.target === e.currentTarget) closeDelete() }}
+            >
+              <div
+                ref={deleteDialogRef}
+                tabIndex={-1}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Delete Technology"
+                className="glass-card p-6 w-full max-w-md mx-4 border border-accent-red/30 outline-none"
+              >                <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-xl bg-accent-red/10 flex items-center justify-center flex-shrink-0">
                     <AlertTriangle size={20} className="text-accent-red" />
                   </div>
@@ -310,8 +347,9 @@ export default function AdminTechnologies() {
                 )}
 
                 <div className="flex justify-end gap-3">
-                  <button onClick={() => { setDeleteTarget(null); setDeleteConfirmName('') }} className="btn-secondary" disabled={deleteLoading}>Cancel</button>
+                  <button type="button" onClick={closeDelete} className="btn-secondary" disabled={deleteLoading}>Cancel</button>
                   <button
+                    type="button"
                     onClick={confirmDelete}
                     disabled={!canConfirmDelete || deleteLoading}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-red/90 hover:bg-accent-red text-white text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
@@ -325,8 +363,18 @@ export default function AdminTechnologies() {
 
           {/* Maintenance panel modal */}
           {maintenanceTech && (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
-              <div className="glass-card p-6 w-full max-w-lg mx-4 border border-amber-500/20">
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
+              onMouseDown={(e) => { if (e.target === e.currentTarget) closeMaintenance() }}
+            >
+              <div
+                ref={maintenanceDialogRef}
+                tabIndex={-1}
+                role="dialog"
+                aria-modal="true"
+                aria-label={`${maintenanceTech.name} — Maintenance`}
+                className="glass-card p-6 w-full max-w-lg mx-4 border border-amber-500/20 outline-none"
+              >
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center">
@@ -337,7 +385,7 @@ export default function AdminTechnologies() {
                       <p className="text-xs text-surface-400">Subscribers will be emailed when maintenance is toggled on</p>
                     </div>
                   </div>
-                  <button onClick={() => setMaintenanceTech(null)} className="text-surface-500 hover:text-white"><X size={20} /></button>
+                  <button type="button" onClick={closeMaintenance} aria-label="Close maintenance panel" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-white"><X size={20} /></button>
                 </div>
 
                 <div className="space-y-4">
@@ -449,26 +497,41 @@ export default function AdminTechnologies() {
           </div>
 
           {showTagForm && (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
-              <div className="glass-card p-6 w-full max-w-sm mx-4">
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
+              onMouseDown={(e) => { if (e.target === e.currentTarget) closeTagForm() }}
+            >
+              <div
+                ref={tagDialogRef}
+                tabIndex={-1}
+                role="dialog"
+                aria-modal="true"
+                aria-label={editingTagId ? 'Edit Tag' : 'New Tag'}
+                className="glass-card p-6 w-full max-w-sm mx-4 outline-none"
+              >
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-white">{editingTagId ? 'Edit Tag' : 'New Tag'}</h2>
-                  <button onClick={() => setShowTagForm(false)} className="text-surface-500 hover:text-white"><X size={20} /></button>
+                  <button type="button" onClick={closeTagForm} aria-label="Close tag form" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-white"><X size={20} /></button>
                 </div>
                 <div>
                   <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Name</label>
                   <input value={tagForm.name} onChange={(e) => setTagForm({ name: e.target.value })} className="input-field" placeholder="systemd, nginx, networking..." />
                 </div>
                 <div className="flex justify-end gap-3 mt-4">
-                  <button onClick={() => setShowTagForm(false)} className="btn-secondary">Cancel</button>
-                  <button onClick={handleSaveTag} className="btn-primary flex items-center gap-2"><Save size={16} /> {editingTagId ? 'Update' : 'Create'}</button>
+                  <button type="button" onClick={closeTagForm} className="btn-secondary">Cancel</button>
+                  <button type="button" onClick={handleSaveTag} className="btn-primary flex items-center gap-2"><Save size={16} /> {editingTagId ? 'Update' : 'Create'}</button>
                 </div>
               </div>
             </div>
           )}
 
           <div className="glass-card p-6">
-            {tags.length === 0 ? (
+            {tagsFailed ? (
+              <div className="text-center py-8">
+                <Tag size={32} className="text-amber-500/70 mx-auto mb-2" />
+                <p className="text-amber-300/90">Couldn&apos;t load tags. Technologies above are still available.</p>
+              </div>
+            ) : tags.length === 0 ? (
               <div className="text-center py-8">
                 <Tag size={32} className="text-surface-700 mx-auto mb-2" />
                 <p className="text-surface-500">No tags yet. Add tags to categorize scenarios.</p>

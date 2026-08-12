@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
 import {
-  BarChart3, Users, MessageSquare, CreditCard, Settings, CalendarClock, Mic,
+  BarChart3, Users, MessageSquare, Settings, CalendarClock, Mic,
   Gift, DollarSign, Eye, Plus, Trash2, Upload, FileText,
 } from 'lucide-react'
 import toast from 'react-hot-toast'

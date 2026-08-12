@@ -5,9 +5,10 @@ import {
   newInstanceId, newVolumeId, newSnapshotId, newSgId, newKeyPairId, newAmiId, newEipAllocId,
   newEipAssocId, newIgwId, newSubnetId, newVpcId, newSgRuleId, newRtbId, newNatId, newAclId,
   newIamUserId, newIamRoleId, newIamGroupId, newAccessKeyId,
-  newSecretAccessKey, newPrivateIp, newPublicIp, publicDns, privateDns, hostnameFromIp,
+  newSecretAccessKey, newPrivateIp, newPublicIp,
 } from '../lib/ids'
 import { getAmi, getInstanceType } from '../lib/instanceTypes'
+import { amiArchMatchesInstanceType, amiEnaMatchesInstanceType } from '../lib/validators'
 import {
   EC2_TIMING, GENERIC_TIMING, dueIn,
   initializingChecks, phase1Checks, passedChecks, noChecks,
@@ -797,6 +798,24 @@ export const useAwsStore = create(
       launchInstances: ({ name, amiId, type, count, keyName, subnetId, securityGroups, volumeSize, volumeType, monitoring, tags }) => {
         const { region, subnets } = get()
         const ami = getAmi(amiId)
+        const it = getInstanceType(type)
+        if (!amiArchMatchesInstanceType(ami?.arch, it?.arch)) {
+          const err = (
+            `InvalidParameterCombination: The architecture '${ami?.arch}' of the specified AMI `
+            + `is incompatible with the architecture '${it?.arch}' of the specified instance type.`
+          )
+          get().pushFlash('error', err)
+          return []
+        }
+        if (!amiEnaMatchesInstanceType(ami, type)) {
+          const err = (
+            `InvalidParameterCombination: The specified instance type '${type}' `
+            + 'requires the Elastic Network Adapter (ENA) driver, which is not '
+            + 'present in the selected AMI.'
+          )
+          get().pushFlash('error', err)
+          return []
+        }
         const subnet = subnets.find((sn) => sn.id === subnetId) || subnets.find((sn) => sn.region === region)
         const az = subnet?.az || `${region}a`
         const created = []
@@ -2255,7 +2274,7 @@ export const useAwsStore = create(
       // the active lab session id (that's re-armed fresh by AwsLabOverlay on
       // every mount, never something a stale persisted blob should carry).
       partialize: (s) => {
-        const { flash, labSessionId, ...rest } = s
+        const { flash: _flash, labSessionId: _labSessionId, ...rest } = s
         return rest
       },
       merge: (persisted, current) => {

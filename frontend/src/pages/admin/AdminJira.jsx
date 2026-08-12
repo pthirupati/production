@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
+import { useModalA11y } from '../../components/ConfirmModal'
 import { Ticket, Search, Plus, User, Target, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import JiraTicketLink from '../../components/JiraTicketLink'
@@ -16,6 +17,9 @@ export default function AdminJira() {
   const [scenarios, setScenarios] = useState([])
   const [createForm, setCreateForm] = useState({ user_id: '', scenario_id: '' })
   const [creating, setCreating] = useState(false)
+
+  const closeCreate = () => setShowCreate(false)
+  const createDialogRef = useModalA11y(showCreate, closeCreate)
 
   useEffect(() => { loadTickets() }, [])
 
@@ -168,11 +172,19 @@ export default function AdminJira() {
       </div>
 
       {showCreate && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowCreate(false)}>
-          <div className="glass-card p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={closeCreate}>
+          <div
+            ref={createDialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Create Jira Ticket"
+            className="glass-card p-6 w-full max-w-md space-y-4 outline-none"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-white">Create Jira Ticket</h2>
-              <button type="button" onClick={() => setShowCreate(false)} className="text-surface-400 hover:text-white p-1 rounded-md hover:bg-surface-800/60">
+              <button type="button" onClick={closeCreate} aria-label="Close create Jira ticket" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400 hover:text-white p-1 rounded-md hover:bg-surface-800/60">
                 <X size={20} />
               </button>
             </div>

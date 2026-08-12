@@ -12,6 +12,7 @@ empty.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import time
 from typing import Any
@@ -26,6 +27,11 @@ SESSION_TTL = 7200
 # pending -> running -> completed/failed timeline.
 _JOB_RUNNING_AT = 2.0
 _JOB_FINISH_AT = 6.0
+
+# A day in seconds — retention is expressed in days but recovery points carry a
+# wall-clock timestamp, so aging a point past its policy's retention in a test
+# (or a long-lived session) is a plain arithmetic comparison.
+_DAY = 86400.0
 
 
 def _session_key(session_id: str) -> str:
@@ -111,7 +117,274 @@ def _advance_jobs(state: dict) -> bool:
     for job in state.get("jobs", []):
         if _advance_job(job):
             changed = True
+            # Provenance is settled at completion, not at launch: a backup only
+            # yields a recovery point if it actually finished, and a restore is
+            # only verified against the media once its job has run out.
+            if job.get("status") == "completed":
+                if job.get("kind") == "backup" and job.get("pending_point"):
+                    _complete_backup_job(state, job)
+                elif job.get("kind") == "restore":
+                    _complete_restore_job(state, job)
     return changed
+
+
+# ---------------------------------------------------------------------------
+# Backup/restore provenance
+#
+# A completed backup writes a *recovery point*: a manifest of the subclient's
+# content (path -> sha256 of the bytes that were protected) plus the job that
+# produced it, the policy that governs its retention, and which copies hold it.
+# A restore SELECTS a recovery point, materialises its files through the
+# Linux-terminal bridge, then VERIFIES the materialised bytes against the
+# manifest. Everything a restore can legitimately fail on — no point, expired
+# by retention, copy unavailable, corrupt/incomplete backup — is decided from
+# this data rather than hardcoded, so `will_fail` is a computed outcome.
+# ---------------------------------------------------------------------------
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _synthetic_file_body(client: str, path: str, generation: int) -> str:
+    """Deterministic stand-in for the bytes a real agent would have protected.
+
+    Deterministic per (client, path, generation) so a restore of generation N
+    reproduces exactly the content backup N recorded — that reproducibility is
+    the whole point of the manifest check.
+    """
+    return f"{client}:{path}:gen{generation}\n"
+
+
+def _subclient_content(state: dict, client_name: str) -> list[str]:
+    sub = next((s for s in state.get("subclients", []) if s.get("client") == client_name), None)
+    return list((sub or {}).get("content") or [])
+
+
+def _manifest_for(state: dict, client_name: str, generation: int) -> list[dict]:
+    """Expand a subclient's content roots into per-file manifest entries."""
+    entries = []
+    for root in _subclient_content(state, client_name) or [f"/data/{client_name}"]:
+        for leaf in ("index.dat", "records.db"):
+            path = f"{root.rstrip('/')}/{leaf}"
+            body = _synthetic_file_body(client_name, path, generation)
+            entries.append({"path": path, "sha256": _sha256(body), "size": len(body)})
+    return entries
+
+
+def _policy_for(state: dict, name: str) -> dict | None:
+    return next((p for p in state.get("storage_policies", []) if p.get("name") == name), None)
+
+
+def _record_recovery_point(state: dict, *, job: dict, client_name: str,
+                           policy_name: str, corrupt: bool = False,
+                           incomplete: bool = False) -> dict:
+    """Register the recovery point a completed backup leaves behind."""
+    points = state.setdefault("recovery_points", [])
+    generation = len(points) + 1
+    manifest = _manifest_for(state, client_name, generation)
+    if incomplete and len(manifest) > 1:
+        # An aborted backup protected only part of the content set; the manifest
+        # still advertises the full set, which is exactly what makes the
+        # shortfall detectable at restore time.
+        stored = [e["path"] for e in manifest[:-1]]
+    else:
+        stored = [e["path"] for e in manifest]
+    point = {
+        "id": f"rp-{job['id']}",
+        "job_id": job["id"],
+        "client": client_name,
+        "policy": policy_name,
+        "type": job.get("type") or "Full",
+        "generation": generation,
+        "created": _now_iso(),
+        "created_ts": _now(),
+        "manifest": manifest,
+        # Paths actually written to media. Divergence from the manifest is the
+        # "incomplete backup" fault.
+        "stored_paths": stored,
+        # Media-side corruption: the bytes on media no longer hash to what the
+        # manifest recorded, so restore verification must reject them.
+        "corrupt": bool(corrupt),
+        "copies": ["primary"],
+    }
+    points.insert(0, point)
+    return point
+
+
+def _retention_days(state: dict, point: dict) -> int:
+    policy = _policy_for(state, point.get("policy") or "")
+    return int((policy or {}).get("retention_days") or 30)
+
+
+def _is_expired(state: dict, point: dict) -> bool:
+    """Aged past its policy's retention → pruned from what is restorable."""
+    created = point.get("created_ts")
+    if created is None:
+        return False
+    return (_now() - float(created)) > _retention_days(state, point) * _DAY
+
+
+def _restorable_points(state: dict, client_name: str, *,
+                       copy_name: str = "primary") -> list[dict]:
+    """Recovery points for a client that retention and copy placement still allow.
+
+    Newest first. Retention and aux-copy placement are enforced here, which is
+    what makes those settings affect what is restorable instead of being inert
+    seed fields.
+    """
+    out = []
+    for point in state.get("recovery_points", []):
+        if point.get("client") != client_name:
+            continue
+        if _is_expired(state, point):
+            continue
+        if copy_name not in (point.get("copies") or ["primary"]):
+            continue
+        out.append(point)
+    return sorted(out, key=lambda p: float(p.get("created_ts") or 0), reverse=True)
+
+
+def _select_recovery_point(state: dict, client_name: str, *,
+                           point_id: str = "", job_id: Any = None,
+                           before_ts: float | None = None,
+                           copy_name: str = "primary") -> tuple[dict | None, str]:
+    """Point-in-time selection. Returns (point, error-if-none)."""
+    candidates = _restorable_points(state, client_name, copy_name=copy_name)
+    if point_id:
+        point = next((p for p in candidates if p.get("id") == point_id), None)
+        return (point, "" if point else
+                f"Recovery point {point_id} is not available on copy '{copy_name}'")
+    if job_id is not None:
+        point = next((p for p in candidates if str(p.get("job_id")) == str(job_id)), None)
+        return (point, "" if point else
+                f"No restorable recovery point from job {job_id} on copy '{copy_name}'")
+    if before_ts is not None:
+        # Point-in-time: newest recovery point at or before the requested instant.
+        point = next((p for p in candidates
+                      if float(p.get("created_ts") or 0) <= float(before_ts)), None)
+        return (point, "" if point else
+                "No recovery point exists at or before the requested point in time")
+    point = candidates[0] if candidates else None
+    if point:
+        return point, ""
+    if any(p.get("client") == client_name for p in state.get("recovery_points", [])):
+        return None, (f"No restorable backup for {client_name} on copy '{copy_name}' — "
+                      "every recovery point is expired or not on this copy")
+    return None, f"No backup of {client_name} exists to restore from"
+
+
+def _verify_restore(state: dict, point: dict, materialised: dict[str, str]) -> tuple[bool, str]:
+    """Compare what the restore actually laid down against the manifest.
+
+    Fails CLOSED: a missing path, a hash mismatch, or an empty materialisation
+    all reject. This is the check whose absence let a restore that never wrote
+    anything report success.
+    """
+    manifest = point.get("manifest") or []
+    if not manifest:
+        return False, "Recovery point has no manifest — nothing to verify against"
+    missing, mismatched = [], []
+    for entry in manifest:
+        path = entry.get("path")
+        if path not in materialised:
+            missing.append(path)
+            continue
+        if _sha256(materialised[path]) != entry.get("sha256"):
+            mismatched.append(path)
+    if missing:
+        return False, (f"Restore verification failed: {len(missing)} file(s) missing from the "
+                       f"restored set (first: {missing[0]})")
+    if mismatched:
+        return False, (f"Restore verification failed: checksum mismatch on {len(mismatched)} "
+                       f"file(s) (first: {mismatched[0]})")
+    return True, f"Verified {len(manifest)} file(s) against the recovery point manifest"
+
+
+def _materialise(state: dict, point: dict) -> dict[str, str]:
+    """Produce the bytes a restore of this point puts back on the guest.
+
+    Only `stored_paths` come back — a manifest entry that was never written to
+    media cannot be materialised — and corrupt media yields bytes that will not
+    hash to the manifest value.
+    """
+    stored = set(point.get("stored_paths") or [])
+    out: dict[str, str] = {}
+    for entry in point.get("manifest") or []:
+        path = entry.get("path")
+        if path not in stored:
+            continue
+        body = _synthetic_file_body(point.get("client") or "", path, point.get("generation") or 1)
+        if point.get("corrupt"):
+            body = body + "\x00CORRUPT"
+        out[path] = body
+    return out
+
+
+def _complete_backup_job(state: dict, job: dict) -> None:
+    """A backup that reached `completed` leaves a recovery point behind."""
+    spec = job.pop("pending_point", None) or {}
+    point = _record_recovery_point(
+        state, job=job,
+        client_name=spec.get("client") or "",
+        policy_name=spec.get("policy") or "",
+        corrupt=bool(spec.get("corrupt")),
+        incomplete=bool(spec.get("incomplete")),
+    )
+    job["recovery_point"] = point["id"]
+    _event(state, f"Backup job {job['id']} completed — recovery point {point['id']} "
+                  f"({len(point['stored_paths'])} file(s)) written to {point['policy']}", "success")
+
+
+def _complete_restore_job(state: dict, job: dict) -> None:
+    """A restore that reached `completed` must still pass verification.
+
+    Verification runs against what the bridge recorded the restore as having
+    materialised on the guest. It can flip the job to `failed`, which is the
+    behaviour whose absence made every restore an automatic pass.
+    """
+    if job.get("verified") is not None:
+        return
+    point_id = job.get("recovery_point")
+    point = next((p for p in state.get("recovery_points", []) if p.get("id") == point_id), None)
+    if not point:
+        job["status"] = "failed"
+        job["finish_status"] = "failed"
+        job["verified"] = False
+        job["verify_message"] = "Recovery point no longer available at verification time"
+        _event(state, f"Restore job {job['id']} failed: {job['verify_message']}", "error")
+        return
+
+    materialised = job.get("materialised") or {}
+    ok, message = _verify_restore(state, point, materialised)
+    job["verified"] = ok
+    job["verify_message"] = message
+    job["verified_files"] = len(materialised)
+    if not ok:
+        job["status"] = "failed"
+        job["finish_status"] = "failed"
+        _event(state, f"Restore job {job['id']} failed verification: {message}", "error")
+        return
+    _event(state, f"Restore job {job['id']} verified against {point['id']}: {message}", "success")
+    # Only a VERIFIED restore clears the objective. Popping this at launch is
+    # what previously let an unverified restore satisfy the grader.
+    broken = state.get("broken") or {}
+    if broken.get("needs_restore") == point.get("client"):
+        broken.pop("needs_restore", None)
+
+
+def _redact_internal(state: dict) -> None:
+    """Drop verification bookkeeping from the client-facing state copy.
+
+    The restored file bodies and the pending-point spec are how the server
+    decides an outcome; shipping them to the browser on every poll would both
+    bloat the payload and hand the learner the answer. The verdict
+    (`verified` / `verify_message`) stays — that is console-visible detail.
+    """
+    for job in state.get("jobs", []):
+        job.pop("materialised", None)
+        job.pop("pending_point", None)
+    for point in state.get("recovery_points", []):
+        point.pop("corrupt", None)
 
 
 def _merge_vmware_clients(state: dict, session_id: str) -> None:
@@ -188,6 +461,8 @@ def _base_state() -> dict:
             {"id": "ac1", "name": "Gold-to-Cloud", "source_policy": "Gold-Retention-30d",
              "dest_library": "CloudLib-S3", "status": "idle"},
         ],
+        # Populated by _seed_recovery_points once the subclient content exists.
+        "recovery_points": [],
         "activity_log": [],
         "goal": {"title": "Commvault backup lab", "objective": "Run a backup job for the client with overdue protection."},
         "broken": {"overdue_client": "db01"},
@@ -196,11 +471,50 @@ def _base_state() -> dict:
     }
 
 
+def _seed_recovery_points(state: dict) -> None:
+    """Give the pre-seeded completed backup (job 1001) a real recovery point.
+
+    Without this the console would open showing a successful historical backup
+    that nothing could actually be restored from.
+    """
+    seed_job = next((j for j in state.get("jobs", []) if int(j.get("id", 0)) == 1001), None)
+    if not seed_job or state.get("recovery_points"):
+        return
+    point = _record_recovery_point(
+        state, job=seed_job, client_name="web01",
+        policy_name=seed_job.get("policy") or "Gold-Retention-30d",
+    )
+    # Backdate to match the job it came from, so point-in-time selection has a
+    # genuinely older point to choose between.
+    point["created_ts"] = float(seed_job.get("started_ts") or _now()) - 100.0
+
+
 def _apply_preset(state: dict, slug: str) -> None:
     slug = (slug or "").lower()
     if "restore" in slug:
-        state["goal"] = {"title": "Restore data", "objective": "Run a restore job from the latest successful backup of web01."}
+        state["goal"] = {"title": "Restore data", "objective": "Restore web01 from a recovery point and pass restore verification."}
         state["broken"] = {"needs_restore": "web01"}
+        if "corrupt" in slug or "verify" in slug:
+            # The newest recovery point cannot be verified; the learner must
+            # notice the failure and restore from the older good point instead.
+            for point in state.get("recovery_points", []):
+                if point.get("client") == "web01":
+                    point["corrupt"] = True
+                    break
+            good = _record_recovery_point(
+                state, job={"id": 1000, "type": "Full"}, client_name="web01",
+                policy_name="Gold-Retention-30d",
+            )
+            # Older than the corrupt point, so "restore latest" hits the bad one
+            # first and the learner has to select the earlier point explicitly.
+            for point in state.get("recovery_points", []):
+                if point.get("corrupt"):
+                    good["created_ts"] = float(point.get("created_ts") or _now()) - 3600.0
+                    break
+            state["goal"]["objective"] = (
+                "The latest backup of web01 fails restore verification. "
+                "Restore from a recovery point that verifies clean."
+            )
     elif "policy" in slug:
         state["goal"] = {"title": "Enable storage policy", "objective": "Enable the disabled Silver-Retention-7d storage policy."}
         state["broken"] = {"policy_disabled": "Silver-Retention-7d"}
@@ -225,6 +539,7 @@ def _ensure(session_id: str, slug: str = "") -> dict:
     entry = _load(session_id)
     if entry is None:
         state = _base_state()
+        _seed_recovery_points(state)
         _apply_preset(state, slug)
         entry = {"session_id": str(session_id), "scenario_slug": slug, "state": state}
         _save(session_id, entry)
@@ -243,6 +558,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     if _advance_jobs(entry["state"]):
         _save(session_id, entry)
     state = copy.deepcopy(entry["state"])
+    _redact_internal(state)
     _merge_vmware_clients(state, session_id)
     try:
         from apps.labs.provisioner.simulation.server_identity import sync_commvault_clients
@@ -291,6 +607,15 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         policy_name = (subclient or {}).get("policy") or payload.get("policy") or "Gold-Retention-30d"
         job = _make_job(state, kind="backup", subclient=f"default ({client_name})", policy=policy_name,
                          job_type=payload.get("type") or "Full", will_fail=False)
+        # Carried until the job completes, then turned into a recovery point.
+        # `corrupt`/`incomplete` let a scenario seed a backup that will not
+        # survive restore verification.
+        job["pending_point"] = {
+            "client": client_name,
+            "policy": policy_name,
+            "corrupt": bool(payload.get("corrupt")),
+            "incomplete": bool(payload.get("incomplete")),
+        }
         state.setdefault("jobs", []).insert(0, job)
         if client:
             client["backup_health"] = "protected"
@@ -303,21 +628,52 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 
     if action == "run_restore":
         client_name = payload.get("client") or broken.get("needs_restore") or "web01"
+        copy_name = payload.get("copy") or "primary"
+        before_ts = payload.get("before_ts")
+        if before_ts is not None:
+            try:
+                before_ts = float(before_ts)
+            except (TypeError, ValueError):
+                return {"ok": False, "error": "before_ts must be a unix timestamp"}
+        point, err = _select_recovery_point(
+            state, client_name,
+            point_id=payload.get("recovery_point") or "",
+            job_id=payload.get("from_job_id"),
+            before_ts=before_ts,
+            copy_name=copy_name,
+        )
+        if not point:
+            # Refusing to launch is itself a real outcome: there is nothing on
+            # media to restore from, so no job may claim success.
+            _event(state, f"Restore for {client_name} rejected: {err}", "error")
+            _save(session_id, entry)
+            return {"ok": False, "error": err}
+
         job = _make_job(state, kind="restore", subclient=f"default ({client_name})",
-                         policy=payload.get("policy") or "Gold-Retention-30d",
+                         policy=point.get("policy") or payload.get("policy") or "Gold-Retention-30d",
                          job_type="Restore", will_fail=False)
+        job["recovery_point"] = point["id"]
+        job["point_in_time"] = point.get("created")
+        job["copy"] = copy_name
+        materialised = _materialise(state, point)
+        job["materialised"] = materialised
         state.setdefault("jobs", []).insert(0, job)
-        broken.pop("needs_restore", None)
-        _event(state, f"Restore job {job['id']} started for {client_name}", "success")
+        _event(state, f"Restore job {job['id']} started for {client_name} from "
+                      f"{point['id']} ({point.get('created')}, copy {copy_name})", "info")
         _save(session_id, entry)
         try:
             from apps.labs.provisioner.simulation import commvault_bridge
             commvault_bridge.record_restore_files(
-                str(session_id), ["/restore/latest"], client=client_name,
+                str(session_id), sorted(materialised), client=client_name,
+                job_id=job["id"], contents=materialised,
             )
         except Exception:
-            pass
-        return {"ok": True, "message": "Restore job started", "job_id": job["id"]}
+            # A bridge that did not accept the write means the guest never got
+            # the files; leave a breadcrumb rather than swallowing it silently.
+            _event(state, f"Restore job {job['id']} could not stage files to the guest", "warning")
+        return {"ok": True, "message": f"Restore job started from {point['id']}",
+                "job_id": job["id"], "recovery_point": point["id"],
+                "point_in_time": point.get("created")}
 
     if action == "create_subclient":
         client_name = payload.get("client") or broken.get("missing_subclient") or "app01"
@@ -419,6 +775,19 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         job = _make_job(state, kind="aux_copy", subclient=aux["name"], policy=aux.get("source_policy") or "",
                          job_type="AuxCopy", will_fail=False)
         state.setdefault("jobs", []).insert(0, job)
+        # An aux copy is what puts recovery points on the secondary copy, so it
+        # is the reason a restore from that copy can succeed at all.
+        copy_label = aux.get("dest_library") or aux["name"]
+        copied = 0
+        for point in state.get("recovery_points", []):
+            if point.get("policy") != aux.get("source_policy"):
+                continue
+            copies = point.setdefault("copies", ["primary"])
+            if copy_label not in copies:
+                copies.append(copy_label)
+                copied += 1
+        aux["copied_points"] = copied
+        _event(state, f"Aux copy {aux['name']} placed {copied} recovery point(s) on {copy_label}", "info")
         if broken.get("needs_aux_copy") == aux["name"]:
             broken.pop("needs_aux_copy", None)
         _event(state, f"Auxiliary copy {aux['name']} started (job {job['id']})", "success")
@@ -457,6 +826,39 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     return {"ok": False, "error": f"Unknown action: {action}"}
 
 
+# Per-key grader feedback. The broken dict stores bare targets (a client name,
+# a policy name) and sometimes just True, so the value cannot be echoed the way
+# azure_engine echoes its human-readable reasons.
+_BROKEN_REASONS: dict[str, str] = {
+    "overdue_client": "client {target} is still overdue for a backup — run one to completion",
+    "needs_restore": "a restore for {target} has not been run to completion yet",
+    "policy_disabled": "storage policy {target} is still disabled — enable it",
+    "missing_subclient": "the subclient for {target} has not been created yet",
+    "missing_client": "the new client has not been registered yet",
+    "schedule_disabled": "schedule {target} is still disabled — enable it",
+    "needs_aux_copy": "aux copy {target} has not been run yet",
+}
+
+
+def _describe_broken(broken: dict) -> str:
+    """Name every outstanding objective, not just the first.
+
+    Presets currently seed a single key each, but joining rather than taking
+    next(iter(...)) means a future multi-key preset cannot silently hide half
+    the remaining work.
+    """
+    parts = []
+    for kind, target in broken.items():
+        template = _BROKEN_REASONS.get(kind)
+        if template is None:
+            # Unknown key: still fail CLOSED, and name the key so a missing
+            # template surfaces as a reportable gap rather than a silent pass.
+            parts.append(f"unresolved objective ({kind})")
+        else:
+            parts.append(template.format(target=target))
+    return "; ".join(parts)
+
+
 def validate_commvault_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
     entry = _load(session_id)
     if not entry:
@@ -468,8 +870,21 @@ def validate_commvault_lab(session_id: str, scenario_slug: str = "") -> tuple[bo
     slug = (scenario_slug or entry.get("scenario_slug") or "").lower()
 
     if "restore" in slug:
-        ok = any(j.get("kind") == "restore" and j.get("status") == "completed" for j in state.get("jobs", []))
-        return (ok, "Restore job completed" if ok else "Run a restore job to completion")
+        restores = [j for j in state.get("jobs", []) if j.get("kind") == "restore"]
+        verified = next((j for j in restores
+                         if j.get("status") == "completed" and j.get("verified") is True), None)
+        if verified:
+            return True, (f"Restore job {verified['id']} verified against "
+                          f"{verified.get('recovery_point')}: {verified.get('verify_message')}")
+        # Fail CLOSED, and say WHY: a restore that ran but did not verify is the
+        # exact silent pass this grader used to accept.
+        failed = next((j for j in restores if j.get("verified") is False), None)
+        if failed:
+            return False, (f"Restore job {failed['id']} did not verify: "
+                           f"{failed.get('verify_message') or 'verification failed'}")
+        if restores:
+            return False, "Restore job has not finished verifying yet"
+        return False, "Run a restore job to completion"
     if "policy" in slug:
         name = broken.get("policy_disabled")
         if name:
@@ -487,7 +902,7 @@ def validate_commvault_lab(session_id: str, scenario_slug: str = "") -> tuple[bo
         return True, "Client registered"
 
     if broken:
-        return False, "Commvault environment still has unresolved issues"
+        return False, f"Commvault lab not complete: {_describe_broken(broken)}"
     ok = any(j.get("kind") == "backup" and j.get("status") == "completed" for j in state.get("jobs", []))
     if not ok:
         return False, "Run a backup job to completion"

@@ -37,6 +37,21 @@ class ScenariosListFilterTests(TestCase):
             technology=cls.linux, slug="linux-disk-full",
             title="Disk Full", category="storage",
             difficulty="medium", description="x", is_free=False, is_active=True,
+            validation_script="#!/bin/bash\nexit 0\n",
+        )
+        cls.linux_gradeable = Scenario.objects.create(
+            technology=cls.linux, slug="linux-sshd-down",
+            title="SSHD Down", category="services",
+            difficulty="easy", description="x", is_free=True, is_active=True,
+            lab_mode="simulation",
+            validation_script="#!/bin/bash\nexit 0\n",
+        )
+        cls.linux_coding = Scenario.objects.create(
+            technology=cls.linux, slug="linux-coding-lab",
+            title="Coding Lab", category="coding",
+            difficulty="easy", description="x", is_free=True, is_active=True,
+            coding_mode=True,
+            validation_script="",
         )
 
     def setUp(self):
@@ -69,12 +84,15 @@ class ScenariosListFilterTests(TestCase):
         resp = self.client.get("/api/scenarios/", {"technology": str(self.linux.id)})
         self.assertEqual(resp.status_code, 200)
         slugs = {s["slug"] for s in self._results(resp)}
-        self.assertEqual(slugs, {"linux-disk-full"})
+        self.assertEqual(
+            slugs,
+            {"linux-disk-full", "linux-sshd-down", "linux-coding-lab"},
+        )
 
     def test_empty_and_anonymous_does_not_500(self):
         resp = self.client.get("/api/scenarios/")
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(len(self._results(resp)), 3)
+        self.assertEqual(len(self._results(resp)), 5)
 
     def test_unknown_technology_slug_returns_empty_not_error(self):
         resp = self.client.get("/api/scenarios/", {"technology_slug": "does-not-exist"})
@@ -105,7 +123,60 @@ class ScenariosListFilterTests(TestCase):
         resp = self.client.get("/api/scenarios/", {"free": "1"})
         self.assertEqual(resp.status_code, 200)
         slugs = {s["slug"] for s in self._results(resp)}
-        self.assertEqual(slugs, {"vmware-guest-powered-off"})
+        self.assertEqual(
+            slugs,
+            {"vmware-guest-powered-off", "linux-sshd-down", "linux-coding-lab"},
+        )
+
+    def test_paid_filter(self):
+        resp = self.client.get("/api/scenarios/", {"free": "0"})
+        self.assertEqual(resp.status_code, 200)
+        slugs = {s["slug"] for s in self._results(resp)}
+        self.assertEqual(slugs, {"vmware-ha-failure", "linux-disk-full"})
+        self.assertNotIn("vmware-guest-powered-off", slugs)
+
+    def test_completed_filter_requires_auth_progress(self):
+        from django.contrib.auth import get_user_model
+        from apps.progress.models import UserScenarioProgress
+
+        User = get_user_model()
+        user = User.objects.create_user(username="solver", password="x")
+        UserScenarioProgress.objects.create(
+            user=user, scenario=self.vm_free, completed=True, attempts=1, best_score=100,
+        )
+        self.client.force_authenticate(user=user)
+
+        solved = self.client.get("/api/scenarios/", {"completed": "1"})
+        self.assertEqual(solved.status_code, 200)
+        self.assertEqual({s["slug"] for s in self._results(solved)}, {"vmware-guest-powered-off"})
+
+        unsolved = self.client.get("/api/scenarios/", {"completed": "0"})
+        self.assertEqual(unsolved.status_code, 200)
+        self.assertEqual(
+            {s["slug"] for s in self._results(unsolved)},
+            {
+                "vmware-ha-failure",
+                "linux-disk-full",
+                "linux-sshd-down",
+                "linux-coding-lab",
+            },
+        )
+
+    def test_gradeable_filter(self):
+        # Stub exit-0 without sim/coding → ungradeable; sim slug resolve + coding → gradeable.
+        gradeable = self.client.get("/api/scenarios/", {"gradeable": "1"})
+        self.assertEqual(gradeable.status_code, 200)
+        g_slugs = {s["slug"] for s in self._results(gradeable)}
+        self.assertIn("linux-sshd-down", g_slugs)
+        self.assertIn("linux-coding-lab", g_slugs)
+        self.assertNotIn("linux-disk-full", g_slugs)
+
+        ungradeable = self.client.get("/api/scenarios/", {"gradeable": "0"})
+        self.assertEqual(ungradeable.status_code, 200)
+        u_slugs = {s["slug"] for s in self._results(ungradeable)}
+        self.assertIn("linux-disk-full", u_slugs)
+        self.assertNotIn("linux-coding-lab", u_slugs)
+        self.assertNotIn("linux-sshd-down", u_slugs)
 
 
 class ScenarioDetailAccessTests(TestCase):

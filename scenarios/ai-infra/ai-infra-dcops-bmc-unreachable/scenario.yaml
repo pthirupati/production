@@ -15,14 +15,11 @@ description: 'CONTEXT: DCOps / Bare Metal ticket (PSINFRA board) — MAAS cannot
   for gpu-node-02 over IPMI, so power control and commissioning both fail. On-call DCOps must
   restore the out-of-band path before the fleet bring-up can resume.
 
-
   ENVIRONMENT: Bare Metal (MAAS) console + Lab Terminal + Datacenter twin for rack/BMC context.
   Treat gpu-node-02 as the production canary for this incident.
 
-
   SYMPTOM / STARTING STATE: BMC unreachable on gpu-node-02; MAAS commissioning failed because
   power/IPMI control never responded.
-
 
   OBJECTIVE: Open Bare Metal; restore BMC/IPMI reachability for gpu-node-02; commission the
   previously failed GPU node; leave FIXED-OK once MAAS shows the node past commissioning.'

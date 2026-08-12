@@ -1,0 +1,158 @@
+title: Roll Back a Bad Change Package in Production
+slug: ps-bad-patch-rollback
+category: Fix
+description: 'CONTEXT: Change package CP-014 was promoted into PROD during last night''s
+  maintenance window. Since then every Accounts Payable voucher save is failing and
+  the AP close is blocked. The package shipped PSU_VOUCHER_REC version 9, which drops
+  the vendor key the voucher component depends on. Business impact: AP cannot process
+  payments until PROD is returned to a working definition.
+
+  ENVIRONMENT: You are working in FixitLab''s offline PeopleSoft app server lab. The
+  architecture is a single lab-primary node exposing PIA, Process Scheduler, Integration
+  Broker, Application Designer, and Change Assistant. Three managed environments are
+  configured — DEV, TEST and PROD. Change Assistant retains an apply history for every
+  package, including the exact definitions each apply overwrote. All tools run locally
+  — no paid APIs or external cloud calls are required.
+
+  SYMPTOM / STARTING STATE: PROD reports CP-014 as its last applied package and is
+  running PSU_VOUCHER_REC version 9. The pre-patch definition was version 5. TEST also
+  received CP-014, but the production incident is the one on the clock.
+
+  OBJECTIVE: Open the PeopleSoft (PIA) console from the lab toolbar; Locate change
+  package CP-014 in Change Assistant and read which environments it was applied to;
+  Inspect the apply history to confirm what PSU_VOUCHER_REC looked like before the
+  patch; Roll CP-014 back out of PROD. Acceptance criteria: PROD is no longer carrying
+  CP-014, PSU_VOUCHER_REC is restored to version 5, and success means `check.sh` exits
+  successfully.
+
+  WORK TO DO: A rollback is targeted at one environment at a time. Identify the environment
+  that is actually broken for the business — the ticket is a production incident —
+  and back the package out of that environment. The rollback restores the definitions
+  captured in the apply history for that environment, so verify the restored version
+  rather than assuming it worked. Change one thing at a time.
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully.
+  Confirm PROD reports PSU_VOUCHER_REC at the pre-patch version and that CP-014 is
+  no longer listed as applied to PROD. Capture the before and after state as evidence.
+  Success criteria: the objective''s healthy state holds on a repeat check, not just
+  once.
+
+  ROLLBACK: This lab is itself the rollback procedure. If you back the package out
+  of the wrong environment, re-apply it there and then target the correct one; the
+  apply history keeps both directions available.
+
+  WHAT TO AVOID: Do not hand-edit the production definition to paper over the problem,
+  do not roll back an environment the ticket did not ask about and call it done, and
+  do not fake completion with marker files — the checker validates real environment
+  state.'
+difficulty: medium
+lab_mode: simulation
+simulation_type: peoplesoft
+technology: peoplesoft
+jira_priority: Critical
+time_limit: 1200
+max_score: 100
+is_free: false
+dual_terminal: false
+objectives:
+- Open the PeopleSoft (PIA) console from the lab toolbar
+- Locate change package CP-014 and read the environments it was applied to
+- Inspect the apply history to find the pre-patch definition of PSU_VOUCHER_REC
+- Roll CP-014 back out of PROD
+- Confirm PROD is restored to PSU_VOUCHER_REC version 5
+initial_state: A PeopleSoft HCM 9.2 environment where change package CP-014 has been
+  applied to TEST and PROD, leaving PROD running PSU_VOUCHER_REC version 9 — a regression
+  that drops the vendor key and breaks Accounts Payable.
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not change any definitions by hand. First read the change package list and
+    note which environments CP-014 was applied to, then read the version of PSU_VOUCHER_REC
+    in each environment. This lab is about backing a bad patch out cleanly using the
+    migration tooling rather than editing production directly.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the incident method:
+
+    A regression that arrived through a change package is backed out through that
+    same package, not by re-typing the old definition. Change Assistant recorded what
+    each apply overwrote, so a rollback can restore the previous definitions exactly.
+    Read the apply history for CP-014 and confirm what the pre-patch version was before
+    you act.'
+- order: 3
+  cost: 20
+  content: 'NARROW — the right environment:
+
+    CP-014 was applied to more than one environment, but a rollback targets one environment
+    at a time. The ticket is a production incident: Accounts Payable is failing in
+    PROD. Rolling the package out of TEST will not clear the production outage and
+    will not satisfy the check.'
+- order: 4
+  cost: 30
+  content: 'RESOLVE — the rollback:
+
+    Roll CP-014 back out of PROD. Then re-read PROD and confirm two things: PSU_VOUCHER_REC
+    is on version 5 again, and CP-014 no longer appears as applied to PROD. If the
+    version is still 9, the rollback did not target the environment you expected.'
+summary: Back a regressive change package out of production with Change Assistant
+  and restore the pre-patch definition
+estimated_minutes: 20
+xp_reward: 200
+prerequisites:
+- Basic peoplesoft literacy
+- Familiarity with PeopleSoft change packages and the DEV to PROD promotion path
+tags:
+- fix
+- hands-on
+- peoplesoft
+- migration
+- rollback
+- incident
+linked_tutorial: peoplesoft-zero-hero
+what_you_will_learn:
+- How Change Assistant records what each apply overwrote
+- How to back a regressive change package out of a single environment
+- Why a rollback is safer than hand-editing a production definition
+- How to confirm a rollback actually restored the pre-patch state
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PeopleSoft app server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline lab environment
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - peoplesoft
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Roll Back a Bad Change Package in Production
+  description: Identify change package CP-014 as the source of the Accounts Payable
+    regression and roll it back out of PROD so PSU_VOUCHER_REC returns to its pre-patch
+    definition.
+  background: This peoplesoft lab teaches incident response against a managed migration
+    — read the apply history, target the affected environment, and restore rather
+    than patch over.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Confirm CP-014 is no longer applied to
+      PROD and that PROD runs PSU_VOUCHER_REC version 5.
+solution:
+  summary: Read the CP-014 apply history to confirm PSU_VOUCHER_REC was version 5
+    before the patch, then roll CP-014 back out of the PROD environment. The rollback
+    restores the exact definitions the apply overwrote, returning PROD to version
+    5 and clearing the Accounts Payable failure.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: peoplesoft-fundamentals
+hosted_as: peoplesoft

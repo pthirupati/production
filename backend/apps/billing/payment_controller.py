@@ -121,17 +121,46 @@ class CreatePaymentOrderView(APIView):
                 status=http_status.HTTP_400_BAD_REQUEST,
             )
 
-        currency = request.data.get("currency", "INR")
+        # Currency is server-side for the same reason the amount above is (audit
+        # Z1-10). This read `request.data.get("currency", "INR")` three lines below a
+        # comment insisting we never trust the client on price — but amount and
+        # currency are one fact, not two. Posting {"currency": "USD"} produced a $499
+        # order for a ₹499 product (~83x), and it then passed verification, because
+        # payment_service compares the payment against the currency STORED on the
+        # order. Technology prices are denominated in INR; CreateRazorpayOrderView
+        # already hardcodes it.
+        currency = "INR"
 
         try:
-            # Create tech subscription (pending verification)
-            tech_sub = TechnologySubscription.objects.create(
-                user=request.user,
-                technology=technology,
-                amount=amount,
-                is_active=False,  # Will activate after payment
-                payment_verified=False,
+            # Renewal-safe (audit Z1-7). The duplicate guard above filters
+            # `is_active=True`, so a LAPSED subscription passes it — and a bare
+            # .create() then hit `unique_together = ("user", "technology")` and 500'd.
+            # Every attempt to re-subscribe to an expired technology failed, which is
+            # the renewal path: the customer most likely to pay could not.
+            #
+            # get_or_create_technology_subscription takes select_for_update and
+            # catches the IntegrityError, so it is also safe against two concurrent
+            # checkouts. On an existing row we reset it to pending: this order is not
+            # paid yet, and leaving a stale is_active=True would grant access before
+            # verification.
+            from .subscription_utils import get_or_create_technology_subscription
+
+            tech_sub, _created = get_or_create_technology_subscription(
+                request.user,
+                technology,
+                defaults={
+                    "amount": amount,
+                    "is_active": False,   # activated after payment verification
+                    "payment_verified": False,
+                },
             )
+            if not _created:
+                tech_sub.amount = amount
+                tech_sub.is_active = False
+                tech_sub.payment_verified = False
+                tech_sub.save(
+                    update_fields=["amount", "is_active", "payment_verified"]
+                )
 
             # Create payment order via service
             service = PaymentService(

@@ -534,6 +534,177 @@ def eval_promql(query: str, broken: dict, t: float | None = None) -> dict:
     return {"status": "success", "data": {"resultType": "vector", "result": result}}
 
 
+def prometheus_http_api(url_or_path: str, broken: dict | None = None) -> tuple[int, dict]:
+    """Prometheus HTTP API surface for curl teaching labs (audit Y3 residual).
+
+    Routes ``/api/v1/query`` and ``/api/v1/query_range`` through :func:`eval_promql`
+    so CLI and UI cannot diverge. Returns ``(http_status, body)``.
+    """
+    from urllib.parse import parse_qs, urlparse
+
+    broken = broken or {}
+    raw = (url_or_path or "").strip()
+    if not raw:
+        return 400, {"status": "error", "error": "empty URL", "data": None}
+
+    if "://" in raw:
+        parsed = urlparse(raw)
+        path = parsed.path or "/"
+        qs = parse_qs(parsed.query)
+    elif "?" in raw:
+        path, q = raw.split("?", 1)
+        qs = parse_qs(q)
+    else:
+        path, qs = raw, {}
+
+    norm = path.rstrip("/") or "/"
+    expr = (qs.get("query") or [""])[0]
+
+    if norm.endswith("/api/v1/query"):
+        return 200, eval_promql(expr, broken)
+
+    if norm.endswith("/api/v1/query_range"):
+        # Teaching stub: same samples as instant, shaped as a one-point matrix.
+        instant = eval_promql(expr, broken)
+        if instant.get("status") != "success":
+            return 200, instant
+        matrix = []
+        for row in instant.get("data", {}).get("result") or []:
+            ts, val = row.get("value") or [0, "0"]
+            matrix.append({"metric": row.get("metric") or {}, "values": [[ts, val]]})
+        return 200, {"status": "success", "data": {"resultType": "matrix", "result": matrix}}
+
+    if norm.endswith("/-/healthy") or norm.endswith("/-/ready"):
+        return 200, {"status": "success"}
+
+    return 404, {
+        "status": "error",
+        "error": f"Prometheus HTTP API: unknown path {path}",
+        "data": None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Alert rule evaluation.
+#
+# Before this existed, a rule's `state` was whatever the preset or the UI toggle
+# last wrote, so authoring a rule with a real expression never changed anything:
+# the authoring → evaluation → firing loop was open. Now the rule's own `expr`
+# is run through eval_promql and the state is *derived*:
+#
+#   expr yields no samples          → inactive
+#   expr yields samples, for= unmet → pending  (active_since tracks the clock)
+#   expr yields samples, for= met   → firing
+#
+# An active Alertmanager silence whose matchers select the alert keeps the rule
+# firing (real Alertmanager silences suppress *notifications*, not evaluation)
+# but marks it suppressed so the UI can grey it out.
+#
+# IMPORTANT (grading): this is deliberately kept out of validate_monitoring_lab.
+# Presets force `graf["alert_rules"]` states for the flap/routing scenarios, and
+# grading keys off broken["alert_misrouted"] / contact-point config — never off
+# a computed rule state. Deriving state must not become a free pass.
+# ---------------------------------------------------------------------------
+
+_DURATION_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*(ms|s|m|h|d|w)?\s*$")
+_DURATION_MULT = {"ms": 0.001, "s": 1.0, "m": 60.0, "h": 3600.0, "d": 86400.0, "w": 604800.0}
+
+
+def _duration_seconds(text: Any, default: float = 0.0) -> float:
+    """Parse a Prometheus duration ("5m", "0s", "1h30m" → best effort) to seconds."""
+    if isinstance(text, (int, float)):
+        return float(text)
+    raw = str(text or "").strip()
+    if not raw:
+        return default
+    m = _DURATION_RE.match(raw)
+    if m:
+        return float(m.group(1)) * _DURATION_MULT.get(m.group(2) or "s", 1.0)
+    # Compound form like "1h30m": sum the parts rather than giving up.
+    total = 0.0
+    matched = False
+    for value, unit in re.findall(r"(\d+(?:\.\d+)?)\s*(ms|s|m|h|d|w)", raw):
+        total += float(value) * _DURATION_MULT[unit]
+        matched = True
+    return total if matched else default
+
+
+def _silence_suppresses(silences: list[dict], rule: dict) -> bool:
+    """True when an *active* silence's matchers select this rule's alert.
+
+    Only `alertname` and the rule's own labels are matchable here — the sim has
+    no per-sample notification pipeline. An expired silence never suppresses.
+    """
+    labels = {"alertname": rule.get("name", ""), **(rule.get("labels") or {})}
+    for sil in silences or []:
+        # v2 silences carry an explicit state; the legacy silence_alert action
+        # writes none, and an absent state means "just created" → active.
+        if (sil.get("state") or "active") != "active":
+            continue
+        matchers = sil.get("matchers") or []
+        if not matchers:
+            continue
+        if all(str(labels.get(m.get("name"), "")) == str(m.get("value")) for m in matchers):
+            return True
+    return False
+
+
+def evaluate_alert_rule(rule: dict, broken: dict, silences: list[dict] | None = None,
+                        t: float | None = None) -> dict:
+    """Derive one rule's state from its expr. Mutates and returns the rule."""
+    t = t if t is not None else _now()
+    if rule.get("enabled") is False:
+        rule["state"] = "inactive"
+        rule["active_since"] = None
+        rule["firing_samples"] = 0
+        rule["suppressed"] = False
+        return rule
+
+    res = eval_promql(rule.get("expr") or "", broken, t)
+    if res.get("status") != "success":
+        # A rule whose expression doesn't parse is unhealthy, not quietly quiet —
+        # surface it the way Prometheus does instead of pretending it's inactive.
+        rule["health"] = "err"
+        rule["last_error"] = res.get("error") or "evaluation failed"
+        rule["state"] = "inactive"
+        rule["active_since"] = None
+        rule["firing_samples"] = 0
+        rule["suppressed"] = False
+        return rule
+
+    rows = res.get("data", {}).get("result", [])
+    rule["health"] = "ok"
+    rule.pop("last_error", None)
+    rule["firing_samples"] = len(rows)
+
+    if not rows:
+        rule["state"] = "inactive"
+        rule["active_since"] = None
+        rule["suppressed"] = False
+        return rule
+
+    active_since = rule.get("active_since")
+    if not isinstance(active_since, (int, float)):
+        active_since = t
+        rule["active_since"] = active_since
+    hold = _duration_seconds(rule.get("for"), default=0.0)
+    rule["state"] = "firing" if (t - active_since) >= hold else "pending"
+    rule["suppressed"] = _silence_suppresses(silences or [], rule)
+    return rule
+
+
+def refresh_alert_rules(state: dict, t: float | None = None) -> list[dict]:
+    """Re-evaluate every Prometheus alerting rule against current series."""
+    t = t if t is not None else _now()
+    prom = state.setdefault("prometheus", {})
+    broken = state.get("broken") or {}
+    silences = (prom.get("alertmanager") or {}).get("silences") or []
+    rules = prom.setdefault("alerting_rules", [])
+    for rule in rules:
+        evaluate_alert_rule(rule, broken, silences, t)
+    return rules
+
+
 # ---------------------------------------------------------------------------
 # Base inventory (Grafana + Prometheus)
 # ---------------------------------------------------------------------------
@@ -914,7 +1085,18 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     targets_before = len((entry["state"].get("prometheus") or {}).get("targets") or [])
     ensure_v2(entry["state"])
     targets_after = len((entry["state"].get("prometheus") or {}).get("targets") or [])
-    if set(entry["state"].keys()) != keys_before or targets_after != targets_before:
+    # Alert states are derived from each rule's own expr, not stored. Evaluate on
+    # the *persisted* state (not the deepcopy below) so `active_since` accumulates
+    # across reads and a `for:` hold actually elapses into firing.
+    rules_before = json.dumps([[r.get("state"), r.get("active_since")]
+                               for r in (entry["state"].get("prometheus") or {}).get("alerting_rules") or []],
+                              sort_keys=True)
+    refresh_alert_rules(entry["state"])
+    rules_after = json.dumps([[r.get("state"), r.get("active_since")]
+                              for r in (entry["state"].get("prometheus") or {}).get("alerting_rules") or []],
+                             sort_keys=True)
+    if (set(entry["state"].keys()) != keys_before or targets_after != targets_before
+            or rules_after != rules_before):
         _save_session(str(session_id), entry)
     state = copy.deepcopy(entry["state"])
     _merge_lab_hosts(state, session_id)
@@ -937,6 +1119,10 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "targets_down": sum(1 for t in prom["targets"] if t.get("health") == "down"),
         "recording_rules_total": len(prom["recording_rules"]),
         "alerting_rules_total": len(prom["alerting_rules"]),
+        # Derived from each rule's expr by refresh_alert_rules — these move when
+        # the learner authors a rule that actually matches, not when a preset says so.
+        "alerting_rules_firing": sum(1 for r in prom["alerting_rules"] if r.get("state") == "firing"),
+        "alerting_rules_pending": sum(1 for r in prom["alerting_rules"] if r.get("state") == "pending"),
         "head_series": prom["tsdb"]["head_series"],
         "high_cardinality": bool(broken.get("high_cardinality_metric")),
         "fix_applied": state.get("fix_applied", False),
@@ -982,6 +1168,13 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _merge_bridge_workloads(state, session_id)
         res = eval_promql(expr, broken)
         return {"ok": True, "query": expr, "result": res}
+
+    if action in ("prometheus_http", "prom_http", "http_api"):
+        # curl-shaped Prometheus HTTP API (Y3). Same evaluator as `query`.
+        _merge_bridge_workloads(state, session_id)
+        url = payload.get("url") or payload.get("path") or ""
+        status, body = prometheus_http_api(url, broken)
+        return {"ok": status < 400, "status": status, "body": body}
 
     if action == "test_datasource":
         uid = payload.get("uid")
@@ -1030,15 +1223,19 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return {"ok": True, "message": f"Added data source {name}", "datasource": ds}
 
     if action == "silence_alert":
-        # Add an Alertmanager silence (cosmetic — alerts still defined).
+        # Add an Alertmanager silence. Like the real thing this suppresses
+        # *notification* for matching rules (rule["suppressed"]) — it does not
+        # stop evaluation, so a silenced rule stays firing while it matches.
         am = state["prometheus"]["alertmanager"]
-        am.setdefault("silences", []).append({
+        silence = {
             "id": f"sil-{int(_now())}", "matchers": payload.get("matchers", []),
             "comment": payload.get("comment", "silenced from sim"),
-            "created_by": "lab_grafana", "ends_at": _now_iso(),
-        })
+            "created_by": "lab_grafana", "state": "active", "ends_at": _now_iso(),
+        }
+        am.setdefault("silences", []).append(silence)
+        refresh_alert_rules(state)
         _save_session(str(session_id), entry)
-        return {"ok": True, "message": "Silence created"}
+        return {"ok": True, "message": "Silence created", "silence": silence}
 
     if action == "update_panel":
         dash_uid = payload.get("dashboard_uid")
@@ -1203,13 +1400,21 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return {"ok": True, "message": "Prometheus configuration reloaded"}
 
     if action == "toggle_alert_rule":
+        # State is derived from the expr now, so this can no longer mean "flip
+        # firing/inactive" — that was the fake loop. It enables/disables the rule
+        # (like `promtool`-style rule-group muting); a disabled rule evaluates to
+        # inactive regardless of what its expression matches.
         name = (payload.get("name") or payload.get("alert") or "").strip()
         rules = state["prometheus"].setdefault("alerting_rules", [])
+        silences = (state["prometheus"].get("alertmanager") or {}).get("silences") or []
         for r in rules:
             if r.get("name") == name:
-                r["state"] = "inactive" if r.get("state") == "firing" else "firing"
+                r["enabled"] = not r.get("enabled", True)
+                r["active_since"] = None  # re-enabling restarts the `for` hold
+                evaluate_alert_rule(r, state["broken"], silences)
                 _save_session(str(session_id), entry)
-                return {"ok": True, "message": f"Alert rule {name} updated", "rule": r}
+                verb = "enabled" if r["enabled"] else "disabled"
+                return {"ok": True, "message": f"Alert rule {name} {verb}", "rule": r}
         return {"ok": False, "error": "alert rule not found"}
 
     if action == "add_alert_rule":
@@ -1226,9 +1431,15 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             "name": name,
             "expr": expr,
             "for": payload.get("for") or "5m",
-            "state": payload.get("state") or "inactive",
+            "labels": payload.get("labels") or {},
             "annotations": payload.get("annotations") or {"summary": name},
+            "enabled": True,
+            "health": "ok",
         }
+        # Evaluate on creation: the payload's `state` is deliberately ignored so a
+        # learner can't declare a rule "firing" — the expression has to earn it.
+        silences = (state["prometheus"].get("alertmanager") or {}).get("silences") or []
+        evaluate_alert_rule(rule, state["broken"], silences)
         rules.append(rule)
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"Added alert rule {name}", "rule": rule}

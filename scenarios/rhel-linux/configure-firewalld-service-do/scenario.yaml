@@ -15,20 +15,16 @@ description: 'CONTEXT: A team operating Red Hat Enterprise Linux has raised a ti
   resolve it. Business impact: reduced service reliability and blocked users until the underlying state
   is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline RHEL practice host. The architecture is a single
   lab-primary node exposing dnf, subscription-manager, firewalld, and SELinux; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: RHEL host with firewalld active and the http service not yet allowed. nginx
   may be installed but the firewall blocks inbound web traffic.
-
 
   OBJECTIVE: Allow the http service in firewalld permanently; Reload firewalld and start/enable nginx;
   Verify HTTP traffic is permitted and the site responds. Acceptance criteria: the change is minimal and
   reversible, and success means `firewall-cmd --list-ports` includes `80/tcp`.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
@@ -36,16 +32,13 @@ description: 'CONTEXT: A team operating Red Hat Enterprise Linux has raised a ti
   Check your work continuously against the objective — success means `firewall-cmd --list-ports` includes
   `80/tcp`.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `firewall-cmd --list-ports` includes `80/tcp`.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -97,7 +90,6 @@ hints:
 
     3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
 
-
     WHY: systemd will not start nginx until `nginx -t` passes.'
 summary: Complete the open firewalld service port rhel linux lab and verify success with the checker
 estimated_minutes: 15
@@ -108,7 +100,7 @@ tags:
 - do
 - hands-on
 - rhel-linux
-linked_tutorial: rhel-linux-fundamentals
+linked_tutorial: rhel-linux-zero-hero
 what_you_will_learn:
 - Allow the http service in firewalld permanently
 - Reload firewalld and start/enable nginx

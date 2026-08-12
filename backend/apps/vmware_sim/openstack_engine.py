@@ -158,6 +158,7 @@ def _scenario_overlay(state: dict, scenario_slug: str) -> None:
             "summary": "Attach vol-web-data to web-01, then confirm the disk in the lab terminal with lsblk.",
         }
         state["broken"] = {"volume_unattached": True}
+        state["_preset_applied"] = True
     elif "stop" in slug or "power" in slug:
         inst = state["instances"][0]
         inst["status"] = "SHUTOFF"
@@ -167,12 +168,19 @@ def _scenario_overlay(state: dict, scenario_slug: str) -> None:
             "summary": "web-01 is SHUTOFF after a maintenance window. Start it from Horizon.",
         }
         state["broken"] = {"instance_stopped": True}
+        state["_preset_applied"] = True
     elif "create" in slug or "launch" in slug:
         state["goal"] = {
             "title": "Launch a Nova instance",
             "summary": "Launch app-02 from ubuntu-22.04 on the private network using m1.small.",
         }
         state["broken"] = {"needs_instance": True}
+        state["_preset_applied"] = True
+    else:
+        # Keyword overlay matched nothing — console has no objective for this
+        # slug. validate_openstack_lab returns NO_VALIDATION_SCRIPT so Check
+        # can fall through to the terminal sentinel (azure/gcp/aws pattern).
+        state["_preset_applied"] = False
 
 
 def _ensure(session_id: str, scenario_slug: str = "") -> dict:
@@ -283,6 +291,10 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             },
         }
         state.setdefault("instances", []).append(inst)
+        # Launch labs seed needs_instance; creating any instance clears it.
+        broken = state.setdefault("broken", {})
+        if broken.get("needs_instance"):
+            broken.pop("needs_instance", None)
         _event(state, f"Launching instance {name} ({flavor})", "info")
         _save(session_id, entry)
         try:
@@ -300,6 +312,9 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             inst["status"] = "ACTIVE"
             inst["power_state"] = "Running"
             op = "start"
+            broken = state.setdefault("broken", {})
+            if broken.get("instance_stopped"):
+                broken.pop("instance_stopped", None)
         elif action == "stop_instance":
             inst["status"] = "SHUTOFF"
             inst["power_state"] = "Shutdown"
@@ -345,6 +360,9 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vol["status"] = "in-use"
         vol["attached_to"] = inst["id"]
         vol["device"] = device
+        broken = state.setdefault("broken", {})
+        if broken.get("volume_unattached"):
+            broken.pop("volume_unattached", None)
         _event(state, f"Attached {vol['name']} to {inst['name']} at {device}", "success")
         _save(session_id, entry)
         try:
@@ -456,3 +474,334 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return v2
 
     return {"ok": False, "error": f"Unknown action '{action}'"}
+
+
+# ---------------------------------------------------------------------------
+# `openstack` CLI surface
+#
+# Every write command routes back through apply_action rather than touching
+# state directly, so the `broken` flag clears and the Linux-guest bridges fire
+# identically whether the learner clicked Horizon or typed the command. Read
+# commands render from state so `openstack server list` can never disagree with
+# the dashboard.
+# ---------------------------------------------------------------------------
+
+_CLI_PROMPT_HINT = "Try 'openstack help' for the supported command list."
+
+
+def _cli_error(message: str, *, rc: int = 2) -> dict:
+    """Shell-shaped failure. rc is non-zero so graders and learners both see it."""
+    return {"ok": False, "rc": rc, "error": message, "stdout": "", "stderr": message}
+
+
+def _cli_ok(stdout: str, *, message: str = "") -> dict:
+    return {"ok": True, "rc": 0, "stdout": stdout, "stderr": "", "message": message or stdout}
+
+
+def _parse_cli_opts(tokens: list[str]) -> tuple[list[str], dict[str, str]]:
+    """Split `--flag value` / `--flag=value` pairs out of positional args.
+
+    Flags are normalized to underscore keys so they line up with apply_action
+    payload names (`--port-min 80` -> `port_min`). A flag with no value is
+    treated as a boolean present-flag.
+    """
+    positionals: list[str] = []
+    opts: dict[str, str] = {}
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok.startswith("--"):
+            raw = tok[2:]
+            if "=" in raw:
+                key, value = raw.split("=", 1)
+            else:
+                key = raw
+                if i + 1 < len(tokens) and not tokens[i + 1].startswith("--"):
+                    value = tokens[i + 1]
+                    i += 1
+                else:
+                    value = "true"
+            opts[key.replace("-", "_")] = value
+        else:
+            positionals.append(tok)
+        i += 1
+    return positionals, opts
+
+
+def _fmt_table(headers: list[str], rows: list[list[str]]) -> str:
+    """Render an ONTAP/OpenStack-style aligned table; header only when empty."""
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for idx, cell in enumerate(row):
+            widths[idx] = max(widths[idx], len(str(cell)))
+    sep = "+" + "+".join("-" * (w + 2) for w in widths) + "+"
+    out = [sep, "| " + " | ".join(h.ljust(widths[i]) for i, h in enumerate(headers)) + " |", sep]
+    for row in rows:
+        out.append("| " + " | ".join(str(c).ljust(widths[i]) for i, c in enumerate(row)) + " |")
+    out.append(sep)
+    return "\n".join(out)
+
+
+_CLI_HELP = """Supported commands:
+  openstack server list|show|create|delete|start|stop|reboot|resize
+  openstack volume list|show|create
+  openstack server add volume <server> <volume> [--device DEV]
+  openstack server remove volume <server> <volume>
+  openstack network list
+  openstack image list
+  openstack flavor list
+  openstack security group list|create
+  openstack security group rule create <group> [--protocol P] [--dst-port N]
+  openstack floating ip list|create|set
+"""
+
+
+def _cli_server(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    verb = args[0] if args else ""
+    rest = args[1:]
+
+    if verb == "list":
+        rows = [
+            [i.get("id", ""), i.get("name", ""), i.get("status", ""),
+             f"{i.get('network', '')}={i.get('private_ip', '')}", i.get("image", ""), i.get("flavor", "")]
+            for i in state.get("instances", [])
+        ]
+        return _cli_ok(_fmt_table(["ID", "Name", "Status", "Networks", "Image", "Flavor"], rows))
+
+    if verb == "show":
+        if not rest:
+            return _cli_error("openstack server show: a server name or ID is required")
+        inst = _find_instance(state, rest[0])
+        if not inst:
+            return _cli_error(f"No server with a name or ID of '{rest[0]}' exists.")
+        rows = [[k, str(v)] for k, v in inst.items() if not k.startswith("_")]
+        return _cli_ok(_fmt_table(["Field", "Value"], rows))
+
+    if verb == "create":
+        if not rest and not opts.get("name"):
+            return _cli_error("openstack server create: a server name is required")
+        payload = {
+            "name": opts.get("name") or rest[0],
+            "flavor": opts.get("flavor") or "m1.small",
+            "image": opts.get("image") or "ubuntu-22.04",
+            "network": opts.get("network") or opts.get("nic") or "private",
+        }
+        return apply_action(session_id, "create_instance", payload)
+
+    if verb in ("delete", "start", "stop", "reboot"):
+        if not rest:
+            return _cli_error(f"openstack server {verb}: a server name or ID is required")
+        action = {"delete": "delete_instance", "start": "start_instance",
+                  "stop": "stop_instance", "reboot": "reboot_instance"}[verb]
+        return apply_action(session_id, action, {"instance_id": rest[0]})
+
+    if verb == "resize":
+        if not rest:
+            return _cli_error("openstack server resize: a server name or ID is required")
+        flavor = opts.get("flavor") or ""
+        if not flavor:
+            return _cli_error("openstack server resize: --flavor is required")
+        return apply_action(session_id, "resize_instance", {"instance_id": rest[0], "flavor": flavor})
+
+    # `openstack server add volume <server> <volume>` and its remove counterpart.
+    if verb in ("add", "remove") and rest and rest[0] == "volume":
+        operands = rest[1:]
+        if len(operands) < 2:
+            return _cli_error(f"openstack server {verb} volume: <server> and <volume> are required")
+        server, volume = operands[0], operands[1]
+        if verb == "add":
+            payload = {"instance_id": server, "volume_id": volume}
+            if opts.get("device"):
+                payload["device"] = opts["device"]
+            return apply_action(session_id, "attach_volume", payload)
+        return apply_action(session_id, "detach_volume", {"volume_id": volume})
+
+    return _cli_error(f"openstack server: '{verb}' is not a recognized subcommand. {_CLI_PROMPT_HINT}")
+
+
+def _cli_volume(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    verb = args[0] if args else ""
+    rest = args[1:]
+
+    if verb == "list":
+        rows = [
+            [v.get("id", ""), v.get("name", ""), v.get("status", ""),
+             str(v.get("size_gb", "")), v.get("device") or "-"]
+            for v in state.get("volumes", [])
+        ]
+        return _cli_ok(_fmt_table(["ID", "Name", "Status", "Size", "Attached To"], rows))
+
+    if verb == "show":
+        if not rest:
+            return _cli_error("openstack volume show: a volume name or ID is required")
+        vol = _find_volume(state, rest[0])
+        if not vol:
+            return _cli_error(f"No volume with a name or ID of '{rest[0]}' exists.")
+        return _cli_ok(_fmt_table(["Field", "Value"], [[k, str(v)] for k, v in vol.items()]))
+
+    return _cli_error(f"openstack volume: '{verb}' is not a recognized subcommand. {_CLI_PROMPT_HINT}")
+
+
+def _cli_security_group(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    # `security group ...` and `security group rule ...` share a prefix.
+    if args and args[0] == "rule":
+        rest = args[1:]
+        verb = rest[0] if rest else ""
+        if verb == "list":
+            rows = []
+            for sg in state.get("security_groups", []):
+                for rule in sg.get("rules", []):
+                    ports = "any"
+                    if rule.get("port_min"):
+                        ports = f"{rule['port_min']}:{rule.get('port_max') or rule['port_min']}"
+                    rows.append([sg.get("name", ""), rule.get("direction", ""),
+                                 rule.get("protocol", ""), ports, rule.get("remote", "")])
+            return _cli_ok(_fmt_table(["Group", "Direction", "Protocol", "Port Range", "Remote"], rows))
+        if verb == "create":
+            group = rest[1] if len(rest) > 1 else opts.get("group", "")
+            if not group:
+                return _cli_error("openstack security group rule create: a group name is required")
+            port = opts.get("dst_port") or opts.get("port") or ""
+            payload = {
+                "name": group,
+                "direction": "egress" if opts.get("egress") else "ingress",
+                "protocol": opts.get("protocol") or "tcp",
+                "remote": opts.get("remote_ip") or opts.get("remote") or "0.0.0.0/0",
+            }
+            if port:
+                # `--dst-port 8080:8090` is valid ONTAP-style range syntax.
+                low, _, high = port.partition(":")
+                payload["port_min"] = low
+                payload["port_max"] = high or low
+            return apply_action(session_id, "add_security_group_rule", payload)
+        return _cli_error(f"openstack security group rule: '{verb}' is not recognized. {_CLI_PROMPT_HINT}")
+
+    verb = args[0] if args else ""
+    rest = args[1:]
+    if verb == "list":
+        rows = [[sg.get("id", ""), sg.get("name", ""), str(len(sg.get("rules", [])))]
+                for sg in state.get("security_groups", [])]
+        return _cli_ok(_fmt_table(["ID", "Name", "Rules"], rows))
+    if verb == "create":
+        if not rest:
+            return _cli_error("openstack security group create: a name is required")
+        return apply_action(session_id, "create_security_group", {"name": rest[0]})
+    return _cli_error(f"openstack security group: '{verb}' is not recognized. {_CLI_PROMPT_HINT}")
+
+
+def _cli_floating_ip(state: dict, session_id: str, args: list[str], opts: dict) -> dict:
+    verb = args[0] if args else ""
+    rest = args[1:]
+    if verb == "list":
+        rows = [[f.get("id", ""), f.get("address", ""), f.get("pool", ""),
+                 f.get("instance") or "-", f.get("status", "")]
+                for f in state.get("floating_ips", [])]
+        return _cli_ok(_fmt_table(["ID", "Floating IP", "Pool", "Port", "Status"], rows))
+    if verb == "create":
+        return apply_action(session_id, "allocate_floating_ip", {"pool": rest[0] if rest else "public"})
+    if verb == "set":
+        # `openstack floating ip set --port <server> <address>` — accept either order.
+        server = opts.get("port") or opts.get("server") or (rest[1] if len(rest) > 1 else "")
+        address = rest[0] if rest else ""
+        if not server or not address:
+            return _cli_error("openstack floating ip set: an address and --port <server> are required")
+        return apply_action(session_id, "associate_floating_ip", {"address": address, "instance_id": server})
+    return _cli_error(f"openstack floating ip: '{verb}' is not recognized. {_CLI_PROMPT_HINT}")
+
+
+def run_command(session_id: str, command: str) -> dict:
+    """Execute one `openstack ...` CLI line against the session state.
+
+    Returns a shell-shaped dict ({ok, rc, stdout, stderr}). Unknown commands
+    always come back rc!=0 — a silent no-op would let a learner believe they
+    solved a lab whose `broken` flag never cleared.
+    """
+    import shlex
+
+    raw = (command or "").strip()
+    if not raw:
+        return _cli_error("openstack: no command given. " + _CLI_PROMPT_HINT)
+
+    try:
+        tokens = shlex.split(raw)
+    except ValueError as exc:
+        return _cli_error(f"openstack: could not parse command ({exc})")
+
+    if tokens and tokens[0] == "openstack":
+        tokens = tokens[1:]
+    if not tokens:
+        return _cli_error("openstack: no command given. " + _CLI_PROMPT_HINT)
+
+    if tokens[0] in ("help", "--help", "-h"):
+        return _cli_ok(_CLI_HELP)
+
+    entry = _ensure(session_id)
+    state = entry["state"]
+    _advance_lifecycle(state)
+
+    if not state.get("session", {}).get("logged_in"):
+        return _cli_error(
+            "Missing value auth-url required for auth plugin password — "
+            "source the RC file (or sign in to Horizon) first.",
+            rc=1,
+        )
+
+    positionals, opts = _parse_cli_opts(tokens)
+    if not positionals:
+        return _cli_error("openstack: no object given. " + _CLI_PROMPT_HINT)
+
+    obj = positionals[0]
+    args = positionals[1:]
+
+    if obj == "server":
+        return _cli_server(state, session_id, args, opts)
+    if obj == "volume":
+        return _cli_volume(state, session_id, args, opts)
+    if obj == "security" and args and args[0] == "group":
+        return _cli_security_group(state, session_id, args[1:], opts)
+    if obj == "floating" and args and args[0] == "ip":
+        return _cli_floating_ip(state, session_id, args[1:], opts)
+
+    if obj == "network" and args and args[0] == "list":
+        rows = [[n.get("id", ""), n.get("name", ""),
+                 ",".join(s.get("cidr", "") for s in n.get("subnets", [])), n.get("status", "")]
+                for n in state.get("networks", [])]
+        return _cli_ok(_fmt_table(["ID", "Name", "Subnets", "Status"], rows))
+
+    if obj == "image" and args and args[0] == "list":
+        rows = [[i.get("id", ""), i.get("name", ""), i.get("status", "")]
+                for i in state.get("images", [])]
+        return _cli_ok(_fmt_table(["ID", "Name", "Status"], rows))
+
+    if obj == "flavor" and args and args[0] == "list":
+        rows = [[f.get("name", ""), str(f.get("vcpus", "")), str(f.get("ram_gb", "")), str(f.get("disk_gb", ""))]
+                for f in state.get("flavors", [])]
+        return _cli_ok(_fmt_table(["Name", "VCPUs", "RAM (GB)", "Disk (GB)"], rows))
+
+    return _cli_error(f"openstack: '{obj}' is not an openstack command. {_CLI_PROMPT_HINT}")
+
+
+# ---------------------------------------------------------------------------
+# Grader — fail-CLOSED, matching azure/gcp/aws.
+# ---------------------------------------------------------------------------
+
+def validate_openstack_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
+    """Grade per-scenario objectives from the broken-marker seeded at ensure time.
+
+    Fail-closed: an unmapped slug with no console objective must not auto-pass —
+    it returns NO_VALIDATION_SCRIPT so the provisioner can fall through to the
+    terminal sentinel path (same contract as validate_azure_lab).
+    """
+    entry = _load(session_id)
+    if not entry:
+        return False, "No OpenStack session"
+    state = entry["state"]
+    broken = state.get("broken") or {}
+    if broken:
+        kind = next(iter(broken.keys()))
+        return False, f"Unresolved OpenStack issue ({kind})"
+    if any(i.get("_transition") for i in state.get("instances") or []):
+        return False, "An instance is still transitioning — wait for it to settle"
+    if not state.get("_preset_applied"):
+        return False, "NO_VALIDATION_SCRIPT"
+    return True, "OpenStack validation passed"

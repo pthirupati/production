@@ -1,3 +1,4 @@
+is_active: true
 title: Enable WAL mode for concurrency
 slug: sqlite-wal-mode
 technology: sqlite
@@ -6,35 +7,28 @@ description: 'CONTEXT: A team operating SQLite has raised a ticket for `Enable W
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline SQLite database file. The architecture is a single
   lab-primary node exposing sqlite3 CLI, schema, WAL mode, and pragmas; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Database locked errors under concurrent readers.
-
 
   OBJECTIVE: Understand the current failure mode affecting Enable WAL mode for concurrency; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant sqlite3 CLI, schema, WAL mode, and pragmas), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -97,23 +91,65 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: Database locked errors under concurrent readers.
+  instructions: 'Readers hit ''database is locked'' under concurrency because the journal mode is wrong.
+    Fix solution(conn) so it returns the journal mode that lets readers run concurrently with a writer.
+    Read the current mode from `settings(key, value)` where key=''journal_mode''; if it is already ''wal''
+    leave it alone, otherwise change it to ''wal''. Persist the value back to settings and return the
+    final mode as a lowercase string.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn):\n    # BUG: reports the mode it found without ever switching it, so\
+      \ a database\n    # left on 'delete' keeps serialising readers behind the writer.\n    return conn.execute(\n\
+      \        \"SELECT value FROM settings WHERE key='journal_mode'\").fetchone()[0].lower()\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert callable(solution)
+  - name: delete mode is switched to wal
+    code: "import sqlite3\ndef _seed(mode):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ settings VALUES (?,?)\",\n                     [('journal_mode', mode), ('cache_size', '2000')])\n\
+      \    return conn\ndef _mode(conn):\n    return conn.execute(\"SELECT value FROM settings WHERE key='journal_mode'\"\
+      ).fetchone()[0]\nconn = _seed('delete')\nassert solution(conn) == 'wal', solution(conn)\n"
+  - name: change is persisted
+    code: "import sqlite3\ndef _seed(mode):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ settings VALUES (?,?)\",\n                     [('journal_mode', mode), ('cache_size', '2000')])\n\
+      \    return conn\ndef _mode(conn):\n    return conn.execute(\"SELECT value FROM settings WHERE key='journal_mode'\"\
+      ).fetchone()[0]\nconn = _seed('delete')\nsolution(conn)\nassert _mode(conn) == 'wal', _mode(conn)\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert callable(solution)
+  - name: already-wal database stays wal
+    code: "import sqlite3\ndef _seed(mode):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ settings VALUES (?,?)\",\n                     [('journal_mode', mode), ('cache_size', '2000')])\n\
+      \    return conn\ndef _mode(conn):\n    return conn.execute(\"SELECT value FROM settings WHERE key='journal_mode'\"\
+      ).fetchone()[0]\nconn = _seed('wal')\nassert solution(conn) == 'wal', solution(conn)\n"
+  - name: truncate mode is switched too
+    code: "import sqlite3\ndef _seed(mode):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ settings VALUES (?,?)\",\n                     [('journal_mode', mode), ('cache_size', '2000')])\n\
+      \    return conn\ndef _mode(conn):\n    return conn.execute(\"SELECT value FROM settings WHERE key='journal_mode'\"\
+      ).fetchone()[0]\nconn = _seed('truncate')\nassert solution(conn) == 'wal', solution(conn)\n"
+  - name: uppercase stored mode is normalised
+    code: "import sqlite3\ndef _seed(mode):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ settings VALUES (?,?)\",\n                     [('journal_mode', mode), ('cache_size', '2000')])\n\
+      \    return conn\ndef _mode(conn):\n    return conn.execute(\"SELECT value FROM settings WHERE key='journal_mode'\"\
+      ).fetchone()[0]\nconn = _seed('DELETE')\nassert solution(conn) == 'wal', solution(conn)\n"
+  - name: no other setting is disturbed
+    code: "import sqlite3\ndef _seed(mode):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ settings VALUES (?,?)\",\n                     [('journal_mode', mode), ('cache_size', '2000')])\n\
+      \    return conn\ndef _mode(conn):\n    return conn.execute(\"SELECT value FROM settings WHERE key='journal_mode'\"\
+      ).fetchone()[0]\nconn = _seed('delete')\nsolution(conn)\nother = conn.execute(\"SELECT value FROM\
+      \ settings WHERE key='cache_size'\").fetchone()[0]\nassert other == '2000', other\n"
   timeout: 8
 summary: Complete the enable wal mode for concurrency sqlite lab and verify success with the checker
 estimated_minutes: 20
@@ -124,7 +160,7 @@ tags:
 - fix
 - hands-on
 - sqlite
-linked_tutorial: sqlite-fundamentals
+linked_tutorial: sqlite-embedded-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Enable WAL mode for concurrency
 - Restore expected service behavior with a minimal, documented change

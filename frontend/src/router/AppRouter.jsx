@@ -41,6 +41,8 @@ const CertificateVerify = lazyWithRetry(() => import('../pages/CertificateVerify
 const PaymentPage = lazyWithRetry(() => import('../pages/PaymentPage'))
 const Privacy = lazyWithRetry(() => import('../pages/Privacy'))
 const Terms = lazyWithRetry(() => import('../pages/Terms'))
+const RefundCancellation = lazyWithRetry(() => import('../pages/RefundCancellation'))
+const AcceptableUse = lazyWithRetry(() => import('../pages/AcceptableUse'))
 const Contact = lazyWithRetry(() => import('../pages/Contact'))
 const ContactSales = lazyWithRetry(() => import('../pages/ContactSales'))
 const FAQ = lazyWithRetry(() => import('../pages/FAQ'))
@@ -58,6 +60,7 @@ const AdminJira = lazyWithRetry(() => import('../pages/admin/AdminJira'))
 const AdminItsm = lazyWithRetry(() => import('../pages/admin/AdminItsm'))
 const AdminCoupons = lazyWithRetry(() => import('../pages/admin/AdminCoupons'))
 const AdminAnalytics = lazyWithRetry(() => import('../pages/admin/AdminAnalytics'))
+const AdminFunnel = lazyWithRetry(() => import('../pages/admin/AdminFunnel'))
 const AdminTeams = lazyWithRetry(() => import('../pages/admin/AdminTeams'))
 const AdminSecurity = lazyWithRetry(() => import('../pages/admin/AdminSecurity'))
 const AdminAuditLogs = lazyWithRetry(() => import('../pages/admin/AdminAuditLogs'))
@@ -81,7 +84,6 @@ const RecruiterCompare = lazyWithRetry(() => import('../pages/interviews/Recruit
 const InterviewInvite = lazyWithRetry(() => import('../pages/interviews/InterviewInvite'))
 const AsyncVideoRoom = lazyWithRetry(() => import('../pages/interviews/AsyncVideoRoom'))
 const VMwareSimulator = lazyWithRetry(() => import('../pages/vmware/VMwareSimulator'))
-const AwsConsole = lazyWithRetry(() => import('../components/aws/AwsConsole'))
 const Unsubscribe = lazyWithRetry(() => import('../pages/Unsubscribe'))
 const Changelog = lazyWithRetry(() => import('../pages/Changelog'))
 const Tutorials = lazyWithRetry(() => import('../pages/tutorials/Tutorials'))
@@ -90,6 +92,10 @@ const Certifications = lazyWithRetry(() => import('../pages/certifications/Certi
 const CertificationDetail = lazyWithRetry(() => import('../pages/certifications/CertificationDetail'))
 const Playgrounds = lazyWithRetry(() => import('../pages/playgrounds/Playgrounds'))
 const PlaygroundDetail = lazyWithRetry(() => import('../pages/playgrounds/PlaygroundDetail'))
+const Journeys = lazyWithRetry(() => import('../pages/journeys/Journeys'))
+const JourneyDetail = lazyWithRetry(() => import('../pages/journeys/JourneyDetail'))
+const Projects = lazyWithRetry(() => import('../pages/projects/Projects'))
+const ProjectDetail = lazyWithRetry(() => import('../pages/projects/ProjectDetail'))
 const SimulatorLauncher = lazyWithRetry(() => import('../pages/SimulatorLauncher'))
 
 function PageLoader() {
@@ -97,7 +103,13 @@ function PageLoader() {
     <div className="flex items-center justify-center min-h-[60vh]">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-2 border-accent-cyan/30 border-t-accent-cyan rounded-full animate-spin" />
-        <span className="text-sm text-surface-500">Loading...</span>
+        {/* surface-400, not surface-500: measured against the runtime tokens in
+            index.css, surface-500 body copy is 6.18:1 on the dark bg but only
+            3.66:1 in light mode (--s-500 120,135,155 on --s-950 255,255,255),
+            under the 4.5:1 AA floor. surface-400 measures 9.35:1 dark / 6.46:1
+            light. Fixed at the call site rather than by redefining --s-500,
+            which is shared with borders and disabled states. */}
+        <span className="text-sm text-surface-400">Loading...</span>
       </div>
     </div>
   )
@@ -159,6 +171,16 @@ export default function AppRouter() {
         <Route path="/blog/:slug" element={<PublicLayout><BlogPost /></PublicLayout>} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/refunds" element={<RefundCancellation />} />
+        <Route path="/acceptable-use" element={<AcceptableUse />} />
+        {/* DO NOT delete for having zero in-app links — that is by design. The only
+            producer is backend marketing_unsubscribe_url() (apps/notifications/
+            unsubscribe.py:29), i.e. a link inside an email. Removing this page
+            breaks CAN-SPAM / RFC 8058 list-unsubscribe compliance and no frontend
+            test would go red. Note the backend also builds a SEPARATE POST-able
+            one-click API URL (unsubscribe.py:48) for mail providers; the two are
+            not interchangeable and must not be collapsed. Allowlisted in
+            routeReachability.test.js rather than linked. */}
         <Route path="/unsubscribe" element={<Unsubscribe />} />
         <Route path="/changelog" element={<PublicLayout><Changelog /></PublicLayout>} />
         <Route path="/contact" element={<Contact />} />
@@ -173,13 +195,32 @@ export default function AppRouter() {
         <Route path="/certifications/:slug" element={<CertificationDetail />} />
         <Route path="/playgrounds" element={<Playgrounds />} />
         <Route path="/playgrounds/:slug" element={<PlaygroundDetail />} />
+        {/* §C4 — Learning Journeys. API + seed + Dashboard next-step already
+            existed; these routes were the missing browse surface. */}
+        <Route path="/journeys" element={<Journeys />} />
+        <Route path="/journeys/:slug" element={<JourneyDetail />} />
+        {/* §C3 — Capstone projects catalog (was technology-tab only). */}
+        <Route path="/projects" element={<Projects />} />
+        <Route path="/projects/:slug" element={<ProjectDetail />} />
         <Route path="/interviews/invite/:token" element={<InterviewInvite />} />
         <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
         <Route path="/jira/:issueKey" element={<ProtectedRoute><JiraTicketPage /></ProtectedRoute>} />
         <Route path="/auth/callback/:provider" element={<OAuthCallback />} />
+        {/* Not duplicates (audit §H8 assumed they were). VMwareSimulator:835 reads
+            `searchParams.get('session') || paramSessionId`, and both forms have live
+            producers: /vmware/:sessionId from LabJourneyStrip.jsx:20 and
+            TerraformWorkspaceIde.jsx:244, /vmware-sim?session= from the pure-VMware
+            redirect at LabRunner.jsx:772. Deleting either strips a real entry point. */}
         <Route path="/vmware/:sessionId" element={<ProtectedRoute><VMwareSimulator /></ProtectedRoute>} />
         <Route path="/vmware-sim" element={<ProtectedRoute><VMwareSimulator /></ProtectedRoute>} />
-        <Route path="/aws-sim/*" element={<ProtectedRoute><AwsConsole /></ProtectedRoute>} />
+
+        {/* No standalone /aws-sim/* route (audit §H5). Its only producer,
+            awsConsoleUrlForResource(), was exported but never imported, and the
+            standalone AwsConsole renders zero lab chrome — no Hints/Check/Extend/
+            Stop/Back — so anyone reaching it was stranded. The console is alive on
+            the embedded path only: AwsLabOverlay declares its own /aws-sim/* route
+            inside a MemoryRouter (AwsLabOverlay.jsx:94), which is what
+            serviceFromPath() in AwsConsole matches against. */}
 
         {/* Protected routes */}
         <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
@@ -232,6 +273,7 @@ export default function AppRouter() {
           <Route path="/admin/sales" element={<AdminSales />} />
           <Route path="/admin/coupons" element={<AdminCoupons />} />
           <Route path="/admin/analytics" element={<AdminAnalytics />} />
+          <Route path="/admin/funnel" element={<AdminFunnel />} />
           <Route path="/admin/teams" element={<AdminTeams />} />
           <Route path="/admin/security" element={<AdminSecurity />} />
           <Route path="/admin/audit-logs" element={<AdminAuditLogs />} />

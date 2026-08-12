@@ -16,20 +16,16 @@ description: 'CONTEXT: A team operating database administration has raised a tic
   and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline database server. The architecture is a single lab-primary
   node exposing SQL client, schemas, backups, and performance views; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: A feature fix works in dev, but database replication is not production ready
   — missing guardrails, runbooks, or capacity checks.
-
 
   OBJECTIVE: Day-2 database replication work completes safely in this environment; Changes are verified
   with before/after checks; The system remains stable for dependent teams. Acceptance criteria: the change
   is minimal and reversible, and success means `systemctl is-active postgresql`` returns active.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
@@ -37,16 +33,13 @@ description: 'CONTEXT: A team operating database administration has raised a tic
   Check your work continuously against the objective — success means `systemctl is-active postgresql``
   returns active.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active postgresql` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -98,7 +91,6 @@ hints:
 
     3. Run `systemctl restart postgresql` and confirm `systemctl is-active postgresql` succeeds.
 
-
     WHY: the grader checks real service state, not marker files.'
 summary: Complete the database replication — production lab database lab and verify success with the checker
 estimated_minutes: 20
@@ -109,7 +101,7 @@ tags:
 - database
 - fix
 - hands-on
-linked_tutorial: database-fundamentals
+linked_tutorial: database-engineering-zero-hero
 what_you_will_learn:
 - Day-2 database replication work completes safely in this environment
 - Changes are verified with before/after checks

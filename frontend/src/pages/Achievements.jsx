@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { labApi } from '../api/labs'
-import { useAuthStore } from '../store/authStore'
 import {
-  Trophy, Star, Award, Flame, CheckCircle2,
+  Star, Award, CheckCircle2,
   Download, Shield, Clock, FileText, Server, Monitor, Globe,
-  Database, Cpu, Loader2, Lock, ExternalLink
+  Database, Cpu, Loader2, Lock, ExternalLink, AlertTriangle
 } from 'lucide-react'
 import { SkeletonCard } from '../components/Skeleton'
 import toast from 'react-hot-toast'
@@ -15,23 +14,31 @@ import { PageHeader, FixitPanel } from '../components/design'
 const techIcons = { Linux: Server, Docker: Monitor, Networking: Globe, 'Web Servers': Globe, Databases: Database, AWS: Cpu, Kubernetes: Cpu, Security: Shield }
 
 export default function Achievements() {
-  const { user } = useAuthStore()
   const [achievements, setAchievements] = useState([])
   const [eligibleTechs, setEligibleTechs] = useState([])
   const [loading, setLoading] = useState(true)
   const [interviewCerts, setInterviewCerts] = useState([])
   const [downloading, setDownloading] = useState(null)
+  const [loadFailed, setLoadFailed] = useState(false)
 
   useEffect(() => {
-    Promise.all([
-      labApi.getAchievements().catch(() => []),
-      labApi.getAchievementsCertificate().catch(() => ({ eligible_technologies: [] })),
-      interviewsApi.listCertificates().catch(() => ({ certificates: [] })),
+    // allSettled so a failed fetch is distinguishable from a real empty result:
+    // the old .catch(() => []) rendered "0 of 0 achievements unlocked" and
+    // "No technology subscriptions yet", which is exactly what a brand-new user
+    // sees. An earned certificate silently vanishing is the worse failure here.
+    let active = true
+    Promise.allSettled([
+      labApi.getAchievements(),
+      labApi.getAchievementsCertificate(),
+      interviewsApi.listCertificates(),
     ]).then(([achData, certData, intCerts]) => {
-      setAchievements(achData)
-      setEligibleTechs(certData.eligible_technologies || [])
-      setInterviewCerts(intCerts.certificates || [])
-    }).finally(() => setLoading(false))
+      if (!active) return
+      setAchievements(achData.status === 'fulfilled' ? (achData.value || []) : [])
+      setEligibleTechs(certData.status === 'fulfilled' ? (certData.value?.eligible_technologies || []) : [])
+      setInterviewCerts(intCerts.status === 'fulfilled' ? (intCerts.value?.certificates || []) : [])
+      setLoadFailed([achData, certData, intCerts].some(r => r.status === 'rejected'))
+    }).finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [])
 
   const earned = achievements.filter(a => a.earned)
@@ -86,6 +93,24 @@ export default function Achievements() {
         title="Achievements & Certificates"
         subtitle={`${earned.length} of ${achievements.length} achievements unlocked`}
       />
+
+      {loadFailed && (
+        <div
+          data-testid="achievements-load-error"
+          className="glass-card p-4 border-accent-red/30 bg-accent-red/[0.04] flex items-start gap-3"
+        >
+          <AlertTriangle size={18} className="text-accent-red shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm text-surface-200">Some of this page couldn't be loaded</p>
+            <p className="text-xs text-surface-500 mt-0.5">
+              Anything missing below is a loading problem, not lost progress. Reload to try again.
+            </p>
+          </div>
+          <button onClick={() => window.location.reload()} className="btn-secondary text-xs px-3 py-1.5 shrink-0">
+            Reload
+          </button>
+        </div>
+      )}
 
       {/* ═══ Technology Certificates Section ═══ */}
       <FixitPanel>

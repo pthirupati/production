@@ -15,39 +15,32 @@ description: 'CONTEXT: A team operating GPU operations has raised a ticket for `
   Bus`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline GPU node. The architecture is a single lab-primary
   node exposing nvidia-smi, drivers, CUDA, and container toolkit; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: An 8x H100 SXM node where GPU4 dropped off the PCIe bus mid-training; nvidia-smi
   shows ''GPU has fallen off the bus'' and the run crashed with a NCCL timeout. dmesg shows `NVRM: GPU
   at 0000:8a:00.0 has fallen off the bus.` GPU4 no longer appears in nvidia-smi, `lspci` shows the device
   but reads return 0xffffffff, and the training job died with an unrecoverable ECC/NVLink error.
 
-
   OBJECTIVE: Confirm GPU4 has fallen off the PCIe bus and collect the NVRM dmesg evidence; Correlate the
   drop with a power, thermal, or Xid event in the logs; Reset the device (nvidia-smi -r / GPU reset) or
   reseat via the fix, then confirm it returns. Acceptance criteria: the change is minimal and reversible,
   and success means `nvidia-smi` includes `NVIDIA-SMI`.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant nvidia-smi, drivers, CUDA, and container toolkit), changing one thing at a time.
   Check your work continuously against the objective — success means `nvidia-smi` includes `NVIDIA-SMI`.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
   the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -98,7 +91,6 @@ hints:
 
     3. Confirm `nvidia-smi` shows the container Up.
 
-
     WHY: the checker validates the container is actually running.'
 summary: Diagnose and fix h100 fell off the pcie bus on a datacenter GPU node and verify with the checker
 estimated_minutes: 25
@@ -110,7 +102,7 @@ tags:
 - gpu
 - nvidia
 - hands-on
-linked_tutorial: gpu-fundamentals
+linked_tutorial: gpu-nvidia-zero-hero
 what_you_will_learn:
 - Confirm GPU4 has fallen off the PCIe bus and collect the NVRM dmesg evidence
 - Correlate the drop with a power, thermal, or Xid event in the logs

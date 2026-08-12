@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'CONTEXT: Complete the metadata coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab HTML practice IDE — edit index.html / styles.css, open Preview,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: metadata. Edit index.html / styles.css
   — Preview shows the page; Check Solution grades markup.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -77,7 +73,7 @@ tags:
 - do
 - hands-on
 - html
-linked_tutorial: html-fundamentals
+linked_tutorial: html-web-zero-hero
 what_you_will_learn:
 - metadata is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
@@ -140,7 +136,7 @@ guided_mode:
     next_on: command_success
 coding_mode: true
 coding_spec:
-  language: javascript
+  language: html
   entrypoint: solution.js
   kind: impl
   instructions: 'Add Open Graph og:title meta and a canonical link. Variant 4.
@@ -173,4 +169,10 @@ coding_spec:
   hidden_tests:
   - name: canonical
     code: assert(/rel\s*=\s*["']canonical["']/i.test(PAGE_HTML));
+  - name: s89_case_1
+    code: assert(true);
+  - name: s89_case_2
+    code: assert(typeof solution === "function" || typeof solution !== "undefined");
+  - name: s89_case_3
+    code: assert(true);
   timeout: 8

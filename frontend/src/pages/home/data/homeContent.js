@@ -1,7 +1,7 @@
 import {
-  Terminal, Shield, Clock, Trophy, Zap, Users, Award, Mic2,
+  Terminal, Shield, Clock, Trophy, Zap, Award, Mic2,
   Wrench, Play, Skull, BookOpen, Monitor, CheckCircle2, Ticket, Bot,
-} from 'lucide-react'
+} from '../../../ui/eagerIcons'
 
 export const features = [
   { icon: Terminal, title: 'Real Terminal & Lab Consoles', desc: 'Full bash shell via WebSocket plus Grafana, AWX, VMware vCenter, Terraform, and Windows Server — each lab runs in your own isolated environment.', color: 'cyan' },
@@ -105,6 +105,8 @@ export const footerColumns = [
       { label: 'About', to: '/about' },
       { label: 'Privacy', to: '/privacy' },
       { label: 'Terms', to: '/terms' },
+      { label: 'Refunds', to: '/refunds' },
+      { label: 'Acceptable use', to: '/acceptable-use' },
       { label: 'Contact', to: '/contact' },
     ],
   },

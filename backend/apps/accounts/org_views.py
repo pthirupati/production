@@ -190,7 +190,16 @@ def _member_stats(user):
 
 def _send_org_invite_email(org, email, inviter, is_new_user, token=None):
     frontend = settings.FRONTEND_URL.rstrip("/")
-    action_url = f"{frontend}/register?email={email}" if is_new_user else f"{frontend}/login"
+    # Carry the invite token in the link (audit Z2-2). It was minted, stored and
+    # passed to the template, but the action URL omitted it and the template never
+    # rendered it — so the token could not reach the invitee, and redemption had
+    # nothing to match on but the email address.
+    if is_new_user:
+        action_url = f"{frontend}/register?email={email}"
+        if token:
+            action_url += f"&invite_token={token}"
+    else:
+        action_url = f"{frontend}/login"
     try:
         send_notification_email.delay(
             subject=f"You've been invited to join {org.name} on FixitLab",
@@ -703,14 +712,33 @@ class OrganizationRazorpayVerifyView(APIView):
                 status=400,
             )
 
+        from django.db import transaction as db_transaction
+
         from apps.billing.extended_views import fulfill_org_razorpay_order
-        # Idempotent + race-safe under a duplicate verify/double-click. The cache
-        # key is keyed on the captured payment id so a replay can't re-grant.
-        from django.core.cache import cache as dj_cache
+        from apps.billing.models import ProcessedWebhookEvent
 
-        lock_key = f"org_razorpay_fulfilled:{payment_id}"
-        if not dj_cache.add(lock_key, True, timeout=86400):
-            return Response({"verified": True, "organization": org.name, "seats": org.seat_limit, "already_fulfilled": True})
-
-        fulfill_org_razorpay_order(notes)
+        # Idempotent + race-safe under a duplicate verify / double-click.
+        #
+        # This used to dedup on a Redis key alone (`cache.add`, 24h TTL) — the same
+        # pattern audit Z1-4 replaced for the Stripe and Razorpay webhooks, because a
+        # Redis flush or eviction reopens the double-fulfilment window and a replay
+        # re-grants seats. ProcessedWebhookEvent is the durable, authoritative gate;
+        # creating the row and fulfilling inside one transaction means a replay finds
+        # the row (created=False) and skips fulfilment entirely, while a crash
+        # mid-fulfilment rolls the row back so a genuine retry still works.
+        already = {
+            "verified": True,
+            "organization": org.name,
+            "seats": org.seat_limit,
+            "already_fulfilled": True,
+        }
+        with db_transaction.atomic():
+            _, created = ProcessedWebhookEvent.objects.get_or_create(
+                event_id=f"org_seats:{payment_id}",
+                defaults={"provider": "razorpay"},
+            )
+            if not created:
+                logger.info("Duplicate org fulfilment ignored (db): %s", payment_id)
+                return Response(already)
+            fulfill_org_razorpay_order(notes, payment_id=payment_id, order_id=order_id)
         return Response({"verified": True, "organization": org.name, "seats": org.seat_limit})

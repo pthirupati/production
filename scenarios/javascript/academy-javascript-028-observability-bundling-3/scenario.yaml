@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'CONTEXT: Complete the bundling coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab JavaScript/React practice IDE — edit solution.js, Run visible
   tests, then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: bundling. The stub in solution.js is
   incomplete so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required function so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -74,7 +70,7 @@ tags:
 - do
 - hands-on
 - javascript
-linked_tutorial: javascript-fundamentals
+linked_tutorial: javascript-language-zero-hero
 what_you_will_learn:
 - Day-2 bundling work completes safely in this environment
 - Changes are verified with before/after checks
@@ -156,5 +152,9 @@ coding_spec:
   - name: slash
     code: assert(entryPath('src/', 'main.js') === 'src/main.js');
   - name: root
+    code: assert(entryPath('', 'a3.js') === 'a3.js');
+  - name: s87_fn_defined
+    code: assert(typeof entryPath === "function");
+  - name: s87_repeat_last
     code: assert(entryPath('', 'a3.js') === 'a3.js');
   timeout: 8

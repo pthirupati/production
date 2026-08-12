@@ -6,37 +6,30 @@ description: 'CONTEXT: A team operating MySQL has raised a ticket for `Join Cust
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline MySQL instance. The architecture is a single lab-primary
   node exposing mysql client, InnoDB, grants, and slow query log; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: A reporting query should pair every order with the name of the customer who
   placed it, but the starter forgot the join condition, so the database pairs every customer with every
   order (a cartesian product). Add the ON clause so each order shows only its real customer.
 
-
   OBJECTIVE: See how a missing ON clause produces a cartesian product; Join orders to customers on the
   matching key; Return one row per order with the correct customer name. Acceptance criteria: the change
   is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant mysql client, InnoDB, grants, and slow query log), changing one thing at a time.
   Check your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -162,7 +155,6 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 summary: Complete the join customers to their orders mysql lab and verify success with the checker
 estimated_minutes: 15
@@ -173,7 +165,7 @@ tags:
 - fix
 - hands-on
 - mysql
-linked_tutorial: mysql-fundamentals
+linked_tutorial: mysql-dba-zero-hero
 what_you_will_learn:
 - See how a missing ON clause produces a cartesian product
 - Join orders to customers on the matching key

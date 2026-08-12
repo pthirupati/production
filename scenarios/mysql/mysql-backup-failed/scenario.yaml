@@ -1,3 +1,4 @@
+is_active: true
 title: Recover from a failed mysqldump
 slug: mysql-backup-failed
 technology: mysql
@@ -6,35 +7,28 @@ description: 'CONTEXT: A team operating MySQL has raised a ticket for `Recover f
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline MySQL instance. The architecture is a single lab-primary
   node exposing mysql client, InnoDB, grants, and slow query log; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Nightly backup fails on a large table due to lock timeout.
-
 
   OBJECTIVE: Understand the current failure mode affecting Recover from a failed mysqldump; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant mysql client, InnoDB, grants, and slow query log), changing one thing at a time.
   Check your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -98,23 +92,60 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: Nightly backup fails on a large table due to lock timeout.
+  instructions: 'The nightly backup fails on a large table because it holds a lock too long. Fix solution(conn)
+    so it splits the backup into chunks: return a list of (start_id, end_id) ranges covering every id
+    in `rows`, each range holding at most chunk_size rows. Ranges are inclusive on both ends, built from
+    the actual ids present (which are sparse - do not assume they are contiguous) in ascending order.
+    Return an empty list when the table is empty.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn, chunk_size):\n    # BUG: assumes ids run 1..MAX with no gaps, so on a\
+      \ sparse table the\n    # chunks cover ids that do not exist and miss real ones.\n    top = conn.execute(\"\
+      SELECT COALESCE(MAX(id), 0) FROM rows\").fetchone()[0]\n    out = []\n    start = 1\n    while start\
+      \ <= top:\n        out.append((start, min(start + chunk_size - 1, top)))\n        start += chunk_size\n\
+      \    return out\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert callable(solution)
+  - name: sparse ids are chunked by row count
+    code: "import sqlite3\ndef _seed(ids):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE rows (id INTEGER PRIMARY KEY);\")\n    conn.executemany(\"INSERT INTO rows VALUES (?)\"\
+      , [(i,) for i in ids])\n    return conn\nconn = _seed([1,2,50,51,900])\nassert solution(conn, 2)\
+      \ == [(1,2),(50,51),(900,900)], solution(conn, 2)\n"
+  - name: chunk holds at most chunk_size rows
+    code: "import sqlite3\ndef _seed(ids):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE rows (id INTEGER PRIMARY KEY);\")\n    conn.executemany(\"INSERT INTO rows VALUES (?)\"\
+      , [(i,) for i in ids])\n    return conn\nconn = _seed([1,2,3,4,5])\nassert solution(conn, 2) ==\
+      \ [(1,2),(3,4),(5,5)], solution(conn, 2)\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert callable(solution)
+  - name: empty table returns no chunks
+    code: "import sqlite3\ndef _seed(ids):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE rows (id INTEGER PRIMARY KEY);\")\n    conn.executemany(\"INSERT INTO rows VALUES (?)\"\
+      , [(i,) for i in ids])\n    return conn\nconn = _seed([])\nassert solution(conn, 10) == [], solution(conn,\
+      \ 10)\n"
+  - name: chunk larger than the table is one range
+    code: "import sqlite3\ndef _seed(ids):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE rows (id INTEGER PRIMARY KEY);\")\n    conn.executemany(\"INSERT INTO rows VALUES (?)\"\
+      , [(i,) for i in ids])\n    return conn\nconn = _seed([3,7,11])\nassert solution(conn, 100) == [(3,11)],\
+      \ solution(conn, 100)\n"
+  - name: every id falls inside exactly one range
+    code: "import sqlite3\ndef _seed(ids):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE rows (id INTEGER PRIMARY KEY);\")\n    conn.executemany(\"INSERT INTO rows VALUES (?)\"\
+      , [(i,) for i in ids])\n    return conn\nconn = _seed([2,4,6,8,10])\nr = solution(conn, 2)\nfor\
+      \ i in [2,4,6,8,10]:\n    assert sum(1 for s,e in r if s <= i <= e) == 1, (i, r)\n"
+  - name: single row yields a single point range
+    code: "import sqlite3\ndef _seed(ids):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE rows (id INTEGER PRIMARY KEY);\")\n    conn.executemany(\"INSERT INTO rows VALUES (?)\"\
+      , [(i,) for i in ids])\n    return conn\nconn = _seed([42])\nassert solution(conn, 5) == [(42,42)],\
+      \ solution(conn, 5)\n"
   timeout: 8
 summary: Complete the recover from a failed mysqldump mysql lab and verify success with the checker
 estimated_minutes: 20
@@ -125,7 +156,7 @@ tags:
 - fix
 - hands-on
 - mysql
-linked_tutorial: mysql-fundamentals
+linked_tutorial: mysql-dba-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Recover from a failed mysqldump
 - Restore expected service behavior with a minimal, documented change

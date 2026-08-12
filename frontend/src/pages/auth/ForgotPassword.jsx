@@ -18,7 +18,7 @@ export default function ForgotPassword() {
     try {
       await authApi.forgotPassword(email)
       setSent(true)
-      toast.success('Reset link sent!')
+      toast.success('Check your email')
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong. Please try again.')
     } finally {
@@ -41,12 +41,15 @@ export default function ForgotPassword() {
         <div className="text-center py-4">
           <CheckCircle2 size={48} className="text-accent-green mx-auto mb-4" />
           <h2 className="text-lg font-semibold text-white mb-2">Check Your Email</h2>
+          {/* The API answers identically whether or not an account exists (audit
+              Z2-5), so this copy must not claim an email was definitely sent — that
+              would re-create the enumeration oracle in the UI. */}
           <p className="text-surface-400 text-sm mb-4">
-            A password reset link has been sent to <strong className="text-white">{email}</strong>.
-            The link expires in 1 hour.
+            If an account exists for <strong className="text-white">{email}</strong>, a
+            password reset link is on its way. The link expires in 1 hour.
           </p>
           <p className="text-surface-500 text-xs">
-            Didn&apos;t receive the email? Check your spam folder or{' '}
+            Didn&apos;t receive it? Check your spam folder, confirm the address, or{' '}
             <button type="button" onClick={() => setSent(false)} className="text-accent-cyan hover:underline">
               try again
             </button>

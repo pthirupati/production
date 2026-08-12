@@ -103,7 +103,6 @@ function renderInline(text) {
 }
 
 function SubTicketRow({ sub }) {
-  const s = STATE_STYLE[sub.state] || STATE_STYLE.new
   return (
     <div className="rounded border border-surface-800 bg-surface-900/40 p-2.5">
       <div className="flex items-center justify-between gap-2">

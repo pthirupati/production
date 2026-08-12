@@ -1,0 +1,324 @@
+# FixitLab — SAST, container and IaC scanning (audit L1627).
+#
+# Before this, `grep -rn 'codeql\|semgrep\|bandit\|trivy\|tfsec\|checkov'` over
+# .github/workflows/ returned zero matches, while the repo carried a real
+# infrastructure surface: infra/terraform/main.tf, 9 Kubernetes manifests under
+# infra/k8s/, 8 first-party Dockerfiles and 7 compose files. Dependency CVEs were
+# covered (dependency-scan.yml) but nothing looked at our own code or config.
+#
+# WHY THE GATES ARE WHERE THEY ARE. Every threshold below was measured against
+# this tree on 2026-08-10, not guessed, because the failure mode here is well
+# known: a gate that starts red is a gate people learn to ignore (the same
+# reasoning behind backend/ruff.toml's narrow `select`). Measured totals:
+#
+#   bandit  -r backend/ scripts/  ->  684 findings: 642 LOW, 36 MEDIUM, 6 HIGH
+#                                     ...but only 2 at HIGH severity AND HIGH
+#                                     confidence, and both are false positives.
+#   checkov -d infra/             ->  296 failed checks (38 terraform, 64 k8s,
+#                                     192 kustomize re-reporting the same k8s
+#                                     objects through rendered overlays).
+#   hadolint (8 Dockerfiles)      ->  0 errors, 6 warnings, 5 info.
+#
+# So SAST and containers can gate at zero *today*, and IaC cannot. Rather than
+# make IaC advisory-only forever — the exact mistake dependency-scan.yml was
+# rewritten to stop making — it ratchets against a checked-in baseline count:
+# the build fails if the number of findings goes UP. That blocks new bad
+# infrastructure on day one while the 296-item backlog gets burned down, and
+# each burn-down lowers the ceiling permanently.
+#
+# Structure mirrors dependency-scan.yml: an advisory step that prints the full
+# human-readable report, then a separate gate step that parses JSON and decides.
+# Gates are fail-CLOSED — a scanner that produces no parseable report fails the
+# job rather than passing silently.
+
+name: Security scan
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 7 * * 1" # Mondays 07:00 UTC, an hour after the dependency scan
+  push:
+    branches: [main]
+    paths:
+      - "backend/**/*.py"
+      - "scripts/**/*.py"
+      - "infra/**"
+      - "**/Dockerfile*"
+      - ".github/workflows/security-scan.yml"
+  pull_request:
+    paths:
+      - "backend/**/*.py"
+      - "scripts/**/*.py"
+      - "infra/**"
+      - "**/Dockerfile*"
+      - ".github/workflows/security-scan.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sast:
+    name: SAST (bandit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install bandit
+        run: pip install "bandit>=1.9,<2"
+
+      - name: Scan backend and scripts
+        # Full report for humans; never fails on its own (the gate is next).
+        continue-on-error: true
+        run: |
+          bandit -r backend/ scripts/ \
+            --exclude '**/.venv/**,**/node_modules/**,**/migrations/**,**/tests/**,**/test_*.py' \
+            --severity-level medium
+
+      - name: Fail on high-severity, high-confidence findings
+        run: |
+          # bandit exits non-zero merely because findings exist, which is the
+          # normal case we classify below. A genuinely broken run writes no
+          # file and is caught as such in the reader.
+          bandit -r backend/ scripts/ \
+            --exclude '**/.venv/**,**/node_modules/**,**/migrations/**,**/tests/**,**/test_*.py' \
+            -f json -o /tmp/bandit.json -q || true
+          python3 - <<'PY'
+          import json, sys
+          from collections import Counter
+
+          try:
+              with open("/tmp/bandit.json") as fh:
+                  report = json.load(fh)
+          except (OSError, json.JSONDecodeError) as exc:
+              # A scanner that cannot produce a report is a failure, not a pass.
+              print(f"::error::bandit produced no readable report: {exc}")
+              sys.exit(1)
+
+          results = report.get("results", [])
+
+          # Known false positives, pinned to (test_id, file) so the waiver cannot
+          # silently spread to new code. Both are SHA-1 used to fabricate
+          # realistic-looking commit hashes for the in-memory git simulation in
+          # terminal labs — cosmetic identifiers, never a security boundary.
+          # Verified 2026-08-10: these are the only two HIGH/HIGH findings.
+          WAIVED = {
+              ("B324", "backend/apps/labs/provisioner/simulation/git_state.py"),
+          }
+
+          blocking, waived = [], []
+          for item in results:
+              if item.get("issue_severity") != "HIGH" or item.get("issue_confidence") != "HIGH":
+                  continue
+              filename = item.get("filename", "").lstrip("./")
+              label = (
+                  f"{filename}:{item.get('line_number')} "
+                  f"{item.get('test_id')} {item.get('issue_text', '')[:100]}"
+              )
+              if (item.get("test_id"), filename) in WAIVED:
+                  waived.append(label)
+              else:
+                  blocking.append(label)
+
+          for item in waived:
+              print(f"::notice::Waived known false positive: {item}")
+          for item in blocking:
+              print(f"::error::HIGH-confidence HIGH-severity finding: {item}")
+
+          # Keep the tolerated tiers visible so the backlog cannot quietly grow
+          # behind a green check.
+          counts = Counter(i.get("issue_severity") for i in results)
+          print(
+              "bandit severity counts — high={high} medium={medium} low={low} "
+              "(blocking={blocking}, waived={waived})".format(
+                  high=counts.get("HIGH", 0),
+                  medium=counts.get("MEDIUM", 0),
+                  low=counts.get("LOW", 0),
+                  blocking=len(blocking),
+                  waived=len(waived),
+              )
+          )
+          sys.exit(1 if blocking else 0)
+          PY
+
+  containers:
+    name: Container lint (hadolint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint first-party Dockerfiles
+        run: |
+          # Scenario images under scenarios/ are deliberately broken teaching
+          # artifacts (that is the product), so linting them is meaningless.
+          # Only first-party service images are checked.
+          python3 - <<'PY'
+          import json, subprocess, sys
+          from collections import Counter
+
+          DOCKERFILES = [
+              "backend/Dockerfile",
+              "database/Dockerfile",
+              "frontend/Dockerfile",
+              "frontend/Dockerfile.prod",
+              "gateway/Dockerfile",
+              "gateway/Dockerfile.prod",
+              "rabbitmq/Dockerfile",
+              "test/Dockerfile",
+          ]
+
+          # hadolint parses a heredoc body as Dockerfile instructions, so the two
+          # frontend images — which write a full nginx config via
+          # `RUN cat > ... << 'EOF'` — trip DL1000 "unexpected 's'" on `server {`.
+          # Verified 2026-08-10: the files are valid and build fine; this is a
+          # hadolint limitation, not a defect. Parse errors are reported but do
+          # not gate. Real rule violations in those files still count.
+          PARSE_ERROR = "DL1000"
+
+          blocking, parse_errors = [], []
+          totals = Counter()
+
+          for path in DOCKERFILES:
+              proc = subprocess.run(
+                  ["docker", "run", "--rm", "-i", "hadolint/hadolint:v2.12.0",
+                   "hadolint", "--no-color", "-f", "json", "-"],
+                  stdin=open(path, "rb"),
+                  capture_output=True,
+              )
+              raw = proc.stdout.decode("utf-8", "replace").strip()
+              if not raw:
+                  print(f"{path}: clean")
+                  continue
+              try:
+                  # strict=False: hadolint echoes raw control characters from the
+                  # source line into its JSON messages.
+                  findings = json.loads(raw, strict=False)
+              except json.JSONDecodeError as exc:
+                  print(f"::error::hadolint produced no readable report for {path}: {exc}")
+                  sys.exit(1)
+
+              for f in findings:
+                  level, code = f.get("level"), f.get("code")
+                  totals[level] += 1
+                  label = f"{path}:{f.get('line')} {code} {f.get('message', '')[:100]}"
+                  if code == PARSE_ERROR:
+                      parse_errors.append(label)
+                  elif level == "error":
+                      blocking.append(label)
+
+              print(f"{path}: {len(findings)} finding(s) {dict(Counter(x['level'] for x in findings))}")
+
+          for item in parse_errors:
+              print(f"::notice::hadolint could not parse (heredoc, not a defect): {item}")
+          for item in blocking:
+              print(f"::error::Dockerfile error: {item}")
+
+          print(
+              "hadolint totals — error={error} warning={warning} info={info} "
+              "(blocking={blocking}, unparseable={parse})".format(
+                  error=totals.get("error", 0),
+                  warning=totals.get("warning", 0),
+                  info=totals.get("info", 0),
+                  blocking=len(blocking),
+                  parse=len(parse_errors),
+              )
+          )
+          sys.exit(1 if blocking else 0)
+          PY
+
+  iac:
+    name: IaC scan (checkov)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install checkov
+        run: pip install "checkov>=3.3,<4"
+
+      - name: Scan infra (full report)
+        # Full report for humans; never fails on its own (the gate is next).
+        continue-on-error: true
+        run: checkov -d infra/ --compact --skip-framework secrets
+
+      - name: Ratchet against baseline
+        run: |
+          # --skip-framework secrets: leaked-credential scanning is already done
+          # by scripts/check-no-secrets-in-git.sh in ci.yml, tests.yml and
+          # production.yml. Checkov's entropy heuristic only re-finds the literal
+          # placeholders "REPLACE" (infra/k8s/base/secret.example.yaml) and
+          # "change-me-use-secrets-manager" (infra/terraform/main.tf), so keeping
+          # it on would add two permanent false positives and a second, weaker
+          # gate over ground already covered.
+          #
+          # --skip-framework kustomize: it re-renders the same objects already
+          # checked by the kubernetes framework, triple-counting every finding
+          # (192 of the 296 measured failures) and making the ratchet number move
+          # for reasons unrelated to any real change.
+          checkov -d infra/ --quiet --compact \
+            --skip-framework secrets --skip-framework kustomize \
+            -o json > /tmp/checkov.json || true
+          python3 - <<'PY'
+          import json, sys
+          from collections import Counter
+
+          # Measured 2026-08-10 on this tree with the same flags as above:
+          # terraform 38 + kubernetes 64. The ratchet only ever moves DOWN — when
+          # you fix findings, lower this number in the same PR so the gain is
+          # locked in. It must never be raised to make a build pass; adding
+          # insecure infrastructure is the thing this gate exists to stop.
+          BASELINE = 102
+
+          try:
+              with open("/tmp/checkov.json") as fh:
+                  report = json.load(fh)
+          except (OSError, json.JSONDecodeError) as exc:
+              # A scanner that cannot produce a report is a failure, not a pass.
+              print(f"::error::checkov produced no readable report: {exc}")
+              sys.exit(1)
+
+          # checkov emits a list of per-framework result objects when several
+          # frameworks match, and a bare object when only one does.
+          runs = report if isinstance(report, list) else [report]
+
+          failed = 0
+          by_framework = {}
+          severities = Counter()
+          for run in runs:
+              summary = run.get("summary", {}) or {}
+              count = summary.get("failed", 0)
+              failed += count
+              by_framework[run.get("check_type", "?")] = count
+              for check in (run.get("results") or {}).get("failed_checks") or []:
+                  severities[check.get("severity") or "UNSPECIFIED"] += 1
+
+          print(f"checkov failed checks by framework: {by_framework}")
+          print(f"severity breakdown: {dict(severities)}")
+          print(f"total failed={failed} baseline={BASELINE}")
+
+          if failed > BASELINE:
+              print(
+                  f"::error::IaC findings rose to {failed}, above the "
+                  f"{BASELINE} baseline. New insecure infrastructure was added — "
+                  "fix it rather than raising the baseline."
+              )
+              sys.exit(1)
+
+          if failed < BASELINE:
+              # Not a failure, but it must be loud: an un-lowered baseline is how
+              # a ratchet quietly stops ratcheting.
+              print(
+                  f"::warning::IaC findings dropped to {failed} (baseline "
+                  f"{BASELINE}). Lower BASELINE to {failed} in "
+                  ".github/workflows/security-scan.yml to lock in the gain."
+              )
+          sys.exit(0)
+          PY

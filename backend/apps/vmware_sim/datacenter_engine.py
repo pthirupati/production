@@ -290,18 +290,216 @@ def _server(asset_id: str, rack: str, u_slot: int, hostname: str, **overrides) -
 
 # ── Power chain ────────────────────────────────────────────────────────────
 
-def _rack_pdus() -> list[dict]:
+# Steady-state draw per powered-on server, by role. Loosely tracks real 2U
+# hardware: a GPU node with 2x2200W PSUs pulls multiples of an app node.
+_ROLE_DRAW_KW = {
+    "esxi_host": 1.45,
+    "db": 1.7,
+    "gpu_node": 4.6,
+    "storage": 1.55,
+    "app": 1.3,
+    "cache": 1.1,
+    None: 1.2,
+}
+# A powered-off server still draws BMC/standby power — the PSU is live.
+_STANDBY_DRAW_KW = 0.35
+# ToR switch + rack fans + PDU conversion loss on any populated rack.
+_RACK_OVERHEAD_KW = 0.8
+# MDF racks hold switching gear that is not modelled as a server object.
+_MDF_GEAR_KW = 1.6
+# Breaker trips above this; 208V/30A single-phase derated to 80% ≈ 5.0 kW.
+RACK_BREAKER_KW = 5.8
+# Continuous branch-circuit derate (NEC 80%) — used for cascade warnings only.
+RACK_BREAKER_CONTINUOUS_KW = round(RACK_BREAKER_KW * 0.8, 2)
+
+
+def rack_load_kw(rack_id: str, servers: list[dict]) -> float:
+    """Actual draw for one rack, summed from the servers physically in it.
+
+    Replaces a hardcoded 4.2 kW so that racking, powering off, or losing a
+    server visibly moves power, heat and PUE instead of decorating the panel.
+    """
+    rack_servers = [s for s in servers or [] if s.get("rack") == rack_id]
+    total = 0.0
+    for s in rack_servers:
+        if s.get("power_state") == "on":
+            total += _ROLE_DRAW_KW.get(s.get("role"), _ROLE_DRAW_KW[None])
+        else:
+            total += _STANDBY_DRAW_KW
+    if rack_servers:
+        total += _RACK_OVERHEAD_KW
+    elif rack_id in _MDF_RACKS:
+        total += _MDF_GEAR_KW
+    return round(total, 2)
+
+
+def _rack_pdus(servers: list[dict] | None = None) -> list[dict]:
+    """Build A/B dual-feed PDUs per rack (audit D14).
+
+    Legacy id ``PDU-{rack}`` is feed A so existing trip/restore labs keep working.
+    Feed B is ``PDU-{rack}-B``. Servers without ``power_feeds`` stay single-corded
+    on A (trip A still kills them); dual-corded servers list ``["A","B"]``.
+    """
     pdus = []
     for r in _RACKS:
+        load_kw = rack_load_kw(r, servers or [])
+        # Default single-corded world: all load on A.
         pdus.append({
             "id": f"PDU-{r}",
             "rack": r,
+            "feed": "A",
             "status": "online",
             "breaker": "closed",
-            "load_pct": 45,
-            "load_kw": 4.2,
+            "rating_kw": RACK_BREAKER_KW,
+            "load_pct": int(min(100, round(load_kw / RACK_BREAKER_KW * 100))),
+            "load_kw": load_kw,
+        })
+        pdus.append({
+            "id": f"PDU-{r}-B",
+            "rack": r,
+            "feed": "B",
+            "status": "online",
+            "breaker": "closed",
+            "rating_kw": RACK_BREAKER_KW,
+            "load_pct": 0,
+            "load_kw": 0.0,
         })
     return pdus
+
+
+def _server_feeds(server: dict) -> list[str]:
+    feeds = server.get("power_feeds")
+    if isinstance(feeds, list) and feeds:
+        return [str(f).upper() for f in feeds]
+    # Legacy / default: single-corded on A.
+    return ["A"]
+
+
+def _redistribute_pdu_loads(state: dict) -> list[dict]:
+    """Recompute per-feed load and auto-trip breakers that exceed rating.
+
+    Returns list of PDUs that newly tripped (for events / cascade).
+    """
+    rack_pdus = state.get("power_chain", {}).get("rack_pdus", []) or []
+    servers = state.get("servers") or []
+    # Ensure every rack has a B feed (sessions seeded before dual-feed).
+    by_rack: dict[str, dict[str, dict]] = {}
+    for p in rack_pdus:
+        rack = p.get("rack")
+        feed = (p.get("feed") or ("B" if str(p.get("id", "")).endswith("-B") else "A")).upper()
+        p["feed"] = feed
+        p.setdefault("rating_kw", RACK_BREAKER_KW)
+        by_rack.setdefault(rack, {})[feed] = p
+    for rack in list({p.get("rack") for p in rack_pdus}):
+        feeds = by_rack.setdefault(rack, {})
+        if "B" not in feeds:
+            b = {
+                "id": f"PDU-{rack}-B", "rack": rack, "feed": "B",
+                "status": "online", "breaker": "closed",
+                "rating_kw": RACK_BREAKER_KW, "load_pct": 0, "load_kw": 0.0,
+            }
+            rack_pdus.append(b)
+            feeds["B"] = b
+        if "A" not in feeds:
+            a = next((p for p in rack_pdus if p.get("rack") == rack and p.get("feed") == "A"), None)
+            if a:
+                feeds["A"] = a
+
+    # Zero loads then accumulate from servers that can still draw from a closed feed.
+    for p in rack_pdus:
+        p["load_kw"] = 0.0
+
+    for srv in servers:
+        rack = srv.get("rack")
+        feeds = by_rack.get(rack) or {}
+        wanted = _server_feeds(srv)
+        live = [
+            f for f in wanted
+            if feeds.get(f)
+            and feeds[f].get("breaker") == "closed"
+            and feeds[f].get("status") == "online"
+        ]
+        if not live:
+            # No live feed → server is dark.
+            if srv.get("power_state") == "on":
+                srv["power_state"] = "off"
+                if isinstance(srv.get("bmc"), dict):
+                    srv["bmc"]["power"] = "off"
+            continue
+        draw = (
+            _ROLE_DRAW_KW.get(srv.get("role"), _ROLE_DRAW_KW[None])
+            if srv.get("power_state") == "on"
+            else _STANDBY_DRAW_KW
+        )
+        share = draw / len(live)
+        for f in live:
+            feeds[f]["load_kw"] = round(feeds[f]["load_kw"] + share, 3)
+
+    # Rack overhead / MDF gear on feed A when A is live, else B.
+    for rack, feeds in by_rack.items():
+        overhead = 0.0
+        rack_servers = [s for s in servers if s.get("rack") == rack]
+        if rack_servers:
+            overhead = _RACK_OVERHEAD_KW
+        elif rack in _MDF_RACKS:
+            overhead = _MDF_GEAR_KW
+        if overhead <= 0:
+            continue
+        target = feeds.get("A") if feeds.get("A", {}).get("breaker") == "closed" else feeds.get("B")
+        if target and target.get("breaker") == "closed":
+            target["load_kw"] = round(target["load_kw"] + overhead, 3)
+
+    tripped: list[dict] = []
+    for p in rack_pdus:
+        rating = float(p.get("rating_kw") or RACK_BREAKER_KW)
+        load_kw = float(p.get("load_kw") or 0)
+        p["load_pct"] = int(min(999, round(load_kw / rating * 100))) if rating else 0
+        p["continuous_derate_kw"] = RACK_BREAKER_CONTINUOUS_KW
+        # Hard overcurrent: trip when load exceeds breaker rating.
+        if (
+            p.get("breaker") == "closed"
+            and p.get("status") == "online"
+            and load_kw > rating
+        ):
+            p["breaker"] = "open"
+            p["status"] = "tripped"
+            p["trip_reason"] = "overcurrent"
+            tripped.append(p)
+
+    return tripped
+
+
+def _apply_feed_loss(state: dict, pdu: dict) -> list[str]:
+    """Power off servers that lost their last live feed after a PDU trip."""
+    rack = pdu.get("rack")
+    feed = (pdu.get("feed") or "A").upper()
+    rack_pdus = state.get("power_chain", {}).get("rack_pdus", []) or []
+    feeds = {
+        (p.get("feed") or "A").upper(): p
+        for p in rack_pdus
+        if p.get("rack") == rack
+    }
+    affected = []
+    for srv in state.get("servers") or []:
+        if srv.get("rack") != rack:
+            continue
+        wanted = _server_feeds(srv)
+        live = [
+            f for f in wanted
+            if feeds.get(f)
+            and feeds[f].get("breaker") == "closed"
+            and feeds[f].get("status") == "online"
+        ]
+        if not live:
+            if srv.get("power_state") != "off":
+                srv["power_state"] = "off"
+                if isinstance(srv.get("bmc"), dict):
+                    srv["bmc"]["power"] = "off"
+                affected.append(srv["id"])
+        elif feed in wanted and feed not in live:
+            # Survived on the alternate feed — leave powered.
+            pass
+    return affected
 
 
 def _power_chain(rack_pdus: list[dict]) -> dict:
@@ -329,8 +527,31 @@ def _power_chain(rack_pdus: list[dict]) -> dict:
     }
 
 
+# Compressor work per kW of IT heat rejected (inverse of a ~1.8 CoP chiller).
+_COOLING_KW_PER_IT_KW = 0.55
+
+
+def _apply_cooling_load(it_kw: float, cooling: list[dict]) -> None:
+    """Split the IT heat across running CRACs so cooling draw follows load.
+
+    Previously each CRAC held a constant 9.0 kW, which made PUE a fixed number
+    no matter what the racks were doing. Load is shared evenly; a unit that is
+    over its capacity_kw is left at capacity so the overload stays visible.
+    """
+    running = [c for c in cooling or [] if c.get("status") == "running"]
+    for c in cooling or []:
+        if c.get("status") != "running":
+            c["load_kw"] = 0.0
+    if not running:
+        return
+    share = it_kw * _COOLING_KW_PER_IT_KW / len(running)
+    for c in running:
+        c["load_kw"] = round(min(share, float(c.get("capacity_kw") or share)), 2)
+
+
 def _facility_summary(rack_pdus: list[dict], cooling: list[dict]) -> dict:
     it_kw = round(sum(p["load_kw"] for p in rack_pdus if p.get("status") == "online"), 2)
+    _apply_cooling_load(it_kw, cooling)
     cooling_kw = round(sum(c["load_kw"] for c in cooling if c.get("status") == "running"), 2)
     overhead_kw = round(it_kw * 0.08, 2)
     total_kw = round(it_kw + cooling_kw + overhead_kw, 2)
@@ -347,8 +568,29 @@ def _facility_summary(rack_pdus: list[dict], cooling: list[dict]) -> dict:
 
 
 def _recompute_facility(state: dict) -> None:
-    rack_pdus = state.get("power_chain", {}).get("rack_pdus", [])
     cooling = state.get("cooling", [])
+    # Dual-feed redistribution + overcurrent auto-trip (D14).
+    # May cascade: A trip → load on B → B overcurrent → B trip.
+    for _ in range(3):
+        newly = _redistribute_pdu_loads(state)
+        if not newly:
+            break
+        for pdu in newly:
+            affected = _apply_feed_loss(state, pdu)
+            _event(
+                state,
+                f"Breaker auto-tripped on {pdu['id']} (overcurrent "
+                f"{pdu.get('load_kw')} kW > {pdu.get('rating_kw')} kW)"
+                + (f" — lost power to {', '.join(affected)}" if affected else ""),
+                "danger",
+            )
+    rack_pdus = state.get("power_chain", {}).get("rack_pdus", [])
+    # Floor PDUs are the sum of the rack PDUs they feed.
+    for floor_pdu in state.get("power_chain", {}).get("floor_pdus", []) or []:
+        feeds = set(floor_pdu.get("feeds") or [])
+        floor_pdu["load_kw"] = round(
+            sum(p["load_kw"] for p in rack_pdus if p.get("rack") in feeds), 1
+        )
     state["facility"] = {
         **state.get("facility", {}),
         **_facility_summary(rack_pdus, cooling),
@@ -461,7 +703,7 @@ def _base_state() -> dict:
         _server("srv-r06-u08", "R06", 8, "edge-cache-01", role="cache", vendor="Gigabyte"),
     ]
     rooms = _rooms()
-    rack_pdus = _rack_pdus()
+    rack_pdus = _rack_pdus(servers)
     power_chain = _power_chain(rack_pdus)
     cooling = _cooling_units()
     network = _network()
@@ -936,6 +1178,8 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             srv["power_state"] = "on" if all(v == "healthy" for v in srv["components"].values()) else "off"
         srv["bmc"]["power"] = "on" if srv["power_state"] == "on" else "off"
         srv["bmc"].setdefault("sel", []).insert(0, {"time": _now_iso(), "message": f"Power {mode} issued via Redfish"})
+        # Rack draw is derived from powered-on servers, so power ops move kW.
+        _recompute_facility(state)
         _event(state, f"BMC {mode} issued for {srv['id']}", "info")
         _save(session_id, entry)
         _sync_identity(session_id, state)
@@ -949,6 +1193,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": f"Asset {asset_id} not found"}
         srv["power_state"] = "on" if all(v == "healthy" for v in srv["components"].values()) else "off"
         srv["bmc"]["power"] = "on" if srv["power_state"] == "on" else "off"
+        _recompute_facility(state)
         _event(state, f"Power cycled {srv['id']}", "info")
         _save(session_id, entry)
         _sync_identity(session_id, state)
@@ -1109,15 +1354,18 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": f"PDU {pdu_id} not found"}
         pdu["status"] = "tripped"
         pdu["breaker"] = "open"
-        affected = []
-        for srv in state.get("servers", []):
-            if srv["rack"] == pdu["rack"]:
-                srv["power_state"] = "off"
-                srv["bmc"]["power"] = "off"
-                affected.append(srv["id"])
+        pdu["trip_reason"] = payload.get("reason") or "manual"
+        affected = _apply_feed_loss(state, pdu)
+        # Failover may overload the surviving feed → cascade overcurrent trip.
         _recompute_facility(state)
         _sync_rack_pdus(state)
-        _event(state, f"Breaker tripped on {pdu['id']} — rack {pdu['rack']} lost power", "danger")
+        feed = pdu.get("feed") or "A"
+        _event(
+            state,
+            f"Breaker tripped on {pdu['id']} (feed {feed}) — rack {pdu['rack']}"
+            + (f" lost power to {len(affected)} server(s)" if affected else " (dual-corded load failed over)"),
+            "danger",
+        )
         try:
             from apps.labs.provisioner.simulation.chaos_engine import inject as chaos_inject
             chaos_inject(session_id, "trip_pdu", pdu["id"], detail={"rack": pdu["rack"], "affected_servers": affected})
@@ -1126,6 +1374,21 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         _sync_identity(session_id, state)
         return {"ok": True, "message": f"Breaker tripped on {pdu['id']}", "affected_servers": affected}
+
+    if action == "set_server_power_feeds":
+        asset_id = payload.get("asset_id") or payload.get("server_id") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        feeds = payload.get("power_feeds") or payload.get("feeds") or ["A", "B"]
+        if not isinstance(feeds, list) or not feeds:
+            return {"ok": False, "error": "power_feeds must be a non-empty list"}
+        srv["power_feeds"] = [str(f).upper() for f in feeds]
+        _recompute_facility(state)
+        _sync_rack_pdus(state)
+        _event(state, f"{srv['id']} cording set to {srv['power_feeds']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"{srv['id']} power_feeds={srv['power_feeds']}", "server": srv}
 
     if action == "restore_pdu":
         pdu_id = payload.get("pdu_id") or payload.get("asset_id") or ""
@@ -2586,10 +2849,21 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             "biometrics": (ac.get("biometrics") or {}).get("status", "online"),
             "cameras": (ac.get("cameras") or {}).get("online", 24),
         }
+        # `broken` is a single-fault slot shared with hardware chaos injection,
+        # so a security event must not evict an in-flight hardware fault a lab
+        # is grading on. Only claim the slot when it is free, and restore what
+        # was there on clear.
         if op == "tailgate_alarm":
-            state["broken"] = {"server": None, "component": "security", "target": "gate"}
+            if not broken:
+                state["broken"] = {"server": None, "component": "security", "target": "gate"}
+            else:
+                ac.setdefault("events", []).insert(0, {
+                    "time": _now_iso(), "type": "warning",
+                    "message": "Tailgate alarm raised while a hardware fault is open",
+                })
         if op == "clear_alarms" and broken.get("component") == "security":
             broken.clear()
+            state["broken"] = {}
         _twin_journal(state, "access_ops", {"op": op})
         _event(state, f"Access: {msg}", "warning" if "alarm" in op or "deny" in msg.lower() or "Denied" in msg else "info")
         _save(session_id, entry)
@@ -2789,6 +3063,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if not ticket:
             return {"ok": False, "error": f"Ticket {ticket_id} not found"}
         try:
+            rack_pdus = (state.get("power_chain") or {}).get("rack_pdus") or []
+            # Dual-feed lists A then B; last-wins would hide a hot A behind idle B=0%.
+            rack_loads = {}
+            for p in rack_pdus:
+                rack = p.get("rack")
+                if not rack:
+                    continue
+                pct = int(p.get("load_pct") or 0)
+                if pct >= int(rack_loads.get(rack) or 0):
+                    rack_loads[rack] = pct
             advance_ticket(
                 ticket,
                 payload.get("advance") or "assign",
@@ -2799,18 +3083,33 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 duration_min=payload.get("duration_min"),
                 sku=payload.get("sku"),
                 carrier=payload.get("carrier"),
+                eta_days=payload.get("eta_days"),
+                rack=payload.get("rack"),
+                # Live floor state so a window can be judged against real load
+                # rather than being a free-text note (audit L2267).
+                facility={
+                    **(state.get("facility") or {}),
+                    "rack_loads": rack_loads,
+                },
             )
         except ValueError as exc:
             return {"ok": False, "error": str(exc)}
         # Close FRU loop: ship_rma enqueues a loading-dock ASN tied to ticket+asset.
         pending = ticket.pop("_pending_dock_asn", None)
         if pending:
-            from apps.vmware_sim.datacenter_facility_ops import ensure_campus_plant
+            from apps.vmware_sim.datacenter_facility_ops import (
+                TICKS_PER_TRANSIT_DAY,
+                ensure_campus_plant,
+                eta_summary,
+            )
             campus = ensure_campus_plant(state.get("campus") or {}, state.get("power_chain"))
             dock = campus.setdefault("loading_dock", {})
             queue = dock.setdefault("queue", [])
             asn_id = f"ASN-RMA-{pending.get('rma_number') or len(queue) + 1}"
-            queue.insert(0, {
+            # The RMA already carried eta_days but nothing enforced it; convert
+            # it to sim ticks so the part is genuinely unavailable until then.
+            eta_days = int((ticket.get("rma") or {}).get("eta_days") or 2)
+            asn = {
                 "id": asn_id,
                 "carrier": pending.get("carrier") or "FedEx",
                 "contents": pending.get("contents") or "FRU",
@@ -2819,9 +3118,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 "asset_id": pending.get("asset_id"),
                 "rma_number": pending.get("rma_number"),
                 "sku": pending.get("sku"),
-            })
+                "eta_days": eta_days,
+                "ticks_remaining": max(1, eta_days * TICKS_PER_TRANSIT_DAY),
+            }
+            queue.insert(0, asn)
             state["campus"] = campus
-            _event(state, f"Dock ASN {asn_id} queued for {pending.get('rma_number')}", "info")
+            _event(state, f"Dock ASN {asn_id} queued for {pending.get('rma_number')} · {eta_summary(asn)}", "info")
         _event(state, f"Ticket {ticket_id} → {ticket.get('status')}", "info")
         _save(session_id, entry)
         return {"ok": True, "message": f"Ticket {ticket_id} updated", "ticket": ticket}
@@ -2888,13 +3190,279 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": "Metrics refreshed", "monitoring": state["monitoring"]}
 
+    if action == "accept_contract":
+        from apps.vmware_sim.datacenter_economy_ops import accept_contract, evaluate_contracts
+        contract = accept_contract(
+            state,
+            tenant=payload.get("tenant") or "acme",
+            kw=float(payload.get("kw") or 10),
+            u_slots=int(payload.get("u_slots") or 20),
+            sla_pct=float(payload.get("sla_pct") or 99.99),
+            credit_usd=payload.get("credit_usd"),
+        )
+        evaluate_contracts(state)
+        _twin_journal(state, "accept_contract", {"id": contract["id"], "tenant": contract["tenant"]})
+        _event(state, f"Accepted contract {contract['id']} for {contract['tenant']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Contract {contract['id']}", "contract": contract, "contracts": state.get("contracts")}
+
+    if action == "economy_buy":
+        from apps.vmware_sim.datacenter_economy_ops import buy_hardware
+        result = buy_hardware(state, sku=payload.get("sku") or "", qty=int(payload.get("qty") or 1))
+        if not result.get("ok"):
+            return result
+        _event(state, f"Purchased {result['qty']}× {result['sku']} (${result['usd']})", "info")
+        _save(session_id, entry)
+        return result
+
+    if action == "economy_tick":
+        from apps.vmware_sim.datacenter_economy_ops import tick_opex, tick_fatigue, tick_reputation
+        result = tick_opex(state, hours=float(payload.get("hours") or 1))
+        tick_fatigue(state, hours=float(payload.get("hours") or 1))
+        tick_reputation(state)
+        _save(session_id, entry)
+        return {**result, "reputation": state.get("reputation")}
+
+    if action == "apply_upgrade":
+        from apps.vmware_sim.datacenter_economy_ops import apply_upgrade, list_upgrades
+        result = apply_upgrade(state, payload.get("upgrade_id") or "")
+        if result.get("ok"):
+            _event(state, f"Unlocked upgrade {result['upgrade']}", "success")
+            _save(session_id, entry)
+        result["upgrades"] = list_upgrades(state)
+        return result
+
+    if action == "list_upgrades":
+        from apps.vmware_sim.datacenter_economy_ops import list_upgrades
+        return {"ok": True, "upgrades": list_upgrades(state)}
+
+    if action == "unlock_second_hall":
+        from apps.vmware_sim.datacenter_economy_ops import unlock_second_hall
+        result = unlock_second_hall(state)
+        if result.get("ok"):
+            _event(state, "Unlocked data-hall-b", "success")
+            _save(session_id, entry)
+        return result
+
+    if action == "inspect_floor":
+        from apps.vmware_sim.datacenter_economy_ops import inspect_before_energize
+        report = inspect_before_energize(state)
+        _save(session_id, entry)
+        return {"ok": report["ok"], "inspection": report}
+
+    if action == "energize_floor":
+        from apps.vmware_sim.datacenter_economy_ops import energize_floor
+        result = energize_floor(state, force=bool(payload.get("force")))
+        if result.get("ok"):
+            _event(state, f"Floor energized ({result.get('energized_outlets')} outlets)", "success")
+            _save(session_id, entry)
+        return result
+
+    if action == "hire_staff":
+        from apps.vmware_sim.datacenter_economy_ops import hire_staff
+        result = hire_staff(
+            state,
+            name=payload.get("name") or "tech",
+            role=payload.get("role") or "field-tech",
+            shift=payload.get("shift") or "day",
+        )
+        _event(state, f"Hired {result['staff']['name']} ({result['staff']['role']})", "info")
+        _save(session_id, entry)
+        return result
+
+    if action == "dispatch_staff":
+        from apps.vmware_sim.datacenter_economy_ops import dispatch_staff
+        result = dispatch_staff(
+            state,
+            ticket_id=payload.get("ticket_id") or "",
+            staff_id=payload.get("staff_id") or "",
+        )
+        if result.get("ok"):
+            _event(state, f"Dispatched {result['staff']['name']} → {result['ticket']['id']}", "info")
+            _save(session_id, entry)
+        return result
+
+    if action == "place_rack":
+        from apps.vmware_sim.datacenter_economy_ops import place_rack
+        result = place_rack(
+            state,
+            rack_id=payload.get("rack_id") or "",
+            grid_x=int(payload.get("grid_x") or 0),
+            grid_z=int(payload.get("grid_z") or 0),
+            orientation=payload.get("orientation") or "hot_cold",
+            mass_kg=float(payload.get("mass_kg") or 250),
+        )
+        if not result.get("ok"):
+            return result
+        _twin_journal(state, "place_rack", {"rack_id": result["rack"]["id"], "grid": [result["rack"]["grid_x"], result["rack"]["grid_z"]]})
+        _event(state, f"Placed rack {result['rack']['id']} at ({result['rack']['grid_x']},{result['rack']['grid_z']})", "success")
+        _save(session_id, entry)
+        return result
+
+    if action == "remove_rack":
+        from apps.vmware_sim.datacenter_economy_ops import remove_rack
+        result = remove_rack(state, payload.get("rack_id") or "")
+        if not result.get("ok"):
+            return result
+        _twin_journal(state, "remove_rack", {"rack_id": result["removed"]})
+        _event(state, f"Removed rack {result['removed']}", "info")
+        _save(session_id, entry)
+        return result
+
+    if action == "blueprint_undo":
+        from apps.vmware_sim.datacenter_economy_ops import undo_blueprint
+        result = undo_blueprint(state)
+        if result.get("ok"):
+            _event(state, "Blueprint undo", "info")
+            _save(session_id, entry)
+        return result
+
+    if action == "blueprint_redo":
+        from apps.vmware_sim.datacenter_economy_ops import redo_blueprint
+        result = redo_blueprint(state)
+        if result.get("ok"):
+            _event(state, "Blueprint redo", "info")
+            _save(session_id, entry)
+        return result
+
+    if action == "blueprint_save":
+        from apps.vmware_sim.datacenter_economy_ops import save_blueprint
+        result = save_blueprint(state, payload.get("name") or "default")
+        if result.get("ok"):
+            _event(state, f"Blueprint saved: {result['name']}", "success")
+            _save(session_id, entry)
+        return result
+
+    if action == "blueprint_load":
+        from apps.vmware_sim.datacenter_economy_ops import load_blueprint
+        result = load_blueprint(state, payload.get("name") or "default")
+        if result.get("ok"):
+            _event(state, f"Blueprint loaded: {result['name']}", "success")
+            _save(session_id, entry)
+        return result
+
+    if action == "blueprint_copy_row":
+        from apps.vmware_sim.datacenter_economy_ops import copy_rack_row
+        result = copy_rack_row(
+            state,
+            source_z=int(payload.get("source_z") or 0),
+            dest_z=int(payload.get("dest_z") or 1),
+        )
+        if result.get("ok"):
+            _event(state, f"Copied row → {len(result.get('created') or [])} racks", "success")
+            _save(session_id, entry)
+        return result
+
+    if action == "vendor_inject":
+        from apps.labs.vendor_dependency_ops import inject_vendor_event
+        result = inject_vendor_event(
+            state,
+            kind=payload.get("kind") or "",
+            detail=payload.get("detail"),
+        )
+        if result.get("ok"):
+            _event(state, f"Vendor event: {result['event']['kind']}", "danger")
+            _save(session_id, entry)
+        return result
+
+    if action == "vendor_remediate":
+        from apps.labs.vendor_dependency_ops import remediate_vendor_event
+        result = remediate_vendor_event(
+            state,
+            event_id=payload.get("event_id") or "",
+            action=payload.get("remediation") or payload.get("action") or "",
+        )
+        if result.get("ok"):
+            _event(state, f"Vendor remediated via {result['event'].get('resolved_by')}", "success")
+            _save(session_id, entry)
+        return result
+
+    if action == "vault_status":
+        from apps.labs.vault_lab_ops import vault_status
+        return vault_status(state)
+
+    if action == "vault_seal":
+        from apps.labs.vault_lab_ops import seal_vault
+        result = seal_vault(state)
+        _event(state, "Vault sealed", "danger")
+        _save(session_id, entry)
+        return result
+
+    if action == "vault_unseal_key":
+        from apps.labs.vault_lab_ops import present_unseal_key
+        result = present_unseal_key(state, payload.get("key") or "")
+        if result.get("unsealed"):
+            _event(state, "Vault unsealed — service restored", "success")
+        elif result.get("ok"):
+            _event(state, result.get("message") or "Unseal progress", "info")
+        if result.get("ok"):
+            _save(session_id, entry)
+        return result
+
+    if action == "vault_auth":
+        from apps.labs.vault_lab_ops import auth_vault
+        result = auth_vault(
+            state,
+            method=payload.get("method") or "token",
+            token=payload.get("token"),
+            role_id=payload.get("role_id"),
+            secret_id=payload.get("secret_id"),
+        )
+        if result.get("ok"):
+            _event(state, f"Vault auth via {result.get('auth_method')}", "success")
+            _save(session_id, entry)
+        return result
+
+    if action == "vault_issue_db":
+        from apps.labs.vault_lab_ops import issue_db_credentials
+        result = issue_db_credentials(state, ttl_seconds=int(payload.get("ttl_seconds") or 60))
+        if result.get("ok"):
+            _event(state, f"Dynamic DB lease {result['lease']['id']}", "success")
+            _save(session_id, entry)
+        return result
+
+    if action == "vault_renew_lease":
+        from apps.labs.vault_lab_ops import renew_lease
+        result = renew_lease(state, payload.get("lease_id") or "", extend_seconds=int(payload.get("extend_seconds") or 60))
+        if result.get("ok"):
+            _save(session_id, entry)
+        return result
+
+    if action == "vault_revoke_lease":
+        from apps.labs.vault_lab_ops import revoke_lease
+        result = revoke_lease(state, payload.get("lease_id") or "")
+        if result.get("ok"):
+            _event(state, f"Revoked lease {result['lease_id']}", "info")
+            _save(session_id, entry)
+        return result
+
     if action == "live_tick":
         # Live scrape without flooding the twin journal (not replayed).
-        from apps.vmware_sim.datacenter_facility_ops import tick_live
-        from apps.vmware_sim.datacenter_physics_ops import build_monitoring_snapshot
+        from apps.vmware_sim.datacenter_facility_ops import advance_shipments, tick_live
+        from apps.vmware_sim.datacenter_physics_ops import build_monitoring_snapshot, refresh_all_ticket_slas
         env = tick_live(state)
         state["environmental"] = env
         state["monitoring"] = build_monitoring_snapshot(state)
+        breached = refresh_all_ticket_slas(state)
+        for t in breached:
+            _event(state, f"SLA breached: {t.get('id')} ({t.get('summary')})", "danger")
+        from apps.vmware_sim.datacenter_economy_ops import evaluate_contracts
+        for c in evaluate_contracts(state):
+            _event(
+                state,
+                f"Contract SLA: {c.get('id')} credits ${c.get('credits_owed')} ({c.get('tenant')})",
+                "danger",
+            )
+        # Inbound RMA parts close distance on the sim clock, not wall-clock, so
+        # an idle session never conjures a part and a busy one still finishes.
+        arrived = advance_shipments(state.get("campus") or {})
+        for item in arrived:
+            _event(state, f"Dock: {item['id']} arrived at bay ({item.get('contents')})", "info")
+        # Propped doors and unescorted visitors escalate on the same clock.
+        from apps.vmware_sim.datacenter_facility_ops import advance_physical_security
+        violations = advance_physical_security(state)
+        for viol in violations:
+            _event(state, f"Security: {viol['message']}", "danger")
         from apps.vmware_sim.datacenter_facility_ops import build_capacity_snapshot
         state["capacity"] = build_capacity_snapshot(state)
         _save(session_id, entry)
@@ -2904,6 +3472,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             "environmental": env,
             "monitoring": state["monitoring"],
             "capacity": state["capacity"],
+            "shipments_arrived": [i["id"] for i in arrived],
         }
 
     if action == "hypervisor_ops":
@@ -3010,6 +3579,77 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     return {"ok": False, "error": f"Unknown action: {action}"}
 
 
+# Per-component grader feedback. Unlike the other console engines, this one's
+# broken dict is a single fault RECORD -- {"server": ..., "component": ...,
+# "target": ..., "cable_id": ...} -- not a bag of independent objective keys.
+# So the reason is keyed on the component, and the target is resolved from
+# whichever of server/cable_id/target the injector filled in.
+_BROKEN_REASONS: dict[str, str] = {
+    # Field-replaceable server hardware.
+    "power": "the power supply in {target} is still failed — replace the PSU",
+    "nic": "the NIC in {target} is still failed — replace it",
+    "disk": "the disk in {target} is still failed — replace it",
+    "motherboard": "the motherboard in {target} is still failed — replace it",
+    "cpu": "the CPU in {target} is still failed — replace it",
+    "gpu": "the GPU in {target} is still failed — replace it",
+    "fan": "the fan in {target} is still failed — replace it",
+    "dimm": "the DIMM in {target} is still failed — replace it",
+    "pcie": "the PCIe/NVLink device in {target} is still failed — replace it",
+    "raid": "the RAID controller in {target} is still failed — replace it",
+    "hba": "the HBA in {target} is still failed — replace it",
+    # Server-scoped, but fixed by something other than a part swap.
+    "firmware": "the firmware on {target} is still corrupt — reflash it",
+    "cable": "cable {target} is still faulted — reseat or replace it",
+    "pxe": "PXE boot for {target} is still broken — re-enable PXE and DHCP",
+    # Facility.
+    "cooling": "cooling unit {target} is still failed — restore cooling",
+    "pdu": "PDU {target} is still failed — restore the power feed",
+    "ups": "UPS {target} is still on fault — restore utility power",
+    "leak": "the water leak at {target} has not been contained yet",
+    "fire": "the fire/smoke alarm in zone {target} has not been cleared yet",
+    "security": "the security breach at {target} has not been resolved yet",
+    # Network fabric.
+    "switch": "switch {target} is still down — bring it back up",
+    "bgp": "BGP on {target} has not been restored yet",
+    "ospf": "OSPF on {target} has not been restored yet",
+    "mpls": "MPLS on {target} has not been re-enabled yet",
+    "evpn": "EVPN on {target} has not been re-enabled yet",
+    "vxlan": "the VXLAN overlay on {target} has not been restored yet",
+    "vlan": "the VLAN misconfiguration on {target} has not been corrected yet",
+    "dns": "DNS resolution for {target} has not been restored yet",
+    "dhcp": "DHCP for {target} has not been restored yet",
+    # Site-level.
+    "dr": "the DR failover for {target} has not completed yet",
+}
+
+
+def _broken_target(broken: dict) -> str:
+    """Best available name for the faulted asset.
+
+    Server faults carry "server"; facility/network faults set server to None
+    and carry "target" instead; cable faults carry both plus "cable_id".
+    """
+    server = broken.get("server")
+    cable_id = broken.get("cable_id")
+    if cable_id and server:
+        return f"{cable_id} on {server}"
+    return str(cable_id or server or broken.get("target") or "this environment")
+
+
+def _describe_broken(broken: dict) -> str:
+    component = broken.get("component")
+    if not component:
+        # A fault record with no component at all: fail CLOSED and name the
+        # keys present so the gap is reportable rather than silently generic.
+        return f"unresolved objective ({', '.join(sorted(broken))})"
+    template = _BROKEN_REASONS.get(component)
+    if template is None:
+        # Unknown component: still fail CLOSED, and name it so a missing
+        # template surfaces as a reportable gap rather than a silent pass.
+        return f"unresolved objective ({component})"
+    return template.format(target=_broken_target(broken))
+
+
 def validate_datacenter_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
     entry = _load(session_id)
     if not entry:
@@ -3017,5 +3657,5 @@ def validate_datacenter_lab(session_id: str, scenario_slug: str = "") -> tuple[b
     state = entry["state"]
     broken = state.get("broken") or {}
     if broken:
-        return False, "Datacenter environment still has unresolved issues"
+        return False, f"Datacenter lab not complete: {_describe_broken(broken)}"
     return True, "Datacenter lab objectives met"

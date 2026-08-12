@@ -1,0 +1,118 @@
+# FixitLab Certified Network Engineer track definition.
+#
+# A track is a weighted, ordered VIEW over scenarios that already exist in the
+# library — the `scenarios:` lists below reference existing FixitLab scenario
+# slugs grouped by skill area. Weights are relative and sum to 100.
+#
+# A FixitLab-original certification: objectives follow the shape of the
+# scenarios/networking/ library — layer-2 and interface faults, IP routing,
+# BGP and dynamic routing, DNS, MTU and path-MTU discovery, time
+# synchronization, and firewall/NAT and load-balancer behaviour. Slugs are
+# drawn from the hand-authored networking scenarios, which carry
+# scenario-specific fault presets and fail-closed graders.
+
+track:
+  slug: network-engineer
+  code: FL-NET
+  name: FixitLab Certified Network Engineer
+  vendor: FixitLab
+  description: >
+    Hands-on preparation for production network troubleshooting. Every
+    objective maps to live break-fix labs across interfaces and bonding, IP
+    routing, BGP, DNS resolution, MTU and path-MTU discovery, NTP, and
+    firewall, NAT, and load-balancer behaviour.
+  technology_slug: networking
+  exam_duration_minutes: 150
+  passing_score: 70
+  validity_months: 24
+  order: 10
+
+objectives:
+  - code: fl-net.interfaces-l2
+    title: Diagnose interface, VLAN, and bonding faults
+    weight: 15
+    order: 1
+    scenarios:
+      - interface-duplex-mismatch
+      - bonding-failover-broken
+      - vlan-misconfigured
+      - networking-linux-bond-vlan-trunk
+      - arp-cache-stale
+
+  - code: fl-net.ip-routing
+    title: Troubleshoot IP routing and reachability
+    weight: 15
+    order: 2
+    scenarios:
+      - static-route-broken
+      - ipv6-routing-broken
+      - ospf-neighbor-down
+      - network-namespace-isolated
+
+  - code: fl-net.bgp
+    title: Operate and troubleshoot BGP peering
+    weight: 18
+    order: 3
+    scenarios:
+      - networking-bgp-session-down
+      - bgp-route-flapping
+      - networking-bgp-as-mismatch
+      - networking-bgp-nexthop-unreachable
+      - networking-bgp-holdtimer-expiry
+      - networking-bgp-maxprefix-shutdown
+      - networking-bgp-route-map-deny
+      - configure-bgp-neighbor-do
+
+  - code: fl-net.dns
+    title: Resolve DNS failures
+    weight: 12
+    order: 4
+    scenarios:
+      - dns-resolution-broken
+      - dns-resolution-failure
+      - dns-cache-poisoning
+
+  - code: fl-net.mtu-path
+    title: Diagnose MTU and path-MTU discovery problems
+    weight: 14
+    order: 5
+    scenarios:
+      - networking-mtu-mismatch
+      - mtu-blackhole
+      - networking-mtu-pmtud-broken
+      - networking-mtu-jumbo-blackhole
+      - networking-mtu-vxlan-overhead
+      - networking-mtu-tunnel-pmtud
+
+  - code: fl-net.time-sync
+    title: Maintain accurate time synchronization
+    weight: 10
+    order: 6
+    scenarios:
+      - ntp-sync-failed
+      - networking-ntp-drift
+      - networking-ntp-server-down-failover
+      - networking-ntp-iburst-firewall
+      - networking-ntp-key-mismatch
+      - networking-ntp-stratum-high
+
+  - code: fl-net.firewall-nat
+    title: Troubleshoot firewall, NAT, and tunnel policy
+    weight: 8
+    order: 7
+    scenarios:
+      - firewall-port-blocked
+      - firewall-blocked-http
+      - nat-masquerade-broken
+      - wireguard-tunnel-down
+      - networking-firewalld-app-reachability
+
+  - code: fl-net.load-balancing
+    title: Diagnose load-balancer and traffic-delivery faults
+    weight: 8
+    order: 8
+    scenarios:
+      - load-balancer-health-fail
+      - haproxy-session-stuck
+      - nginx-upstream-timeout
+      - bandwidth-throttle

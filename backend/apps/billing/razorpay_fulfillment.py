@@ -41,12 +41,14 @@ def create_technology_payment_transaction(*, user, amount, order, technology_id,
     coupon). The GST breakup is computed + persisted here so the invoice and the
     Razorpay order are consistent (PRODUCTION_AUDIT FIN-01).
     """
-    from .gst import compute_gst
+    from .gst import compute_gst, place_of_supply_for
     from .models import PaymentTransaction
 
     key_src = f"{user.id}-{technology_id}-{amount}-{order['id']}"
     idempotency_key = hashlib.sha256(key_src.encode()).hexdigest()
-    breakup = compute_gst(amount)
+    # Audit Z1-13: the place of supply must come from the customer, not be assumed
+    # to be the seller's state — otherwise every sale books as intra-state CGST+SGST.
+    breakup = compute_gst(amount, place_of_supply=place_of_supply_for(user))
     return PaymentTransaction.objects.create(
         user=user,
         amount=breakup.total_amount,
@@ -201,12 +203,12 @@ def product_type_from_transaction(transaction) -> str | None:
 
 
 def create_interview_payment_transaction(*, user, amount, order, plan_code: str):
-    from .gst import compute_gst
+    from .gst import compute_gst, place_of_supply_for
     from .models import PaymentTransaction
 
     key_src = f"{user.id}-interview-{plan_code}-{amount}-{order['id']}"
     idempotency_key = hashlib.sha256(key_src.encode()).hexdigest()
-    breakup = compute_gst(amount)
+    breakup = compute_gst(amount, place_of_supply=place_of_supply_for(user))
     return PaymentTransaction.objects.create(
         user=user,
         amount=breakup.total_amount,

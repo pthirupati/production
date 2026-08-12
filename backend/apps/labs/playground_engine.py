@@ -28,6 +28,7 @@ Ephemerality / abuse-resistance:
 
 from __future__ import annotations
 
+import re
 import sqlite3
 import threading
 import time
@@ -272,9 +273,167 @@ def _seed_sql(conn: sqlite3.Connection) -> None:
             ('5xx spike after deploy',   1, 2, 0),
             ('Certificate expiring soon',3, 4, 0),
             ('Slow database queries',    2, 3, 0);
+
+        CREATE TABLE products (
+            id INTEGER PRIMARY KEY,
+            sku TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            price_cents INTEGER NOT NULL DEFAULT 0,
+            stock INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT INTO products (sku, name, price_cents, stock) VALUES
+            ('SKU-NIC-25G', '25GbE NIC', 24900, 12),
+            ('SKU-SSD-2T',  '2TB NVMe SSD', 18900, 40),
+            ('SKU-PSU-1400','1400W PSU', 32000, 8);
+
+        CREATE TABLE orders (
+            id INTEGER PRIMARY KEY,
+            product_id INTEGER NOT NULL,
+            qty INTEGER NOT NULL DEFAULT 1,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (product_id) REFERENCES products(id)
+        );
+        INSERT INTO orders (product_id, qty, status) VALUES
+            (1, 2, 'pending'),
+            (2, 1, 'shipped');
         """
     )
     conn.commit()
+
+
+def rest_http_api(
+    session_id: str,
+    method: str,
+    path: str,
+    body: dict | None = None,
+) -> tuple[int, Any]:
+    """REST-over-SQL teaching surface on the SQL playground sqlite (audit Y3).
+
+    Routes ``/api/products`` and ``/api/orders`` with real per-session persistence
+    in the in-memory sqlite connection. Returns ``(http_status, body)``.
+    """
+    from urllib.parse import urlparse
+
+    definition = get_definition("sql")
+    if not definition:
+        return 503, {"error": "SQL playground unavailable"}
+
+    sess = _get_or_create(str(session_id or "rest-anon"), definition)
+    conn: sqlite3.Connection = sess.engine
+    method = (method or "GET").upper()
+    raw = (path or "").strip()
+    if "://" in raw:
+        raw = urlparse(raw).path or "/"
+    if "?" in raw:
+        raw = raw.split("?", 1)[0]
+    norm = raw.rstrip("/") or "/"
+    body = body if isinstance(body, dict) else {}
+
+    def _rows(sql: str, args: tuple = ()) -> list[dict]:
+        cur = conn.execute(sql, args)
+        cols = [c[0] for c in cur.description] if cur.description else []
+        return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+    # /api/products[/{id}]
+    if norm == "/api/products":
+        if method == "GET":
+            return 200, {"items": _rows("SELECT * FROM products ORDER BY id")}
+        if method == "POST":
+            sku = str(body.get("sku") or "").strip()
+            name = str(body.get("name") or "").strip()
+            if not sku or not name:
+                return 400, {"error": "sku and name are required"}
+            try:
+                cur = conn.execute(
+                    "INSERT INTO products (sku, name, price_cents, stock) VALUES (?, ?, ?, ?)",
+                    (sku, name, int(body.get("price_cents") or 0), int(body.get("stock") or 0)),
+                )
+                conn.commit()
+            except sqlite3.IntegrityError:
+                return 409, {"error": f"sku {sku!r} already exists"}
+            row = _rows("SELECT * FROM products WHERE id = ?", (cur.lastrowid,))[0]
+            return 201, row
+        return 405, {"error": "method not allowed"}
+
+    m = re.match(r"^/api/products/(\d+)$", norm)
+    if m:
+        pid = int(m.group(1))
+        rows = _rows("SELECT * FROM products WHERE id = ?", (pid,))
+        if method == "GET":
+            if not rows:
+                return 404, {"error": "product not found"}
+            return 200, rows[0]
+        if method == "PATCH" or method == "PUT":
+            if not rows:
+                return 404, {"error": "product not found"}
+            fields = []
+            args: list[Any] = []
+            for key in ("sku", "name", "price_cents", "stock"):
+                if key in body:
+                    fields.append(f"{key} = ?")
+                    args.append(body[key])
+            if not fields:
+                return 400, {"error": "no fields to update"}
+            args.append(pid)
+            conn.execute(f"UPDATE products SET {', '.join(fields)} WHERE id = ?", tuple(args))
+            conn.commit()
+            return 200, _rows("SELECT * FROM products WHERE id = ?", (pid,))[0]
+        if method == "DELETE":
+            conn.execute("DELETE FROM products WHERE id = ?", (pid,))
+            conn.commit()
+            return 204, {}
+        return 405, {"error": "method not allowed"}
+
+    if norm == "/api/orders":
+        if method == "GET":
+            return 200, {"items": _rows(
+                "SELECT o.*, p.sku AS product_sku FROM orders o "
+                "JOIN products p ON p.id = o.product_id ORDER BY o.id"
+            )}
+        if method == "POST":
+            product_id = int(body.get("product_id") or 0)
+            qty = int(body.get("qty") or 1)
+            if product_id < 1 or qty < 1:
+                return 400, {"error": "product_id and qty are required"}
+            prod = _rows("SELECT id, stock FROM products WHERE id = ?", (product_id,))
+            if not prod:
+                return 404, {"error": "product not found"}
+            if prod[0]["stock"] < qty:
+                return 409, {"error": "insufficient stock"}
+            cur = conn.execute(
+                "INSERT INTO orders (product_id, qty, status) VALUES (?, ?, ?)",
+                (product_id, qty, str(body.get("status") or "pending")),
+            )
+            conn.execute(
+                "UPDATE products SET stock = stock - ? WHERE id = ?",
+                (qty, product_id),
+            )
+            conn.commit()
+            row = _rows("SELECT * FROM orders WHERE id = ?", (cur.lastrowid,))[0]
+            return 201, row
+        return 405, {"error": "method not allowed"}
+
+    m = re.match(r"^/api/orders/(\d+)$", norm)
+    if m:
+        oid = int(m.group(1))
+        rows = _rows("SELECT * FROM orders WHERE id = ?", (oid,))
+        if method == "GET":
+            if not rows:
+                return 404, {"error": "order not found"}
+            return 200, rows[0]
+        if method == "PATCH":
+            if not rows:
+                return 404, {"error": "order not found"}
+            status = str(body.get("status") or "").strip()
+            if not status:
+                return 400, {"error": "status is required"}
+            conn.execute("UPDATE orders SET status = ? WHERE id = ?", (status, oid))
+            conn.commit()
+            return 200, _rows("SELECT * FROM orders WHERE id = ?", (oid,))[0]
+        return 405, {"error": "method not allowed"}
+
+    return 404, {"error": f"REST API: unknown path {path}"}
 
 
 def _new_engine(definition: dict) -> Any:

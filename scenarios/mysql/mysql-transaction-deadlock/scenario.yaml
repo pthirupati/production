@@ -1,3 +1,4 @@
+is_active: true
 title: Resolve a transaction deadlock
 slug: mysql-transaction-deadlock
 technology: mysql
@@ -6,35 +7,28 @@ description: 'CONTEXT: A team operating MySQL has raised a ticket for `Resolve a
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline MySQL instance. The architecture is a single lab-primary
   node exposing mysql client, InnoDB, grants, and slow query log; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Two sessions deadlock on row locks. Fix isolation and lock order.
-
 
   OBJECTIVE: Understand the current failure mode affecting Resolve a transaction deadlock; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant mysql client, InnoDB, grants, and slow query log), changing one thing at a time.
   Check your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -97,23 +91,44 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: Two sessions deadlock on row locks. Fix isolation and lock order.
+  instructions: 'Two sessions deadlock because they take row locks in opposite orders. Fix solution(conn)
+    so it returns the order in which a session should lock the given row ids: always ascending, so every
+    session agrees on a global order and a cycle becomes impossible. Duplicates must be collapsed. Return
+    a list of ids.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn, row_ids):\n    # BUG: locks in the order the caller happened to supply,\
+      \ which is exactly\n    # how two sessions end up waiting on each other.\n    return list(row_ids)\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert callable(solution)
+  - name: ids are locked in ascending order
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ [5,2,9]) == [2,5,9], solution(conn, [5,2,9])\n"
+  - name: two sessions agree on the order
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ [3,1]) == solution(conn, [1,3]), 'orders must match'\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert callable(solution)
+  - name: duplicates are collapsed
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ [4,4,1]) == [1,4], solution(conn, [4,4,1])\n"
+  - name: empty set returns empty
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ []) == [], solution(conn, [])\n"
+  - name: already-sorted input is unchanged
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ [1,2,3]) == [1,2,3], solution(conn, [1,2,3])\n"
+  - name: reversed input is fully reordered
+    code: "import sqlite3\ndef _c():\n    return sqlite3.connect(':memory:')\nconn = _c()\nassert solution(conn,\
+      \ [9,8,7,6]) == [6,7,8,9], solution(conn, [9,8,7,6])\n"
   timeout: 8
 summary: Complete the resolve a transaction deadlock mysql lab and verify success with the checker
 estimated_minutes: 20
@@ -124,7 +139,7 @@ tags:
 - fix
 - hands-on
 - mysql
-linked_tutorial: mysql-fundamentals
+linked_tutorial: mysql-dba-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Resolve a transaction deadlock
 - Restore expected service behavior with a minimal, documented change

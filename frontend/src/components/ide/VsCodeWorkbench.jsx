@@ -1,8 +1,15 @@
+import { useState } from 'react'
+import { PanelRight, X } from 'lucide-react'
 import '../../styles/vscode-workbench.css'
 
 /**
  * Shared VS Code–style workbench shell for CodingIDE and IaC workspace IDE.
  * Slots: titleBar, activityBar, sidebar, editorTabs, editor, bottomPanel, rightPanel, statusBar.
+ *
+ * The right panel (instructions / preview / mentor) docks beside the editor at
+ * lg and above. Below that it is reachable as a bottom-sheet drawer — see
+ * .vsc-right-panel-drawer — because hiding it outright made lab instructions
+ * unreadable on tablets and phones.
  */
 export default function VsCodeWorkbench({
   theme = 'vscode',          // 'vscode' | 'app'
@@ -25,8 +32,10 @@ export default function VsCodeWorkbench({
   rightPanel,
   statusBar,
   footer,
+  rightPanelLabel = 'Instructions',
   children,
 }) {
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const style = {
     ...(accent ? { '--vsc-accent': accent, '--vsc-status': accent } : {}),
     ...(sidebarWidth ? { '--vsc-sidebar-w': `${sidebarWidth}px` } : {}),
@@ -83,10 +92,50 @@ export default function VsCodeWorkbench({
         </div>
 
         {rightPanel?.visible !== false && rightPanel && (
-          <aside className="vsc-right-panel hidden lg:flex">
-            {rightPanel.header && <div className="vsc-right-header">{rightPanel.header}</div>}
-            <div className="vsc-right-body">{rightPanel.content}</div>
-          </aside>
+          <>
+            {/* Docked panel — lg and up. */}
+            <aside className="vsc-right-panel hidden lg:flex">
+              {rightPanel.header && <div className="vsc-right-header">{rightPanel.header}</div>}
+              <div className="vsc-right-body">{rightPanel.content}</div>
+            </aside>
+
+            {/* Below lg: a bottom sheet, so instructions/preview stay reachable
+                without stealing width from an already-narrow editor. */}
+            {!drawerOpen && (
+              <button
+                type="button"
+                className="vsc-right-drawer-toggle lg:hidden"
+                onClick={() => setDrawerOpen(true)}
+                aria-expanded={false}
+              >
+                <PanelRight size={13} /> {rightPanelLabel}
+              </button>
+            )}
+            {drawerOpen && (
+              <>
+                <button
+                  type="button"
+                  className="vsc-right-scrim lg:hidden"
+                  aria-label="Close panel"
+                  onClick={() => setDrawerOpen(false)}
+                />
+                <aside className="vsc-right-panel vsc-right-panel-drawer flex lg:hidden">
+                  <div className="vsc-right-header">
+                    <div className="flex-1 flex min-w-0">{rightPanel.header}</div>
+                    <button
+                      type="button"
+                      onClick={() => setDrawerOpen(false)}
+                      className="px-2 text-[var(--vsc-muted)] shrink-0"
+                      aria-label="Close panel"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div className="vsc-right-body">{rightPanel.content}</div>
+                </aside>
+              </>
+            )}
+          </>
         )}
       </div>
 

@@ -8,22 +8,18 @@ description: 'CONTEXT: A team operating network operations has raised a ticket f
   (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
   the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline network lab. The architecture is a single lab-primary
   node exposing interfaces, routing tables, DNS, and firewall rules; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: An api-edge-01 host. /etc/firewalld/services/app8443.xml is malformed (incorrect
 
   port/protocol, broken XML) and not enabled in any zone, so inbound 8443 is blocked.
 
-
   OBJECTIVE: Confirm 8443 is blocked and the custom firewalld service XML is malformed; Correct /etc/firewalld/services/app8443.xml
   (valid port 8443/tcp definition) and bind it to the active zone; Confirm the service definition is corrected
   so 8443 is reachable. Acceptance criteria: the change is minimal and reversible, and success means `firewall-cmd
   --list-ports` includes `80/tcp`.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
@@ -31,16 +27,13 @@ description: 'CONTEXT: A team operating network operations has raised a ticket f
   Check your work continuously against the objective — success means `firewall-cmd --list-ports` includes
   `80/tcp`.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `firewall-cmd --list-ports` includes `80/tcp`.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -106,7 +99,6 @@ hints:
 
     3. Confirm `firewall-cmd --list-ports` includes the required port.
 
-
     WHY: a running service behind a closed firewall still fails health checks.'
 summary: 'Complete the network ↔ security: firewalld blocks the app service port networking lab and verify
   success with the checker'
@@ -118,7 +110,7 @@ tags:
 - fix
 - hands-on
 - networking
-linked_tutorial: networking-fundamentals
+linked_tutorial: tcpip-networking-zero-hero
 what_you_will_learn:
 - Confirm 8443 is blocked and the custom firewalld service XML is malformed
 - Correct /etc/firewalld/services/app8443.xml (valid port 8443/tcp definition) and bind it to the active

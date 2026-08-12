@@ -61,6 +61,8 @@ class SupportBotChatView(APIView):
             text,
             is_authenticated=request.user.is_authenticated,
             page_path=page_path,
+            # Lab context is resolved against THIS user's sessions only (Z3-9).
+            user=request.user if request.user.is_authenticated else None,
         )
         return Response(result)
 

@@ -1,7 +1,21 @@
 /**
- * Resolve which in-app simulator a scenario opens (Grafana, Terraform, AWX, etc.).
+ * BADGE COPY for the "opens an in-app simulator" chip on ScenarioDetail.
+ *
+ * This is NOT the router, despite what the old header comment ("Resolve which
+ * in-app simulator a scenario opens") claimed — that wording is what made this
+ * file look authoritative and let it drift (audit L509). The real routing table
+ * is `PRIMARY_SIM_COMPONENTS` in components/lab/labSimLoader.js, selected by
+ * LabRunner's `primarySimKind` chain and utils/scenarioConsoles.js. Those know
+ * ~22 kinds; the map below knows 15, and the difference is purely cosmetic —
+ * a kind missing here loses a badge, it does not lose its simulator.
+ *
+ * So: do NOT drive routing from this map. Adding a key here only adds badge
+ * copy. The single consumer is getScenarioSimInfo → ScenarioDetail.jsx:266.
+ *
+ * Keys are matched against `simulation_type`, `technology.slug`, then
+ * slugHints() — a deliberately loose union, because the badge is allowed to
+ * guess where the router must not.
  */
-
 const SIM_TYPES = {
   'ansible-awx': { label: 'Ansible AWX', short: 'AWX', accent: '#EE0000' },
   grafana: { label: 'Grafana', short: 'Grafana', accent: '#f7913b' },
@@ -18,6 +32,23 @@ const SIM_TYPES = {
   'ai-agent': { label: 'AI Agent Workflow', short: 'Agent', accent: '#a855f7' },
   nmap: { label: 'Nmap Scanner', short: 'Nmap', accent: '#22c55e' },
   wireshark: { label: 'Wireshark', short: 'Wireshark', accent: '#1679a7' },
+  // Added 2026-08 to close the badge gap (L509). These consoles already existed
+  // in PRIMARY_SIM_COMPONENTS and opened fine — they just showed no chip on
+  // ScenarioDetail. Keys are the `simulation_type` / `technology.slug` values,
+  // which is what getScenarioSimInfo looks up; they are NOT the router's kind
+  // strings (e.g. the router calls this 'datadashboard', the data uses
+  // 'data-dashboard' — see the existing entry above).
+  azure: { label: 'Azure Portal', short: 'Azure', accent: '#0078d4' },
+  gcp: { label: 'Google Cloud Console', short: 'GCP', accent: '#4285f4' },
+  openstack: { label: 'OpenStack Horizon', short: 'OpenStack', accent: '#da1a32' },
+  kubernetes: { label: 'Kubernetes Dashboard', short: 'Kubernetes', accent: '#326ce5' },
+  k8s: { label: 'Kubernetes Dashboard', short: 'Kubernetes', accent: '#326ce5' },
+  docker: { label: 'Docker Console', short: 'Docker', accent: '#2496ed' },
+  netapp: { label: 'NetApp ONTAP', short: 'NetApp', accent: '#0067c5' },
+  commvault: { label: 'Commvault Command Center', short: 'Commvault', accent: '#c8102e' },
+  dellemc: { label: 'Dell EMC Unisphere', short: 'Dell EMC', accent: '#007db8' },
+  datacenter: { label: 'Datacenter Floor', short: 'Datacenter', accent: '#14b8a6' },
+  soc: { label: 'Security Operations Center', short: 'SOC', accent: '#ef4444' },
 }
 
 function slugHints(slug) {

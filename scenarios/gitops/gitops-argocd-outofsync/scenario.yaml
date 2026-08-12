@@ -15,39 +15,32 @@ description: 'CONTEXT: A team operating gitops has raised a ticket for `ArgoCD A
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture is a
   single lab-primary node exposing CLI and configuration files; treat it as the production host for this
   incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: The `payments-web` ArgoCD Application shows health Healthy but sync status
   OutOfSync and never converges. `argocd app diff payments-web` reports a live Deployment with `replicas:
   2` while Git declares `replicas: 4`. Auto-sync is disabled, so the controller detects drift but will
   not act on it.
 
-
   OBJECTIVE: The payments-web Application reconciles back to Sync status Synced; Root cause (out-of-band
   kubectl edit vs Git desired state) is confirmed with argocd app diff; Automated sync with self-heal
   is enabled so future manual drift is reverted. Acceptance criteria: the change is minimal and reversible,
   and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant CLI and configuration files), changing one thing at a time. Check your work continuously
   against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -99,7 +92,6 @@ hints:
 
     3. Confirm `kubectl get pods` shows every pod Running.
 
-
     WHY: Kubernetes only reports healthy when the workload actually runs.'
 summary: Diagnose and resolve argocd application stuck outofsync in the gitops lab and verify
   the healthy end state
@@ -112,7 +104,7 @@ tags:
 - fix
 - hands-on
 - simulation
-linked_tutorial: gitops-fundamentals
+linked_tutorial: argocd-gitops-zero-hero
 what_you_will_learn:
 - The payments-web Application reconciles back to Sync status Synced
 - Root cause (out-of-band kubectl edit vs Git desired state) is confirmed with argocd app diff

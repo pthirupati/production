@@ -1,5 +1,12 @@
 # FixItLab Gap Analysis — Production-Grade Company Infra
 
+> **Not to be confused with `docs/GAP_ANALYSIS.md`.** The two filenames differ only by letter case
+> and an underscore-vs-hyphen, but the documents are unrelated. **This** file is the inward-facing *infrastructure*
+> ledger: which simulator engines are real vs facade, and what still needs hardening.
+> `docs/GAP_ANALYSIS.md` is the outward-facing *market* study comparing FixitLab to competing
+> lab/interview platforms. Renaming is tracked in `docs/AUDIT_2026_08_TODO.md` (O1) — it is
+> deferred because five files across the backend, docs, and CI link to these paths.
+
 Living document for the platform hardening pass on `chore/vault-diagnose`.
 Last updated: 2026-07-16 (Health Check issues:write + AWX/Monitoring/Windows LabServer sync).
 

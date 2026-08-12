@@ -80,3 +80,34 @@ class HealthReadinessTest(SimpleTestCase):
         body = resp.json()
         self.assertIn("checks", body)
         self.assertIn("vault", body["checks"])
+
+
+class PrometheusMetricsExpositionTest(SimpleTestCase):
+    """Audit Z5-17 — `/api/health/metrics/` is real (not readiness-only)."""
+
+    @override_settings(METRICS_TOKEN="", CACHES=LOCMEM_CACHE, VAULT_ENABLED="")
+    def test_unconfigured_looks_like_missing_route(self):
+        resp = self.client.get("/api/health/metrics/")
+        self.assertEqual(resp.status_code, 404)
+
+    @override_settings(METRICS_TOKEN="scrape-secret", CACHES=LOCMEM_CACHE, VAULT_ENABLED="")
+    @patch("apps.accounts.health.connection.ensure_connection")
+    def test_bearer_token_returns_prometheus_text(self, _mock_db):
+        resp = self.client.get(
+            "/api/health/metrics/",
+            HTTP_AUTHORIZATION="Bearer scrape-secret",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("text/plain", resp["Content-Type"])
+        body = resp.content.decode()
+        self.assertIn("fixitlab_database_up", body)
+        self.assertIn("fixitlab_sim_sessions", body)
+        self.assertIn("# TYPE fixitlab_sim_sessions gauge", body)
+
+    @override_settings(METRICS_TOKEN="scrape-secret", CACHES=LOCMEM_CACHE, VAULT_ENABLED="")
+    def test_wrong_token_is_404(self):
+        resp = self.client.get(
+            "/api/health/metrics/",
+            HTTP_AUTHORIZATION="Bearer wrong",
+        )
+        self.assertEqual(resp.status_code, 404)

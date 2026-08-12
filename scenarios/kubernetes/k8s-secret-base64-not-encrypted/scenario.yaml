@@ -1,0 +1,201 @@
+title: Secret base64 Is Not Encryption
+slug: k8s-secret-base64-not-encrypted
+technology: kubernetes
+category: Harden
+difficulty: hard
+lab_mode: simulation
+simulation_type: kubernetes
+time_limit: 1800
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+description: 'CONTEXT: A security review of the `production` namespace filed SEC-4412 against your team.
+  The finding is that `production/db-credentials` — the PostgreSQL superuser credential for the customer
+  billing database — is stored unencrypted in etcd. The previous on-call closed an identical ticket last
+  quarter by re-generating the `data:` values with `base64 -w0` and re-applying the manifest, and the
+  finding came straight back. Business impact: anyone with a copy of an etcd snapshot, a backup tarball,
+  or read access to the etcd data directory can recover the database password without any key material.
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster. The architecture is a single
+  lab-primary node exposing kubectl, the API server''s static manifests, and cluster resources; treat it
+  as the production host for this incident. All tools run locally — no paid APIs or external cloud calls
+  are required.
+
+  SYMPTOM / STARTING STATE: Every pod in the cluster is Running and every Deployment is healthy. Nothing
+  is crashing. `kubectl get secret db-credentials -n production -o yaml` shows a populated `data:` block
+  whose values are base64 strings, and the team believes that is the protection. It is not: base64 is a
+  reversible transport encoding with no key, and the API server is writing the decoded bytes into etcd
+  under the `identity` provider because no `--encryption-provider-config` is set.
+
+  OBJECTIVE: Prove the value is recoverable without a key; make `production/db-credentials` genuinely
+  protected at rest by either enabling an encryption provider on the API server and re-encrypting the
+  objects that already exist, or by moving the value out of etcd behind an External Secrets Operator
+  ExternalSecret; keep the billing workload Running throughout. Acceptance criteria: the checker asserts
+  the API server''s encryption provider configuration (or the ExternalSecret''s store reference) — it
+  deliberately never inspects the encoding of the `data:` field, so re-encoding will not pass.
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. First demonstrate the problem to yourself — decode the value and confirm no key
+  was involved. Then pick ONE remediation and carry it all the way through. Path A (encryption at rest):
+  write an EncryptionConfiguration covering the `secrets` resource with a real provider — `aescbc`,
+  `aesgcm`, `secretbox`, or `kms` — listed BEFORE `identity`, point the API server at it, then rewrite
+  the Secrets that already exist so they are re-serialised under the new provider. Path B (external
+  secrets): create an ExternalSecret with a `secretStoreRef` and a `remoteRef` key so the operator
+  materialises the Secret from the external store and the cleartext never lives in git or etcd. Make the
+  smallest change that satisfies the objective, changing one thing at a time.
+
+  VERIFY: Re-run the same check the grader uses. For Path A confirm the provider is active, that it
+  covers `secrets`, and that the pre-existing object was rewritten — a provider enabled but never
+  followed by a rewrite leaves old rows in plaintext, which is the single most common way this fix is
+  declared done while still being broken. For Path B confirm the target Secret reports its external
+  store. Capture the before/after output as evidence. Success criteria: the objective''s healthy state
+  holds on a repeat check, not just once.
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (remove the
+  EncryptionConfiguration and restore the API server''s original flags, or delete the ExternalSecret) and
+  re-observe before trying another hypothesis. Never stack unverified changes — an API server that will
+  not start because of a malformed encryption config takes the whole control plane with it.
+
+  WHAT TO AVOID: Do not re-base64 the value and call it fixed — that is the exact misconception this lab
+  exists to correct, and the checker is built so it cannot pass. Do not delete the Secret to make the
+  finding disappear. Do not list `identity` first in the provider array; it is the no-op provider and
+  everything after it is dead configuration. Do not apply broad destructive changes, skip evidence
+  gathering, or fake completion with marker files — the checker validates real cluster state.'
+initial_state: Secret production/db-credentials holds the billing database superuser password. Its data
+  values are base64-encoded, no EncryptionConfiguration is set on the API server, and the team believes
+  the base64 encoding is what protects it. The cluster is otherwise completely healthy.
+objectives:
+- Demonstrate that the base64 data value is recoverable with no key material
+- Enable a real encryption provider for the secrets resource, or move the value behind an ExternalSecret
+- Re-encrypt the Secret that already existed so it is not left in plaintext
+- Verify the protection by asserting the provider config, not the encoding
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. Note what is NOT wrong: every pod is Running and no Deployment is degraded.
+    This lab has no outage symptom, which is the point — a confidentiality defect is invisible to liveness
+    checks. Read `kubectl get secret db-credentials -n production -o yaml` and ask one question about the
+    `data:` block: what key would an attacker need to reverse it? Write down your answer before forming
+    any theory about the fix.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. Separate three things people routinely conflate: (1) encoding, which
+    is base64 and is reversible by anyone with no secret, (2) encryption in transit, which TLS to the API
+    server already gives you, and (3) encryption at rest, which is what SEC-4412 is actually about and
+    which is a property of how the API server serialises the object into etcd. The Secret manifest cannot
+    express (3) at all — no field you add to it changes the answer. So the fix lives somewhere other than
+    the manifest. Decide where, then change exactly one thing and re-check.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `kubectl get secret db-credentials -n production -o jsonpath=''{.data.POSTGRES_PASSWORD}'' | base64 -d`
+    and observe that it returns the plaintext password with no key supplied. Then check whether the API
+    server is encrypting anything: look for `--encryption-provider-config` in the kube-apiserver flags,
+    and read the file it points at if it exists. No flag means the `identity` provider, which stores
+    cleartext.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. Confirm no EncryptionConfiguration is present, or that one exists but lists `identity` first.
+
+    2. Decide the remediation path: encryption at rest (API-server-side) or External Secrets Operator
+    (move the value out of etcd).
+
+    3. If you take the encryption path, remember that enabling a provider only affects writes that happen
+    AFTER the API server restarts — objects already in etcd keep their old serialisation until something
+    rewrites them.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    Path A — encryption at rest:
+
+    1. Write an EncryptionConfiguration whose `resources` includes `secrets` and whose `providers` array
+    lists `aescbc` (or aesgcm/secretbox/kms) FIRST and `identity` last as the read fallback.
+
+    2. Point kube-apiserver at it with `--encryption-provider-config` and let it restart.
+
+    3. Rewrite the existing objects: `kubectl get secrets -n production -o json | kubectl replace -f -`.
+
+    Path B — external secrets:
+
+    1. Create an ExternalSecret with a `secretStoreRef` (e.g. vault-backend) and a `remoteRef` key whose
+    target is `db-credentials`.
+
+    WHY: the grader reads the API server''s provider configuration and the object''s at-rest state, or
+    the ExternalSecret''s store reference. It never reads the `data:` encoding, so a re-encoded manifest
+    cannot pass — only a structural change to where and how the value is stored will.'
+summary: Prove Kubernetes Secret base64 is encoding rather than encryption and remediate with encryption at rest or an external secrets operator
+estimated_minutes: 30
+xp_reward: 200
+prerequisites:
+- Basic kubernetes literacy
+- Familiarity with kubectl and Secret objects
+tags:
+- harden
+- security
+- hands-on
+- kubernetes
+- secrets
+linked_tutorial: kubernetes-platform-zero-hero
+what_you_will_learn:
+- Demonstrate that the base64 data value is recoverable with no key material
+- Enable a real encryption provider for the secrets resource, or move the value behind an ExternalSecret
+- Re-encrypt the Secret that already existed so it is not left in plaintext
+- Verify the protection by asserting the provider config, not the encoding
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline lab environment
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Make production/db-credentials genuinely encrypted at rest
+  description: Prove the base64 value is recoverable without a key, then remediate by enabling an
+    encryption provider covering the secrets resource and re-encrypting the existing object, or by
+    moving the value behind an External Secrets Operator ExternalSecret.
+  background: 'Kubernetes stores Secret values base64-encoded, not encrypted. Without an
+    EncryptionConfiguration the API server uses the identity provider and writes cleartext into etcd, so
+    an etcd snapshot or backup tarball leaks every credential. This lab teaches the distinction between
+    encoding, encryption in transit, and encryption at rest — and that only the last one closes the
+    finding.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Secret
+    resource_name: db-credentials
+    namespace: production
+    expected_state: EncryptedAtRest
+    error_message: Secret production/db-credentials is still stored in plaintext. base64 in the manifest
+      is encoding, not encryption — re-encoding it will not pass. Enable an EncryptionConfiguration
+      covering the secrets resource with a real provider listed before identity and rewrite the existing
+      Secrets, or move the value behind an ExternalSecret with a secretStoreRef.
+solution:
+  summary: Enable an EncryptionConfiguration on kube-apiserver covering the secrets resource with aescbc
+    listed before identity, then rewrite the existing Secrets so the pre-existing object is re-serialised
+    under the new provider. Alternatively create an ExternalSecret with a secretStoreRef so the value is
+    sourced from an external store and never lands in etcd.
+  files_changed:
+  - /etc/kubernetes/enc/enc.yaml
+  - /etc/kubernetes/manifests/kube-apiserver.yaml
+  commands_run:
+  - kubectl get secret db-credentials -n production -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d
+  - kubectl get secrets -n production -o json | kubectl replace -f -
+  reference_docs: kubernetes-fundamentals

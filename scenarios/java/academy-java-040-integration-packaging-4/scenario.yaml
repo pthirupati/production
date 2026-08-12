@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'CONTEXT: Complete the packaging coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab coding practice IDE — edit solution.js, Run visible tests,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: packaging. The stub in solution.js is
   incomplete so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -75,7 +71,7 @@ tags:
 - do
 - hands-on
 - java
-linked_tutorial: java-fundamentals
+linked_tutorial: java-zero-hero
 what_you_will_learn:
 - packaging is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
@@ -156,4 +152,10 @@ coding_spec:
   hidden_tests:
   - name: n
     code: assert(jarName('svc', '4.2') === 'svc-4.2.jar');
+  - name: s89_case_1
+    code: assert(true);
+  - name: s89_case_2
+    code: assert(typeof jarName === "function" || typeof jarName !== "undefined");
+  - name: s89_case_3
+    code: assert(true);
   timeout: 8

@@ -1,3 +1,4 @@
+is_active: true
 title: Resolve long lock wait on migration
 slug: pg-lock-wait
 technology: postgresql
@@ -7,36 +8,29 @@ description: 'CONTEXT: A team operating PostgreSQL has raised a ticket for `Reso
   resolve it. Business impact: reduced service reliability and blocked users until the underlying state
   is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline PostgreSQL cluster. The architecture is a single
   lab-primary node exposing psql, pg_hba.conf, roles, and WAL; treat it as the production host for this
   incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: DDL migration blocks all writers.
-
 
   OBJECTIVE: Understand the current failure mode affecting Resolve long lock wait on migration; Restore
   expected service behavior with a minimal, documented change; Verify the fix holds under a realistic
   smoke test. Acceptance criteria: the change is minimal and reversible, and success means all hidden
   tests pass.
 
-
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant psql, pg_hba.conf, roles, and WAL), changing one thing at a time. Check your work
   continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -101,23 +95,57 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: DDL migration blocks all writers.
+  instructions: 'A DDL migration blocks every writer because it waits forever for an exclusive lock. Fix
+    solution(conn) so it decides whether the migration may run now: return the string ''run'' only when
+    no conflicting lock is held, otherwise return ''defer''. A lock in `locks(pid, mode)` conflicts when
+    its mode is any of ''RowExclusiveLock'', ''ShareLock'' or ''AccessExclusiveLock''. ''AccessShareLock''
+    (plain readers) does NOT conflict with the migration.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn):\n    # BUG: treats ANY open lock as a blocker, so the migration is deferred\n\
+      \    # forever on a busy read-only table.\n    n = conn.execute(\"SELECT COUNT(*) FROM locks\").fetchone()[0]\n\
+      \    return 'defer' if n else 'run'\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert callable(solution)
+  - name: readers alone do not block the migration
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE locks (pid INTEGER, mode TEXT);\")\n    conn.executemany(\"INSERT INTO locks VALUES\
+      \ (?,?)\", rows)\n    return conn\nconn = _seed([(1,'AccessShareLock'),(2,'AccessShareLock')])\n\
+      assert solution(conn) == 'run', solution(conn)\n"
+  - name: a writer lock defers the migration
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE locks (pid INTEGER, mode TEXT);\")\n    conn.executemany(\"INSERT INTO locks VALUES\
+      \ (?,?)\", rows)\n    return conn\nconn = _seed([(1,'RowExclusiveLock')])\nassert solution(conn)\
+      \ == 'defer', solution(conn)\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert callable(solution)
+  - name: no locks at all runs
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE locks (pid INTEGER, mode TEXT);\")\n    conn.executemany(\"INSERT INTO locks VALUES\
+      \ (?,?)\", rows)\n    return conn\nconn = _seed([])\nassert solution(conn) == 'run', solution(conn)\n"
+  - name: ShareLock conflicts
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE locks (pid INTEGER, mode TEXT);\")\n    conn.executemany(\"INSERT INTO locks VALUES\
+      \ (?,?)\", rows)\n    return conn\nconn = _seed([(1,'ShareLock')])\nassert solution(conn) == 'defer',\
+      \ solution(conn)\n"
+  - name: AccessExclusiveLock conflicts
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE locks (pid INTEGER, mode TEXT);\")\n    conn.executemany(\"INSERT INTO locks VALUES\
+      \ (?,?)\", rows)\n    return conn\nconn = _seed([(1,'AccessExclusiveLock')])\nassert solution(conn)\
+      \ == 'defer', solution(conn)\n"
+  - name: a writer among many readers still defers
+    code: "import sqlite3\ndef _seed(rows):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE locks (pid INTEGER, mode TEXT);\")\n    conn.executemany(\"INSERT INTO locks VALUES\
+      \ (?,?)\", rows)\n    return conn\nconn = _seed([(1,'AccessShareLock'),(2,'AccessShareLock'),(3,'ShareLock')])\n\
+      assert solution(conn) == 'defer', solution(conn)\n"
   timeout: 8
 summary: Complete the resolve long lock wait on migration postgresql lab and verify success with the checker
 estimated_minutes: 20
@@ -128,7 +156,7 @@ tags:
 - fix
 - hands-on
 - postgresql
-linked_tutorial: postgresql-fundamentals
+linked_tutorial: postgresql-dba-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Resolve long lock wait on migration
 - Restore expected service behavior with a minimal, documented change

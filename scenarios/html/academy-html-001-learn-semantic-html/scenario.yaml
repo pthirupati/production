@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Low
 description: 'CONTEXT: Complete the semantic html coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab HTML practice IDE — edit index.html / styles.css, open Preview,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: semantic html. Edit index.html / styles.css
   — Preview shows the page; Check Solution grades markup.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -76,7 +72,7 @@ tags:
 - do
 - hands-on
 - html
-linked_tutorial: html-fundamentals
+linked_tutorial: html-web-zero-hero
 what_you_will_learn:
 - Understand how semantic HTML work in this lab environment
 - Identify the main status and configuration signals for semantic HTML
@@ -140,7 +136,7 @@ guided_mode:
     next_on: command_success
 coding_mode: true
 coding_spec:
-  language: javascript
+  language: html
   entrypoint: solution.js
   kind: impl
   instructions: 'Add a landmark <main> containing one <h1> with meaningful page title
@@ -179,4 +175,8 @@ coding_spec:
     code: assert(PAGE_HTML.toLowerCase().indexOf('</h1>') >= 0);
   - name: lang
     code: assert(PAGE_HTML.indexOf('lang=') >= 0);
+  - name: s89_case_2
+    code: assert(/<h1[^>]*>\s*Welcome\s*<\/h1>/i.test(PAGE_HTML), 'h1 should say Welcome');
+  - name: s89_case_3
+    code: assert(/<!DOCTYPE\s+html>/i.test(PAGE_HTML), 'missing doctype');
   timeout: 8

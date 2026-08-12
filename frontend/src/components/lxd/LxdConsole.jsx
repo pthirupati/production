@@ -11,6 +11,14 @@ import './lxd.css'
 
 const ACCENT = '#E95420'
 
+// Shared fallbacks for absent server state. A bare `x || {}` in a render body
+// mints a new identity every pass, so any memo/effect depending on it never
+// hits — this console polls, so that was a full re-derive per tick. Frozen so
+// an accidental in-place mutation throws here instead of silently corrupting
+// the fallback for every other consumer.
+const EMPTY_OBJ = Object.freeze({})
+const EMPTY_ARR = Object.freeze([])
+
 const NAV = [
   { key: 'instances', label: 'Instances', icon: Box, section: 'Compute' },
   { key: 'images', label: 'Images', icon: ImageIcon, section: 'Compute' },
@@ -109,21 +117,26 @@ export default function LxdConsole({
 
   useEffect(() => { refresh() }, [refresh])
 
-  const st = state?.state || {}
+  const st = state?.state || EMPTY_OBJ
   const loggedIn = st?.session?.logged_in
-  const lxd = st?.lxd || {}
-  const instances = useMemo(() => lxd.containers || lxd.instances || [], [lxd])
-  const profiles = useMemo(() => (lxd.profiles || []).map((p) => (
+  const lxd = st?.lxd || EMPTY_OBJ
+  // Depend on the two arrays actually read, not on `lxd` — `lxd` changes identity
+  // on every poll response even when the instance list is byte-identical.
+  const instances = useMemo(
+    () => lxd.containers || lxd.instances || EMPTY_ARR,
+    [lxd.containers, lxd.instances],
+  )
+  const profiles = useMemo(() => (lxd.profiles || EMPTY_ARR).map((p) => (
     typeof p === 'string' ? { name: p, config: {}, devices: {} } : p
   )), [lxd.profiles])
-  const images = lxd.images || []
-  const storage = lxd.storage_pools || []
-  const networks = lxd.networks || []
-  const projects = lxd.projects || []
-  const cluster = lxd.cluster || []
-  const operations = lxd.operations || []
-  const settings = lxd.settings || {}
-  const events = st?.events || []
+  const images = lxd.images || EMPTY_ARR
+  const storage = lxd.storage_pools || EMPTY_ARR
+  const networks = lxd.networks || EMPTY_ARR
+  const projects = lxd.projects || EMPTY_ARR
+  const cluster = lxd.cluster || EMPTY_ARR
+  const operations = lxd.operations || EMPTY_ARR
+  const settings = lxd.settings || EMPTY_OBJ
+  const events = st?.events || EMPTY_ARR
   const user = st?.session?.user || 'admin'
 
   const selectedInst = useMemo(

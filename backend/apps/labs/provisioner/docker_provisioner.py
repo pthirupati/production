@@ -204,6 +204,25 @@ class DockerProvisioner:
                 "FIXITLAB_HOST_ROLE": "ssh_client",
             },
             read_only=False,
+            pids_limit=256,
+            # The jump box is never privileged, so it always gets the restricted
+            # cap set. Mirrors the primary-host list at _provision() rather than a
+            # blanket drop: the setup script below runs `apk add` (SETFCAP, to
+            # restore file caps on packages), `adduser` (SETUID/SETGID), and
+            # chown/chmod on /home/labuser (CHOWN/FOWNER/DAC_OVERRIDE). Dropping
+            # ALL without these leaves labuser half-created and SSH unusable.
+            cap_drop=["ALL"],
+            cap_add=[
+                "CHOWN",
+                "DAC_OVERRIDE",
+                "FOWNER",
+                "SETUID",
+                "SETGID",
+                "SETFCAP",
+                "NET_BIND_SERVICE",
+                "NET_RAW",
+            ],
+            privileged=False,
             tty=True,
             stdin_open=True,
         )
@@ -496,7 +515,11 @@ class DockerProvisioner:
         try:
             existing = self.client.containers.get(container_name)
             existing.stop(timeout=3)
-            existing.remove(force=True)
+            # v=True here too (audit Z5-11). This is the name-collision path — it
+            # runs when a previous container for the same lab was left behind, so
+            # it is precisely the case where an orphaned volume already exists and
+            # removing without `v` would orphan a second one.
+            existing.remove(force=True, v=True)
             logger.info(f"Cleaned up stale container: {container_name}")
         except NotFound:
             pass
@@ -681,7 +704,10 @@ class DockerProvisioner:
             if session_id:
                 release_holder(str(session_id))
             container.stop(timeout=5)
-            container.remove(force=True)
+            # v=True reclaims the container's anonymous volumes. Without it every
+            # teardown orphaned them (audit Z5-11) and only `docker volume prune`
+            # would ever have got them back — which nothing ran.
+            container.remove(force=True, v=True)
             logger.info(f"Terminated container {container_id[:12]}")
         except NotFound:
             logger.warning(f"Container {container_id[:12]} already removed")
@@ -706,27 +732,78 @@ class DockerProvisioner:
         except APIError:
             return "unknown"
 
+    # A container whose session row is not live is an orphan *now*, whatever its
+    # age — but a container is created moments before its session row commits, so
+    # a short floor avoids reaping a lab that is still being provisioned.
+    ORPHAN_GRACE_SECONDS = 300
+
     def cleanup_expired(self, max_age_seconds=3600):
-        """Remove all containers and their networks older than max_age_seconds."""
+        """Remove lab containers that are expired or whose session is gone.
+
+        Audit Z5-11 observed a crashed orphan parking 512 MB (2 of ~13 slots) for
+        up to three hours, and suggested lowering `max_age_seconds` toward
+        `LAB_MAX_DURATION_MINUTES`. Measuring first says not to: a lab may be
+        extended twice a day by 30 minutes on top of a 60-minute maximum, so a
+        legitimately *running* lab can reach 120 minutes. The 7200 s floor is
+        exactly that ceiling, and lowering it would kill live labs — a much worse
+        outcome than a parked slot.
+
+        So the age rule stays as the backstop and a second, sharper rule is added:
+        if the container's `fixitlab.session_id` has no session in PROVISIONING or
+        RUNNING, it is an orphan regardless of age. That reclaims a crashed lab's
+        slot in minutes instead of hours *and* cannot touch a live one, because
+        "live" is now read from the database rather than inferred from a clock.
+        """
         import time
         from dateutil.parser import parse as parse_date
+
+        from apps.labs.models import LabSession
 
         containers = self.client.containers.list(
             filters={"label": "fixitlab.session_id"},
             all=True,
         )
+        live_sessions = set()
+        try:
+            live_sessions = {
+                str(sid) for sid in LabSession.objects.filter(
+                    status__in=("PROVISIONING", "RUNNING")
+                ).values_list("id", flat=True)
+            }
+        except Exception as exc:
+            # Without the session set we cannot tell an orphan from a live lab, so
+            # fall back to age-only rather than guessing. Reaping on a failed query
+            # would take down every running lab at once.
+            logger.error("Orphan cleanup could not read live sessions (%s); "
+                         "falling back to age-only", exc)
+            live_sessions = None
+
         cleaned = 0
         for container in containers:
             try:
+                session_id = container.labels.get("fixitlab.session_id")
                 created = parse_date(container.attrs["Created"])
                 age = time.time() - created.timestamp()
-                if age > max_age_seconds:
-                    session_id = container.labels.get("fixitlab.session_id")
-                    container.stop(timeout=3)
-                    container.remove(force=True)
-                    if session_id:
-                        self._remove_session_network(session_id)
-                    cleaned += 1
+
+                too_old = age > max_age_seconds
+                orphaned = (
+                    live_sessions is not None
+                    and age > self.ORPHAN_GRACE_SECONDS
+                    and (not session_id or session_id not in live_sessions)
+                )
+                if not (too_old or orphaned):
+                    continue
+
+                if orphaned and not too_old:
+                    logger.info(
+                        "Reclaiming orphaned container %s (session %s not live, "
+                        "age %ds)", container.short_id, session_id, int(age),
+                    )
+                container.stop(timeout=3)
+                container.remove(force=True, v=True)
+                if session_id:
+                    self._remove_session_network(session_id)
+                cleaned += 1
             except Exception as e:
                 logger.error(f"Cleanup error for {container.short_id}: {e}")
 

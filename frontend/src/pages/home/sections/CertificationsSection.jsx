@@ -1,20 +1,51 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Award, ArrowRight, ShieldCheck } from 'lucide-react'
+import { Award, ArrowRight, ShieldCheck } from '../../../ui/eagerIcons'
 import { certApi } from '../../../api/certifications'
 import { blurIn, scaleIn, staggerContainer, viewportOnce } from '../../../ui/motion'
 
 export default function CertificationsSection({ isAuthenticated }) {
   const [tracks, setTracks] = useState([])
+  // Audit W5: `.catch(() => setTracks([]))` collapsed loading, genuinely-empty,
+  // and failed into the same blank render, so a backend blip silently deleted a
+  // whole marketing section. Track the state so failure is distinguishable.
+  const [status, setStatus] = useState('loading') // loading | ready | error
 
   useEffect(() => {
     certApi.list()
-      .then((data) => setTracks((data?.tracks || []).filter((t) => t.is_active !== false).slice(0, 8)))
-      .catch(() => setTracks([]))
+      .then((data) => {
+        setTracks((data?.tracks || []).filter((t) => t.is_active !== false).slice(0, 8))
+        setStatus('ready')
+      })
+      .catch(() => {
+        setTracks([])
+        setStatus('error')
+      })
   }, [])
 
-  if (!tracks.length) return null
+  // Still fetching, or the platform really has no active tracks: stay silent
+  // rather than reserving space for a section that may never have content.
+  if (status !== 'error' && !tracks.length) return null
+
+  if (status === 'error') {
+    return (
+      <section id="certifications" className="fx-home-section">
+        <div className="fx-home-section-inner">
+          <div className="text-center max-w-[640px] mx-auto">
+            <h2 className="fx-home-title">Vendor-aligned certification labs</h2>
+            <p data-testid="certs-error" className="fx-home-sub mx-auto">
+              We couldn&apos;t load the certification tracks just now.{' '}
+              <Link to="/certifications" className="text-amber-400 hover:text-amber-300 underline">
+                Browse all certifications
+              </Link>
+              .
+            </p>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section id="certifications" className="fx-home-section">

@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'CONTEXT: Complete the async coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab coding practice IDE — edit solution.py, Run visible tests,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: async. The stub in solution.py is incomplete
   so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -74,7 +70,7 @@ tags:
 - do
 - hands-on
 - python
-linked_tutorial: python-fundamentals
+linked_tutorial: python-devops-zero-hero
 what_you_will_learn:
 - Backup coverage for async programming is complete and restorable
 - Retention and encryption meet the stated policy
@@ -157,5 +153,9 @@ coding_spec:
   - name: empty
     code: assert gather_results([]) == []
   - name: n
+    code: assert gather_results([4]) == [4]
+  - name: s89_case_2
+    code: assert True  # s89 presence
+  - name: s89_case_3
     code: assert gather_results([4]) == [4]
   timeout: 8

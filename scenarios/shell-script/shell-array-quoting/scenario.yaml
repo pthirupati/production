@@ -15,35 +15,28 @@ description: 'CONTEXT: A team operating shell scripting has raised a ticket for 
   resolve it. Business impact: reduced service reliability and blocked users until the underlying state
   is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline bash lab environment. The architecture is a single
   lab-primary node exposing scripts, cron, logs, and shellcheck; treat it as the production host for this
   incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: An ops script mis-expanding a bash array.
-
 
   OBJECTIVE: Confirm the issue: Array args split incorrectly; Apply the documented fix in /opt/scripts/args-array.sh;
   Verify the configuration is corrected. Acceptance criteria: the change is minimal and reversible, and
   success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant scripts, cron, logs, and shellcheck), changing one thing at a time. Check your work
   continuously against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -103,7 +96,6 @@ hints:
 
     3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
-
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 summary: Complete the script array expansion splits wrong shell script lab and verify success with the
@@ -116,7 +108,7 @@ tags:
 - fix
 - hands-on
 - shell-script
-linked_tutorial: shell-script-fundamentals
+linked_tutorial: bash-shell-zero-hero
 what_you_will_learn:
 - 'Confirm the issue: Array args split incorrectly'
 - Apply the documented fix in /opt/scripts/args-array.sh

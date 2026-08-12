@@ -21,22 +21,18 @@ description: 'CONTEXT: A team operating Ansible automation has raised a ticket f
   and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline Ansible control node. The architecture is a single
   lab-primary node exposing inventory, playbooks, roles, and ansible-playbook; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: ansible-control node with inventory at /etc/ansible/hosts. web1 is reachable
   over SSH key auth; web2 rejects publickey authentication because the control node''s key isn''t authorized
   there.
 
-
   OBJECTIVE: Run the ping and identify that web2 is UNREACHABLE on publickey auth; Install the control
   node''s public key into web2''s authorized_keys; Verify every host in the group responds to the Ansible
   ping. Acceptance criteria: the change is minimal and reversible, and success means `ansible webservers
   -m ping` includes `SUCCESS`.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
@@ -44,16 +40,13 @@ description: 'CONTEXT: A team operating Ansible automation has raised a ticket f
   Check your work continuously against the objective — success means `ansible webservers -m ping` includes
   `SUCCESS`.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `ansible webservers -m ping` includes `SUCCESS`.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -106,7 +99,6 @@ hints:
 
     3. Confirm `ansible webservers -m ping` succeeds.
 
-
     WHY: Ansible labs grade real playbook outcomes, not marker files.'
 summary: 'Complete the rhel: ansible ssh key failure ansible lab and verify success with the
   checker'
@@ -118,7 +110,7 @@ tags:
 - ansible
 - fix
 - hands-on
-linked_tutorial: ansible-fundamentals
+linked_tutorial: ansible-automation-zero-hero
 what_you_will_learn:
 - Run the ping and identify that web2 is UNREACHABLE on publickey auth
 - Install the control node's public key into web2's authorized_keys

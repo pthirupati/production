@@ -32,9 +32,14 @@ from apps.labs.provisioner.exec_socket import stream_chunk_to_text
 logger = logging.getLogger(__name__)
 
 # Per-user WebSocket connection tracking (prevents resource exhaustion)
-MAX_WS_PER_USER = int(os.environ.get("TERMINAL_MAX_WS_PER_USER", "20"))
-_WS_CONN_KEY = "ws_conn:{user_id}"
-_WS_CONN_TTL = 3700  # slightly over 1 hour; auto-expires stale counts if process crashes
+# Re-exported from common.ws_slots so existing imports of MAX_WS_PER_USER from this
+# module keep working; the accounting itself now lives there (audit Z5-6).
+from common.ws_slots import (  # noqa: E402
+    _WS_CONN_KEY,
+    MAX_WS_PER_USER,
+    acquire_ws_slot,
+    release_ws_slot,
+)
 
 # Learner-facing environment labels — never expose "Simulation".
 _LAB_SERVER_LABELS = {
@@ -191,6 +196,25 @@ def reset_user_ws_connections(user_id=None):
         cache.delete(_WS_CONN_KEY.format(user_id=user_id))
 
 
+# Output backpressure (audit Z5-16).
+#
+# `_read_output` forwards every 4 KB chunk as its own JSON frame with no
+# server-side bound, so `yes`, `cat /dev/urandom` or a runaway log tail was limited
+# only by the client's TCP window. A fast client therefore pins the worker: a
+# thread hop, a `json.dumps` and a WebSocket frame per 4 KB, indefinitely.
+#
+# The cap is on BYTES PER SECOND rather than a total, because the goal is to stop
+# one session monopolising a worker, not to stop long-running output — a lab that
+# legitimately prints a large file should still finish.
+#
+# 2 MB/s is far above interactive use (a full 200x50 screen redraw is ~40 KB) and
+# far below what a firehose produces, so normal work never touches this path.
+OUTPUT_BYTES_PER_SECOND = 2 * 1024 * 1024
+# How long to pause once the budget is spent. Long enough to yield the event loop
+# and let other sessions run; short enough that output still streams visibly.
+OUTPUT_THROTTLE_SLEEP = 0.05
+
+
 class TerminalConsumer(AsyncWebsocketConsumer):
     """
     WebSocket consumer that bridges xterm.js to a lab shell.
@@ -234,6 +258,10 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         # Command history recording
         self._input_buffer = ""
         self._recording_events = deque(maxlen=5000)
+        # Rolling one-second output budget — see OUTPUT_BYTES_PER_SECOND.
+        self._out_window_start = 0.0
+        self._out_bytes_in_window = 0
+        self._throttle_notified = False
         self._session_start_time = None
         self._tracked_user_id = None  # For per-user connection counting
         self._blocked_patterns = []
@@ -261,15 +289,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         user_id = getattr(self, "_tracked_user_id", None)
         if user_id is None:
             return
-        self._tracked_user_id = None
-        try:
-            from django.core.cache import cache
-            key = _WS_CONN_KEY.format(user_id=user_id)
-            new_val = cache.decr(key, delta=1)
-            if new_val <= 0:
-                cache.delete(key)
-        except Exception:
-            pass
+        self._tracked_user_id = None   # cleared first, so a repeat call is a no-op
+        release_ws_slot(user_id)
 
     async def connect(self):
         user = self.scope.get("user", AnonymousUser())
@@ -279,26 +300,13 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             await self.close(code=4001)
             return
 
-        # Enforce per-user WebSocket connection limit
+        # Enforce per-user WebSocket connection limit. The accounting moved to
+        # `common.ws_slots` (audit Z5-6) so BaremetalConsumer shares it — a cap
+        # implemented inside one consumer is a cap the next consumer will not have.
         user_id = user.id
-        try:
-            from django.core.cache import cache
-            key = _WS_CONN_KEY.format(user_id=user_id)
-            # Atomic increment; if key didn't exist, set to 1
-            try:
-                current = cache.incr(key, delta=1)
-                cache.expire(key, _WS_CONN_TTL)
-            except ValueError:
-                # Key doesn't exist — create it
-                cache.set(key, 1, timeout=_WS_CONN_TTL)
-                current = 1
-            if current > MAX_WS_PER_USER:
-                cache.decr(key, delta=1)
-                logger.warning("User %s exceeded max WS connections (%s)", user_id, MAX_WS_PER_USER)
-                await self.close(code=4008)
-                return
-        except Exception:
-            pass
+        if not acquire_ws_slot(user_id):
+            await self.close(code=4008)
+            return
         self._tracked_user_id = user_id
 
         # Verify session ownership and status
@@ -335,6 +343,10 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         # Initialize recording
         self._session_start_time = time.time()
         self._recording_events = deque(maxlen=5000)
+        # Rolling one-second output budget — see OUTPUT_BYTES_PER_SECOND.
+        self._out_window_start = 0.0
+        self._out_bytes_in_window = 0
+        self._throttle_notified = False
 
         # For cloud labs, show a connecting message since SSH may take a moment
         is_cloud = self.provider_type not in ("docker", "simulation")
@@ -651,6 +663,41 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         finally:
             self._respawn_in_progress = False
 
+    async def _apply_output_backpressure(self, nbytes: int) -> None:
+        """Throttle a session that is producing output faster than a human reads.
+
+        Audit Z5-16. Without this the read loop is bounded only by the client's TCP
+        window, so a firehose command pins a worker for as long as it runs.
+
+        A rolling one-second budget rather than a fixed total: the goal is to stop
+        one session monopolising the worker, not to truncate legitimate long output.
+        A lab printing a large file still finishes; it just cannot do it faster than
+        anyone could read it.
+
+        The sleep is the whole mechanism — it yields the event loop so other
+        sessions on the same worker get scheduled. Dropping output instead would
+        corrupt the terminal stream, which is worse than slowing it.
+        """
+        now = time.monotonic()
+        if now - self._out_window_start >= 1.0:
+            self._out_window_start = now
+            self._out_bytes_in_window = 0
+            self._throttle_notified = False
+
+        self._out_bytes_in_window += nbytes
+        if self._out_bytes_in_window < OUTPUT_BYTES_PER_SECOND:
+            return
+
+        if not self._throttle_notified:
+            # Said once per window, not per chunk — a throttle notice printed at
+            # firehose rate would itself be a firehose.
+            self._throttle_notified = True
+            logger.info(
+                "Throttling output for session %s (%d bytes in <1s)",
+                getattr(self.lab_session, "id", "?"), self._out_bytes_in_window,
+            )
+        await asyncio.sleep(OUTPUT_THROTTLE_SLEEP)
+
     async def _read_output_safe(self):
         """Wrapper so reader failures never propagate to daphne/channels dispatch."""
         try:
@@ -741,6 +788,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     elapsed = time.time() - self._session_start_time
                     self._recording_events.append([elapsed, "o", output])
 
+                await self._apply_output_backpressure(len(data))
+
                 if not await self._safe_send(json.dumps({"output": output})):
                     break
         except asyncio.CancelledError:
@@ -786,6 +835,21 @@ class TerminalConsumer(AsyncWebsocketConsumer):
     # guaranteed flush in disconnect().
     SNAPSHOT_MIN_INTERVAL = 15.0
 
+    # ...with one exception that makes the "slightly stale is fine" reasoning above
+    # WRONG on its own: grading is a separate HTTP request. `ValidateLabView` ->
+    # `simulation_provisioner.run_validation` looks the session up in the handling
+    # worker's `_SIM_SESSIONS`, and with UVICORN_WORKERS>1 that is usually NOT the
+    # worker holding this websocket, so it falls back to `ensure_sim_session()`,
+    # which rehydrates from `LabSession.simulation_snapshot`. A leading-edge-only
+    # throttle therefore lets a learner apply the fix, click Check Solution, and be
+    # graded against state up to SNAPSHOT_MIN_INTERVAL seconds old — a false
+    # failure on correct work.
+    #
+    # So also flush on the TRAILING edge: a suppressed snapshot is written this many
+    # seconds after the last command. Bursts still collapse to ~2 writes instead of
+    # one per command, and a human cannot out-race it to the Check Solution button.
+    SNAPSHOT_TRAILING_DELAY = 1.5
+
     async def _maybe_snapshot_simulation(self, force: bool = False) -> None:
         if not self.lab_session or self.provider_type != "simulation":
             return
@@ -793,7 +857,9 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         last = getattr(self, "_last_snapshot_at", 0.0)
         if not force and (now - last) < self.SNAPSHOT_MIN_INTERVAL:
             self._snapshot_pending = True
+            self._schedule_trailing_snapshot()
             return
+        self._cancel_trailing_snapshot()
         self._last_snapshot_at = now
         self._snapshot_pending = False
         try:
@@ -807,6 +873,32 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 "Simulation snapshot failed for session %s: %s",
                 self.lab_session.id, exc,
             )
+
+    def _schedule_trailing_snapshot(self) -> None:
+        """(Re)arm the trailing flush; each new command pushes it out."""
+        self._cancel_trailing_snapshot()
+        try:
+            self._trailing_snapshot_task = asyncio.create_task(
+                self._trailing_snapshot()
+            )
+        except RuntimeError:  # no running loop (shouldn't happen in ASGI)
+            self._trailing_snapshot_task = None
+
+    def _cancel_trailing_snapshot(self) -> None:
+        task = getattr(self, "_trailing_snapshot_task", None)
+        # Never cancel ourselves — the trailing task calls back into
+        # _maybe_snapshot_simulation(force=True), which lands here.
+        if task and not task.done() and task is not asyncio.current_task():
+            task.cancel()
+        self._trailing_snapshot_task = None
+
+    async def _trailing_snapshot(self) -> None:
+        try:
+            await asyncio.sleep(self.SNAPSHOT_TRAILING_DELAY)
+        except asyncio.CancelledError:
+            return
+        if getattr(self, "_snapshot_pending", False):
+            await self._maybe_snapshot_simulation(force=True)
 
     async def disconnect(self, close_code):
         """Cleanup on disconnect and save recording."""

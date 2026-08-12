@@ -46,3 +46,49 @@ def corpus_keywords_for_technology(technology_id: int | None) -> list[str]:
             seen.add(k)
             out.append(k)
     return out[:80]
+
+
+def _entry_list_for_technology(technology_id: int | None) -> list[dict]:
+    if not technology_id:
+        return []
+    entries: list[dict] = []
+    for corpus in InterviewAnswerCorpus.objects.filter(
+        technology_id=technology_id, is_active=True
+    ).only("entries"):
+        entries.extend(corpus.entries or [])
+    return entries
+
+
+def best_reference_answer(
+    question_text: str,
+    technology_id: int | None = None,
+    entries: list[dict] | None = None,
+) -> str:
+    """Pick the corpus line with the best keyword overlap against the question.
+
+    Pure overlap — no MiniLM/embeddings. Callers that already have entries (tests,
+    offline fixtures) pass them; production passes technology_id.
+    """
+    pool = list(entries) if entries is not None else _entry_list_for_technology(technology_id)
+    if not pool:
+        return ""
+    q_words = set(re.findall(r"[a-z0-9][a-z0-9+.#-]{2,}", (question_text or "").lower()))
+    if not q_words:
+        return str(pool[0].get("line") or "")
+
+    best_line = ""
+    best_score = -1
+    for entry in pool:
+        line = str(entry.get("line") or "").strip()
+        if len(line) < 8:
+            continue
+        kws = {str(k).lower() for k in (entry.get("keywords") or []) if k}
+        if not kws:
+            kws = set(re.findall(r"[a-z0-9][a-z0-9+.#-]{2,}", line.lower()))
+        score = len(q_words & kws)
+        # Prefer longer substantive lines on a tie so vague stubs lose.
+        score = score * 1000 + min(len(line), 400)
+        if score > best_score:
+            best_score = score
+            best_line = line
+    return best_line

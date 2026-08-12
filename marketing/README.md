@@ -77,11 +77,19 @@ All the HTML videos have been rendered to MP4 (H.264, 30fps, universally compati
 
 **About the silent explainer:** headless rendering can't capture the browser's live text-to-speech, so `explainer-silent.mp4` has the visuals + captions but **no voice**. To get the spoken version, either (a) screen-record `explainer.html` with system audio (OBS), or (b) add a voiceover/music track to `explainer-silent.mp4` in any editor — the script for each line is the `scenes` array in `explainer.html`.
 
-**To regenerate the MP4s** (after editing any HTML), with the static server running on port 8899:
+**To regenerate the MP4s** (after editing any HTML). The renderer loads the pages over HTTP rather than `file://` (fonts and `document.fonts.ready` are unreliable on `file://`), so it needs a static server on port 8899 — start one in a second terminal:
+
 ```bash
-cd marketing/.render && npm run render
+# terminal 1 — serve marketing/ on the port render.js expects
+cd marketing && python3 -m http.server 8899
+
+# terminal 2 — install deps once, then render
+cd marketing/.render && npm install && npm run render
 ```
-The renderer uses your installed Google Chrome (headless) + a bundled ffmpeg — nothing is installed system-wide. `node_modules/` is git-ignored.
+
+The toolchain is committed at `marketing/.render/` (`package.json`, `package-lock.json`, `render.js`) — it is a dot-directory, so a plain `ls marketing/` will not show it; use `ls -a`. Only `node_modules/` is git-ignored, which is why the `npm install` above is required on a fresh clone.
+
+The renderer uses your installed Google Chrome (headless) + a bundled ffmpeg — nothing is installed system-wide. The Chrome path is hardcoded to the macOS location (`/Applications/Google Chrome.app/...`) at the top of `render.js`; on Linux/Windows edit that constant before running. It writes all five MP4s listed above back into `marketing/`.
 
 ## 2. The banners — how to export to PNG/JPG
 

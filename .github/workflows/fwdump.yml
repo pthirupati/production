@@ -27,7 +27,7 @@ jobs:
           [ -z "$TOK" ] && { echo "No DO token"; exit 1; }
           echo "::add-mask::$TOK"; echo "token=$TOK" >> "$GITHUB_OUTPUT"
       - name: Install doctl
-        uses: digitalocean/action-doctl@v2
+        uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f # v2.5.2
         with:
           token: ${{ steps.tok.outputs.token }}
       - name: Dump firewalls (full JSON) + droplet IPs

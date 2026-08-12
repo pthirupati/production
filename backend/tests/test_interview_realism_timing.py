@@ -128,3 +128,66 @@ class RealismCallbackTests(SimpleTestCase):
         cb = maybe_callback_opener(phrases, chance=1.0, rng=random.Random(1))
         self.assertIsNotNone(cb)
         self.assertTrue(any(p.lower() in cb.lower() for p in phrases))
+
+
+class ThinkingDelayAbsorbsScoringTests(SimpleTestCase):
+    """Scoring time is part of the think-time budget, not additive to it.
+
+    The candidate has already been waiting through scoring by the time the
+    "is typing…" cue starts, so the elapsed time is subtracted rather than
+    merely scaled down — otherwise a slow turn charges them twice.
+    """
+
+    def test_elapsed_is_subtracted_not_just_scaled(self):
+        import random
+
+        from apps.interviews.services.realism.timing import compute_thinking_delay_ms
+
+        kwargs = dict(round_type="technical", difficulty=2)
+        instant = compute_thinking_delay_ms(
+            **kwargs, scoring_elapsed_ms=0, rng=random.Random(5)
+        )
+        slow = compute_thinking_delay_ms(
+            **kwargs, scoring_elapsed_ms=800, rng=random.Random(5)
+        )
+        # 800ms of scoring must come off the delay roughly 1:1. The old
+        # scale-above-1500ms rule left `slow == instant` for any elapsed under
+        # the threshold, which is exactly the dead air being removed here.
+        self.assertLess(slow, instant)
+        self.assertAlmostEqual(instant - slow, 800, delta=60)
+
+    def test_sub_threshold_elapsed_still_counts(self):
+        """Elapsed below the old 1500ms threshold used to be ignored entirely."""
+        import random
+
+        from apps.interviews.services.realism.timing import compute_thinking_delay_ms
+
+        a = compute_thinking_delay_ms(
+            "technical", difficulty=2, scoring_elapsed_ms=0, rng=random.Random(9)
+        )
+        b = compute_thinking_delay_ms(
+            "technical", difficulty=2, scoring_elapsed_ms=400, rng=random.Random(9)
+        )
+        self.assertLess(b, a)
+
+    def test_heavy_scoring_floors_at_300_not_500(self):
+        """A very slow turn collapses to the ~300ms cap the audit asked for."""
+        import random
+
+        from apps.interviews.services.realism.timing import compute_thinking_delay_ms
+
+        d = compute_thinking_delay_ms(
+            "technical", difficulty=2, scoring_elapsed_ms=9000, rng=random.Random(4)
+        )
+        self.assertEqual(d, 300)
+
+    def test_fast_turn_keeps_full_persona_window(self):
+        """No regression on humanness when the server is quick."""
+        import random
+
+        from apps.interviews.services.realism.timing import compute_thinking_delay_ms
+
+        d = compute_thinking_delay_ms(
+            "deep_dive", difficulty=4, scoring_elapsed_ms=0, rng=random.Random(4)
+        )
+        self.assertGreater(d, 1000)

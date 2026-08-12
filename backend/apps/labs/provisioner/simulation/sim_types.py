@@ -16,6 +16,7 @@ UNIFIED_SIM_TYPES = {
     "python": "Python Development Lab",
     "java": "Java Development Lab",
     "javascript": "JavaScript Coding Lab",
+    "nodejs": "Node.js Development Lab",
     "react": "React Coding Lab",
     "html": "HTML / CSS Coding Lab",
     "shell_script": "Shell Scripting Lab",
@@ -56,6 +57,10 @@ _LEGACY_MAP = {
     "promql": "prometheus",
     # Coding YAML sometimes uses hyphenated shell tech slug as simulation_type
     "shell": "shell_script",
+    # Node YAML/DB rows spell the runtime three different ways.
+    "node": "nodejs",
+    "node.js": "nodejs",
+    "node-js": "nodejs",
 }
 
 
@@ -115,6 +120,10 @@ def infer_sim_type(
         ("academy-windows", "windows-", "win-")
     ):
         return "windows"
+    if tech in ("nodejs", "node", "node.js") or low.startswith(
+        ("academy-nodejs", "nodejs-", "node-")
+    ):
+        return "nodejs"
     if tech == "javascript" or low.startswith(("academy-javascript", "js-")):
         return "javascript"
     if tech == "react" or low.startswith(("academy-react", "react-")):
@@ -163,6 +172,7 @@ def lab_server_banner(sim_type: str, slug: str = "") -> str:
         "nmap": "Nmap Lab Workstation — RHEL 9",
         "wireshark": "Wireshark Lab Workstation — RHEL 9",
         "javascript": "JavaScript Coding Lab Host — RHEL 9",
+        "nodejs": "Node.js Development Lab Host — RHEL 9",
         "react": "React Coding Lab Host — RHEL 9",
         "html": "HTML Coding Lab Host — RHEL 9",
         "shell_script": "Shell Scripting Lab Host — RHEL 9",
@@ -224,6 +234,7 @@ def hostname_for_type(sim_type: str, slug: str = "") -> str:
         "ansible": "ansible-control",
         "python": "dev-server",
         "java": "dev-server",
+        "nodejs": "dev-server",
         "vmware": "vcenter-lab",
         "terraform": "terraform-ws",
         "windows": "WIN-SRV-01",
@@ -270,7 +281,7 @@ def boot_console_for(scenario_slug: str, sim_type: str) -> bool:
         "commvault", "netapp", "dellemc", "datacenter", "soc", "azure", "gcp",
         "peoplesoft", "nmap", "wireshark", "data-dashboard", "ai-agent",
         "javascript", "react", "html", "shell_script", "shell-script",
-        "java", "python",
+        "java", "python", "nodejs",
     ):
         # These personas have their own surfaces and never use the RHEL boot flow.
         return False

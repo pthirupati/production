@@ -130,6 +130,7 @@ export default function Tutorials() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const topicParam = searchParams.get('topic') || ''
+  const courseParam = searchParams.get('course') || ''
 
   usePageTitle(
     'Free Tech Tutorials',
@@ -155,8 +156,9 @@ export default function Tutorials() {
 
   const filteredCourses = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q && !topicParam) return courses
+    if (!q && !topicParam && !courseParam) return courses
     return courses
+      .filter((course) => !courseParam || course.course_slug === courseParam)
       .map((course) => ({
         ...course,
         modules: course.modules.filter((t) => {
@@ -171,15 +173,16 @@ export default function Tutorials() {
         module_count: course.modules.length,
         total_sections: course.modules.reduce((n, t) => n + (t.section_count || 0), 0),
       }))
-  }, [courses, query, topicParam])
+  }, [courses, query, topicParam, courseParam])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q && !topicParam) return curriculum
+    if (!q && !topicParam && !courseParam) return curriculum
     return curriculum
       .map((track) => ({
         ...track,
         tutorials: track.tutorials.filter((t) => {
+          if (courseParam && t.course_slug !== courseParam) return false
           if (topicParam && t.topic !== topicParam) return false
           if (q && !(`${t.title} ${t.summary} ${t.topic}`.toLowerCase().includes(q))) return false
           return true
@@ -191,7 +194,7 @@ export default function Tutorials() {
         tutorial_count: track.tutorials.length,
         total_sections: track.tutorials.reduce((n, t) => n + (t.section_count || 0), 0),
       }))
-  }, [curriculum, query, topicParam])
+  }, [curriculum, query, topicParam, courseParam])
 
   return (
     <PublicLayout>
@@ -264,7 +267,7 @@ export default function Tutorials() {
                   Expand a course to see every module in order — like TutorialsPoint or JavaPoint. Each module has 20 sections with diagrams, shell commands, code, and quizzes.
                 </p>
                 {filteredCourses.map((course, i) => (
-                  <CourseTrack key={course.course_slug} course={course} defaultOpen={i === 0 && !topicParam} />
+                  <CourseTrack key={course.course_slug} course={course} defaultOpen={Boolean(courseParam) || (i === 0 && !topicParam)} />
                 ))}
               </div>
             ) : filtered.length > 0 ? (

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   ArrowLeft, ArrowRight, ArrowUp, RefreshCw, Search, Folder, FileText, HardDrive,
-  Disc, Network, Star, Monitor, Download, Image, Music, Video, FolderOpen, Scissors, Copy, Clipboard, Trash2, Plus,
+  Disc, Network, Star, Monitor, Download, Image, FolderOpen, Scissors, Copy, Clipboard, Trash2, Plus,
 } from 'lucide-react'
 import { useOS, normPath } from '../store'
 import { fmtBytes, useCtxMenu, Dialog, Tabs } from '../ui'
@@ -176,9 +176,9 @@ export default function FileExplorer({ win }) {
 
       {/* address bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderBottom: '1px solid #e2e2e2' }}>
-        <button className="winos-btn" style={{ padding: '4px 7px' }} onClick={back} disabled={hi === 0}><ArrowLeft size={15} /></button>
-        <button className="winos-btn" style={{ padding: '4px 7px' }} onClick={fwd} disabled={hi >= history.length - 1}><ArrowRight size={15} /></button>
-        <button className="winos-btn" style={{ padding: '4px 7px' }} onClick={up}><ArrowUp size={15} /></button>
+        <button type="button" className="winos-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" style={{ padding: '4px 7px' }} onClick={back} disabled={hi === 0} aria-label="Back"><ArrowLeft size={15} /></button>
+        <button type="button" className="winos-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" style={{ padding: '4px 7px' }} onClick={fwd} disabled={hi >= history.length - 1} aria-label="Forward"><ArrowRight size={15} /></button>
+        <button type="button" className="winos-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" style={{ padding: '4px 7px' }} onClick={up} aria-label="Up one folder"><ArrowUp size={15} /></button>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', border: '1px solid #c8c8c8', borderRadius: 4, padding: '3px 8px', background: '#fff', minWidth: 0, overflow: 'hidden' }}>
           {breadcrumb.map((b, i) => (
             <span key={i} style={{ display: 'inline-flex', alignItems: 'center' }}>

@@ -15,13 +15,10 @@ description: 'CONTEXT: AI Infra Engineering — after MAAS deployed an ImageDev 
   the node, the NVIDIA device-plugin DaemonSet is CrashLooping on a broken image tag. Nodes do not advertise
   nvidia.com/gpu, so inference pods stay Pending.
 
-
   ENVIRONMENT: Lab Terminal (kubectl + nvidia-smi) + Bare Metal + Datacenter twin. Cross-tech consoles
   for MAAS and Datacenter available from the lab strip.
 
-
   SYMPTOM: nvidia-device-plugin pods CrashLoopBackOff; kubectl custom-columns show GPU as <none>.
-
 
   OBJECTIVE: Confirm host GPUs with nvidia-smi; repair/apply a healthy NVIDIA device-plugin DaemonSet;
   verify allocatable nvidia.com/gpu is non-zero.'

@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
-import { scenarioApi } from '../../api/scenarios'
 import {
   CreditCard, IndianRupee, DollarSign, Users, Search, Download,
-  Filter, X, RefreshCw, BadgeCheck, XCircle, ChevronRight, ChevronLeft,
-  Mail, Send, WrenchIcon, BarChart3, ArrowLeft, Clock, CheckCircle,
+  X, BadgeCheck, XCircle, ChevronRight,
+  Mail, Send, WrenchIcon, BarChart3, ArrowLeft, Clock,
   TrendingUp, Layers, User as UserIcon, Save, AlertTriangle, Cpu,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -91,7 +90,13 @@ function TechDetailView({ tech, onBack }) {
         scheduled_end: m.maintenance_scheduled_end ? m.maintenance_scheduled_end.slice(0, 16) : '',
       })
       setMaintenanceLoaded(true)
-    } catch {}
+    } catch (err) {
+      // maintenanceLoaded stays false so the next tab switch retries. Tell the
+      // operator: a silent failure leaves the form at its empty defaults, which
+      // reads as "maintenance is off" for a tech that may be in maintenance.
+      console.error('[fixitlab] tech maintenance load failed:', err)
+      toast.error('Failed to load maintenance settings')
+    }
   }
 
   const handleSubTabChange = (tab) => {
@@ -132,7 +137,7 @@ function TechDetailView({ tech, onBack }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-2 rounded-lg text-surface-400 hover:text-white hover:bg-surface-800 transition-all">
+        <button type="button" onClick={onBack} aria-label="Back to subscriptions" className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-surface-400 hover:text-white hover:bg-surface-800 transition-all">
           <ArrowLeft size={18} />
         </button>
         <div className={`w-9 h-9 rounded-xl bg-accent-${tech.color || 'cyan'}/10 flex items-center justify-center`}>
@@ -364,7 +369,6 @@ export default function AdminSubscriptions() {
 
   // Legacy logs state
   const [logs, setLogs] = useState([])
-  const [interviewLogs, setInterviewLogs] = useState([])
   const [stats, setStats] = useState({ total_revenue: 0, active_count: 0, total_count: 0 })
   const [logsLoading, setLogsLoading] = useState(false)
   const [logsLoaded, setLogsLoaded] = useState(false)
@@ -411,7 +415,6 @@ export default function AdminSubscriptions() {
       if (dateTo) params.set('date_to', dateTo)
       const data = await adminApi.getSubscriptionLogs(Object.fromEntries(params))
       setLogs(data.logs || [])
-      setInterviewLogs(data.interview_logs || [])
       setStats({
         total_revenue: data.total_revenue || 0,
         active_count: data.active_count || 0,
@@ -435,7 +438,12 @@ export default function AdminSubscriptions() {
         scheduled_end: m.maintenance_scheduled_end ? m.maintenance_scheduled_end.slice(0, 16) : '',
       })
       setInterviewMaintenanceLoaded(true)
-    } catch {}
+    } catch (err) {
+      // Same reasoning as loadMaintenance above — an empty form must not be
+      // mistaken for "interview maintenance is off".
+      console.error('[fixitlab] interview maintenance load failed:', err)
+      toast.error('Failed to load interview maintenance settings')
+    }
   }
 
   const saveInterviewMaintenance = async () => {

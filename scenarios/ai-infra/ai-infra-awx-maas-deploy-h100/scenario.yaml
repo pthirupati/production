@@ -15,13 +15,10 @@ description: 'CONTEXT: Bare Metal / AWX integration — Automation Controller mu
   of Ready H100 nodes with the ImageDev custom boot resource. AI Infra Engineering owns AWX↔MAAS
   job templates for fleet bring-up (not the GPU app course).
 
-
   ENVIRONMENT: AWX console + Bare Metal (MAAS) + Lab Terminal. Companion chrome (Hints/Check/+30m/Stop)
   must stay usable while AWX is open.
 
-
   SYMPTOM: Job template exists but canary stays New/Ready without Deploy; custom/h100-jammy unused.
-
 
   OBJECTIVE: Launch the MAAS deploy job from AWX; confirm MAAS shows Deploying/Deployed with the
   custom image; verify on Lab Terminal; FIXED-OK.'

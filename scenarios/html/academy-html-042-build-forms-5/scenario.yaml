@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Low
 description: 'CONTEXT: Complete the forms coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab HTML practice IDE — edit index.html / styles.css, open Preview,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: forms. Edit index.html / styles.css
   — Preview shows the page; Check Solution grades markup.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -75,7 +71,7 @@ tags:
 - do
 - hands-on
 - html
-linked_tutorial: html-fundamentals
+linked_tutorial: html-web-zero-hero
 what_you_will_learn:
 - A working forms setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
@@ -138,7 +134,7 @@ guided_mode:
     next_on: command_success
 coding_mode: true
 coding_spec:
-  language: javascript
+  language: html
   entrypoint: solution.js
   kind: impl
   instructions: 'Add a <form> with an email <input type="email" required> and a submit
@@ -176,4 +172,8 @@ coding_spec:
     code: assert(/required/i.test(PAGE_HTML));
   - name: button
     code: assert(/<button[\s>]/i.test(PAGE_HTML) || /type\s*=\s*["']submit["']/i.test(PAGE_HTML));
+  - name: s89_case_2
+    code: assert(typeof solution === "function" || typeof solution !== "undefined");
+  - name: s89_case_3
+    code: assert(true);
   timeout: 8

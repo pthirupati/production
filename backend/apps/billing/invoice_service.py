@@ -1,16 +1,42 @@
 """Subscription invoice generation and retrieval."""
 
+import logging
+
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils import timezone
 
 from .models import PaymentTransaction, SubscriptionInvoice
 
+logger = logging.getLogger(__name__)
+
 
 def _invoice_number(transaction):
-    ts = timezone.now().strftime("%Y%m%d")
-    short = str(transaction.id).replace("-", "")[:8].upper()
-    return f"INV-{ts}-{short}"
+    """Next number in the gapless per-financial-year series (audit Z1-13).
+
+    Was ``INV-{today}-{8 hex of the row UUID}``: random rather than consecutive,
+    and 21 characters against CGST Rule 46(b)'s 16-character ceiling. Uniqueness
+    was satisfied; nothing else about the rule was.
+
+    Falls back to the old random form only if the allocator itself fails — a
+    payment that succeeded must still produce *an* invoice. That is a
+    non-conforming number, so it is logged at ERROR rather than passed over: it
+    means the series needs manual reconciliation.
+    """
+    from .models import InvoiceSeries
+
+    try:
+        return InvoiceSeries.allocate(moment=transaction.verified_at or timezone.now())
+    except Exception as exc:
+        logger.error(
+            "Invoice series allocation failed for transaction %s (%s) — falling back "
+            "to a non-conforming random number; this invoice breaks the gapless "
+            "series and needs manual reconciliation",
+            transaction.id, exc,
+        )
+        ts = timezone.now().strftime("%Y%m%d")
+        short = str(transaction.id).replace("-", "")[:8].upper()
+        return f"INV-{ts}-{short}"
 
 
 def create_invoice_for_transaction(transaction: PaymentTransaction) -> SubscriptionInvoice | None:

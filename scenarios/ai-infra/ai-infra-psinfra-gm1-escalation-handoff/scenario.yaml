@@ -17,15 +17,12 @@ description: 'CONTEXT: PSINFRA opened a Sev2 for the GM1 facility — a GPU node
   re-run the fleet job once the node is back. Nothing moves until each team closes its part of
   the handoff. AI Infra Engineering owns this cross-team PSINFRA escalation path.
 
-
   ENVIRONMENT: Datacenter twin (GM1 facility) + Bare Metal (MAAS) + AWX + Packer + Lab Terminal.
   Lab chrome (Hints/Check/+30m/Stop) stays usable across every companion console.
-
 
   SYMPTOM / STARTING STATE: RMA ticket open in Datacenter twin awaiting FRU swap; MAAS shows the
   node stuck pre-Deploy; the ImageDev boot resource is out of date; the AWX fleet job has not
   been re-run since the outage started.
-
 
   OBJECTIVE: In the Datacenter twin, badge in and complete the FRU swap to close the DCOps leg;
   in Packer, republish the current image to MAAS to close the ImageDev leg; in Bare Metal,

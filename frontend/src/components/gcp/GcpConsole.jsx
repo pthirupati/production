@@ -9,8 +9,7 @@ import {
 import { simPanelRoot } from '../../utils/simLayout'
 import {
   SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession,
-  GlobalSearch, indexGcpState,
-} from '../sim/shared'
+  GlobalSearch, indexGcpState, SimLoginGateCard } from '../sim/shared'
 import CloudShellPanel from '../lab/CloudShellPanel'
 import { renderGcpV2Page } from './GcpV2Panels'
 import '../../styles/sim-products.css'
@@ -24,6 +23,13 @@ import './gcp.css'
 const GCP_LAB_USER = 'admin@fixitlab.io'
 const GCP_LAB_PASS = 'lab123'
 const ACCENT = '#4285f4'
+
+// Stable fallbacks for absent server state. A bare `|| {}` mints a new identity
+// every render, so the `indexGcpState(st)` memo below re-indexed the entire
+// console state on every pass. Frozen so an accidental in-place mutation throws
+// rather than silently corrupting the shared fallback.
+const EMPTY_OBJ = Object.freeze({})
+const EMPTY_ARR = Object.freeze([])
 
 const SIDEBAR = [
   { key: 'overview', label: 'Overview', icon: Cloud },
@@ -107,20 +113,20 @@ export default function GcpConsole({
   const [vmName, setVmName] = useState('lab-vm')
   const [vmMachineType, setVmMachineType] = useState('e2-medium')
 
-  const st = state?.state || {}
+  const st = state?.state || EMPTY_OBJ
   const loggedIn = st?.session?.logged_in
-  const goal = st?.goal || {}
-  const broken = st?.broken || {}
-  const instances = st.instances || []
-  const firewallRules = st.firewall_rules || []
-  const disks = st.disks || []
-  const networks = st.networks || []
-  const buckets = st.buckets || []
-  const iamBindings = st.iam_bindings || []
-  const operations = st.operations || st.events || []
-  const routes = st.routes || []
-  const forwardingRules = st.forwarding_rules || []
-  const snapshots = st.snapshots || []
+  const goal = st?.goal || EMPTY_OBJ
+  const broken = st?.broken || EMPTY_OBJ
+  const instances = st.instances || EMPTY_ARR
+  const firewallRules = st.firewall_rules || EMPTY_ARR
+  const disks = st.disks || EMPTY_ARR
+  const networks = st.networks || EMPTY_ARR
+  const buckets = st.buckets || EMPTY_ARR
+  const iamBindings = st.iam_bindings || EMPTY_ARR
+  const operations = st.operations || st.events || EMPTY_ARR
+  const routes = st.routes || EMPTY_ARR
+  const forwardingRules = st.forwarding_rules || EMPTY_ARR
+  const snapshots = st.snapshots || EMPTY_ARR
   const searchServices = useMemo(
     () => SIDEBAR.map((s) => ({ key: s.key, label: s.label, keywords: s.key })),
     [],
@@ -185,7 +191,7 @@ export default function GcpConsole({
       <div className={simPanelRoot(embedded, 'bg-[#0d1117]')}>
         <LabChromeBar title="Google Cloud" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <SimLoginGateCard title="Sign in to Google Cloud" onClose={onExit} className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold flex items-center gap-2" style={{ background: ACCENT }}>
               <Cloud size={18} /> Sign in to Google Cloud
             </div>
@@ -218,7 +224,7 @@ export default function GcpConsole({
                 Training credentials: <span className="font-mono text-slate-700">{GCP_LAB_USER}</span> / <span className="font-mono text-slate-700">{GCP_LAB_PASS}</span>
               </p>
             </form>
-          </div>
+          </SimLoginGateCard>
         </div>
       </div>
     )

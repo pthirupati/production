@@ -399,6 +399,60 @@ class QuestionGeneratorUnitTest(TestCase):
         b = generate_question(**kwargs)
         self.assertEqual(a.text, b.text, "same state must yield the same question (free + deterministic)")
 
+    def test_seed_is_stable_across_interpreter_processes(self):
+        """The seed must survive a *new interpreter*, not just a new call.
+
+        ``_seed_from`` originally used Python's built-in ``hash()``, which is
+        salted per-process by PYTHONHASHSEED. In-process determinism tests (the
+        one above) pass happily under that bug because both calls share one
+        salt; only a fresh interpreter exposes it. Audit §I8.
+
+        We spawn two children with *explicitly different* PYTHONHASHSEED values
+        rather than letting them inherit the parent's. If the runner is ever
+        started with a fixed PYTHONHASHSEED (CI sometimes pins it for
+        reproducibility), inherited children would share one salt and the test
+        would silently prove nothing even with ``hash()`` restored.
+        """
+        import json as _json
+        import os
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        # apps/interviews/tests/<this file> -> backend/
+        backend_root = Path(__file__).resolve().parents[3]
+        probe = (
+            "import sys, json;"
+            f"sys.path.insert(0, {str(backend_root)!r});"
+            "from apps.interviews.services.question_generator import _seed_from;"
+            'print(json.dumps([_seed_from([{"role": "candidate", "content": "disk full on /var"}], 3),'
+            ' _seed_from([], 0)]))'
+        )
+
+        seeds = []
+        for hash_seed in ("1", "9999"):
+            env = dict(os.environ, PYTHONHASHSEED=hash_seed)
+            # Avoid pulling in the parent's Django settings module; the
+            # generator is a pure module and imports without django.setup().
+            env.pop("DJANGO_SETTINGS_MODULE", None)
+            out = subprocess.run(
+                [sys.executable, "-c", probe],
+                capture_output=True, text=True, timeout=120, env=env, cwd=str(backend_root),
+            )
+            self.assertEqual(
+                out.returncode, 0,
+                f"seed probe failed under PYTHONHASHSEED={hash_seed}: {out.stderr[-2000:]}",
+            )
+            seeds.append(_json.loads(out.stdout.strip().splitlines()[-1]))
+
+        self.assertEqual(
+            seeds[0], seeds[1],
+            "_seed_from must not depend on PYTHONHASHSEED — use blake2b, not hash()",
+        )
+        # Pinned blake2b values: catches a silent switch to any other salted or
+        # version-dependent digest that would still be self-consistent above.
+        self.assertEqual(seeds[0], [1115959761, 262550522])
+
     def test_generation_avoids_repeating_asked_questions(self):
         snap = {"primary_technology_name": "Linux"}
         asked: list[str] = []

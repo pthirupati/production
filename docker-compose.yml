@@ -21,6 +21,11 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend:
     build: ./frontend
@@ -29,6 +34,11 @@ services:
     networks:
       - fixitlab_net
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   backend:
     build: ./backend
@@ -56,6 +66,11 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   celery_worker:
     build: ./backend
@@ -82,6 +97,11 @@ services:
         limits:
           memory: 1G
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   celery_provisioning:
     build: ./backend
@@ -108,6 +128,11 @@ services:
         limits:
           memory: 1G
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   celery_maintenance:
     build: ./backend
@@ -134,6 +159,11 @@ services:
         limits:
           memory: 512M
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   celery_beat:
     build: ./backend
@@ -148,6 +178,11 @@ services:
     networks:
       - fixitlab_net
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   database:
     build: ./database
@@ -165,11 +200,16 @@ services:
       retries: 5
       start_period: 10s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:7-alpine
     container_name: fixitlab_redis
-    command: redis-server --maxmemory 1gb --maxmemory-policy allkeys-lru --tcp-backlog 511 --timeout 300
+    command: redis-server --maxmemory 2gb --maxmemory-policy volatile-lru --tcp-backlog 511 --timeout 300
     networks:
       - fixitlab_net
     volumes:
@@ -180,6 +220,11 @@ services:
       timeout: 3s
       retries: 3
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -195,14 +240,26 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   mailhog:
-    image: mailhog/mailhog:latest
+    # Dev-only mail catcher, but pinned for the same reason as the rest: a rebuilt
+    # dev env should not silently differ from the one a bug was reproduced on.
+    image: mailhog/mailhog:latest@sha256:8d76a3d4ffa32a3661311944007a415332c4bb855657f4f6c57996405c009bea
     container_name: fixitlab_mailhog
     # No ports exposed externally — accessible only via /mailbox/ through gateway (admin-only)
     networks:
       - fixitlab_net
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   fixitlab_db_data:

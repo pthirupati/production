@@ -6,6 +6,7 @@ import { Trophy, Star, Clock, Crown, Medal, Server, CalendarDays, Infinity as In
 import Pagination from '../components/Pagination'
 import { PageHeader, FixitPanel } from '../components/design'
 import { SkeletonTable } from '../components/Skeleton'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 const PAGE_SIZE = 20
 
@@ -142,6 +143,7 @@ function RankCell({ rank }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function Leaderboard() {
+  usePageTitle('Leaderboard', 'Top performers across FixitLab labs, ranked by scenarios solved and objectives graded.')
   const { user } = useAuthStore()
   const getTechnologies = useDataStore(s => s.getTechnologies)
   const [data, setData] = useState({ leaderboard: [], user_rank: null })
@@ -346,7 +348,6 @@ export default function Leaderboard() {
                   <tbody>
                     {tableRows.map((entry, i) => {
                       const isUser = entry.username === user?.username
-                      const isTopThree = entry.rank <= 3
 
                       return (
                         <tr

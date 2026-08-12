@@ -1,6 +1,6 @@
 # health-check.yml — Production heartbeat every 30 minutes
 # Checks: /api/health/ HTTP 200, key public endpoints, critical API contract
-# Alerts: Slack + GitHub issue on repeated failure
+# Alerts: opens a GitHub issue on repeated failure
 name: Health Check
 
 on:
@@ -97,6 +97,7 @@ jobs:
   alert:
     name: Alert on failure
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [health]
     if: failure()
     permissions:
@@ -105,15 +106,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Slack alert
-        uses: ./.github/actions/notify-slack
-        with:
-          status: failure
-          workflow: "Health Check — PRODUCTION DOWN"
-          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-
       - name: Create GitHub issue on repeated failure
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             const title = `[ALERT] Production health check failed — ${new Date().toISOString()}`;
@@ -159,13 +153,14 @@ jobs:
   resolve:
     name: Resolve alert issue on recovery
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [health]
     if: success()
     permissions:
       contents: read
       issues: write
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             try {

@@ -6,7 +6,7 @@ import { useDataStore } from '../store/dataStore'
 import {
   Search, CheckCircle2, Clock, Wrench, Play, Skull,
   BookmarkPlus, Bookmark, Filter, X, Hash, Trophy, Lock,
-  ChevronRight, Zap, Target, AlertTriangle,
+  ChevronRight, Zap, Target, AlertTriangle, Flame,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Pagination from '../components/Pagination'
@@ -14,6 +14,7 @@ import StickyPageToolbar from '../components/StickyPageToolbar'
 import { useScrollHideToolbar } from '../hooks/useScrollHideToolbar'
 import { PageHeader } from '../components/design'
 import { ScenarioStatsChip } from '../components/engagement'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 const typeConfig = {
   fix:  { icon: Wrench,  label: 'Fix',  color: 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20',    border: 'border-l-accent-cyan',   glow: 'hover:shadow-[0_0_20px_rgba(6,182,212,0.06)]' },
@@ -21,21 +22,31 @@ const typeConfig = {
   hack: { icon: Skull,   label: 'Hack', color: 'bg-accent-red/10 text-accent-red border-accent-red/20',         border: 'border-l-accent-red',    glow: 'hover:shadow-[0_0_20px_rgba(239,68,68,0.06)]' },
 }
 
+// 'expert' is the fourth tier above hard. It has no badge-* utility of its own —
+// index.css only defines easy/medium/hard — so it composes the same badge shape
+// inline from purple accents rather than rendering an unstyled chip.
+const EXPERT_BADGE = 'badge bg-accent-purple/10 text-accent-purple border border-accent-purple/20'
+
 const difficultyConfig = {
   easy:   { label: 'Easy',   badge: 'badge-easy',   dot: 'bg-accent-green', icon: Zap,           textColor: 'text-accent-green' },
   medium: { label: 'Medium', badge: 'badge-medium',  dot: 'bg-accent-amber', icon: Target,        textColor: 'text-accent-amber' },
   hard:   { label: 'Hard',   badge: 'badge-hard',    dot: 'bg-accent-red',   icon: AlertTriangle, textColor: 'text-accent-red'   },
+  expert: { label: 'Expert', badge: EXPERT_BADGE,    dot: 'bg-accent-purple', icon: Flame,        textColor: 'text-accent-purple' },
 }
 
+// Difficulty tiers, hardest last. Every difficulty-keyed map below derives from
+// this so a fifth tier can never again be added to the model and silently vanish
+// from the listing (the old `grouped` map dropped unknown difficulties outright).
+const DIFFICULTY_ORDER = Object.keys(difficultyConfig)
+
 function DifficultyDots({ difficulty }) {
-  const levels = { easy: 1, medium: 2, hard: 3 }
-  const count = levels[difficulty] || 1
-  const colorMap = { easy: 'bg-accent-green', medium: 'bg-accent-amber', hard: 'bg-accent-red' }
-  const color = colorMap[difficulty] || 'bg-surface-600'
+  // Unknown difficulty keeps the old single grey dot rather than rendering none.
+  const count = Math.max(1, DIFFICULTY_ORDER.indexOf(difficulty) + 1)
+  const color = difficultyConfig[difficulty]?.dot || 'bg-surface-600'
   return (
     <span className="flex items-center gap-0.5 shrink-0">
-      {[1, 2, 3].map(i => (
-        <span key={i} className={`w-1.5 h-1.5 rounded-full ${i <= count ? color : 'bg-surface-700'}`} />
+      {DIFFICULTY_ORDER.map((_, i) => (
+        <span key={i} className={`w-1.5 h-1.5 rounded-full ${i < count ? color : 'bg-surface-700'}`} />
       ))}
     </span>
   )
@@ -229,23 +240,37 @@ function EmptyState({ hasFilters, onClear }) {
       <p className="text-surface-400 text-sm max-w-xs mb-6">
         {hasFilters
           ? 'Your current filters returned no results. Try adjusting or clearing them.'
-          : 'No scenarios are available yet. Check back soon!'}
+          : 'The catalog is empty right now. Browse technologies to see what’s coming, or try a guided tutorial.'}
       </p>
-      {hasFilters && (
+      {/* An empty state with no exit is a dead end. With filters the fix is to
+          clear them; without filters the catalog itself is empty, so send the
+          user somewhere that still has content rather than "check back soon". */}
+      {hasFilters ? (
         <button onClick={onClear} className="btn-secondary flex items-center gap-2 text-sm">
           <X size={14} /> Clear filters
         </button>
+      ) : (
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link to="/technologies" className="btn-primary flex items-center gap-2 text-sm">
+            Browse technologies
+          </Link>
+          <Link to="/tutorials" className="btn-secondary flex items-center gap-2 text-sm">
+            Guided tutorials
+          </Link>
+        </div>
       )}
     </div>
   )
 }
 
 export default function Scenarios() {
+  usePageTitle('Scenarios', 'Browse hands-on troubleshooting scenarios across 40+ technologies — each one a real broken system with graded objectives.')
   const [searchParams, setSearchParams] = useSearchParams()
   const { isAuthenticated } = useAuthStore()
   const getTechnologies = useDataStore(s => s.getTechnologies)
   const [scenarios, setScenarios] = useState([])
   const [totalCount, setTotalCount] = useState(0)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [technologies, setTechnologies] = useState([])
   const [tags, setTags] = useState([])
   const [loading, setLoading] = useState(true)
@@ -261,6 +286,10 @@ export default function Scenarios() {
     category:    searchParams.get('category')    || '',
     tag:         searchParams.get('tag')         || '',
     search:      searchParams.get('search')      || '',
+    // Backend `?free=1` (scenarios.js already forwards it). UI was the missing half of §X7b.
+    free:        searchParams.get('free')        || '',
+    completed:   searchParams.get('completed')   || '',
+    gradeable:   searchParams.get('gradeable')   || '',
   }
 
   // The `technology` URL param can be either a numeric PK (from the filter
@@ -295,7 +324,7 @@ export default function Scenarios() {
 
   const clearFilters = () => setSearchParams({})
   const hasFilters = Object.values(filters).some(Boolean)
-  const activeFilterCount = [filters.technology, filters.difficulty, filters.type, filters.category, filters.tag].filter(Boolean).length
+  const activeFilterCount = [filters.technology, filters.difficulty, filters.type, filters.category, filters.tag, filters.free, filters.completed, filters.gradeable].filter(Boolean).length
 
   // The active technology filter may be stored as an id (chips) or a slug
   // (links from a technology page). Match on either so the chip highlights.
@@ -311,6 +340,7 @@ export default function Scenarios() {
     setLoading(true)
     scenarioApi.getScenarios({ ...buildQueryFilters(), page: currentPage })
       .then(data => {
+        setLoadFailed(false)
         if (data?.results) {
           setScenarios(data.results)
           setTotalCount(data.count || data.results.length)
@@ -322,7 +352,15 @@ export default function Scenarios() {
           setTotalCount(0)
         }
       })
-      .catch(console.error)
+      // A failed fetch previously fell through to the empty state, which now
+      // carries a "browse technologies" CTA — that would permanently disguise an
+      // outage as an empty catalog. Track it so the error branch wins instead.
+      .catch(err => {
+        console.error(err)
+        setLoadFailed(true)
+        setScenarios([])
+        setTotalCount(0)
+      })
       .finally(() => setLoading(false))
   }, [searchParams.toString()])
 
@@ -339,10 +377,12 @@ export default function Scenarios() {
     } catch { toast.error('Failed') }
   }
 
-  // Group by difficulty for section layout
-  const grouped = { easy: [], medium: [], hard: [] }
+  // Group by difficulty for section layout. Built from DIFFICULTY_ORDER so a new
+  // tier shows up automatically; scenarios with a difficulty we don't know about
+  // fall into the easiest bucket instead of disappearing from the page.
+  const grouped = Object.fromEntries(DIFFICULTY_ORDER.map(k => [k, []]))
   scenarios.forEach(s => {
-    if (grouped[s.difficulty]) grouped[s.difficulty].push(s)
+    (grouped[s.difficulty] || grouped[DIFFICULTY_ORDER[0]]).push(s)
   })
 
   const { hidden: toolbarHidden, toolbarRef, anchorRef } = useScrollHideToolbar(64)
@@ -459,7 +499,7 @@ export default function Scenarios() {
             </div>
           </div>
 
-          {/* Difficulty + Type */}
+          {/* Difficulty + Type + Access */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <p className="text-[11px] font-semibold text-surface-500 uppercase tracking-widest mb-3">Difficulty</p>
@@ -467,6 +507,7 @@ export default function Scenarios() {
                 {Object.entries(difficultyConfig).map(([key, cfg]) => (
                   <button
                     key={key}
+                    type="button"
                     onClick={() => setFilter('difficulty', filters.difficulty === key ? '' : key)}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                       filters.difficulty === key ? cfg.badge : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
@@ -486,6 +527,7 @@ export default function Scenarios() {
                   return (
                     <button
                       key={key}
+                      type="button"
                       onClick={() => setFilter('type', filters.type === key ? '' : key)}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                         filters.type === key ? cfg.color : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
@@ -498,6 +540,86 @@ export default function Scenarios() {
               </div>
             </div>
           </div>
+
+          <div>
+            <p className="text-[11px] font-semibold text-surface-500 uppercase tracking-widest mb-3">Access</p>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setFilter('free', filters.free === '1' ? '' : '1')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  filters.free === '1'
+                    ? 'bg-accent-green/10 text-accent-green border-accent-green/20'
+                    : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
+                }`}
+              >
+                Free only
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter('free', filters.free === '0' ? '' : '0')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  filters.free === '0'
+                    ? 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20'
+                    : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
+                }`}
+              >
+                Paid only
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter('gradeable', filters.gradeable === '1' ? '' : '1')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  filters.gradeable === '1'
+                    ? 'bg-accent-green/10 text-accent-green border-accent-green/20'
+                    : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
+                }`}
+              >
+                Gradeable
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter('gradeable', filters.gradeable === '0' ? '' : '0')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  filters.gradeable === '0'
+                    ? 'bg-accent-amber/10 text-accent-amber border-accent-amber/20'
+                    : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
+                }`}
+              >
+                Ungradeable
+              </button>
+            </div>
+          </div>
+
+          {isAuthenticated && (
+            <div>
+              <p className="text-[11px] font-semibold text-surface-500 uppercase tracking-widest mb-3">Progress</p>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setFilter('completed', filters.completed === '1' ? '' : '1')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    filters.completed === '1'
+                      ? 'bg-accent-green/10 text-accent-green border-accent-green/20'
+                      : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
+                  }`}
+                >
+                  Solved
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilter('completed', filters.completed === '0' ? '' : '0')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    filters.completed === '0'
+                      ? 'bg-accent-amber/10 text-accent-amber border-accent-amber/20'
+                      : 'bg-surface-800 text-surface-400 hover:text-white border-surface-700'
+                  }`}
+                >
+                  Unsolved
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Tags */}
           {tags.length > 0 && (
@@ -546,7 +668,23 @@ export default function Scenarios() {
           ))}
         </div>
       ) : scenarios.length === 0 ? (
-        <EmptyState hasFilters={hasFilters} onClear={clearFilters} />
+        loadFailed ? (
+          <div
+            data-testid="scenarios-load-error"
+            className="glass-card p-16 flex flex-col items-center justify-center text-center animate-fade-in"
+          >
+            <AlertTriangle size={32} className="text-accent-red mb-4" />
+            <h3 className="text-lg font-bold text-white mb-2">Couldn&apos;t load scenarios</h3>
+            <p className="text-surface-400 text-sm max-w-xs mb-6">
+              The catalog isn&apos;t empty — this request failed. Try again in a moment.
+            </p>
+            <button onClick={() => window.location.reload()} className="btn-secondary text-sm">
+              Retry
+            </button>
+          </div>
+        ) : (
+          <EmptyState hasFilters={hasFilters} onClear={clearFilters} />
+        )
       ) : (
         <div className="space-y-8 animate-fade-in">
           {Object.entries(grouped).map(([difficulty, items]) => {

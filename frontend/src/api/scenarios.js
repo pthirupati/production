@@ -20,7 +20,9 @@ export const scenarioApi = {
     if (filters.category) params.append('category', filters.category)
     if (filters.tag) params.append('tag', filters.tag)
     if (filters.search) params.append('search', filters.search)
-    if (filters.free) params.append('free', '1')
+    if (filters.free === '1' || filters.free === '0') params.append('free', filters.free)
+    if (filters.completed === '1' || filters.completed === '0') params.append('completed', filters.completed)
+    if (filters.gradeable === '1' || filters.gradeable === '0') params.append('gradeable', filters.gradeable)
     if (filters.page) params.append('page', filters.page)
     const { data } = await api.get(`/scenarios/?${params}`)
     return data

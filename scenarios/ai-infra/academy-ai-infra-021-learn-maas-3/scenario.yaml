@@ -15,13 +15,10 @@ description: 'CONTEXT: Bare Metal / AI Infra — before commissioning more nodes
   to sanity-check the two settings that most often break PXE at volume: DHCP on the PXE VLAN and the global
   NTP/commissioning-distro Settings.
 
-
   ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin.
-
 
   SYMPTOM / STARTING STATE: The PXE VLAN and global Settings have not been reviewed since initial setup;
   DHCP state and the NTP/commissioning distro values need to be confirmed before onboarding new nodes.
-
 
   OBJECTIVE: Open Bare Metal → Subnets/VLANs and confirm DHCP is enabled on the PXE VLAN; open Settings
   and confirm the NTP servers are reachable and the commissioning distro series matches the imported image;

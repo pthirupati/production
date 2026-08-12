@@ -1,0 +1,112 @@
+# FixitLab Certified Security Engineer track definition.
+#
+# A track is a weighted, ordered VIEW over scenarios that already exist in the
+# library — the `scenarios:` lists below reference existing FixitLab scenario
+# slugs grouped by skill area. Weights are relative and sum to 100.
+#
+# A FixitLab-original certification: objectives follow the shape of the
+# scenarios/security/ library — host and access hardening, privilege
+# escalation, network and service exposure, cryptography and TLS, intrusion
+# detection and response, and application/container security. Slugs are drawn
+# from the hand-authored security scenarios (not the academy set) because they
+# carry scenario-specific fault presets and graders.
+
+track:
+  slug: linux-security-engineer
+  code: FL-SEC
+  name: FixitLab Certified Security Engineer
+  vendor: FixitLab
+  description: >
+    Hands-on preparation for defensive security work on Linux systems. Every
+    objective maps to live break-fix labs across access control and hardening,
+    privilege escalation, service exposure, TLS and cryptography, intrusion
+    detection and incident response, and container and application security.
+  technology_slug: security
+  exam_duration_minutes: 150
+  passing_score: 72
+  validity_months: 24
+  order: 9
+
+objectives:
+  - code: fl-sec.access-control
+    title: Enforce access control and authentication policy
+    weight: 18
+    order: 1
+    scenarios:
+      - ssh-root-login-enabled
+      - weak-password-policy
+      - pam-auth-broken
+      - sudo-misconfiguration
+      - sudoers-misconfigured
+      - sudo-nopasswd-all
+
+  - code: fl-sec.privilege-escalation
+    title: Find and close privilege-escalation paths
+    weight: 16
+    order: 2
+    scenarios:
+      - suid-bit-unauthorized
+      - suid-privilege-escalation
+      - world-writable-files
+      - cron-writable-by-all
+      - file-permissions-broken
+      - kernel-module-unsigned
+
+  - code: fl-sec.host-hardening
+    title: Harden the host and its kernel
+    weight: 14
+    order: 3
+    scenarios:
+      - security-linux-ssh-cis-hardening
+      - kernel-exploit-mitigate
+      - selinux-blocking-nginx
+      - harden-firewalld-zone-do
+      - iptables-default-accept
+
+  - code: fl-sec.service-exposure
+    title: Reduce network and service exposure
+    weight: 14
+    order: 4
+    scenarios:
+      - redis-no-auth
+      - mysql-remote-root
+      - ldap-anonymous-bind
+      - snmp-community-string
+      - apache-directory-listing
+      - nginx-server-tokens
+
+  - code: fl-sec.crypto-tls
+    title: Operate TLS and cryptography correctly
+    weight: 12
+    order: 5
+    scenarios:
+      - ssl-cert-expired
+      - openssl-cert-revoked
+      - openssl-heartbleed
+      - crypto-weak-algorithm
+
+  - code: fl-sec.detection-response
+    title: Detect intrusions and respond to incidents
+    weight: 16
+    order: 6
+    scenarios:
+      - rootkit-detection
+      - file-integrity-tripwire
+      - audit-log-cleared
+      - log-tampering-detect
+      - snort-ids-alert
+      - hids-alert-review
+      - brute-force-ssh
+      - ssh-brute-force
+
+  - code: fl-sec.application-container
+    title: Secure applications and container workloads
+    weight: 10
+    order: 7
+    scenarios:
+      - docker-socket-exposed
+      - docker-escape-attempt
+      - security-java-log4shell-jndi-lookup
+      - cve-2021-44228-detection
+      - xss-csp-header
+      - buffer-overflow-detect

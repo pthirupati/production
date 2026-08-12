@@ -1,33 +1,36 @@
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import PublicLayout from '../components/layout/PublicLayout'
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
-import api from '../api/client'
+import { useFetch } from '../hooks/useFetch'
 import { Mail, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react'
 
 export default function Unsubscribe() {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token')
-  const [status, setStatus] = useState('loading')
-  const [message, setMessage] = useState('')
+  const url = token
+    ? `/notifications/unsubscribe/?token=${encodeURIComponent(token)}`
+    : null
+  const { data, loading, error } = useFetch(url, { enabled: Boolean(token) })
 
-  useEffect(() => {
+  const status = useMemo(() => {
+    if (!token) return 'error'
+    if (loading) return 'loading'
+    if (error) return 'error'
+    if (data) return 'success'
+    return 'loading'
+  }, [token, loading, error, data])
+
+  const message = useMemo(() => {
     if (!token) {
-      setStatus('error')
-      setMessage('Missing unsubscribe link. Use the link from your email or update preferences in Profile.')
-      return
+      return 'Missing unsubscribe link. Use the link from your email or update preferences in Profile.'
     }
-    api.get(`/notifications/unsubscribe/?token=${encodeURIComponent(token)}`)
-      .then((res) => {
-        setStatus('success')
-        setMessage(res.data.message || 'You have been unsubscribed from marketing emails.')
-      })
-      .catch((err) => {
-        setStatus('error')
-        setMessage(err.response?.data?.error || 'Could not process unsubscribe request.')
-      })
-  }, [token])
+    if (error) {
+      return error.response?.data?.error || 'Could not process unsubscribe request.'
+    }
+    return data?.message || 'You have been unsubscribed from marketing emails.'
+  }, [token, error, data])
 
   return (
     <PublicLayout>

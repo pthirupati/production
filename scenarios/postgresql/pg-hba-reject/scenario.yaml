@@ -1,3 +1,4 @@
+is_active: true
 title: Fix pg_hba.conf client rejection
 slug: pg-hba-reject
 technology: postgresql
@@ -6,35 +7,28 @@ description: 'CONTEXT: A team operating PostgreSQL has raised a ticket for `Fix 
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline PostgreSQL cluster. The architecture is a single
   lab-primary node exposing psql, pg_hba.conf, roles, and WAL; treat it as the production host for this
   incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Remote app cannot connect after subnet change.
-
 
   OBJECTIVE: Understand the current failure mode affecting Fix pg_hba.conf client rejection; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant psql, pg_hba.conf, roles, and WAL), changing one thing at a time. Check your work
   continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -97,23 +91,65 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: Remote app cannot connect after subnet change.
+  instructions: 'The app subnet moved to 10.20.0.0/16 and pg_hba rules are evaluated top-to-bottom, first
+    match wins. Fix solution(conn) so it returns the effective auth decision for a client IP as the string
+    ''reject'' or ''md5'', using the FIRST rule in `hba` (ordered by line_no) whose cidr contains the
+    address. Return ''reject'' when no rule matches. conn has hba(line_no, cidr, method); use the provided
+    ip_in_cidr(ip, cidr) helper already defined in your file.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn, ip):\n    # BUG: picks any matching rule (and the last one wins), ignoring\
+      \ that\n    # pg_hba stops at the FIRST match by line number.\n    decision = 'reject'\n    for\
+      \ line_no, cidr, method in conn.execute(\"SELECT line_no, cidr, method FROM hba\"):\n        if\
+      \ ip_in_cidr(ip, cidr):\n            decision = method\n    return decision\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert callable(solution)
+  - name: first matching rule wins
+    code: "import sqlite3, ipaddress\ndef ip_in_cidr(ip, cidr):\n    return ipaddress.ip_address(ip) in\
+      \ ipaddress.ip_network(cidr)\ndef _seed(rules):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE hba (line_no INTEGER, cidr TEXT, method TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ hba VALUES (?,?,?)\", rules)\n    return conn\nconn = _seed([(1,'10.20.0.0/16','reject'),(2,'10.20.0.0/16','md5')])\n\
+      assert solution(conn, '10.20.5.7') == 'reject', solution(conn, '10.20.5.7')\n"
+  - name: allowed subnet authenticates
+    code: "import sqlite3, ipaddress\ndef ip_in_cidr(ip, cidr):\n    return ipaddress.ip_address(ip) in\
+      \ ipaddress.ip_network(cidr)\ndef _seed(rules):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE hba (line_no INTEGER, cidr TEXT, method TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ hba VALUES (?,?,?)\", rules)\n    return conn\nconn = _seed([(1,'10.20.0.0/16','md5'),(2,'0.0.0.0/0','reject')])\n\
+      assert solution(conn, '10.20.5.7') == 'md5', solution(conn, '10.20.5.7')\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert callable(solution)
+  - name: no matching rule rejects
+    code: "import sqlite3, ipaddress\ndef ip_in_cidr(ip, cidr):\n    return ipaddress.ip_address(ip) in\
+      \ ipaddress.ip_network(cidr)\ndef _seed(rules):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE hba (line_no INTEGER, cidr TEXT, method TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ hba VALUES (?,?,?)\", rules)\n    return conn\nconn = _seed([(1,'192.168.0.0/16','md5')])\nassert\
+      \ solution(conn, '10.20.5.7') == 'reject', solution(conn, '10.20.5.7')\n"
+  - name: empty ruleset rejects
+    code: "import sqlite3, ipaddress\ndef ip_in_cidr(ip, cidr):\n    return ipaddress.ip_address(ip) in\
+      \ ipaddress.ip_network(cidr)\ndef _seed(rules):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE hba (line_no INTEGER, cidr TEXT, method TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ hba VALUES (?,?,?)\", rules)\n    return conn\nconn = _seed([])\nassert solution(conn, '10.20.5.7')\
+      \ == 'reject', solution(conn, '10.20.5.7')\n"
+  - name: later permissive rule cannot override an earlier reject
+    code: "import sqlite3, ipaddress\ndef ip_in_cidr(ip, cidr):\n    return ipaddress.ip_address(ip) in\
+      \ ipaddress.ip_network(cidr)\ndef _seed(rules):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE hba (line_no INTEGER, cidr TEXT, method TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ hba VALUES (?,?,?)\", rules)\n    return conn\nconn = _seed([(5,'10.20.0.0/16','reject'),(1,'0.0.0.0/0','md5')])\n\
+      assert solution(conn, '10.20.5.7') == 'md5', solution(conn, '10.20.5.7')\n"
+  - name: rule order is by line_no not insert order
+    code: "import sqlite3, ipaddress\ndef ip_in_cidr(ip, cidr):\n    return ipaddress.ip_address(ip) in\
+      \ ipaddress.ip_network(cidr)\ndef _seed(rules):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\"\
+      CREATE TABLE hba (line_no INTEGER, cidr TEXT, method TEXT);\")\n    conn.executemany(\"INSERT INTO\
+      \ hba VALUES (?,?,?)\", rules)\n    return conn\nconn = _seed([(9,'10.0.0.0/8','md5'),(2,'10.20.0.0/16','reject')])\n\
+      assert solution(conn, '10.20.1.1') == 'reject', solution(conn, '10.20.1.1')\n"
   timeout: 8
 summary: Complete the fix pg_hba conf client rejection postgresql lab and verify success with the checker
 estimated_minutes: 20
@@ -124,7 +160,7 @@ tags:
 - fix
 - hands-on
 - postgresql
-linked_tutorial: postgresql-fundamentals
+linked_tutorial: postgresql-dba-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Fix pg_hba.conf client rejection
 - Restore expected service behavior with a minimal, documented change

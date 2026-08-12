@@ -24,6 +24,7 @@ Public API:
 
 from __future__ import annotations
 
+import hashlib
 import random
 import re
 from dataclasses import dataclass, field
@@ -63,6 +64,10 @@ _TOPIC_QUESTIONS: dict[str, dict[int, list[str]]] = {
             "Design pod scheduling so a noisy tenant can't starve a latency-sensitive one on the same nodes.",
             "Your cluster autoscaler won't add nodes during a spike — walk me through every layer you'd check.",
         ],
+        5: [
+            "Design a multi-cluster, multi-region Kubernetes platform for a regulated workload — how do you handle identity, networking, and failover?",
+            "Control plane etcd is corrupted on one of three masters mid-incident — walk me through recovery without losing the cluster or the apps.",
+        ],
     },
     "docker": {
         1: [
@@ -79,6 +84,11 @@ _TOPIC_QUESTIONS: dict[str, dict[int, list[str]]] = {
         ],
         4: [
             "Design an image build+scan+sign pipeline that blocks a vulnerable base image from ever shipping.",
+            "A fleet of hosts suddenly can't pull images and registry auth looks fine — how do you isolate whether it's Docker, the registry, or the network path?",
+        ],
+        5: [
+            "Design a container runtime strategy across bare metal, VMs, and Kubernetes so teams share one image contract without leaking host privileges.",
+            "You inherit a monorepo that builds 200 images nightly and the registry is full of untagged layers — how do you redesign retention, provenance, and rebuilds without breaking prod?",
         ],
     },
     "nginx": {
@@ -93,6 +103,14 @@ _TOPIC_QUESTIONS: dict[str, dict[int, list[str]]] = {
         3: [
             "Set up TLS termination plus mutual TLS to an upstream — what are the failure modes?",
             "Half your 502s correlate with deploys. How do you prove it and fix the handoff?",
+        ],
+        4: [
+            "Design nginx as the edge for blue/green and canary traffic — how do you shift weight safely and abort on bad signals?",
+            "Workers are pegged at 100% CPU while upstreams are idle — walk me through finding whether it's TLS, Lua, buffering, or something else.",
+        ],
+        5: [
+            "Design a globally distributed nginx edge that terminates TLS, enforces WAF rules, and fails over across regions without sticky-session pain.",
+            "A config change that passed canary is now causing intermittent client disconnects only for HTTP/2 — how do you root-cause and roll forward or back?",
         ],
     },
     "linux": {
@@ -110,6 +128,11 @@ _TOPIC_QUESTIONS: dict[str, dict[int, list[str]]] = {
         ],
         4: [
             "A box intermittently freezes for seconds under no obvious load. How do you trace it to the kernel?",
+            "Design a disk and filesystem strategy for a host that must survive sudden 10x log volume without taking the app offline.",
+        ],
+        5: [
+            "A production fleet shows rising tail latency only on cgroup-v2 hosts after a kernel upgrade — how do you prove causality and contain blast radius?",
+            "Design the OS hardening, patching, and rollback story for thousands of Linux hosts so a bad package can't strand the fleet.",
         ],
     },
     "monitoring": {
@@ -125,6 +148,14 @@ _TOPIC_QUESTIONS: dict[str, dict[int, list[str]]] = {
             "Metric cardinality just exploded and Prometheus is OOMing. How do you contain it fast and properly?",
             "Design an alert that pages on user-facing impact, not on a single failing replica.",
         ],
+        4: [
+            "Design an observability stack that survives the region where your primary metrics store lives going dark.",
+            "Error budgets are burning but every individual alert looks green — how do you find the real user-impact signal?",
+        ],
+        5: [
+            "Design SLOs and multi-window burn-rate alerting for a dependency graph of 40 services without paging the whole company.",
+            "Your metrics pipeline is dropping 15% of samples during peak — walk me through proving it, quantifying impact on SLOs, and fixing the path end to end.",
+        ],
     },
     "aws": {
         1: [
@@ -138,6 +169,14 @@ _TOPIC_QUESTIONS: dict[str, dict[int, list[str]]] = {
         3: [
             "Design cross-region failover for a stateful service with an RTO under 5 minutes.",
             "Costs jumped 40% month over month with no traffic change. How do you find the cause?",
+        ],
+        4: [
+            "Design a multi-account AWS landing zone with clear blast-radius boundaries for prod, data, and shared services.",
+            "An EKS control plane is healthy but worker nodes can't pull images after a VPC change — walk me through every layer you'd check.",
+        ],
+        5: [
+            "Design active-active AWS across two regions for a payment API — how do you handle data consistency, DNS, and failed-region drain?",
+            "A compromised IAM role was used for 40 minutes in production — walk me through containment, forensics, and how you'd redesign so it can't happen again.",
         ],
     },
     "terraform": {
@@ -153,6 +192,14 @@ _TOPIC_QUESTIONS: dict[str, dict[int, list[str]]] = {
             "There's drift between state and real infra. Walk me through reconciling it without an outage.",
             "How would you structure Terraform across 50 microservices so teams move independently?",
         ],
+        4: [
+            "Design a Terraform CI workflow that proves plan safety for shared modules without letting every PR touch prod state.",
+            "A terraform apply partially succeeded and left orphaned resources — how do you recover state and infra to a known-good shape?",
+        ],
+        5: [
+            "Design a multi-cloud Terraform platform with per-team autonomy, centralized policy, and a disaster story if the state backend is lost.",
+            "You need to refactor a 10k-resource root module into stacks mid-flight — walk me through migration without dual-writes or downtime.",
+        ],
     },
     "ci_cd": {
         1: [
@@ -165,6 +212,14 @@ _TOPIC_QUESTIONS: dict[str, dict[int, list[str]]] = {
         ],
         3: [
             "Design a deploy pipeline with progressive rollout and an automatic, metric-driven abort.",
+        ],
+        4: [
+            "Design a CI system that runs the right tests for a monorepo change set without becoming a two-hour bottleneck.",
+            "A canary looked green but full rollout spiked errors — how do you redesign promotion gates so that can't slip through again?",
+        ],
+        5: [
+            "Design supply-chain-hardened CI/CD from commit to prod — signing, provenance, policy gates, and emergency hotfix paths.",
+            "Your CD orchestrator is down during an active incident and you still need to ship a one-line fix — walk me through the safe break-glass path and how you audit it later.",
         ],
     },
     "python": {
@@ -179,6 +234,14 @@ _TOPIC_QUESTIONS: dict[str, dict[int, list[str]]] = {
         3: [
             "How do you reason about thread safety and the GIL in a high-throughput Python service?",
         ],
+        4: [
+            "Design a Python service that must process a bursty event stream without dropping messages or OOMing under back-pressure.",
+            "A Django/FastAPI app is fine at 100 RPS and falls apart at 1k — walk me through profiling and the changes you'd make first.",
+        ],
+        5: [
+            "Design a Python platform shared by dozens of teams — packaging, typing, observability, and how you stop one bad dependency from taking everyone down.",
+            "You suspect a native extension is corrupting memory in a long-running worker — how do you prove it and ship a fix without rewriting the whole service?",
+        ],
     },
     "ansible": {
         1: [
@@ -188,6 +251,14 @@ _TOPIC_QUESTIONS: dict[str, dict[int, list[str]]] = {
         2: [
             "A run partially fails across 200 hosts. How do you recover to a consistent state?",
             "How do you test an Ansible role in CI without a real inventory?",
+        ],
+        4: [
+            "Design an Ansible execution model for 5,000 hosts with per-environment secrets, rolling updates, and a clear abort story.",
+            "A playbook is idempotent in staging but drifts prod every run — how do you find the non-deterministic task and fix it?",
+        ],
+        5: [
+            "Design configuration management so Ansible, cloud images, and GitOps don't fight each other for the same hosts.",
+            "You need to patch a critical CVE across the fleet tonight with Ansible — walk me through blast radius, canaries, and how you prove every host landed the fix.",
         ],
     },
     "security": {
@@ -202,6 +273,14 @@ _TOPIC_QUESTIONS: dict[str, dict[int, list[str]]] = {
         3: [
             "Design defence-in-depth so a single leaked token can't reach customer data.",
         ],
+        4: [
+            "Design a secrets and identity model for microservices so nothing long-lived sits on disk or in env vars.",
+            "You find an unexpected outbound connection from a prod container to an unknown IP — walk me through containment and root cause.",
+        ],
+        5: [
+            "Design a zero-trust access path to production for humans and machines, including break-glass and full auditability.",
+            "A supply-chain compromise landed a malicious dependency in your build yesterday — walk me through detection, rollback, and how you'd harden the pipeline afterward.",
+        ],
     },
     "database": {
         1: [
@@ -215,6 +294,14 @@ _TOPIC_QUESTIONS: dict[str, dict[int, list[str]]] = {
         3: [
             "A query is fast in staging and slow in prod. Walk me through finding the real difference.",
         ],
+        4: [
+            "Design a zero-downtime cutover from a single primary to a new HA pair across availability zones.",
+            "Autovacuum and bloat are eating I/O on a critical table — how do you stabilize writes tonight and fix the root cause tomorrow?",
+        ],
+        5: [
+            "Design multi-region database architecture for a system that cannot accept split-brain or silent data loss.",
+            "A migration shipped that locks a hot table under load — walk me through unblocking production now and how you'd prevent the next one.",
+        ],
     },
     "networking": {
         1: [
@@ -223,6 +310,14 @@ _TOPIC_QUESTIONS: dict[str, dict[int, list[str]]] = {
         ],
         2: [
             "DNS resolves fine but the service is unreachable from one subnet only. How do you isolate it?",
+        ],
+        4: [
+            "Design east-west and north-south network segmentation for a multi-tier app so a compromise in one tier can't freely scan the rest.",
+            "Intermittent packet loss appears only between two AZs under load — walk me through isolating MTU, routing, security groups, and the fabric.",
+        ],
+        5: [
+            "Design a hybrid cloud network connecting on-prem and two cloud regions with overlapping CIDRs — how do you avoid asymmetric routing and broken return paths?",
+            "A TLS-intercepting middlebox started dropping a subset of connections after a cert rotation — how do you prove where and restore service without flying blind?",
         ],
     },
 }
@@ -259,6 +354,29 @@ _OPEN_ENDED_FALLBACKS = [
 
 # Rotating "angle" suffixes appended to a base prompt so that, even once the whole
 # fallback pool is used in a round, each subsequent question is still unique.
+def _strip_question_decoration(text: str) -> str:
+    """Recover the bare prompt from a finalized question.
+
+    Undoes what ``personalize_question`` and the duplicate-breaking suffixes add,
+    so dedup can compare a candidate prompt against what was really asked. Kept
+    beside _FALLBACK_ANGLES deliberately: if an angle is added there, or a new
+    wrapper in resume_context.personalize_question, it must be handled here too.
+    """
+    t = (text or "").strip()
+    # Suffixes, innermost last: "(angle N)" then a rotating angle.
+    t = re.sub(r"\s*\(angle \d+\)\s*$", "", t)
+    for angle in _FALLBACK_ANGLES:
+        if t.endswith(angle):
+            t = t[: -len(angle)].rstrip()
+            break
+    # personalize_question wrappers.
+    t = re.sub(r"^in your .{1,40}? context:\s*", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"^for a .{1,40}? track\s+—\s*", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"\s*\(thinking about your work at .+?\)\s*$", "", t)
+    t = re.sub(r"\s+—\s+at .+?\?$", "?", t)
+    return t.strip()
+
+
 _FALLBACK_ANGLES = [
     "— going one level deeper",
     "— focusing on what you'd do differently now",
@@ -875,9 +993,15 @@ def _tool_cross_question(
 
 def _seed_from(conversation_tail: list[dict], questions_asked: int) -> int:
     """Deterministic seed: stable for a given conversation state so output is
-    repeatable (tests) but varies turn-to-turn (not robotic)."""
+    repeatable (tests) but varies turn-to-turn (not robotic).
+
+    Uses blake2b — Python's built-in ``hash()`` is process-salted and breaks
+    cross-process determinism (audit §I8 / §Y1g).
+    """
     blob = "".join((m.get("content") or "")[:40] for m in (conversation_tail or []))
-    return (hash(blob) ^ (questions_asked * 2654435761)) & 0x7FFFFFFF
+    blob = f"{blob}|{questions_asked}"
+    digest = hashlib.blake2b(blob.encode("utf-8", errors="replace"), digest_size=8).digest()
+    return int.from_bytes(digest, "big") & 0x7FFFFFFF
 
 
 # ---------------------------------------------------------------------------
@@ -939,7 +1063,17 @@ def generate_question(
     snap = profile_snapshot or {}
     asked_texts = asked_texts or []
     conversation_tail = conversation_tail or []
-    used = {_normalize(t) for t in asked_texts}
+    # Index every asked question under BOTH its finalized form and its bare
+    # prompt. The caller only keeps what we returned, which has been through
+    # personalize_question ("In your Linux context: ...") and possibly a
+    # de-duplication angle suffix — while every pool below matches on the bare
+    # prompt. Without stripping, a question that was already asked never looks
+    # used, so the pool re-picks it and only the suffix differs: one Linux round
+    # asked the same D-state question on 4 of its first 5 turns.
+    used = set()
+    for t in asked_texts:
+        used.add(_normalize(t))
+        used.add(_normalize(_strip_question_decoration(t)))
     mem = memory if isinstance(memory, dict) else {}
 
     rng = random.Random(_seed_from(conversation_tail, questions_asked))
@@ -962,7 +1096,32 @@ def generate_question(
         return personalize_question(text, snap, rng)
 
     def _finalize(text: str) -> str:
-        return _personalize(text)
+        """Personalize, then guarantee the result is not a verbatim repeat.
+
+        `used` holds prior FINALIZED questions, but every pool pick above tests the
+        RAW prompt — and `personalize_question` may prepend "In your <tech>
+        context: ". So a raw prompt that was already asked looks unused, gets picked
+        again, and the same prefix is re-applied: a verbatim duplicate. This guard
+        used to live at the single generic fallback return, leaving the other
+        seventeen return paths unprotected (a Linux round repeated its first
+        question on turns 2 AND 3). Centralizing it here covers all of them.
+
+        Deterministic — a rotating angle then a turn ordinal, no rng/date calls — so
+        the same conversation state still reproduces the same question.
+        """
+        final = _personalize(text)
+        if _normalize(final) in used:
+            final = f"{final} {_FALLBACK_ANGLES[len(used) % len(_FALLBACK_ANGLES)]}"
+            if _normalize(final) in used:
+                final = f"{final} (angle {len(used) + 1})"
+        # Record BOTH forms. Recording only the finalized text stops verbatim
+        # repeats but not substantive ones: the pools match on the raw prompt, so
+        # the same base question kept winning and only the angle suffix differed
+        # (a Linux round asked the same D-state question on 4 of its first 5
+        # turns). Seeding `used` with the raw prompt makes the pools skip it.
+        used.add(_normalize(final))
+        used.add(_normalize(text))
+        return final
 
     incident_round = round_type in ("devops_debug", "sre_oncall")
 
@@ -1376,17 +1535,8 @@ def generate_question(
         angle = _FALLBACK_ANGLES[len(used) % len(_FALLBACK_ANGLES)]
         gq = f"{base} {angle}"
     stitch = _maybe_stitch(last_answer_quality, rng)
+    # _finalize now owns the no-verbatim-repeat guarantee for every return path.
     final = _finalize(f"{stitch} {gq}".strip() if stitch else gq)
-    # Guarantee no verbatim repeat within the round. `used` holds prior FINALIZED
-    # (resume-context-prefixed) questions, but the pool pick above checks the RAW
-    # prompt — so a prefixed collision can slip through (the finalized text was
-    # already asked). If so, append a deterministic rotating angle, then a turn
-    # ordinal as a hard backstop — no rng/date, so it stays reproducible.
-    if _normalize(final) in used:
-        final = f"{final} {_FALLBACK_ANGLES[len(used) % len(_FALLBACK_ANGLES)]}"
-        if _normalize(final) in used:
-            final = f"{final} (angle {len(used) + 1})"
-    used.add(_normalize(final))
     return GeneratedQuestion(
         text=final,
         category="technical",

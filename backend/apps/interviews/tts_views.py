@@ -28,10 +28,10 @@ class TTSSynthesizeView(APIView):
     """
     POST /api/interviews/tts/synthesize/
     Body: { "text": "...", "voice_code": "US_F_ZIRA" }
-    Response: { "provider": "elevenlabs"|"polly"|"browser",
+    Response: { "provider": "browser",
                 "audio_b64": "<base64 MP3>"|null,
                 "mime": "audio/mpeg" }
-    Frontend plays audio_b64 if present, else falls back to SpeechSynthesis.
+    Paid providers (ElevenLabs/Polly) are not used; frontend falls back to SpeechSynthesis.
     """
     permission_classes = [IsAuthenticated]
 

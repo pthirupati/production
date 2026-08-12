@@ -121,9 +121,17 @@ class JSONFormatter(logging.Formatter):
             "message": _redact_message(record.getMessage()),
         }
         
-        # Add exception info if present
+        # Add exception info if present. The traceback needs the SAME redaction as
+        # the message: exception text routinely carries the identifier the message
+        # masked. smtplib.SMTPRecipientsRefused, for one, stringifies to
+        # {'user@example.com': (550, ...)} and notifications/email_dispatch.py logs
+        # it under logger.exception -- so the OTP/reset/billing flows this masking
+        # exists for leaked cleartext addresses on exactly the failure branch, i.e.
+        # during an incident, while the sibling "message" field showed them masked.
         if record.exc_info:
-            log_data["exception"] = self.formatException(record.exc_info)
+            log_data["exception"] = _redact_message(
+                self.formatException(record.exc_info)
+            )
         
         # Extract and mask request context if available
         if hasattr(record, 'request') and record.request:

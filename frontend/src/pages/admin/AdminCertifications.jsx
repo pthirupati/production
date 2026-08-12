@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { certAdminApi } from '../../api/certifications'
 import { AdminPageHeader } from '../../components/design'
+import { useModalA11y } from '../../components/ConfirmModal'
 import {
   Edit2, X, Save, Award, WrenchIcon, Layers, ListChecks, ChevronRight, BookOpen,
 } from 'lucide-react'
@@ -25,6 +26,11 @@ export default function AdminCertifications() {
   const [scenarioTrack, setScenarioTrack] = useState(null)
   const [scenarioData, setScenarioData] = useState(null)
   const [scenarioLoading, setScenarioLoading] = useState(false)
+
+  const closeEdit = () => setEditingTrack(null)
+  const closeScenarios = () => { setScenarioTrack(null); setScenarioData(null) }
+  const editDialogRef = useModalA11y(!!editingTrack, closeEdit)
+  const scenarioDialogRef = useModalA11y(!!scenarioTrack, closeScenarios)
 
   useEffect(() => { loadData() }, [])
 
@@ -117,14 +123,24 @@ export default function AdminCertifications() {
 
       {/* Edit modal */}
       {editingTrack && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="glass-card p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) closeEdit() }}
+        >
+          <div
+            ref={editDialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Edit ${editingTrack.code}`}
+            className="glass-card p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto outline-none"
+          >
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-lg font-semibold text-white">Edit {editingTrack.code}</h2>
                 <p className="text-xs text-surface-500 font-mono">/{editingTrack.slug}</p>
               </div>
-              <button onClick={() => setEditingTrack(null)} className="text-surface-500 hover:text-white"><X size={20} /></button>
+              <button type="button" onClick={closeEdit} aria-label="Close certification editor" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-white"><X size={20} /></button>
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -243,8 +259,8 @@ export default function AdminCertifications() {
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-surface-800">
-              <button onClick={() => setEditingTrack(null)} className="btn-secondary">Cancel</button>
-              <button onClick={handleSave} disabled={saving} className="btn-primary flex items-center gap-2"><Save size={16} /> {saving ? 'Saving…' : 'Save'}</button>
+              <button type="button" onClick={closeEdit} className="btn-secondary">Cancel</button>
+              <button type="button" onClick={handleSave} disabled={saving} className="btn-primary flex items-center gap-2"><Save size={16} /> {saving ? 'Saving…' : 'Save'}</button>
             </div>
           </div>
         </div>
@@ -252,8 +268,18 @@ export default function AdminCertifications() {
 
       {/* Scenarios drawer */}
       {scenarioTrack && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="glass-card p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) closeScenarios() }}
+        >
+          <div
+            ref={scenarioDialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${scenarioTrack.code} — Certification scenarios`}
+            className="glass-card p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto outline-none"
+          >
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-accent-cyan/10 flex items-center justify-center">
@@ -264,7 +290,7 @@ export default function AdminCertifications() {
                   <p className="text-xs text-surface-400">Labs mapped into this track, grouped by exam objective</p>
                 </div>
               </div>
-              <button onClick={() => { setScenarioTrack(null); setScenarioData(null) }} className="text-surface-500 hover:text-white"><X size={20} /></button>
+              <button type="button" onClick={closeScenarios} aria-label="Close certification scenarios" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-white"><X size={20} /></button>
             </div>
 
             {scenarioLoading ? (

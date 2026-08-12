@@ -7,8 +7,10 @@ networks, volumes, and docker-compose service groups.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import random
+import re
 import time
 from typing import Any
 
@@ -182,6 +184,122 @@ def _compose_service(name: str, image: str, status: str = "running", replicas: i
         "status": status,
         "replicas": replicas,
         "runningReplicas": replicas if status == "running" else 0,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Mounted secrets
+#
+# docker_v2_facades.seed_v2 already ships a `secrets` list, but those rows are
+# name-only cosmetics: no value, no mount, and nothing a container can resolve.
+# That makes the "move the credential out of the env var" scenario ungradeable —
+# the only observable action would be deleting the env var, which also passes a
+# learner who simply broke the container. The rows below carry a real value and a
+# real mount target so the fix has a destination and the checker can require BOTH
+# halves (leak closed AND workload still resolving the credential).
+# ---------------------------------------------------------------------------
+
+# Planted credential for the env-leak scenario. Fake, generated for the lab, and
+# never valid anywhere — the secret scanner allowlists this marker.
+# SIMULATED-CREDENTIAL: lab fixture, grants no access. See docs/AUDIT_2026_08_TODO.md §Y2e.
+LEAKED_DB_PASSWORD = "p9RtQ2vLx7mK4wZn"  # noqa: S105
+LEAKED_SECRET_NAME = "api_db_password"
+LEAKED_SECRET_ENV = "DATABASE_PASSWORD"
+LEAKED_SECRET_CONTAINER = "api"
+
+
+def _secret(name: str, value: str, age_seconds: int = 86400) -> dict:
+    """A docker secret that actually holds a value.
+
+    `value` stays server-side: _redact_secrets strips it from every state payload
+    the console renders, mirroring real Docker, where a secret's plaintext is
+    readable only from inside a container that mounts it.
+    """
+    return {
+        "id": f"sec-{name}",
+        "name": name,
+        "value": value,
+        "created": _ago_iso(age_seconds),
+        "updated": _ago_iso(age_seconds),
+    }
+
+
+def _find_secret(state: dict, name: str) -> dict | None:
+    for s in state.get("secrets") or []:
+        if s.get("name") == name or s.get("id") == name:
+            return s
+    return None
+
+
+def _secret_mounts(container: dict) -> list:
+    return container.get("secretMounts") or []
+
+
+def _mounted_secret_path(name: str) -> str:
+    return f"/run/secrets/{name}"
+
+
+def _resolves_secret(state: dict, container: dict, secret_name: str) -> bool:
+    """True when the container can actually read the secret at runtime.
+
+    Requires the mount to exist AND the underlying secret to still be present —
+    a learner who mounts a secret and then deletes it has not fixed anything.
+    """
+    mount = next((m for m in _secret_mounts(container) if m.get("secret") == secret_name), None)
+    if not mount:
+        return False
+    return _find_secret(state, secret_name) is not None
+
+
+def _redact_secrets(state: dict) -> None:
+    """Strip plaintext secret values from an outbound state payload.
+
+    Mutates a deep copy only — callers must never pass the live session state.
+    """
+    for s in state.get("secrets") or []:
+        if "value" in s:
+            s["value"] = "<hidden>"
+
+
+def _plant_env_secret_leak(state: dict) -> None:
+    """Seed the 'credential exposed via docker inspect' fault.
+
+    The api container carries the DB password in plaintext in its env list, so it
+    leaks through both `docker inspect` and `docker exec api env`. The secret
+    store already holds the same value under `api_db_password`, so the fix is to
+    mount it rather than to invent it — and the container must keep resolving the
+    credential afterwards.
+    """
+    state.setdefault("secrets", []).append(
+        _secret(LEAKED_SECRET_NAME, LEAKED_DB_PASSWORD, age_seconds=604800)
+    )
+
+    api = _find_container(state, LEAKED_SECRET_CONTAINER)
+    if api:
+        # Replace the masked seed value with the real one so the leak is observable.
+        api["env"] = [e for e in api.get("env") or [] if not e.startswith("DATABASE_URL=")]
+        api["env"].append(f"{LEAKED_SECRET_ENV}={LEAKED_DB_PASSWORD}")
+        api["env"].append(
+            f"DATABASE_URL=postgresql://fixitlab:{LEAKED_DB_PASSWORD}@db:5432/fixitlab"
+        )
+
+    state["events"].append({
+        "time": _now_iso(),
+        "type": "warning",
+        "action": "secret_exposed",
+        "actor": LEAKED_SECRET_CONTAINER,
+        "message": (
+            f"Audit: container '{LEAKED_SECRET_CONTAINER}' exposes {LEAKED_SECRET_ENV} "
+            f"in plaintext via docker inspect"
+        ),
+    })
+    state["validation"] = {
+        "require_secret_not_in_env": {
+            "container": LEAKED_SECRET_CONTAINER,
+            "secret": LEAKED_SECRET_NAME,
+            "value": LEAKED_DB_PASSWORD,
+            "env_keys": [LEAKED_SECRET_ENV, "DATABASE_URL"],
+        }
     }
 
 
@@ -383,6 +501,12 @@ def _apply_scenario_preset(state: dict, scenario_slug: str) -> None:
     slug = (scenario_slug or "").lower()
     events = state["events"]
 
+    # Checked before the generic branches: this slug must not fall through to the
+    # "cache"/"memory" matcher, and its fault is planted on `api`, not `worker`.
+    if "secret" in slug:
+        _plant_env_secret_leak(state)
+        return
+
     if "oom" in slug or "memory" in slug or "cache" in slug:
         for c in state["containers"]:
             if c["shortName"] == "cache":
@@ -465,6 +589,9 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     ensure_v2(entry["state"])
     _save_session(str(session_id), entry)
     state = copy.deepcopy(entry["state"])
+    # Deep copy above, so this redacts the outbound payload only — the live session
+    # keeps the value that `docker exec cat /run/secrets/...` resolves.
+    _redact_secrets(state)
 
     running = [c for c in state["containers"] if c["state"] == "running"]
     exited = [c for c in state["containers"] if c["state"] == "exited"]
@@ -646,6 +773,138 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 
     # --- Image operations ---
 
+    if action in ("build_image", "docker_build"):
+        # Dockerfile layer semantics (X4): cache by instruction digest, multi-stage,
+        # digest-pinned FROM, failure → no image tag (docker run → Unable to find image).
+        dockerfile = payload.get("dockerfile") or payload.get("Dockerfile") or ""
+        context_files = payload.get("files") if isinstance(payload.get("files"), dict) else {}
+        tag = (payload.get("tag") or payload.get("name") or "app:latest").strip()
+        if ":" in tag:
+            repo, img_tag = tag.rsplit(":", 1)
+        else:
+            repo, img_tag = tag, "latest"
+
+        ignore = set()
+        dockerignore = context_files.get(".dockerignore") or payload.get("dockerignore") or ""
+        for line in str(dockerignore).splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                ignore.add(line)
+
+        if not dockerfile and "Dockerfile" in context_files:
+            dockerfile = str(context_files["Dockerfile"])
+        if not dockerfile.strip():
+            return {"ok": False, "error": "Dockerfile is required"}
+
+        lines = [ln.rstrip() for ln in dockerfile.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+        if not any(ln.upper().startswith("FROM ") for ln in lines):
+            return {"ok": False, "error": "Dockerfile must start with FROM"}
+
+        cache = state.setdefault("build_cache", {})
+        layers = []
+        stage = "default"
+        stages: dict[str, list] = {}
+        final_layers = []
+        cache_hits = 0
+        parent = "scratch"
+
+        for instr in lines:
+            upper = instr.upper()
+            if upper.startswith("FROM "):
+                # FROM image@sha256:… AS name  OR  FROM name AS stage
+                m = re.match(
+                    r"FROM\s+(\S+)(?:\s+AS\s+(\w+))?",
+                    instr,
+                    re.I,
+                )
+                base = m.group(1) if m else "scratch"
+                stage = (m.group(2) if m and m.group(2) else "default")
+                if "@sha256:" not in base and payload.get("require_digest_pin"):
+                    return {
+                        "ok": False,
+                        "error": (
+                            "build failed: base image must be pinned by digest "
+                            "(FROM repo@sha256:…)"
+                        ),
+                    }
+                parent = base
+                stages.setdefault(stage, [])
+                continue
+
+            # Failure injection for teaching
+            if "FAIL_BUILD" in instr or payload.get("force_fail"):
+                state.setdefault("events", []).append(
+                    _docker_event("build", "die", tag, f"Build failed at: {instr[:80]}")
+                )
+                _save_session(str(session_id), entry)
+                return {
+                    "ok": False,
+                    "error": f"build failed: {instr[:120]}",
+                    "layers": layers,
+                    "cache_hits": cache_hits,
+                }
+
+            # COPY/ADD respect .dockerignore (bloat teaching)
+            if upper.startswith(("COPY ", "ADD ")):
+                parts = instr.split()
+                src = parts[1] if len(parts) > 1 else ""
+                if src in ignore or any(src.startswith(p.rstrip("*")) for p in ignore if p.endswith("*")):
+                    # Still creates a layer but notes ignored content
+                    instr = f"{instr}  # ignored by .dockerignore"
+
+            digest_src = f"{parent}\n{instr}\n"
+            for path, content in sorted(context_files.items()):
+                if path == "Dockerfile":
+                    continue
+                if path in ignore:
+                    continue
+                digest_src += f"{path}:{hashlib.sha256(str(content).encode()).hexdigest()[:16]}\n"
+            layer_digest = "sha256:" + hashlib.sha256(digest_src.encode()).hexdigest()
+            hit = layer_digest in cache
+            if hit:
+                cache_hits += 1
+            else:
+                cache[layer_digest] = {"instr": instr[:200], "at": _now_iso()}
+            layer = {
+                "digest": layer_digest,
+                "instruction": instr[:200],
+                "cache_hit": hit,
+                "stage": stage,
+            }
+            layers.append(layer)
+            stages.setdefault(stage, []).append(layer)
+            parent = layer_digest
+
+        final_layers = stages.get(stage) or layers
+        size_mb = 40 + 15 * max(1, len(final_layers) - cache_hits)
+        img = _image(repo, img_tag, size_mb=size_mb, age_seconds=1)
+        img["layers"] = final_layers
+        img["digest"] = final_layers[-1]["digest"] if final_layers else img["id"]
+        img["stages"] = list(stages.keys())
+        img["cacheHits"] = cache_hits
+        # Replace existing tag
+        state["images"] = [
+            i for i in state.get("images") or []
+            if not (i.get("repository") == repo and i.get("tag") == img_tag)
+        ]
+        state.setdefault("images", []).insert(0, img)
+        state["disk_usage"]["imagesMb"] = sum(i.get("sizeMb") or 0 for i in state["images"])
+        state["disk_usage"]["totalMb"] = (
+            state["disk_usage"]["imagesMb"]
+            + state["disk_usage"].get("containersMb", 0)
+            + state["disk_usage"].get("volumesMb", 0)
+            + state["disk_usage"].get("buildCacheMb", 0)
+        )
+        events.append(_docker_event("build", "build", tag, f"Built {tag} ({len(final_layers)} layers, {cache_hits} cache hits)"))
+        _save_session(str(session_id), entry)
+        return {
+            "ok": True,
+            "message": f"Successfully tagged {repo}:{img_tag}",
+            "image": img,
+            "layers": final_layers,
+            "cache_hits": cache_hits,
+        }
+
     if action == "pull_image":
         image = payload.get("image") or payload.get("name")
         if not image:
@@ -745,6 +1004,21 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         image = (payload.get("image") or "nginx:latest").strip()
         if _find_container(state, name):
             return {"ok": False, "error": f"Conflict. The container name \"/{name}\" is already in use"}
+        # X4 failure propagation: failed build → no tag → Unable to find image
+        # (check before mutating containers).
+        repo, _, tag = image.partition(":")
+        tag = tag or "latest"
+        has_img = any(
+            i.get("repoTag") == image or (i.get("repository") == repo and i.get("tag") == tag)
+            for i in state.get("images") or []
+        )
+        if not has_img:
+            if payload.get("create_missing_image") is False or payload.get("pull") is False:
+                return {
+                    "ok": False,
+                    "error": f"Unable to find image '{image}' locally",
+                }
+            state.setdefault("images", []).insert(0, _image(repo or image, tag=tag, size_mb=80, age_seconds=1))
         network = payload.get("network") or payload.get("network_mode") or "bridge"
         ports_in = payload.get("ports") or []
         ports = []
@@ -785,12 +1059,6 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             containers = net.setdefault("containers", [])
             if name not in containers:
                 containers.append(name)
-        # Ensure image exists locally after a run
-        repo, _, tag = image.partition(":")
-        tag = tag or "latest"
-        if not any(i.get("repoTag") == image or (i.get("repository") == repo and i.get("tag") == tag)
-                   for i in state.get("images") or []):
-            state.setdefault("images", []).insert(0, _image(repo or image, tag=tag, size_mb=80, age_seconds=1))
         events.append(_docker_event("create", "create", name, f"Created container {name}"))
         if start:
             events.append(_docker_event("start", "start", name, f"Started container {name}"))
@@ -954,6 +1222,26 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         # Simulate command output based on common commands
         cmd_lower = cmd.lower().strip()
         output = ""
+        # Mounted secrets are readable only from inside the container, and only by
+        # path — this is what makes the mount a real destination for the credential
+        # rather than a label the learner ticks off.
+        if "/run/secrets" in cmd_lower:
+            mounts = _secret_mounts(c)
+            if cmd_lower.startswith("ls") or " ls " in cmd_lower:
+                names = sorted(m["target"].rsplit("/", 1)[-1] for m in mounts)
+                return {"ok": True, "output": "  ".join(names), "exitCode": 0}
+            wanted = next((tok for tok in cmd.split() if "/run/secrets" in tok), "")
+            mount = next((m for m in mounts if m.get("target") == wanted), None)
+            if not mount:
+                return {"ok": True,
+                        "output": f"cat: {wanted}: No such file or directory", "exitCode": 1}
+            sec = _find_secret(state, mount["secret"])
+            if not sec:
+                # Mount survives but the secret was deleted: the file is empty, the
+                # app breaks. Surfacing this is the point — it is the failure mode
+                # the checker refuses to pass.
+                return {"ok": True, "output": "", "exitCode": 1}
+            return {"ok": True, "output": sec["value"], "exitCode": 0}
         if "env" in cmd_lower:
             output = "\n".join(c.get("env", []))
         elif "ps" in cmd_lower:
@@ -984,6 +1272,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             "memory": int(c["memLimitMb"] * 1024 * 1024),
             "logConfig": {"Type": "json-file", "Config": {"max-size": "10m", "max-file": "5"}},
         }
+        # Real `docker inspect` lists the secret's target path but never its value —
+        # that asymmetry against the env list is the whole lesson of this scenario.
+        detail["secrets"] = [
+            {"secret": m["secret"], "target": m["target"], "mode": m.get("mode", "0400")}
+            for m in _secret_mounts(c)
+        ]
         return {"ok": True, "inspect": detail}
 
     if action == "stats_container":
@@ -1066,6 +1360,102 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             "buildCacheReclaimedMb": cache_reclaimed,
         }
 
+    # --- Secret operations ---
+    #
+    # These intercept `create_secret` ahead of the v2 facade, which only records a
+    # name. A secret with no value cannot be mounted, and a mount that resolves to
+    # nothing cannot be graded, so the engine owns the whole lifecycle here.
+
+    if action == "create_secret":
+        ensure_v2(state)
+        name = (payload.get("name") or "").strip()
+        value = payload.get("value")
+        if not name:
+            return {"ok": False, "error": "Secret name is required"}
+        if _find_secret(state, name):
+            return {"ok": False, "error": f"Secret '{name}' already exists"}
+        if value in (None, ""):
+            return {"ok": False, "error": "Secret value is required (docker secret create reads from stdin or a file)"}
+        row = _secret(name, str(value), age_seconds=1)
+        state.setdefault("secrets", []).append(row)
+        events.append(_docker_event("create", "secret_create", name, f"Secret {name} created"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": row["id"],
+                "secret": {k: v for k, v in row.items() if k != "value"}}
+
+    if action == "remove_secret":
+        ensure_v2(state)
+        name = (payload.get("name") or payload.get("secret") or "").strip()
+        sec = _find_secret(state, name)
+        if not sec:
+            return {"ok": False, "error": f"No such secret: {name}"}
+        in_use = [c["shortName"] for c in state["containers"]
+                  if any(m.get("secret") == sec["name"] for m in _secret_mounts(c))]
+        if in_use:
+            return {"ok": False,
+                    "error": f"Error response from daemon: secret '{sec['name']}' is in use by service: {in_use[0]}"}
+        state["secrets"] = [s for s in state["secrets"] if s["id"] != sec["id"]]
+        events.append(_docker_event("destroy", "secret_remove", sec["name"], f"Secret {sec['name']} removed"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": sec["name"]}
+
+    if action in ("mount_secret", "attach_secret"):
+        ensure_v2(state)
+        container_name = payload.get("container") or payload.get("name") or ""
+        secret_name = (payload.get("secret") or "").strip()
+        c = _find_container(state, container_name)
+        if not c:
+            return {"ok": False, "error": f"No such container: {container_name}"}
+        sec = _find_secret(state, secret_name)
+        if not sec:
+            return {"ok": False, "error": f"No such secret: {secret_name}"}
+        mounts = c.setdefault("secretMounts", [])
+        if any(m.get("secret") == sec["name"] for m in mounts):
+            return {"ok": False, "error": f"Secret '{sec['name']}' is already mounted in {c['shortName']}"}
+        # Real Docker exposes the secret as a tmpfs file, never as an env var, so
+        # the mount deliberately records only a path — mounting must not re-create
+        # the very leak the learner is being asked to close.
+        target = payload.get("target") or _mounted_secret_path(sec["name"])
+        mounts.append({"secret": sec["name"], "target": target, "mode": "0400", "uid": "0", "gid": "0"})
+        events.append(_docker_event("mount", "secret_mount", c["shortName"],
+                                    f"Mounted secret {sec['name']} at {target} in {c['shortName']}"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Mounted {sec['name']} at {target}",
+                "container": c["shortName"], "target": target}
+
+    if action in ("unmount_secret", "detach_secret"):
+        ensure_v2(state)
+        container_name = payload.get("container") or payload.get("name") or ""
+        secret_name = (payload.get("secret") or "").strip()
+        c = _find_container(state, container_name)
+        if not c:
+            return {"ok": False, "error": f"No such container: {container_name}"}
+        before = len(_secret_mounts(c))
+        c["secretMounts"] = [m for m in _secret_mounts(c) if m.get("secret") != secret_name]
+        if len(c["secretMounts"]) == before:
+            return {"ok": False, "error": f"Secret '{secret_name}' is not mounted in {c['shortName']}"}
+        events.append(_docker_event("unmount", "secret_unmount", c["shortName"],
+                                    f"Unmounted secret {secret_name} from {c['shortName']}"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Unmounted {secret_name}"}
+
+    if action in ("remove_container_env", "unset_env"):
+        container_name = payload.get("container") or payload.get("name") or ""
+        key = (payload.get("key") or payload.get("env") or "").strip()
+        c = _find_container(state, container_name)
+        if not c:
+            return {"ok": False, "error": f"No such container: {container_name}"}
+        if not key:
+            return {"ok": False, "error": "Env key is required"}
+        before = list(c.get("env") or [])
+        c["env"] = [e for e in before if e.split("=", 1)[0] != key]
+        if len(c["env"]) == len(before):
+            return {"ok": False, "error": f"Container '{c['shortName']}' has no env var '{key}'"}
+        events.append(_docker_event("update", "env_unset", c["shortName"],
+                                    f"Removed env var {key} from {c['shortName']}"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Removed {key} from {c['shortName']}"}
+
     ensure_v2(state)
     v2 = apply_v2_action(state, action, payload)
     if v2 is not None:
@@ -1084,6 +1474,57 @@ def validate_docker_lab(session_id: str, scenario_slug: str = "") -> tuple[bool,
     entry = _load_session(str(session_id)) or _ensure_session(session_id, scenario_slug)
     state = entry["state"]
     rules = state.get("validation") or {}
+
+    if rules.get("require_secret_not_in_env"):
+        rule = rules["require_secret_not_in_env"]
+        name = rule["container"]
+        secret_name = rule["secret"]
+        value = rule["value"]
+        c = _find_container(state, name)
+        if not c:
+            return False, f"Container '{name}' no longer exists — the workload must survive the fix"
+
+        # Half 1: the credential must be gone from every inspect/exec surface.
+        # Checked by value, not by key name: renaming DATABASE_PASSWORD to
+        # DB_PASS_2 moves the leak, it does not close it.
+        leaking = [e for e in c.get("env") or [] if value in e]
+        if leaking:
+            leaked_keys = ", ".join(sorted({e.split("=", 1)[0] for e in leaking}))
+            return False, (
+                f"'{name}' still exposes the credential via docker inspect "
+                f"(env: {leaked_keys}) — move it to a mounted secret"
+            )
+
+        # Half 2: the workload must still resolve the credential. Without this the
+        # scenario would pass a learner who simply deleted the env var and broke
+        # the container — the exact failure the audit flagged.
+        if not _resolves_secret(state, c, secret_name):
+            if _find_secret(state, secret_name) is None:
+                return False, (
+                    f"Secret '{secret_name}' does not exist — '{name}' has no way to "
+                    f"resolve the credential; deleting it is not a fix"
+                )
+            return False, (
+                f"'{name}' no longer has the credential: mount secret "
+                f"'{secret_name}' at {_mounted_secret_path(secret_name)}"
+            )
+
+        # Half 3: the mounted secret must carry the real credential, not a
+        # placeholder the learner typed to satisfy the mount check.
+        sec = _find_secret(state, secret_name)
+        if sec.get("value") != value:
+            return False, (
+                f"Secret '{secret_name}' does not hold the working credential — "
+                f"'{name}' would fail to authenticate against db"
+            )
+
+        if c.get("state") != "running":
+            return False, f"Container '{name}' must be running after the fix (currently {c.get('state')})"
+
+        return True, (
+            f"'{name}' resolves {secret_name} from {_mounted_secret_path(secret_name)} "
+            f"and no longer leaks it through docker inspect — validation passed"
+        )
 
     if rules.get("require_container_running"):
         name = rules["require_container_running"]

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Terminal, ArrowRight, Menu, X, Sun, Moon } from 'lucide-react'
+import { Terminal, ArrowRight, Menu, X, Sun, Moon } from '../../../ui/eagerIcons'
 import { useAuthStore } from '../../../store/authStore'
 import { useThemeStore } from '../../../store/themeStore'
 import { PlatformBanners } from '../../../components/PlatformBanners'

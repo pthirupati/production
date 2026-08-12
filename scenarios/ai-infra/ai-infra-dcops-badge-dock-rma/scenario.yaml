@@ -15,12 +15,9 @@ description: 'CONTEXT: DCOps / Bare Metal — Steam-class facility loop. Badge i
   the FRU ASN at the loading dock, install the kit on the thermal ticket asset, run burn-in soak,
   and close the RMA. AI Infra Engineering owns this DCOps path for GPU fleets.
 
-
   ENVIRONMENT: Datacenter twin (3D Walk: reception → mantrap → staging/dock → data hall) + Bare Metal.
 
-
   SYMPTOM: Ticket awaiting_parts; ASN on dock; soak not run; ticket still open.
-
 
   OBJECTIVE: Badge-in; receive dock ASN; install FRU; attach load bank and soak to pass (auto-closes
   ticket); FIXED-OK.'

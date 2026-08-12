@@ -11,118 +11,147 @@ max_score: 100
 is_free: true
 infrastructure_type: docker
 jira_priority: Low
-description: 'CONTEXT: A team operating GPU operations has raised a ticket for `Gpu Drivers — Learn Lab`.
-  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
-  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
+description: 'CONTEXT: This is your first GPU lab. Nothing here is an outage — you have been handed a
+  freshly imaged 8-GPU training node and asked to certify it before the ML team schedules work on it.
+  Read the whole ticket before you type anything; the point of this lab is learning to tell "the hardware
+  is missing" apart from "the driver is missing", which is the single most common wrong diagnosis on
+  GPU fleets.
 
+  ENVIRONMENT: One node, `lab-primary`, with 8× NVIDIA H100 80GB HBM3 cards. Two pieces of software sit
+  between you and those cards, and you must keep them straight:
 
-  ENVIRONMENT: You are working in FixitLab''s offline GPU node. The architecture is a single lab-primary
-  node exposing nvidia-smi, drivers, CUDA, and container toolkit; treat it as the production host for
-  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  • The KERNEL MODULE (`nvidia.ko`) — driver code loaded into the running Linux kernel. It is what actually
+  talks to the card over PCIe. `lsmod` lists it; `modprobe` loads it.
 
+  • The USERSPACE tools (`nvidia-smi`, CUDA runtime, `nvcc`) — ordinary programs. They are installed on
+  disk whether or not the kernel module is loaded, and they fail with a *communication* error when it
+  is not.
 
-  SYMPTOM / STARTING STATE: The GPU node is online with a starter GPU drivers setup. Some pieces are intentionally
-  incomplete so you can learn how they fit together. Nothing is on fire — focus on observation.
+  Two more terms you will see in the output: PCIE is the bus the cards are physically attached to, so
+  a card shows up on the PCIe bus as soon as it is seated — before any driver exists. HBM (High Bandwidth
+  Memory) is the 80GB of memory stacked on each H100 die; `nvidia-smi` reports it as Memory-Usage, and
+  it is separate from host RAM.
 
+  SYMPTOM / STARTING STATE: The node boots and is reachable. `nvidia-smi` refuses to report anything.
+  Nothing is on fire and no user is affected — this is pre-production certification, so take your time
+  and observe before acting.
 
-  OBJECTIVE: Understand how GPU drivers work in this lab environment; Identify the main status and configuration
-  signals for GPU drivers; Confirm you can read the current state confidently before changing anything.
-  Acceptance criteria: the change is minimal and reversible, and success means `nvidia-smi` includes `NVIDIA-SMI`.
+  OBJECTIVE: Learn to read the GPU software stack from the bottom up, and prove the node is usable. Work
+  out for yourself, from evidence, whether the cards are absent or merely unclaimed by a driver, then
+  bring the node to a healthy state. Acceptance criteria: `nvidia-smi` returns the device table (its
+  banner line contains `NVIDIA-SMI`) instead of the driver-communication error.
 
+  WORK TO DO: Answer these three questions in order, with a command for each, and note the answer before
+  moving on. (1) Are the cards physically present on the PCIe bus? (2) Is the kernel module loaded? (3)
+  Is the userspace tooling installed? Only after all three answers are in should you change anything —
+  and the change is a single command. Do not reinstall drivers or reboot; neither is the answer here,
+  and both destroy the evidence you just gathered.
 
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant nvidia-smi, drivers, CUDA, and container toolkit), changing one thing at a time.
-  Check your work continuously against the objective — success means `nvidia-smi` includes `NVIDIA-SMI`.
+  VERIFY: Re-run the check the grader uses — `nvidia-smi` — and confirm you get the table. Then read the
+  table rather than just accepting it: how many GPUs, what driver and CUDA version, how much HBM per card,
+  and how much of it is already in use. Confirm with `lsmod | grep nvidia` that the module you loaded
+  is now resident. Success criteria: both hold on a repeat check.
 
+  ROLLBACK: Every change in this lab is one `modprobe` away from being undone (`modprobe -r nvidia`).
+  If you want to see the failure mode again to confirm cause and effect, unload the module, re-run `nvidia-smi`,
+  and load it back. That round trip is the lesson.
 
-  VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
-  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
-  check, not just once.
-
-
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
-
-
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not skip the observation steps and jump straight to the fix — you will pass the checker
+  and learn nothing. Do not conclude "the GPUs are dead" from `nvidia-smi` alone; that error message is
+  about the driver, not the hardware. Do not fake completion with marker files — the checker reads real
+  device state.'
 objectives:
-- Understand how GPU drivers work in this lab environment
-- Identify the main status and configuration signals for GPU drivers
-- Confirm you can read the current state confidently before changing anything
-initial_state: The GPU node is online with a starter GPU drivers setup. Some pieces are intentionally
-  incomplete so you can learn how they fit together. Nothing is on fire — focus on observation.
+- Distinguish the NVIDIA kernel module from the userspace CUDA tooling, and name which one each command
+  inspects
+- Prove from PCIe evidence that the GPUs are physically present before blaming the hardware
+- Load the driver and read the nvidia-smi table — GPU count, driver and CUDA version, and HBM usage per
+  card
+initial_state: A freshly imaged 8× H100 training node is up and reachable, but no NVIDIA kernel module
+  has been loaded yet, so nvidia-smi cannot reach the cards. The cards themselves are seated and visible
+  on the PCIe bus. Nothing is on fire — this is pre-production certification, so focus on observation.
 hints:
 - order: 1
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: GPUs are invisible to CUDA workloads or nodes
-    fail GPU health checks. This lab is about GPU drivers — driver/kernel module versions, persistence
-    mode, and device nodes. Read the objectives and the current state, and note precisely what looks wrong
-    versus healthy before you form any theory.'
+    Do not fix anything yet. Run `nvidia-smi` and read its error carefully: "couldn''t communicate with
+    the NVIDIA driver". Note the word *communicate* — the tool ran, so the tool is installed; it could
+    not reach a driver. That single sentence already rules out "nvidia-smi is missing" and points at the
+    kernel module layer. Write down what you expect to find before you look.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For GPU drivers problems the reliable method is: (1) reproduce/observe
-    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
-    change exactly one thing, (4) re-check. Make one small, reversible change toward the objective, re-reading
-    status after each step so you understand cause and effect.'
+    Work bottom-up through the stack, because each layer depends on the one below: hardware on the PCIe
+    bus → kernel module bound to it → userspace tools talking to the module. Confirm each layer before
+    suspecting the next. This ordering is why GPU issues get misdiagnosed: people start at `nvidia-smi`
+    (the top) and conclude the cards are dead, when the bottom two layers were never checked.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+    One command per layer. `lspci | grep -i nvidia` shows what is on the PCIe bus (hardware). `lsmod |
+    grep nvidia` lists loaded kernel modules (driver). `modinfo nvidia` asks whether the module exists
+    to be loaded at all. `nvcc --version` shows the installed CUDA toolkit (userspace).'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. `docker ps -a` — note Exited status and exit code.
+    1. `lspci | grep -i nvidia` — eight 3D controller lines means the hardware is present and seated. Hardware
+    layer: healthy.
 
-    2. `docker logs <name>` for the startup error.
+    2. `lsmod | grep nvidia` — empty output means no NVIDIA module is resident in the kernel. Driver layer:
+    this is your fault domain.
 
-    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+    3. `modinfo nvidia` — tells you whether the module is merely unloaded versus genuinely not installed.
+    An "unloaded but installed" module is a one-command fix; a missing one would mean a driver install.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Fix image, port mapping, volume, or env configuration.
+    1. Load the kernel module: `modprobe nvidia`.
 
-    2. `docker start <name>` or re-run with corrected flags.
+    2. Confirm it is now resident: `lsmod | grep nvidia` should list `nvidia`, plus `nvidia_uvm` (unified
+    memory) and `nvidia_drm`.
 
-    3. Confirm `nvidia-smi` shows the container Up.
+    3. Re-run `nvidia-smi` and read the table: 8 GPUs, driver and CUDA version in the banner, and per-card
+    HBM usage in MiB out of ~81559 MiB.
 
-
-    WHY: the checker validates the container is actually running.'
-summary: Complete the gpu drivers — learn lab gpu lab and verify success with the checker
+    WHY: the grader queries real device state through the driver, so it only passes once the module is
+    actually loaded — there is no marker file to write.'
+summary: Learn the GPU software stack — PCIe hardware, kernel module, and userspace CUDA tooling — by
+  diagnosing why nvidia-smi cannot see eight healthy H100s
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
-- Basic gpu literacy
+- Basic Linux command line (running commands and reading their output)
 tags:
 - do
 - gpu
 - hands-on
-linked_tutorial: gpu-fundamentals
+linked_tutorial: gpu-nvidia-zero-hero
 what_you_will_learn:
-- Understand how GPU drivers work in this lab environment
-- Identify the main status and configuration signals for GPU drivers
-- Confirm you can read the current state confidently before changing anything
+- What the NVIDIA kernel module is, how it differs from userspace tools like nvidia-smi and nvcc, and
+  why only one of them can be "missing" at a time
+- How to read PCIe evidence with lspci to prove GPUs are physically present before suspecting hardware
+  failure
+- How to load a kernel module with modprobe and confirm residency with lsmod
+- How to read an nvidia-smi table — GPU count, driver and CUDA version, and HBM memory usage per card
 environment:
   nodes:
   - role: primary
     os: FixitLab GPU node
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline lab environment
+    specs: 8× NVIDIA H100 80GB HBM3, local offline lab environment
   pre_installed:
   - bash
   - coreutils
+  - cuda-toolkit
   - gpu
   - journalctl
+  - kmod
+  - pciutils
   - systemctl
   credentials:
   - user: root
@@ -130,41 +159,68 @@ environment:
 tasks:
 - id: task_1
   title: Gpu Drivers — Learn Lab
-  description: Restore healthy behavior for Gpu Drivers — Learn Lab by investigating the failure, applying
-    the smallest safe fix, and validating the outcome.
-  background: 'This gpu lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Work down the GPU stack — PCIe bus, kernel module, userspace tooling — to determine why
+    nvidia-smi cannot reach the cards, then load the driver and read the resulting device table.
+  background: 'This lab teaches the layer model behind every GPU incident: hardware on the PCIe bus, a
+    kernel module bound to it, and userspace tools that talk to that module. Checking layers bottom-up
+    is what separates "the driver is unloaded" from "the card is dead".'
   validation:
     type: command_output
     command: nvidia-smi
     expected_output: NVIDIA-SMI
-    error_message: GPU health check still fails. Verify driver and device visibility.
+    error_message: nvidia-smi still cannot reach a driver. Check `lsmod | grep nvidia` — if it is empty,
+      the kernel module is not loaded.
 solution:
-  summary: Identify the misconfiguration affecting this gpu lab and apply the minimal fix.
+  summary: The eight H100s are present on the PCIe bus but no NVIDIA kernel module is loaded, so the userspace
+    tools have nothing to communicate with. Loading `nvidia` restores the whole stack.
   files_changed: []
   commands_run:
+  - lspci | grep -i nvidia
+  - lsmod | grep nvidia
+  - modinfo nvidia
+  - modprobe nvidia
   - nvidia-smi
   reference_docs: gpu-fundamentals
 guided_mode:
   enabled: true
   steps:
   - step: 1
-    title: Inspect current state
-    instruction: Run a read-only diagnostic before changing anything.
+    title: Observe the failure at the top of the stack
+    instruction: Run nvidia-smi and read the error wording before doing anything else.
     command: nvidia-smi
-    expected_output: Output shows the current failure mode
-    explanation: Evidence-first troubleshooting avoids guessing.
+    expected_output: '"NVIDIA-SMI has failed because it couldn''t communicate with the NVIDIA driver"'
+    explanation: The tool itself ran, so userspace is installed. "Communicate" means it could not reach
+      a kernel driver — that is a different layer from the hardware.
     next_on: command_success
   - step: 2
-    title: Apply the minimal fix
-    instruction: Make one reversible change aligned with the objectives.
-    command: '# your fix command here'
-    expected_output: State moves toward the objective
-    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    title: Check the hardware layer on the PCIe bus
+    instruction: List NVIDIA devices on the PCIe bus to prove the cards are physically present.
+    command: lspci | grep -i nvidia
+    expected_output: Eight 3D controller lines for NVIDIA H100 80GB HBM3
+    explanation: PCIe enumeration happens at boot, independent of any driver. Cards listed here are seated
+      and powered — so this is not a hardware failure.
     next_on: command_success
   - step: 3
-    title: Verify with the grader
-    instruction: Run the same verification the checker uses.
+    title: Check the kernel module layer
+    instruction: List loaded kernel modules and filter for nvidia.
+    command: lsmod | grep nvidia
+    expected_output: No output — no NVIDIA module is resident
+    explanation: Empty output isolates the fault. The hardware is present and the tools are installed,
+      so the missing piece is the driver between them.
+    next_on: command_success
+  - step: 4
+    title: Load the driver
+    instruction: Load the NVIDIA kernel module, then confirm it is resident.
+    command: modprobe nvidia
+    expected_output: No output — modprobe is silent on success
+    explanation: modprobe inserts the module and its dependencies (nvidia_uvm for unified memory, nvidia_drm
+      for display) into the running kernel. It is reversible with `modprobe -r nvidia`.
+    next_on: command_success
+  - step: 5
+    title: Verify and read the table
+    instruction: Re-run the grader's check and read the device table rather than just accepting it.
     command: nvidia-smi
-    expected_output: '`nvidia-smi` includes `NVIDIA-SMI`'
-    explanation: The lab passes only when real state is healthy.
+    expected_output: The device table, banner containing `NVIDIA-SMI`, 8 GPUs, ~81559MiB HBM per card
+    explanation: Note the driver and CUDA versions in the banner and the per-card HBM usage — that memory
+      is on the GPU die, not host RAM. The lab passes only when real device state is healthy.
     next_on: command_success

@@ -76,14 +76,13 @@ function Row({ label, value, color }) {
   )
 }
 
-export default function VmwareHostConfigurePanel({ host, datastores = [], networks = [], vswitches = [], vms = [], licensing = {}, onAction, acting }) {
+export default function VmwareHostConfigurePanel({ host, datastores = [], networks: _networks = [], vswitches = [], vms: _vms = [], licensing = {}, onAction, acting }) {
   const [sub, setSub] = useState('overview')
   if (!host) return null
 
   const cores = (host.cpu_sockets || 0) * (host.cpu_cores_per_socket || 0)
   const threads = host.cpu_threads || cores * 2
   const hostVswitches = vswitches.filter(v => v.type === 'standard' ? v.host === host.id : (v.hosts || []).includes(host.id))
-  const hostNets = networks.filter(n => (n.hosts || []).includes(host.id))
   const hostDatastores = datastores.filter(d => (d.hosts || []).includes(host.id))
 
   const renderBody = () => {

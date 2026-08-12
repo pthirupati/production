@@ -1,4 +1,6 @@
 import logging
+import time
+
 from celery import shared_task
 from django.utils import timezone
 from datetime import timedelta
@@ -14,7 +16,7 @@ def debug_task(self):
     return {"task_id": self.request.id, "status": "completed"}
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=60, retry_kwargs={"max_retries": 2})
 def cleanup_expired_labs():
     """
     Terminate lab sessions that have exceeded their time limit.
@@ -191,7 +193,134 @@ def cleanup_expired_labs():
     return {"terminated": terminated, "stuck_cleaned": stuck_cleaned}
 
 
-@shared_task
+# Where beat records that it is alive, and how stale that record may be before the
+# container is considered unhealthy.
+#
+# A file rather than Redis: the healthcheck runs inside the beat container with
+# `docker exec`, so it must not need a Redis client, credentials, or the network.
+# A stale file is also unambiguous — no "is Redis down, or is beat down?".
+BEAT_HEARTBEAT_PATH = "/tmp/celerybeat-heartbeat"
+BEAT_HEARTBEAT_INTERVAL_SECONDS = 60
+# Three missed beats. Tight enough to catch a wedge quickly, loose enough that one
+# slow tick under load does not restart a healthy scheduler.
+BEAT_HEARTBEAT_MAX_AGE_SECONDS = 200
+
+
+@shared_task(name="celery_app.tasks.beat_heartbeat", autoretry_for=(OSError,), retry_backoff=5, retry_kwargs={"max_retries": 2})
+def beat_heartbeat():
+    """Prove celery beat is still scheduling (audit Z5-15).
+
+    The healthcheck previously only confirmed the pidfile existed and the process
+    was alive, so a beat that was running but no longer scheduling looked perfectly
+    healthy — meaning no expiry cleanup, no orphan cleanup, no retention sweep, and
+    **no alert**.
+
+    The tempting alternative is to watch the mtime of beat's own schedule file.
+    Measured, that does not work: with the next task an hour away the mtime does not
+    advance, so the check would report a healthy beat as dead whenever nothing is
+    due — a restart loop in place of a missing alert.
+
+    This proves liveness by beat doing its actual job. If the scheduler stops
+    dispatching, this task stops running, the file goes stale, and the healthcheck
+    fails. It is deliberately trivial: a heartbeat that can fail for its own reasons
+    is a heartbeat that reports false alarms.
+    """
+    import os
+    import tempfile
+
+    payload = f"{time.time():.0f}\n"
+    # Written atomically. A healthcheck reading a half-written file would flap, and
+    # the whole point of this task is to be the one thing that does not.
+    directory = os.path.dirname(BEAT_HEARTBEAT_PATH) or "/tmp"
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix=".beat-hb-")
+    try:
+        with os.fdopen(fd, "w") as handle:
+            handle.write(payload)
+        os.replace(tmp, BEAT_HEARTBEAT_PATH)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    return {"written_at": payload.strip()}
+
+
+@shared_task(
+    name="celery_app.tasks.prune_docker_artifacts",
+    queue="provisioning",
+    autoretry_for=(Exception,),
+    retry_backoff=30,
+    retry_kwargs={"max_retries": 2},
+)
+def prune_docker_artifacts():
+    """Reclaim disk from dangling images, build cache and unused volumes.
+
+    Audit Z5-11. Container and network cleanup was correct and label-scoped, but
+    nothing ever ran `image prune`, `builder prune` or `volume prune` — so the lab
+    host accumulated every intermediate layer from every scenario image build until
+    the disk filled. Anonymous volumes were worse: `container.remove(force=True)`
+    omitted `v=True`, so one orphaned on *every* teardown.
+
+    Deliberately conservative, because an over-eager prune on the lab host means
+    every subsequent lab start pays a full image pull:
+
+    * images: `dangling=True` only — untagged layers with nothing referencing them.
+      A blanket `until=` prune would delete the scenario base images themselves,
+      which are large and slow to rebuild.
+    * volumes: unused only. Nothing here is stateful; lab state lives in the
+      container filesystem and the DB.
+    * build cache: aged out rather than emptied, so an incremental rebuild still
+      hits warm layers.
+
+    Reports reclaimed bytes so the value is measurable rather than assumed.
+    """
+    from django.conf import settings
+
+    try:
+        import docker
+    except Exception as exc:
+        return {"status": "docker_unavailable", "error": str(exc)}
+
+    try:
+        client = docker.DockerClient(
+            base_url=getattr(settings, "DOCKER_SOCKET", "unix:///var/run/docker.sock"),
+            timeout=60,
+        )
+    except Exception as exc:
+        # Expected on any node that is not the lab host.
+        logger.debug("prune_docker_artifacts: no docker daemon here (%s)", exc)
+        return {"status": "not_applicable"}
+
+    reclaimed = {}
+    try:
+        for label, call in (
+            ("images", lambda: client.images.prune(filters={"dangling": True})),
+            ("volumes", lambda: client.volumes.prune()),
+            ("build_cache", lambda: client.api.prune_builds(filters={"until": "168h"})),
+        ):
+            try:
+                result = call() or {}
+                reclaimed[label] = int(result.get("SpaceReclaimed") or 0)
+            except Exception as exc:
+                # One unsupported prune (older API, rootless daemon) must not stop
+                # the others — the disk pressure is usually in a different bucket.
+                logger.warning("prune_docker_artifacts: %s prune failed: %s", label, exc)
+                reclaimed[label] = None
+    finally:
+        try:
+            client.close()
+        except Exception:
+            pass
+
+    total = sum(v for v in reclaimed.values() if v)
+    logger.info(
+        "prune_docker_artifacts: reclaimed %.1f MB (%s)", total / 1_048_576, reclaimed
+    )
+    return {"status": "ok", "reclaimed_bytes": reclaimed, "total_bytes": total}
+
+
+@shared_task(autoretry_for=(Exception,), retry_backoff=60, retry_kwargs={"max_retries": 2})
 def cleanup_orphaned_containers():
     """
     Remove Docker containers and cloud instances that don't have a matching active lab session.
@@ -241,45 +370,30 @@ def cleanup_orphaned_containers():
     return results
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=30, retry_kwargs={"max_retries": 2})
 def recalculate_leaderboard():
     """
-    Recalculate global leaderboard from progress data.
-    Runs hourly via Celery Beat.
+    Recalculate the global leaderboard snapshot from progress data.
+    Scheduled daily (see celery_app.beat_schedule) — nothing reads the table yet.
+
+    Delegates to apps.leaderboard.services, which is the single hardened
+    implementation. This task used to carry a second, near-identical copy of the
+    delete + bulk_create; the copy drifted from the original (audit Z3-7) and only
+    one of the two was covered by tests. Two implementations of one invariant means
+    the next person to harden it fixes one and misses the other.
+
+    The dropped copy also annotated `completed_count=Count("id")` and then never
+    used it — `LeaderboardEntry` has no such field, and the rows it built passed
+    only user/scenario/score/rank. Removing it drops a wasted aggregate, not data.
     """
-    from apps.progress.models import UserScenarioProgress
     from apps.leaderboard.models import LeaderboardEntry
-    from django.db.models import Sum, Count
-    from django.db import transaction
+    from apps.leaderboard.services import compute_global_leaderboard
 
-    # Compute from progress
-    rankings = (
-        UserScenarioProgress.objects.filter(completed=True)
-        .values("user_id")
-        .annotate(
-            total_score=Sum("best_score"),
-            completed_count=Count("id"),
-        )
-        .order_by("-total_score")
-    )
+    compute_global_leaderboard()
 
-    entries = []
-    for rank, data in enumerate(rankings, 1):
-        entries.append(LeaderboardEntry(
-            user_id=data["user_id"],
-            scenario=None,  # Global leaderboard
-            score=data["total_score"],
-            rank=rank,
-        ))
-
-    # Batch upsert: delete old and create new in batches to reduce lock time
-    with transaction.atomic():
-        LeaderboardEntry.objects.filter(scenario__isnull=True).delete()
-        batch_size = 500
-        for i in range(0, len(entries), batch_size):
-            LeaderboardEntry.objects.bulk_create(entries[i:i + batch_size])
-    logger.info(f"Leaderboard recalculated: {len(entries)} entries")
-    return {"entries": len(entries)}
+    count = LeaderboardEntry.objects.filter(scenario__isnull=True).count()
+    logger.info(f"Leaderboard recalculated: {count} entries")
+    return {"entries": count}
 
 
 @shared_task(bind=True, max_retries=2, default_retry_delay=30)
@@ -416,7 +530,52 @@ def provision_docker_lab(self, session_id: str):
         raise self.retry(exc=exc)
 
 
-@shared_task
+@shared_task(
+    bind=True,
+    name="celery_app.tasks.teardown_lab_resource",
+    queue="provisioning",
+    max_retries=3,
+    default_retry_delay=10,
+)
+def teardown_lab_resource(self, session_id: str):
+    """Destroy the container / cloud instance backing an already-terminated session.
+
+    Audit Z5-9. `StartLabView` used to tear the user's previous labs down inline,
+    inside the `transaction.atomic()` block that also holds the global capacity
+    advisory lock. That is network I/O — SSH to D4, or the docker daemon — executed
+    while holding a row lock *and* a lock every other lab start in the platform is
+    waiting on. One slow D4 response serialised lab starts for everybody.
+
+    The DB half (marking the session TERMINATED) stays in the transaction, because
+    capacity accounting has to be atomic. Only the resource teardown moved here,
+    scheduled via `transaction.on_commit` so a rolled-back start never destroys a
+    lab the user still has.
+
+    Retried, unlike the old inline version which swallowed every failure into a
+    `logger.warning` — a teardown that quietly fails is a container that runs until
+    the reaper notices, on a box with a hard capacity cap.
+    """
+    from apps.labs.models import LabSession
+    from apps.labs.provisioner import get_provisioner, terminate_lab_session
+
+    try:
+        session = LabSession.objects.get(id=session_id)
+    except LabSession.DoesNotExist:
+        return {"status": "gone"}
+
+    resource_id = session.container_id or session.instance_id
+    if not resource_id:
+        return {"status": "no_resource"}
+
+    try:
+        terminate_lab_session(get_provisioner(session.provider or "docker"), session)
+    except Exception as exc:
+        logger.warning("teardown_lab_resource: session %s failed: %s", session_id, exc)
+        raise self.retry(exc=exc)
+    return {"status": "terminated", "session_id": str(session_id)}
+
+
+@shared_task(autoretry_for=(Exception,), retry_backoff=30, retry_kwargs={"max_retries": 2})
 def cleanup_expired_otps():
     """
     Remove expired OTP records older than 24 hours.
@@ -429,7 +588,7 @@ def cleanup_expired_otps():
     return {"deleted_otps": deleted}
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=30, retry_kwargs={"max_retries": 2})
 def cleanup_expired_tokens():
     """
     Remove used/expired password reset tokens older than 7 days.
@@ -443,7 +602,7 @@ def cleanup_expired_tokens():
     return {"deleted_tokens": deleted}
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=30, retry_kwargs={"max_retries": 2})
 def cleanup_old_audit_logs():
     """
     Remove audit log entries older than 90 days.
@@ -456,7 +615,7 @@ def cleanup_old_audit_logs():
     return {"deleted_audit_logs": deleted}
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=30, retry_kwargs={"max_retries": 2})
 def cleanup_old_notifications():
     """
     Remove read notifications older than 60 days.
@@ -655,6 +814,7 @@ def deliver_jira_team_reply(
     scenario_slug: str = "",
 ):
     """Delayed Jira @team bot reply — applies simulation ops then posts comment."""
+    from apps.jira_integration.pending_team_replies import cancel_pending_for_issue
     from apps.jira_integration.team_bots import deliver_team_reply_now
 
     deliver_team_reply_now(
@@ -665,8 +825,28 @@ def deliver_jira_team_reply(
         actions or [],
         scenario_slug,
     )
+    # Celery path won — drop the durable pending row so beat does not double-post.
+    try:
+        cancel_pending_for_issue(issue_key)
+    except Exception:  # pragma: no cover
+        pass
     logger.info("Jira team reply delivered issue=%s author=%s", issue_key, author)
     return {"issue_key": issue_key, "author": author}
+
+
+@shared_task
+def sweep_pending_team_replies():
+    """Beat sweeper for durable @team replies (audit X2b).
+
+    Re-delivers any pending row whose countdown was lost (worker restart /
+    broker drop). Idempotent with the Celery countdown path via cancel-on-deliver.
+    """
+    from apps.jira_integration.pending_team_replies import deliver_due_pending_team_replies
+
+    result = deliver_due_pending_team_replies()
+    if result.get("delivered") or result.get("failed"):
+        logger.info("pending team reply sweep: %s", result)
+    return result
 
 
 @shared_task
@@ -731,3 +911,184 @@ from celery_app.tasks_monitoring import check_business_signals  # noqa: E402,F40
 # Without this, fire_org_webhook().delay() raises and silently degrades to a
 # synchronous send — which is the latency problem it exists to remove.
 from apps.accounts.webhooks import deliver_org_webhook  # noqa: E402,F401
+
+
+@shared_task(autoretry_for=(Exception,), retry_backoff=60, retry_kwargs={"max_retries": 2})
+def purge_expired_personal_data():
+    """Enforce the retention periods in settings for the sensitive data classes.
+
+    Audit Z4-2: interview messages (free-text candidate speech), async video,
+    resumes (file + parsed text) and CommandHistory had no retention and no purge
+    — all plaintext, indefinite, stored alongside employer and current_package_lpa.
+
+    Each period defaults to 0 = REPORT ONLY. The task still counts what it would
+    remove and logs it, so the owner picks a retention period against real volumes
+    instead of guessing; silently deleting a customer's interview reports because a
+    default looked sensible would be worse than the gap being closed. Set the
+    matching RETENTION_*_DAYS env var to start actually purging.
+
+    Resumes are cleared field-by-field rather than by deleting CandidateProfile,
+    which would cascade away the whole interview history. Assigning None to
+    resume_file and saving lets the pre_save handler in common/file_cleanup remove
+    the blob from disk too — clearing the DB column alone would orphan the file.
+    """
+    from django.conf import settings
+
+    from apps.accounts.models import AccountLifecycleEvent
+    from apps.interviews.models import AsyncVideoResponse, CandidateProfile, InterviewMessage
+    from apps.labs.models import CommandHistory
+
+    now = timezone.now()
+    report: dict[str, dict] = {}
+
+    def _sweep(label, days, queryset_for, purge):
+        enabled = int(days or 0) > 0
+        if not enabled:
+            # Still measure, so "how much would we delete?" is answerable.
+            days = 365
+        cutoff = now - timedelta(days=int(days))
+        qs = queryset_for(cutoff)
+        count = qs.count()
+        if enabled and count:
+            purge(qs)
+        report[label] = {
+            "enabled": enabled,
+            "retention_days": int(days),
+            "matched": count,
+            "purged": count if enabled else 0,
+        }
+        if count and not enabled:
+            logger.info(
+                "retention: %s — %d record(s) older than %d days would be purged "
+                "(set RETENTION_%s_DAYS to enable)",
+                label, count, int(days), label.upper(),
+            )
+        elif enabled and count:
+            logger.info("retention: %s — purged %d record(s)", label, count)
+
+    _sweep(
+        "interview_message",
+        getattr(settings, "RETENTION_INTERVIEW_MESSAGE_DAYS", 0),
+        lambda c: InterviewMessage.objects.filter(created_at__lt=c),
+        lambda qs: qs.delete(),
+    )
+    _sweep(
+        "async_video",
+        getattr(settings, "RETENTION_ASYNC_VIDEO_DAYS", 0),
+        lambda c: AsyncVideoResponse.objects.filter(created_at__lt=c),
+        lambda qs: qs.delete(),
+    )
+    _sweep(
+        "command_history",
+        getattr(settings, "RETENTION_COMMAND_HISTORY_DAYS", 0),
+        lambda c: CommandHistory.objects.filter(timestamp__lt=c),
+        lambda qs: qs.delete(),
+    )
+
+    def _purge_resumes(qs):
+        # Row-by-row: assigning None and saving fires the file_cleanup pre_save
+        # handler, so the blob leaves the disk. A bulk update() would skip signals
+        # and orphan every file.
+        for profile in qs.iterator(chunk_size=200):
+            profile.resume_file = None
+            profile.resume_text = ""
+            profile.resume_parsed = {}
+            profile.save(update_fields=["resume_file", "resume_text", "resume_parsed"])
+
+    _sweep(
+        "resume",
+        getattr(settings, "RETENTION_RESUME_DAYS", 0),
+        lambda c: CandidateProfile.objects.filter(updated_at__lt=c).exclude(
+            resume_file="", resume_text="",
+        ),
+        _purge_resumes,
+    )
+
+    # Audit Z4-12 leftover: email kept after inactive deletion for anti-abuse.
+    # Basis + TTL must be stated (privacy page) and enforced here — unbounded
+    # retention of a deleted user's email is the defect, not the retention itself.
+    _sweep(
+        "account_lifecycle",
+        getattr(settings, "RETENTION_ACCOUNT_LIFECYCLE_DAYS", 0),
+        lambda c: AccountLifecycleEvent.objects.filter(created_at__lt=c),
+        lambda qs: qs.delete(),
+    )
+
+    # ── Operational growth (audit Z5-8) ────────────────────────────────────────
+    #
+    # Different motivation from the four classes above, same discipline. These are
+    # not privacy risks; they are the tables that decide backup and restore time.
+    # D3 is 2 vCPU with no read replica, `pg_dump` grows linearly and restore is
+    # single-threaded, so unbounded growth converts into RTO — at 50 GB, hours.
+    # SessionRecording alone stores up to 5,000 I/O events per session in a
+    # JSONField (~500 MB/day of JSONB at 1,000 labs/day).
+    #
+    # Report-only by default for the same reason as above: a guessed default that
+    # shipped enabled would delete a customer's session replays the first night it
+    # ran. The counts tell the owner what the real volumes are first.
+    from apps.billing.models import ProcessedWebhookEvent
+    from apps.labs.models import IncidentRun, LabSession, SessionRecording
+    from apps.notifications.models import Notification
+
+    _sweep(
+        "session_recording",
+        getattr(settings, "RETENTION_SESSION_RECORDING_DAYS", 0),
+        lambda c: SessionRecording.objects.filter(created_at__lt=c),
+        lambda qs: qs.delete(),
+    )
+
+    def _clear_snapshots(qs):
+        # The snapshot is only meaningful while a lab can still be resumed, but
+        # it is kept forever — multi-hundred-KB of JSON per row. Cleared with
+        # update() rather than delete(): the LabSession row itself is the
+        # completion record that progress, grading and billing all reference.
+        #
+        # `{}` and not `None`: the column is `JSONField(default=dict)` with no
+        # null=True, so nulling it raises IntegrityError. The full suite caught
+        # that; the isolated run did not, because the enabling override_settings
+        # only exists in a couple of tests.
+        qs.update(simulation_snapshot={})
+
+    _sweep(
+        "lab_snapshot",
+        getattr(settings, "RETENTION_LAB_SNAPSHOT_DAYS", 0),
+        # Terminal states only. A PROVISIONING or RUNNING session is live no
+        # matter how old its row looks, and clearing its snapshot mid-lab would
+        # destroy the learner's work in place.
+        lambda c: LabSession.objects.filter(
+            ended_at__lt=c,
+            status__in=("COMPLETED", "FAILED", "TERMINATED", "EXPIRED"),
+        ).exclude(simulation_snapshot={}),
+        _clear_snapshots,
+    )
+
+    _sweep(
+        "webhook_event",
+        getattr(settings, "RETENTION_WEBHOOK_EVENT_DAYS", 0),
+        # These rows are the durable double-fulfilment guard, so the retention
+        # floor is not a preference — it must comfortably exceed any gateway's
+        # replay window (Razorpay retries for about a day). The default measure of
+        # 365 days is far beyond it; do not set this below ~90.
+        lambda c: ProcessedWebhookEvent.objects.filter(created_at__lt=c),
+        lambda qs: qs.delete(),
+    )
+
+    _sweep(
+        "read_notification",
+        getattr(settings, "RETENTION_READ_NOTIFICATION_DAYS", 0),
+        # Read only. An unread notification is still pending work for the user, so
+        # age alone is not a reason to remove it.
+        lambda c: Notification.objects.filter(created_at__lt=c, read=True),
+        lambda qs: qs.delete(),
+    )
+
+    _sweep(
+        "incident_run",
+        getattr(settings, "RETENTION_INCIDENT_RUN_DAYS", 0),
+        # Cascades to Postmortem, which is the point — an orphaned postmortem
+        # references a run nobody can look at.
+        lambda c: IncidentRun.objects.filter(started_at__lt=c),
+        lambda qs: qs.delete(),
+    )
+
+    return report

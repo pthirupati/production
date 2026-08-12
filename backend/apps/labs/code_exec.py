@@ -44,6 +44,8 @@ import functools
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -60,10 +62,56 @@ _FILE_SIZE_BYTES = 16 * 1024 * 1024        # 16 MB RLIMIT_FSIZE
 _MAX_PROCESSES = 64        # RLIMIT_NPROC — stop fork bombs taking down the host
 _MAX_OPEN_FILES = 256      # RLIMIT_NOFILE — bound fd exhaustion
 
-SUPPORTED_LANGUAGES = {"python", "javascript"}
+# "sql" grades through the Python runtime: the harness drives stdlib sqlite3
+# against a throwaway in-memory database, so it needs no new image, binary or
+# dependency — which is what makes it safe to enable everywhere at once.
+SUPPORTED_LANGUAGES = {"python", "javascript", "sql"}
 # Languages we recognise but cannot safely auto-grade on the backend yet.
 # These return needs_review instead of ever auto-passing (fail-closed).
-NEEDS_REVIEW_LANGUAGES = {"bash", "shell", "sh"}
+NEEDS_REVIEW_LANGUAGES = {"bash", "shell", "sh", "java"}
+
+# Languages whose harness IS a Python program, so they reuse the python image,
+# argv and address-space limit even though the learner writes another language.
+PYTHON_HOSTED_LANGUAGES = {"python", "sql"}
+
+# Authoring ``language`` (what the IDE labels) → gradeable ``runtime``.
+# Audit §Y2c: language and runtime must be separable so HTML labs can declare
+# ``language: html`` while still grading through the JS PAGE_HTML harness.
+AUTHORING_TO_RUNTIME = {
+    "python": "python",
+    "polars": "python",
+    "sklearn": "python",
+    "scikit-learn": "python",
+    "javascript": "javascript",
+    "js": "javascript",
+    "node": "javascript",
+    "nodejs": "javascript",
+    "sql": "sql",
+    "html": "javascript",
+    "css": "javascript",
+    "react": "javascript",
+    "jsx": "javascript",
+    "typescript": "javascript",
+    "ts": "javascript",
+    "bash": "bash",
+    "shell": "bash",
+    "sh": "bash",
+    "java": "java",
+}
+
+
+def resolve_runtime(spec: dict | None, language_override: str | None = None) -> str:
+    """Return the gradeable runtime for a coding_spec (audit §Y2c).
+
+    Explicit ``coding_spec.runtime`` wins. Otherwise map the authoring
+    ``language`` (or a request override) through AUTHORING_TO_RUNTIME.
+    """
+    spec = spec or {}
+    explicit = str(spec.get("runtime") or "").strip().lower()
+    if explicit:
+        return explicit
+    lang = str(language_override or spec.get("language") or "python").strip().lower()
+    return AUTHORING_TO_RUNTIME.get(lang, lang)
 
 
 def compose_user_code_from_files(files: dict, entrypoint: str = "") -> str:
@@ -166,8 +214,9 @@ class GradeResult:
 
 def language_runtime_available(language: str) -> bool:
     lang = (language or "").lower()
-    if lang == "python":
-        return True  # we always have the running interpreter
+    if lang in PYTHON_HOSTED_LANGUAGES:
+        # python: the running interpreter. sql: stdlib sqlite3, same interpreter.
+        return True
     if lang == "javascript":
         if shutil.which("node") is not None:
             return True
@@ -321,7 +370,13 @@ _PY_RESULT_PREFIX = "__FIXITLAB_RESULT__:"
 _JS_RESULT_PREFIX = "__FIXITLAB_RESULT__:"
 
 
-def _build_python_harness(user_code: str, tests: list[dict]) -> str:
+def _build_python_harness(
+    user_code: str,
+    tests: list[dict],
+    *,
+    inject_polars: bool = False,
+    inject_sklearn: bool = False,
+) -> str:
     """Compose a Python program that runs each test and emits a JSON verdict.
 
     Each test dict has {name, code, hidden}. `code` runs inside a function with
@@ -333,6 +388,24 @@ def _build_python_harness(user_code: str, tests: list[dict]) -> str:
           "hidden": bool(t.get("hidden"))}
          for i, t in enumerate(tests)]
     )
+    shim_inject = ""
+    if inject_polars:
+        from apps.labs.polars_shim import POLARS_SHIM_SOURCE
+        shim_inject += (
+            "exec(" + repr(POLARS_SHIM_SOURCE) + ", _g)\n"
+            "_g['pl'] = _g.get('pl')\n"
+        )
+    if inject_sklearn:
+        from apps.labs.sklearn_shim import SKLEARN_SHIM_SOURCE
+        shim_inject += (
+            "exec(" + repr(SKLEARN_SHIM_SOURCE) + ", _g)\n"
+            "_g['sklearn'] = _g.get('sklearn')\n"
+            "_g['imblearn'] = _g.get('imblearn')\n"
+            "_g['train_test_split'] = _g.get('train_test_split')\n"
+            "_g['LogisticRegression'] = _g.get('LogisticRegression')\n"
+            "_g['accuracy_score'] = _g.get('accuracy_score')\n"
+            "_g['SMOTE'] = _g.get('SMOTE')\n"
+        )
     # The user's code and the tests are embedded as data and exec'd inside the
     # sandboxed child only — never in our process.
     return (
@@ -340,7 +413,8 @@ def _build_python_harness(user_code: str, tests: list[dict]) -> str:
         "_USER_SRC = " + repr(user_code) + "\n"
         "_TESTS = json.loads(" + repr(payload) + ")\n"
         "_g = {'__name__': '__fixitlab__'}\n"
-        "_results = []\n"
+        + shim_inject
+        + "_results = []\n"
         "_compile_error = None\n"
         "try:\n"
         "    exec(compile(_USER_SRC, '<solution>', 'exec'), _g)\n"
@@ -362,7 +436,120 @@ def _build_python_harness(user_code: str, tests: list[dict]) -> str:
     )
 
 
-def _build_js_harness(user_code: str, tests: list[dict]) -> str:
+_SQL_HARNESS_TEMPLATE = '''\
+import json, sys, sqlite3, traceback
+_USER_SRC = {user_src}
+_TESTS = json.loads({payload})
+_results = []
+_compile_error = None
+
+
+def _fresh():
+    """A database with the learner's script applied, isolated per test.
+
+    Rebuilt for every test so a test that INSERTs or DROPs cannot change the
+    result of the next one — the SQL equivalent of the python harness copying
+    globals per test. In-memory, so this costs microseconds.
+    """
+    con = sqlite3.connect(":memory:")
+    con.executescript(_USER_SRC)
+    return con
+
+
+try:
+    _probe = _fresh()
+    _probe.close()
+except Exception as _e:
+    # A syntax error in the learner's SQL is one compile_error, not N identical
+    # test failures. Report sqlite's own message ("near \\"TABL\\": syntax error")
+    # rather than a Python traceback — the traceback's frames are all harness
+    # internals, which tell a SQL learner nothing and leak our file layout.
+    _compile_error = "{{}}: {{}}".format(type(_e).__name__, _e)
+
+for _t in _TESTS:
+    if _compile_error is not None:
+        _results.append({{"name": _t["name"], "passed": False,
+                          "hidden": _t["hidden"], "message": "solution failed to load"}})
+        continue
+    _con = None
+    try:
+        _con = _fresh()
+
+        def rows(sql, params=()):
+            """All result rows as a list of tuples."""
+            return _con.execute(sql, params).fetchall()
+
+        def scalar(sql, params=()):
+            """First column of the first row, or None when there are no rows."""
+            r = _con.execute(sql, params).fetchone()
+            return r[0] if r else None
+
+        def tables():
+            return [r[0] for r in _con.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name NOT LIKE 'sqlite_%' ORDER BY name")]
+
+        def columns(table):
+            return [r[1] for r in _con.execute("PRAGMA table_info(" + str(table) + ")")]
+
+        def indexes(table):
+            return [r[1] for r in _con.execute("PRAGMA index_list(" + str(table) + ")")]
+
+        def explain(sql):
+            """Query plan text — lets a lab assert an index is actually used."""
+            return " ".join(str(r[-1]) for r in
+                            _con.execute("EXPLAIN QUERY PLAN " + sql))
+
+        _local = {{
+            "rows": rows, "scalar": scalar, "tables": tables, "columns": columns,
+            "indexes": indexes, "explain": explain, "db": _con, "sqlite3": sqlite3,
+        }}
+        exec(compile(_t["code"], "<test:" + _t["name"] + ">", "exec"), _local)
+        _results.append({{"name": _t["name"], "passed": True,
+                          "hidden": _t["hidden"], "message": ""}})
+    except AssertionError as _e:
+        _results.append({{"name": _t["name"], "passed": False, "hidden": _t["hidden"],
+                          "message": (str(_e) or "assertion failed")}})
+    except Exception:
+        _tb = traceback.format_exc(limit=2)
+        _results.append({{"name": _t["name"], "passed": False, "hidden": _t["hidden"],
+                          "message": _tb.splitlines()[-1] if _tb.strip() else "error"}})
+    finally:
+        if _con is not None:
+            _con.close()
+
+sys.stdout.write("\\n{prefix}" + json.dumps(
+    {{"compile_error": _compile_error, "results": _results}}))
+'''
+
+
+def _build_sql_harness(user_code: str, tests: list[dict]) -> str:
+    """Compose a Python program that grades SQL against stdlib sqlite3.
+
+    The learner's submission is a SQL *script* (DDL + DML), applied with
+    ``executescript``. Each test is a Python snippet with query helpers in scope —
+    ``rows`` / ``scalar`` / ``tables`` / ``columns`` / ``indexes`` / ``explain`` —
+    so a test can assert on real query results rather than on the text of the SQL:
+
+        assert scalar("SELECT COUNT(*) FROM orders") == 3
+        assert "idx_orders_customer" in indexes("orders")
+        assert "USING INDEX" in explain("SELECT * FROM orders WHERE customer_id = 1")
+
+    Emits the same JSON verdict as the python/js harnesses, so the result parsing,
+    fail-closed rules and hidden-test handling downstream are unchanged.
+    """
+    payload = json.dumps(
+        [{"name": t.get("name", f"test_{i}"),
+          "code": t.get("code", ""),
+          "hidden": bool(t.get("hidden"))}
+         for i, t in enumerate(tests)]
+    )
+    return _SQL_HARNESS_TEMPLATE.format(
+        user_src=repr(user_code), payload=repr(payload), prefix=_PY_RESULT_PREFIX,
+    )
+
+
+def _build_js_harness(user_code: str, tests: list[dict], *, api_client: dict | None = None) -> str:
     """Compose a Node program that runs each test and emits a JSON verdict.
 
     Each test runs in a fresh Function whose body is `user_code` immediately
@@ -370,6 +557,9 @@ def _build_js_harness(user_code: str, tests: list[dict]) -> str:
     (functions, consts, classes) through normal lexical scope. assert() throws
     on failure. A standalone compile of the user code first surfaces syntax
     errors as a single compile_error rather than N identical test failures.
+
+    When ``api_client`` is set (or truthy empty dict), inject mockFetch from the
+    shared api_client_mock routes so graded fetch() never opens a socket.
     """
     payload = json.dumps(
         [{"name": t.get("name", f"test_{i}"),
@@ -378,8 +568,16 @@ def _build_js_harness(user_code: str, tests: list[dict]) -> str:
          for i, t in enumerate(tests)]
     )
     user_src_json = json.dumps(user_code)
+    prelude = ""
+    if api_client is not None:
+        from apps.labs.api_client_mock import build_mock_fetch_prelude, _DEFAULT_ROUTES
+        routes = None
+        if isinstance(api_client, dict) and api_client.get("routes"):
+            routes = api_client["routes"]
+        prelude = build_mock_fetch_prelude(routes if routes is not None else _DEFAULT_ROUTES)
     return (
-        "const TESTS = " + payload + ";\n"
+        prelude
+        + "const TESTS = " + payload + ";\n"
         "const USER_SRC = " + user_src_json + ";\n"
         "const assert = (c, m) => { if (!c) throw new Error(m || 'assertion failed'); };\n"
         "const results = [];\n"
@@ -419,6 +617,83 @@ class InProcessExecutionForbidden(RuntimeError):
     sandbox is enabled but unavailable, we refuse rather than fall back, and
     ``grade_submission`` turns this into a ``needs_review`` verdict.
     """
+
+
+# ── fail-closed monitoring (AUDIT L2690) ────────────────────────────────────
+# The fail-closed path below is *correct* but was silent: a Docker-socket outage
+# on the labs engine turns every coding submission into needs_review, and the
+# only signal was a logger.error nobody tails. We keep a process-local counter
+# and fire an operational alert (common.alerting — a no-op unless the operator
+# configured ALERT_WEBHOOK_URL/ALERT_EMAIL) so the outage is visible.
+#
+# The alert is rate-limited: a broken engine fails on EVERY submission, so an
+# unthrottled alert would spam the webhook once per learner keystroke-to-submit.
+# One alert per _ALERT_COOLDOWN_SECONDS per process is enough to page someone.
+_ALERT_COOLDOWN_SECONDS = 900.0  # 15 min — long enough to not spam, short
+                                 # enough that a fresh outage pages within a cycle
+_failclosed_lock = threading.Lock()
+_failclosed_state: dict[str, float] = {"count": 0.0, "last_alert_monotonic": 0.0}
+
+
+def failclosed_grading_stats() -> dict:
+    """Snapshot of how often grading has fail-closed in this process.
+
+    ``count`` is monotonic per-process (workers restart; this is a signal, not a
+    ledger). Exposed for ops/health surfaces and asserted by tests.
+    """
+    with _failclosed_lock:
+        return {"count": int(_failclosed_state["count"])}
+
+
+def reset_failclosed_grading_stats() -> None:
+    """Test-only: clear the counter and the alert cooldown (module state)."""
+    with _failclosed_lock:
+        _failclosed_state["count"] = 0.0
+        _failclosed_state["last_alert_monotonic"] = 0.0
+
+
+def _record_failclosed_grading(sandbox_enabled: bool, container_reachable: bool) -> None:
+    """Count a fail-closed grade and, at most once per cooldown, alert on it.
+
+    Never raises — this runs on the grading path and a broken alert channel must
+    not turn a needs_review into a 500.
+    """
+    now = time.monotonic()
+    with _failclosed_lock:
+        _failclosed_state["count"] += 1
+        count = int(_failclosed_state["count"])
+        last = _failclosed_state["last_alert_monotonic"]
+        should_alert = (last == 0.0) or (now - last) >= _ALERT_COOLDOWN_SECONDS
+        if should_alert:
+            _failclosed_state["last_alert_monotonic"] = now
+
+    if not should_alert:
+        return
+
+    try:
+        from apps.labs import sandbox_runner
+        health = sandbox_runner.sandbox_health()
+    except Exception:  # pragma: no cover - defensive; health is best-effort
+        health = {}
+
+    try:
+        from common.alerting import send_alert
+
+        send_alert(
+            "Coding-lab grading is FAILING CLOSED: the container sandbox is "
+            f"unreachable, so submissions are being deferred to manual review "
+            f"instead of graded. SANDBOX_DOCKER={sandbox_enabled}, "
+            f"container_reachable={container_reachable}, "
+            f"fail-closed grades this process={count}, "
+            f"last probe error={health.get('last_error', 'n/a')!r}, "
+            f"consecutive probe failures={health.get('consecutive_failures', 'n/a')}. "
+            "Ops: check DOCKER_SOCKET reachability from the labs engine and that "
+            "python:3.12-alpine / node:20-alpine are pullable.",
+            level="critical",
+            title="FixitLab: coding labs ungradeable (sandbox down)",
+        )
+    except Exception as exc:  # noqa: BLE001 — monitoring must never break grading
+        logger.warning("code_exec: fail-closed alert could not be sent: %s", exc)
 
 
 def _inprocess_grading_allowed() -> bool:
@@ -497,6 +772,9 @@ def _execute(
             "(SANDBOX_DOCKER=%s, container reachable=%s). Failing closed.",
             sandbox_enabled, use_container,
         )
+        # AUDIT L2690: emit a counter + (rate-limited) alert so this outage is
+        # observable. Best-effort — never let monitoring change the verdict.
+        _record_failclosed_grading(sandbox_enabled, use_container)
         raise InProcessExecutionForbidden(
             "container sandbox required in production; in-process grading refused"
         )
@@ -514,6 +792,8 @@ def grade_submission(
     tests: list[dict],
     *,
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
+    api_client: dict | None = None,
+    authoring_language: str | None = None,
 ) -> GradeResult:
     """Run user_code against `tests` in a sandbox and return a GradeResult.
 
@@ -521,8 +801,15 @@ def grade_submission(
     without raising. all_passed is True ONLY when every test ran and passed —
     an empty test list, a missing runtime, a compile error, or a timeout all
     fail closed (all_passed=False).
+
+    ``api_client`` (optional) injects mockFetch into the JS harness from the
+    shared in-process route table — never a real socket.
+
+    ``authoring_language`` (optional) is the IDE label (e.g. ``polars``) when
+    ``language`` is the resolved gradeable runtime (``python``).
     """
     lang = (language or "").lower()
+    auth_lang = (authoring_language or "").lower()
     timeout = max(1, min(int(timeout or DEFAULT_TIMEOUT_SECONDS), MAX_TIMEOUT_SECONDS))
 
     if lang in NEEDS_REVIEW_LANGUAGES:
@@ -550,15 +837,25 @@ def grade_submission(
 
     workdir = tempfile.mkdtemp(prefix="fixitlab_grade_")
     try:
-        if lang == "python":
-            harness = _build_python_harness(user_code, tests)
+        if lang in PYTHON_HOSTED_LANGUAGES:
+            harness = (
+                _build_sql_harness(user_code, tests) if lang == "sql"
+                else _build_python_harness(
+                    user_code, tests,
+                    inject_polars=(auth_lang == "polars" or lang == "polars"),
+                    inject_sklearn=(
+                        auth_lang in ("sklearn", "scikit-learn")
+                        or lang in ("sklearn", "scikit-learn")
+                    ),
+                )
+            )
             script_name = "_runner.py"
             script = os.path.join(workdir, script_name)
             with open(script, "w", encoding="utf-8") as fh:
                 fh.write(harness)
             argv = [sys.executable, "-I", "-B", script]
         else:  # javascript
-            harness = _build_js_harness(user_code, tests)
+            harness = _build_js_harness(user_code, tests, api_client=api_client)
             script_name = "_runner.js"
             script = os.path.join(workdir, script_name)
             with open(script, "w", encoding="utf-8") as fh:

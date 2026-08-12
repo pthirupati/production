@@ -159,10 +159,74 @@ def build_access_control() -> dict:
         ],
         "active_alarms": [],
         "mantrap": {"status": "ready", "occupied": False},
+        # Visitors are real entities so an escort can be attached or dropped;
+        # advance_physical_security escalates the unescorted ones on tick.
+        "visitors": [],
     }
 
 
 def access_op(access: dict, op: str, **kwargs) -> tuple[bool, str, dict]:
+    if op == "sign_in_visitor":
+        visitors = access.setdefault("visitors", [])
+        name = kwargs.get("name") or "visitor.acme"
+        vis = {
+            "id": f"VIS-{len(visitors) + 1:03d}",
+            "name": name,
+            "company": kwargs.get("company") or "Acme Freight",
+            "zone": kwargs.get("zone") or "reception",
+            "escort": kwargs.get("escort"),
+            "status": "on_site",
+            "unescorted_ticks": 0,
+            "signed_in": _now(),
+        }
+        visitors.insert(0, vis)
+        access.setdefault("events", []).insert(0, {
+            "time": _now(), "type": "info",
+            "message": f"Visitor {name} signed in → {vis['zone']}"
+                       + (f" (escort {vis['escort']})" if vis["escort"] else " UNESCORTED"),
+        })
+        return True, f"Visitor {vis['id']} on site", access
+
+    if op == "assign_escort":
+        vid = kwargs.get("visitor_id")
+        visitors = access.get("visitors") or []
+        vis = next((v for v in visitors if v.get("id") == vid), None) if vid else next(
+            (v for v in visitors if v.get("status") == "on_site" and not v.get("escort")), None
+        )
+        if not vis:
+            return False, "No unescorted visitor to escort", access
+        vis["escort"] = kwargs.get("escort") or "tech.oncall"
+        vis["unescorted_ticks"] = 0
+        # Clearing the flag retires the breach so the alarm can be resolved.
+        vis.pop("flagged", None)
+        access["active_alarms"] = [
+            a for a in access.get("active_alarms") or []
+            if vis["name"] not in (a.get("message") or "")
+        ]
+        access.setdefault("events", []).insert(0, {
+            "time": _now(), "type": "allow", "message": f"{vis['escort']} escorting {vis['name']}",
+        })
+        return True, f"{vis['name']} escorted by {vis['escort']}", access
+
+    if op == "sign_out_visitor":
+        vid = kwargs.get("visitor_id")
+        visitors = access.get("visitors") or []
+        vis = next((v for v in visitors if v.get("id") == vid), None) if vid else next(
+            (v for v in visitors if v.get("status") == "on_site"), None
+        )
+        if not vis:
+            return False, "No visitor on site", access
+        vis["status"] = "signed_out"
+        vis["flagged"] = False
+        access["active_alarms"] = [
+            a for a in access.get("active_alarms") or []
+            if vis["name"] not in (a.get("message") or "")
+        ]
+        access.setdefault("events", []).insert(0, {
+            "time": _now(), "type": "info", "message": f"Visitor {vis['name']} signed out",
+        })
+        return True, f"{vis['name']} signed out", access
+
     if op == "badge_in":
         badge_id = kwargs.get("badge_id") or "BADGE-1001"
         zone = kwargs.get("zone") or "data-hall-a"

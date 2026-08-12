@@ -7,38 +7,31 @@ description: 'CONTEXT: A team operating Node.js backends has raised a ticket for
   and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline Node.js application. The architecture is a single
   lab-primary node exposing Express routes, middleware, and package.json; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: Implement debounce(fn, waitMs, clock): return a debounced wrapper that delays
   calling fn until `waitMs` of quiet has passed since the LAST call. Use the injected clock (clock.setTimeout/clearTimeout)
   so the behaviour is deterministic. Each new call cancels the pending timer and schedules a fresh one;
   fn runs with the arguments of the most recent call. The stub does nothing so tests fail.
 
-
   OBJECTIVE: Schedule fn via clock.setTimeout instead of a real timer; Cancel the previous pending timer
   on every new call (clearTimeout); Invoke fn once, after quiet, with the latest call''s arguments. Acceptance
   criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant Express routes, middleware, and package.json), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -215,7 +208,6 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 summary: Complete the implement debounce with an injected clock nodejs lab and verify success with the
   checker
@@ -227,7 +219,7 @@ tags:
 - do
 - hands-on
 - nodejs
-linked_tutorial: nodejs-fundamentals
+linked_tutorial: nodejs-zero-hero
 what_you_will_learn:
 - Schedule fn via clock.setTimeout instead of a real timer
 - Cancel the previous pending timer on every new call (clearTimeout)

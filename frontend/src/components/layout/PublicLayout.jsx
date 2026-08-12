@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useThemeStore } from '../../store/themeStore'
 import { useAuthStore } from '../../store/authStore'
-import { Sun, Moon, Menu, X, Bot } from 'lucide-react'
+import { Sun, Moon, Menu, X, Bot } from '../../ui/eagerIcons'
 import { useState, useEffect } from 'react'
 import SupportBotWidget from '../SupportBotWidget'
 import { PlatformBanners } from '../PlatformBanners'
@@ -9,6 +9,7 @@ import api from '../../api/client'
 import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_LINKS } from '../../constants/publicNav'
 import BubbleNavLink from '../BubbleNavLink'
 import { FixitLogo } from '../design'
+import { useModalA11y } from '../ConfirmModal'
 
 const navLinkClass = (active) =>
   active
@@ -45,6 +46,8 @@ const FOOTER_SECTIONS = [
     links: [
       { to: '/privacy', label: 'Privacy' },
       { to: '/terms', label: 'Terms' },
+      { to: '/refunds', label: 'Refunds' },
+      { to: '/acceptable-use', label: 'Acceptable use' },
     ],
   },
 ]
@@ -53,6 +56,7 @@ export default function PublicLayout({ children }) {
   const { theme, toggleTheme } = useThemeStore()
   const { isAuthenticated } = useAuthStore()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const mobileNavRef = useModalA11y(mobileMenuOpen, () => setMobileMenuOpen(false))
   const [platformConfig, setPlatformConfig] = useState(null)
   const { pathname } = useLocation()
 
@@ -64,6 +68,14 @@ export default function PublicLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-surface-950">
+      {/* Same visually-hidden-until-focused treatment as MainLayout so the link
+          never shows on marketing pages. z-[60] clears the z-50 fixed nav. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[60] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:rounded-md focus:bg-accent-cyan focus:text-surface-950 focus:font-semibold"
+      >
+        Skip to main content
+      </a>
       <nav className="fixed top-0 w-full z-50 border-b border-white/[0.07] bg-surface-950/[0.88] backdrop-blur-[18px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[68px] flex items-center justify-between gap-4">
           <FixitLogo to="/" size="sm" />
@@ -93,14 +105,21 @@ export default function PublicLayout({ children }) {
                 <Link to="/register" className="btn-primary text-sm">Sign Up</Link>
               </div>
             )}
-            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 text-surface-400" aria-label="Toggle menu">
+            <button type="button" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400" aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}>
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
         </div>
 
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-surface-700/50 bg-surface-950/95 backdrop-blur-xl max-h-[70vh] overflow-y-auto">
+          <div
+            ref={mobileNavRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Site navigation"
+            className="lg:hidden border-t border-surface-700/50 bg-surface-950/95 backdrop-blur-xl max-h-[70vh] overflow-y-auto outline-none"
+          >
             <div className="px-4 py-4 space-y-1">
               {PUBLIC_NAV_LINKS.map(({ to, label }) => (
                 <Link
@@ -129,7 +148,9 @@ export default function PublicLayout({ children }) {
 
       <PlatformBanners config={platformConfig} showMaintenance showPromo />
 
-      <main className="pt-[68px]">
+      {/* pt-[68px] clears the fixed nav; scroll-mt keeps the anchor target from
+          landing underneath that header when the skip link jumps here. */}
+      <main id="main-content" role="main" className="pt-[68px] scroll-mt-[68px]" tabIndex={-1}>
         {children}
       </main>
 

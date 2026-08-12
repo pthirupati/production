@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  MessageSquare, Plus, Search, ChevronUp, ChevronDown,
-  Send, Edit3, Trash2, Pin, Lock, Filter, X, Clock, ImagePlus, Flag,
-  Users, Sparkles
+  MessageSquare, Plus, Search, ChevronUp,
+  Send, Edit3, Trash2, Pin, Lock, X, Clock, ImagePlus, Flag,
 } from 'lucide-react'
 import { communityApi } from '../api/community'
 import { useAuthStore } from '../store/authStore'
@@ -26,14 +25,17 @@ function timeAgo(dateStr) {
 }
 
 function AuthorAvatar({ username, size = 'sm' }) {
-  const initials = (username || '?').slice(0, 2).toUpperCase()
+  // A removed author comes back as the literal "[deleted]" (audit Z3-8), and
+  // slicing that gives an avatar reading "[D". Render a neutral dash instead.
+  const isDeleted = username === '[deleted]'
+  const initials = isDeleted ? '–' : (username || '?').slice(0, 2).toUpperCase()
   const colors = [
     'from-accent-cyan/40 to-accent-blue/40 text-accent-cyan border-accent-cyan/20',
     'from-accent-purple/40 to-accent-pink/40 text-accent-purple border-accent-purple/20',
     'from-accent-green/40 to-accent-cyan/40 text-accent-green border-accent-green/20',
     'from-accent-amber/40 to-accent-red/40 text-accent-amber border-accent-amber/20',
   ]
-  const idx = (username || '').charCodeAt(0) % colors.length
+  const idx = isDeleted ? 0 : (username || '').charCodeAt(0) % colors.length
   const dim = size === 'lg' ? 'w-10 h-10 text-sm' : 'w-7 h-7 text-xs'
   return (
     <div className={`${dim} rounded-lg bg-gradient-to-br ${colors[idx]} border flex items-center justify-center font-bold shrink-0`}>

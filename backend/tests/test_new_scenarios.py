@@ -520,9 +520,6 @@ class JavaScenarioCatalogTests(SimpleTestCase):
 from django.core.cache import cache as _dj_cache  # noqa: E402
 
 from apps.labs.provisioner.simulation import vmware_bridge as _bridge  # noqa: E402
-from apps.labs.provisioner.simulation.unified_sim import (  # noqa: E402
-    UnifiedSimulationEngine,
-)
 from apps.vmware_sim.engine import _ensure_session as _vmw_ensure  # noqa: E402
 from apps.vmware_sim.engine import apply_action as _vmw_action  # noqa: E402
 

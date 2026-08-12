@@ -284,7 +284,7 @@ class JiraIssueCommentView(APIView):
         add_comment(ticket, request.user, text, session=ticket.last_session)
 
         from .team_bots import parse_team_mentions, schedule_team_replies
-        from .simulated import add_customer_reply, ticket_detail_payload
+        from .simulated import add_customer_reply
 
         teams = parse_team_mentions(text)
         team_meta = {}

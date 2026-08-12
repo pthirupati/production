@@ -7,7 +7,7 @@ import {
   Boxes, Cloud, FileText, Lock,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
-import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession, SimLoginGateCard } from '../sim/shared'
 import { renderCommvaultV2Page } from './CommvaultV2Panels'
 import '../../styles/sim-products.css'
 import './commvault.css'
@@ -93,8 +93,25 @@ export default function CommvaultSimulator({
   refreshRef.current = refresh
   useEffect(() => {
     if (!loggedIn || !hasLiveJob) return undefined
-    const t = setInterval(() => { refreshRef.current?.() }, 1000)
-    return () => clearInterval(t)
+    // A 1s poll is a network round-trip + full re-render each tick, so stop it
+    // entirely while the tab is hidden instead of burning it in the background.
+    // Backup/restore jobs here are long-running, so the resume path MUST refresh
+    // immediately before restarting the timer — a job routinely reaches a
+    // terminal status while hidden, and only restarting the interval would keep
+    // showing a stale "Running" badge. The hasLiveJob guard above still owns the
+    // real teardown: once every job is terminal the effect re-runs and returns
+    // early, removing the listener along with the timer.
+    let t = null
+    const stop = () => { if (t) { clearInterval(t); t = null } }
+    const start = () => { if (!t) t = setInterval(() => { refreshRef.current?.() }, 1000) }
+    const onVis = () => {
+      if (document.visibilityState === 'visible') { refreshRef.current?.(); start() } else stop()
+    }
+    // refreshRef (not refresh) is deliberate: the effect must not re-run — and
+    // therefore must not drop the listener — every time refresh is re-created.
+    if (document.visibilityState === 'visible') start()
+    document.addEventListener('visibilitychange', onVis)
+    return () => { stop(); document.removeEventListener('visibilitychange', onVis) }
   }, [loggedIn, hasLiveJob])
 
   const chromeProps = {
@@ -125,7 +142,7 @@ export default function CommvaultSimulator({
       <div className={simPanelRoot(embedded, 'bg-[#0c1930]')}>
         <LabChromeBar title="Commvault Command Center" subtitle={scenario?.title || slug} accent="#0b3d78" {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <SimLoginGateCard title="Sign in to Commvault" onClose={onExit} className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold bg-[#0b3d78] flex items-center gap-2">
               <Database size={18} /> CommCell Console
             </div>
@@ -158,7 +175,7 @@ export default function CommvaultSimulator({
                 Training credentials: <span className="font-mono text-slate-700">{CV_LAB_USER}</span> / <span className="font-mono text-slate-700">{CV_LAB_PASS}</span>
               </p>
             </form>
-          </div>
+          </SimLoginGateCard>
         </div>
       </div>
     )

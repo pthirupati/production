@@ -1,0 +1,112 @@
+# FixitLab Certified Platform Architect (Expert) track definition.
+#
+# A track is a weighted, ordered VIEW over scenarios that already exist in the
+# library — the `scenarios:` lists below reference existing FixitLab scenario
+# slugs grouped by skill area. Weights are relative and sum to 100.
+#
+# This is the expert tier that sits ABOVE the associate/professional tracks
+# (RHCSA/RHCE, CKA/CKAD/CKS, LFCS, Terraform Associate): where those each test
+# one product, this tests the cross-domain failures that only show up when
+# Kubernetes, the Linux host, the network, storage, the database, and the
+# delivery pipeline interact. Every slug listed is a hand-authored scenario
+# rated hard — no academy template labs — so the difficulty floor is real and
+# not just a label on the track.
+#
+# Higher passing_score (75) and a longer window than CKS (67/120min) are what
+# make this an expert tier rather than another peer track. Objectives are drawn
+# from six different technology directories on purpose; each has >= 4 live
+# slugs so the exam pool stays well clear of the two-scenario floor.
+
+track:
+  slug: platform-architect-expert
+  code: FL-ARCH-EXPERT
+  name: FixitLab Certified Platform Architect (Expert)
+  vendor: FixitLab
+  description: >
+    The expert-tier capstone above the associate and professional tracks. Every
+    objective maps to hard, hand-authored break-fix labs that span more than one
+    layer at once — cluster scheduling and node health, Linux boot and storage
+    recovery, routing and path-MTU faults, database replication and durability,
+    service-mesh traffic policy, and GitOps delivery pipelines. Candidates are
+    expected to isolate a root cause that crosses system boundaries under time
+    pressure.
+  technology_slug: kubernetes
+  exam_duration_minutes: 180
+  passing_score: 75
+  validity_months: 24
+  order: 11
+
+objectives:
+  - code: fl-arch.cluster-reliability
+    title: Restore cluster scheduling and workload reliability
+    weight: 18
+    order: 1
+    scenarios:
+      - k8s-pod-evicted-disk-pressure
+      - k8s-topology-spread-unschedulable
+      - k8s-priorityclass-preemption
+      - k8s-rollout-stuck-maxunavailable
+      - k8s-statefulset-stuck-ordered
+      - k8s-pod-stuck-terminating
+
+  - code: fl-arch.host-recovery
+    title: Recover a Linux host from boot and storage failure
+    weight: 18
+    order: 2
+    scenarios:
+      # Two directories ship a grub/initramfs lab; these are the rhel-linux
+      # ones, whose declared slugs differ from their directory names.
+      - rhel-linux-grub-rescue-lab
+      - rhel-linux-initramfs-dracut-lab
+      - ext4-superblock-corrupt
+      - inode-exhausted
+      - disk-full-open-deleted-file
+      - fstab-nfs-hung-mount
+
+  - code: fl-arch.network-fabric
+    title: Diagnose routing and path-MTU faults across the fabric
+    weight: 16
+    order: 3
+    scenarios:
+      - networking-bgp-nexthop-unreachable
+      - networking-bgp-route-map-deny
+      - networking-mtu-pmtud-broken
+      - networking-mtu-jumbo-blackhole
+      - networking-linux-bond-vlan-trunk
+      - network-namespace-isolated
+
+  - code: fl-arch.data-durability
+    title: Protect database replication and durability
+    weight: 16
+    order: 4
+    scenarios:
+      - db-postgres-standby-stopped
+      - db-postgres-disk-full-archive
+      - db-postgres-fsync-off
+      - db-mysql-replica-stopped
+      - db-redis-sentinel-down
+      - db-mongodb-oplog-too-small
+
+  - code: fl-arch.traffic-policy
+    title: Control service-to-service traffic policy safely
+    weight: 16
+    order: 5
+    scenarios:
+      - mesh-retry-timeout-storm
+      - mesh-outlier-eject-flapping
+      - mesh-authz-deny-shadow-allow
+      - mesh-locality-lb-drains-region
+      - mesh-circuitbreaker-maxconns-too-low
+      - mesh-envoyfilter-breaks-listener
+
+  - code: fl-arch.delivery-pipeline
+    title: Keep the delivery pipeline correct under drift
+    weight: 16
+    order: 6
+    scenarios:
+      - gitops-app-of-apps-misconfig
+      - gitops-flux-kustomization-dependson-cycle
+      - gitops-argocd-resource-hook-weight-order
+      - gitops-flux-decrypt-sops-key-missing
+      - devops-helm-crd-upgrade-stuck
+      - terraform-state-backend-corrupt

@@ -36,6 +36,14 @@ TRACK_FILES = [
     "cks.yaml",
     "lfcs.yaml",
     "terraform-associate.yaml",
+    "aws-solutions-architect-associate.yaml",
+    "azure-administrator-associate.yaml",
+    "gcp-associate-cloud-engineer.yaml",
+    "python-developer.yaml",
+    "linux-security-engineer.yaml",
+    "network-engineer.yaml",
+    # Expert tier — sits above every associate/professional track above.
+    "platform-architect-expert.yaml",
 ]
 
 

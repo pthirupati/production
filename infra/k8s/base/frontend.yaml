@@ -14,10 +14,23 @@ spec:
     metadata:
       labels: { app: frontend }
     spec:
+      # As with the backend, runAsNonRoot is NOT set: the image is stock
+      # nginx:alpine (frontend/Dockerfile), whose master process needs root to
+      # write /var/cache/nginx and /var/run/nginx.pid. Running non-root here
+      # requires an nginx-unprivileged base and a listen-port change.
+      securityContext:
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: frontend
           image: fixitlab/fixitlab-frontend:latest
           imagePullPolicy: IfNotPresent
+          # NET_BIND_SERVICE is retained on purpose — nginx listens on :80 (a
+          # privileged port), so dropping it outright would break startup.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE"]
           ports:
             - { name: http, containerPort: 80 }
           resources:
@@ -56,3 +69,40 @@ spec:
       resource:
         name: cpu
         target: { type: Utilization, averageUtilization: 70 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend
+  namespace: fixitlab
+  labels: { app: frontend }
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: frontend }
+---
+# Ingress-only, same rationale as the backend policy: the SPA bundle is served
+# to the ingress controller, and egress stays open (the browser, not this pod,
+# calls the API).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend
+  namespace: fixitlab
+  labels: { app: frontend }
+spec:
+  podSelector:
+    matchLabels: { app: frontend }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: ingress-nginx }
+      ports:
+        - { protocol: TCP, port: 80 }
+    - ports:
+        - { protocol: TCP, port: 80 }
+      from:
+        - ipBlock: { cidr: 10.0.0.0/8 }
+        - ipBlock: { cidr: 172.16.0.0/12 }
+        - ipBlock: { cidr: 192.168.0.0/16 }

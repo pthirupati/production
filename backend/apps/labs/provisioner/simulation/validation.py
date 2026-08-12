@@ -185,6 +185,27 @@ def is_trivial_validation_script(script: str) -> bool:
     return len(substantive) == 0
 
 
+def scenario_is_gradeable(
+    *,
+    slug: str,
+    coding_mode: bool = False,
+    lab_mode: str = "",
+    validation_script: str = "",
+) -> bool:
+    """Heuristic for catalog `?gradeable=` (audit §X7b residual).
+
+    Coding labs use the IDE harness. Simulation labs may replace a stub
+    ``check.sh`` via :func:`resolve_simulation_validation_script`. Everything
+    else needs a non-trivial validation script on the scenario row.
+    """
+    if coding_mode:
+        return True
+    script = validation_script or ""
+    if (lab_mode or "") == "simulation":
+        script = resolve_simulation_validation_script(slug or "", script)
+    return bool(script.strip()) and not is_trivial_validation_script(script)
+
+
 def resolve_simulation_validation_script(scenario_slug: str, validation_script: str) -> str:
     """Replace stub check.sh content with real validation rules."""
     script = (validation_script or "").strip()
@@ -248,13 +269,27 @@ def validate_simulation_state(
     if not script or is_trivial_validation_script(script):
         return False, "Validation not configured — fix the scenario before checking"
 
+    # ── Engine state assertions (audit G2) — prefer world-model over FIXED-OK ──
+    _mslug = (getattr(state, "scenario_slug", "") or "").strip()
+    if _mslug:
+        sid = (
+            getattr(engine, "lab_session_id", None)
+            or getattr(state, "session_id", None)
+            or getattr(getattr(getattr(engine, "shell", None), "state", None), "session_id", None)
+        )
+        if sid:
+            from apps.labs.provisioner.simulation.state_assertions import evaluate_slug_assertions
+
+            verdict = evaluate_slug_assertions(str(sid), _mslug)
+            if verdict is not None:
+                return verdict
+
     # ── Marker-fix scenarios are authoritative & fail-closed (audit P0-1) ──
     # Scenarios whose documented remediation is "apply the fix and append the
     # FIXED-OK sentinel to a specific file" are registered in the e2e marker-fix
     # map. Validate them ONLY by that sentinel: this keeps them fail-closed on
     # the broken state AND on a "touched the file without the sentinel" shortcut,
     # and stops a coarse/`exit 0` check.sh from auto-passing regardless of topic.
-    _mslug = (getattr(state, "scenario_slug", "") or "").strip()
     if _mslug:
         _marker_path = _marker_paths_by_slug().get(_mslug)
         if _marker_path:
@@ -548,7 +583,21 @@ def _run_line_check(
                     failures.append(f"{marker_path} not corrected — apply the documented fix")
                     return True
         # Fail-closed: a scenario only passes when the fix genuinely marked the
-        # GPU healthy. An uninitialised flag must NOT count as resolved.
+        # GPU healthy.
+        #
+        # The `getattr(..., False)` default below used to BE that guard, back when
+        # gpu_healthy was a plain attribute that could be absent. It is now a
+        # PROPERTY over the per-GPU inventory (RHELOSState.gpu_healthy) that always
+        # returns a bool — and returns True for the default inventory — so the
+        # default can never fire and the guard had quietly become dead code.
+        # Restore it explicitly: with no scenario slug there is no marker file and no
+        # preset, so nothing can establish that a fix happened, and a default-healthy
+        # GPU must not be mistaken for a resolved lab. Real labs always carry a slug
+        # (verified across the 359 nvidia-smi scenarios), so this only closes the
+        # no-context hole.
+        if not slug:
+            failures.append("no scenario context — cannot verify the GPU fix")
+            return True
         if not getattr(state, "gpu_healthy", False):
             failures.append("GPU still unhealthy — load the nvidia driver first")
             return True

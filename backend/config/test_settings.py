@@ -90,6 +90,7 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {  # noqa: F405
     "payment": "10000/minute",
     "interview": "10000/minute",
     "strict_anon": "10000/minute",
+    "contact": "10000/minute",
     "lab_start": "10000/minute",
     "token_refresh": "10000/minute",
     "playground": "10000/minute",
@@ -100,13 +101,23 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {  # noqa: F405
     # community test until they were mirrored here.
     "ugc_write": "10000/minute",
     "ugc_light": "10000/minute",
+    "rating_write": "10000/minute",
+    "client_error": "10000/minute",
+    "mfa_verify": "10000/minute",
     "ugc_upload": "10000/minute",
     "ugc_report": "10000/minute",
 }
 
 # Monkey-patch allow_request so throttle classes always pass in tests
 # (covers both global and view-level throttle_classes assignments).
+#
+# The ORIGINAL is preserved so a test can opt back in. Without it, throttling was a
+# project-wide blind spot: a throttle could be deleted, given the wrong scope, or lose
+# its rate, and every test still passed — the protection was literally untestable.
+# Use `common.testing.real_throttling()` to exercise one for real.
 from rest_framework.throttling import SimpleRateThrottle  # noqa: E402
+
+SimpleRateThrottle._real_allow_request = SimpleRateThrottle.allow_request
 SimpleRateThrottle.allow_request = lambda self, request, view: True
 
 # ── Speed up password hashing for tests ──

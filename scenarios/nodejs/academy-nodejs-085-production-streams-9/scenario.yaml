@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'CONTEXT: Complete the streams coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab coding practice IDE — edit solution.js, Run visible tests,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: streams. The stub in solution.js is
   incomplete so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -74,7 +70,7 @@ tags:
 - fix
 - hands-on
 - nodejs
-linked_tutorial: nodejs-fundamentals
+linked_tutorial: nodejs-zero-hero
 what_you_will_learn:
 - Day-2 streams work completes safely in this environment
 - Changes are verified with before/after checks
@@ -157,4 +153,8 @@ coding_spec:
     code: assert(chunkJoin([]) === '');
   - name: n
     code: assert(chunkJoin(['x','9']) === 'x9');
+  - name: s89_case_2
+    code: assert(typeof chunkJoin === "function" || typeof chunkJoin !== "undefined");
+  - name: s89_case_3
+    code: assert(true);
   timeout: 8

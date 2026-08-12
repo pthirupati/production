@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom'
 import { X, Zap, Clock, AlertCircle } from 'lucide-react'
+import { useModalA11y } from './ConfirmModal'
 
 /**
  * Daily-limit popup. Shown as a centered modal window (not an inline banner) so
  * the user clearly understands they've hit the Free-plan cap and what to do.
  */
 export default function LimitReachedModal({ info, onClose }) {
+  const dialogRef = useModalA11y(!!info, onClose)
   if (!info) return null
   const used = info.usage?.labs_today
   const max = info.plan?.max_labs_per_day
@@ -15,16 +17,21 @@ export default function LimitReachedModal({ info, onClose }) {
     <div
       className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
-      role="dialog"
-      aria-modal="true"
+      role="presentation"
     >
       <div
-        className="glass-card relative w-full max-w-md p-6 border-accent-amber/30 bg-surface-900/95 shadow-2xl"
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Daily Limit Reached"
+        className="glass-card relative w-full max-w-md p-6 border-accent-amber/30 bg-surface-900/95 shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 text-surface-500 hover:text-white transition-colors"
+          className="absolute top-4 right-4 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-white transition-colors"
           aria-label="Close"
         >
           <X size={18} />
@@ -58,6 +65,7 @@ export default function LimitReachedModal({ info, onClose }) {
             <Zap size={15} /> Upgrade to Pro
           </Link>
           <button
+            type="button"
             onClick={onClose}
             className="btn-secondary flex-1 px-4 py-2.5 text-sm"
           >

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Play } from 'lucide-react'
+import { ArrowRight, Play } from '../../../ui/eagerIcons'
 import { HeroShowcase } from '../../../components/marketing'
 import { fadeUp, staggerContainer } from '../../../ui/motion'
 

@@ -3,7 +3,7 @@ import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
 import { MonitorPlay, StopCircle, Trash2, Clock, CheckSquare, Square, MinusSquare } from 'lucide-react'
 import toast from 'react-hot-toast'
-import ConfirmModal, { ConfirmDialog } from '../../components/ConfirmModal'
+import { ConfirmDialog } from '../../components/ConfirmModal'
 
 export default function AdminLabs() {
   const [labs, setLabs] = useState([])

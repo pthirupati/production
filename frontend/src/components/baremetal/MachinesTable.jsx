@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState, useRef, useEffect } from 'react'
 import { ChevronDown, Plus, Lock, LifeBuoy } from 'lucide-react'
 import { MaasStatusBadge, PowerIcon } from './MaasStatusBadge'
+import { useModalA11y } from '../ConfirmModal'
 
 const PAGE_SIZE = 25
 
@@ -138,6 +139,9 @@ export default function MachinesTable({
   const [page, setPage] = useState(0)
   const [dialog, setDialog] = useState(null)
   const [dialogVal, setDialogVal] = useState('')
+  // Keeps MaaS's own dialog chrome but borrows the app modal's focus trap,
+  // Escape handling and focus restore.
+  const dialogRef = useModalA11y(!!dialog, () => setDialog(null))
 
   const parsed = useMemo(() => parseQuery(query), [query])
 
@@ -415,8 +419,16 @@ export default function MachinesTable({
 
       {dialog && (
         <div className="maas-dialog-backdrop" onClick={() => setDialog(null)} role="presentation">
-          <div className="maas-dialog" onClick={(e) => e.stopPropagation()} role="dialog">
-            <div className="maas-dialog-head">
+          <div
+            ref={dialogRef}
+            tabIndex={-1}
+            className="maas-dialog"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="maas-dialog-title"
+          >
+            <div className="maas-dialog-head" id="maas-dialog-title">
               {dialog === 'zone' && 'Set zone'}
               {dialog === 'pool' && 'Set resource pool'}
               {dialog === 'tag' && 'Add tag'}

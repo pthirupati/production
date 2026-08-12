@@ -3,21 +3,17 @@ description: 'CONTEXT: A team operating Ansible automation has raised a ticket f
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline Ansible control node. The architecture is a single
   lab-primary node exposing inventory, playbooks, roles, and ansible-playbook; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: Ansible control node with an inventory including web1 and web2. Running ansible-playbook
   site.yml fails on web2 (a task errors there); web1 completes successfully.
-
 
   OBJECTIVE: Run the playbook and identify the exact failed task and host (web2); Fix the underlying cause
   on web2 (e.g. the failing service or its config); Re-run the playbook and confirm web2 shows ok/changed
   with failed=0. Acceptance criteria: the change is minimal and reversible, and success means `ansible
   webservers -m ping` includes `SUCCESS`.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
@@ -25,16 +21,13 @@ description: 'CONTEXT: A team operating Ansible automation has raised a ticket f
   Check your work continuously against the objective — success means `ansible webservers -m ping` includes
   `SUCCESS`.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `ansible webservers -m ping` includes `SUCCESS`.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -82,7 +75,6 @@ hints:
 
     3. Confirm `ansible webservers -m ping` succeeds.
 
-
     WHY: Ansible labs grade real playbook outcomes, not marker files.'
 initial_state: Ansible control node with an inventory including web1 and web2. Running ansible-playbook
   site.yml fails on web2 (a task errors there); web1 completes successfully.
@@ -113,7 +105,7 @@ tags:
 - ansible
 - fix
 - hands-on
-linked_tutorial: ansible-fundamentals
+linked_tutorial: ansible-automation-zero-hero
 what_you_will_learn:
 - Run the playbook and identify the exact failed task and host (web2)
 - Fix the underlying cause on web2 (e.g. the failing service or its config)

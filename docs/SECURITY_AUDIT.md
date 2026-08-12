@@ -150,8 +150,80 @@ Critical (C-01) and the two cookie/admin Highs (A-01, I-01) are closed.
 | **H-03** | Low | Logout doesn't invalidate the current access JTI (valid ≤15 min) | Optionally call `SessionTracker.invalidate_session` for the current JTI on logout | Accepted given the 15-min access lifetime; minor. |
 | **D-01** | Low | Public certificate verifier enables enumeration | Only echo data when a real `UserCertificate` row exists; rate-limit harder | Inherent to a public verifier; acceptable. |
 | **I-03** | Info | Firewall matrix, secret rotation, Vault unseal handling | Verify D2–D4 bind to the private VPC only; define JWT/DB secret rotation cadence; redact credential email | Infrastructure (report-only). |
+| **S-04** | High | Two deleted env files remain reachable as blobs in git history | **Decision: formally accept the history + rotate everything they held.** See "S-04 decision record" below | History rewrite cannot un-publish blobs already pushed to a public remote; rotation is the only control that actually revokes them. |
 
 **Recommended next change (its own PR):** A-03 + A-04 together — make OAuth `state` a verified nonce and require provider-verified email before linking, behind an OAuth E2E. These are the only remaining High-adjacent items and share the same code paths.
+
+---
+
+## S-04 decision record — env blobs in git history
+
+**Date:** 2026-08-09 · **Status:** Decided · **Decision: formally ACCEPT the history as-is and ROTATE
+every credential those files held. Do NOT run `git-filter-repo`.**
+
+### What is actually in history
+
+Two env files were committed and later deleted. The blobs remain reachable by SHA:
+
+| File | Added in | Deleted in | Values |
+|------|----------|------------|--------|
+| `.env.backup.20260401` | `cbd721f75` (2026-04-02) | `337260bbf` (2026-06-05) | Mixed — several `your-…` placeholders, but real local/dev values for the mail, DB, and superuser entries |
+| `deploy/production.env` | `3d35f6b46` (2026-06-05) | `337260bbf` (2026-06-05) | **Real production credentials**, not placeholders |
+
+Variable names only (values are deliberately not restated here, and must never be pasted into a
+tracked file — doing so recreates the leak, and `scripts/check-no-secrets-in-git.sh` would only catch
+it if the name happens to hit its alternation): `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+`DO_API_TOKEN`, `DO_SSH_KEY_PEM`, `AWS_LAB_KEY_PEM`, `POSTGRES_PASSWORD`, `DJANGO_SECRET_KEY`,
+`EMAIL_HOST_PASSWORD`, `SUPERUSER_PASSWORD`, plus the Redis/RabbitMQ/Celery broker URLs (which carry
+their passwords inside the URL userinfo).
+
+**Correction to the original finding.** The audit implied these were mostly placeholder values. They
+are not. Re-measuring `deploy/production.env` at `3d35f6b46` shows a 40-character `AWS_SECRET_ACCESS_KEY`,
+a `dop_v1`-prefixed 71-character `DO_API_TOKEN`, and 20–64 character high-entropy values for
+`POSTGRES_PASSWORD`, `DJANGO_SECRET_KEY`, and `SUPERUSER_PASSWORD` — i.e. live secrets, in the shape
+the issuing provider actually emits. `EMAIL_HOST_PASSWORD` is byte-identical across both files, so it
+was reused between the local backup and production. Treat all of the above as **disclosed**.
+
+*Unchanged and still true:* the live `.env` / `.env.production` were **never** tracked
+(`git log --all --full-history -- .env .env.production` is empty). The 2026-07 ".env secrets" P0 is
+resolved as literally scoped; this is a distinct, older exposure.
+
+### Why accept rather than rewrite
+
+1. **A rewrite does not revoke anything.** Both commits are on `origin/main` at
+   `github.com/pthirupati/production`. Anything already cloned, forked, or scraped keeps the blobs.
+   GitHub also retains unreachable objects, so the SHAs stay fetchable via the API until a manual
+   GC/support request. Rewriting produces the *appearance* of remediation while the credentials stay
+   equally valid — which is worse than accepting, because it invites skipping the rotation.
+2. **Rotation is the only control with real effect**, and it is required identically under both
+   options. Once rotated, the blobs are inert and the rewrite buys nothing.
+3. **The blast radius is large and the payoff is zero.** The blobs are 932 commits behind `HEAD`, and
+   both are contained in ~30 remote branches including open dependabot PRs. A rewrite changes every
+   SHA since 2026-04, force-pushes over shared branches, breaks every open PR and every existing
+   clone, and invalidates the commit SHAs referenced throughout this document and
+   `docs/AUDIT_2026_08_TODO.md`.
+
+**What would change this decision:** if the repository is ever made public *and* the credentials
+cannot be rotated (e.g. a third-party key with no rotation path), revisit. That does not apply to any
+of the values above — all are self-issued and rotatable.
+
+### Required follow-up (this decision is not complete without it)
+
+Acceptance is conditional on rotation. Until each item below is done, treat the corresponding
+credential as compromised. These are owner-only, server-side actions — no code change closes them:
+
+- [ ] Rotate `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`; audit CloudTrail for use from unexpected IPs.
+- [ ] Revoke and reissue `DO_API_TOKEN`; review the DO activity log for unrecognized actions.
+- [ ] Rotate `POSTGRES_PASSWORD`, and the Redis/RabbitMQ passwords carried in the broker URLs.
+- [ ] Rotate `DJANGO_SECRET_KEY` (invalidates existing sessions/signed values — schedule accordingly).
+- [ ] Rotate `EMAIL_HOST_PASSWORD` — **reused** across both files, so it has the widest exposure.
+- [ ] Reset `SUPERUSER_PASSWORD` and confirm no unexpected superuser logins.
+- [ ] Replace the `DO_SSH_KEY_PEM` / `AWS_LAB_KEY_PEM` keypairs and remove the old public keys from
+      `authorized_keys` on D1–D4 and from the DO/AWS key registries.
+
+Prevention for the recurrence path is tracked separately as S1–S3 in `docs/AUDIT_2026_08_TODO.md`
+(broaden the scanner's file globs, and run it on PR rather than only on `workflow_dispatch`) — that is
+what stops the *next* env file from landing, which history rewriting would not have done either.
 
 ---
 

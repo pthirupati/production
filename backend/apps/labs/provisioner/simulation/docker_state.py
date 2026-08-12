@@ -3,12 +3,26 @@
 Backs the unified shell so `docker ps/images/run/build/stop/rm/logs/exec/inspect/
 network/volume/compose` all operate on one mutable object graph instead of canned
 strings. State is plain lists/dicts so it round-trips through the session snapshot.
+
+The same object graph also renders the Docker Engine REST API (see
+`engine_api_*` below) so labs can teach `curl --unix-socket /var/run/docker.sock`
+against the exact schema a real daemon returns.
 """
 
 from __future__ import annotations
 
 import random
+import re
 from typing import Any
+
+# Engine API version the mock reports; matches the socket paths labs curl.
+ENGINE_API_VERSION = "1.43"
+
+# "0.0.0.0:80->80/tcp" / "6379/tcp" — the CLI display form we store internally.
+_PORT_MAPPED_RE = re.compile(
+    r"^(?:(?P<ip>[\d.:a-fA-F\[\]]+):)?(?P<public>\d+)->(?P<private>\d+)/(?P<proto>\w+)$"
+)
+_PORT_BARE_RE = re.compile(r"^(?P<private>\d+)/(?P<proto>\w+)$")
 
 
 def _short_id() -> str:
@@ -397,6 +411,166 @@ class DockerState:
                 f"{round(mem / 512 * 100, 1):<8}% 1.2kB / 0.9kB    {random.randint(1, 20)}"
             )
         return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Engine REST API (GET /containers/json, /images/json, ...)
+    # ------------------------------------------------------------------
+
+    def _created_epoch(self, age_seconds: int) -> int:
+        """Unix `Created` stamp implied by an internal relative age.
+
+        The sim has no wall clock it can trust across snapshot restore, so age
+        is anchored to daemon "boot" rather than time.time() — that keeps two
+        calls in one session self-consistent, which is what learners diff.
+        """
+        return max(0, self._epoch_base - int(age_seconds))
+
+    @property
+    def _epoch_base(self) -> int:
+        # Fixed anchor (2024-01-01T00:00:00Z) so Created never drifts between
+        # calls or across a to_dict/from_dict round trip.
+        return 1704067200
+
+    def _api_ports(self, ports: str) -> list[dict[str, Any]]:
+        """Turn the CLI display string into the API's structured Ports array."""
+        out: list[dict[str, Any]] = []
+        for chunk in (ports or "").split(","):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            m = _PORT_MAPPED_RE.match(chunk)
+            if m:
+                out.append({
+                    "IP": m.group("ip") or "0.0.0.0",
+                    "PrivatePort": int(m.group("private")),
+                    "PublicPort": int(m.group("public")),
+                    "Type": m.group("proto"),
+                })
+                continue
+            m = _PORT_BARE_RE.match(chunk)
+            if m:
+                # Exposed but unpublished: no IP/PublicPort, exactly like real docker.
+                out.append({
+                    "PrivatePort": int(m.group("private")),
+                    "Type": m.group("proto"),
+                })
+        return out
+
+    def _api_status(self, c: dict[str, Any]) -> str:
+        if c["state"] == "running":
+            return f"Up {_uptime_phrase(c['ageSeconds'])}"
+        if c["state"] == "created":
+            return "Created"
+        return f"Exited ({c['exitCode']}) {_uptime_phrase(c['ageSeconds'])} ago"
+
+    def _api_container(self, c: dict[str, Any]) -> dict[str, Any]:
+        net = c.get("network") or "bridge"
+        ip = c.get("ip") or ""
+        return {
+            "Id": c["id"],
+            # Real docker always leading-slashes names and returns a list.
+            "Names": [f"/{c['name']}"],
+            "Image": c["image"],
+            "ImageId": f"sha256:{c['id']}",
+            "Command": c.get("command", ""),
+            "Created": self._created_epoch(c["ageSeconds"]),
+            "Ports": self._api_ports(c.get("ports", "")),
+            "Labels": {},
+            "State": c["state"],
+            "Status": self._api_status(c),
+            "HostConfig": {"NetworkMode": net},
+            "NetworkSettings": {
+                "Networks": {
+                    net: {
+                        "NetworkID": next(
+                            (n["id"] for n in self.networks if n["name"] == net), ""
+                        ),
+                        "IPAddress": ip,
+                    }
+                }
+            },
+            "Mounts": [],
+        }
+
+    def engine_api_containers(self, show_all: bool = False) -> list[dict[str, Any]]:
+        """GET /containers/json — `all=1` includes non-running containers."""
+        return [
+            self._api_container(c)
+            for c in self.containers
+            if show_all or c["state"] == "running"
+        ]
+
+    def _api_image(self, img: dict[str, Any]) -> dict[str, Any]:
+        size_bytes = int(img["sizeMb"]) * 1024 * 1024
+        repo_tag = f"{img['repository']}:{img['tag']}"
+        return {
+            "Id": f"sha256:{img['id']}",
+            "ParentId": "",
+            "RepoTags": [repo_tag],
+            "RepoDigests": [f"{img['repository']}@sha256:{img['id']}"],
+            "Created": self._created_epoch(img["ageSeconds"]),
+            "Size": size_bytes,
+            "VirtualSize": size_bytes,
+            "SharedSize": -1,
+            "Labels": {},
+            # Real docker reports -1 when it hasn't counted referencing containers.
+            "Containers": -1,
+        }
+
+    def engine_api_images(self) -> list[dict[str, Any]]:
+        """GET /images/json."""
+        return [self._api_image(i) for i in self.images]
+
+    def engine_api(self, path: str) -> tuple[int, Any]:
+        """Route an Engine API path to (status_code, json_body).
+
+        Accepts both bare (`/containers/json`) and versioned
+        (`/v1.43/containers/json`) paths, plus an optional query string.
+        """
+        raw = (path or "").strip()
+        if not raw.startswith("/"):
+            raw = "/" + raw
+        route, _, query = raw.partition("?")
+        route = re.sub(r"^/v\d+\.\d+", "", route).rstrip("/") or "/"
+
+        if not self.daemon_running:
+            # Matches what a client sees when the socket has no daemon behind it.
+            return 503, {"message": "dial unix /var/run/docker.sock: connect: connection refused"}
+
+        params = {}
+        for part in query.split("&"):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                params[k] = v
+        show_all = params.get("all", "").lower() in ("1", "true")
+
+        if route == "/containers/json":
+            return 200, self.engine_api_containers(show_all=show_all)
+        if route == "/images/json":
+            return 200, self.engine_api_images()
+        if route in ("/_ping", "/ping"):
+            return 200, "OK"
+        if route == "/version":
+            return 200, {
+                "Version": "24.0.7",
+                "ApiVersion": ENGINE_API_VERSION,
+                "MinAPIVersion": "1.24",
+                "Os": "linux",
+                "Arch": "amd64",
+            }
+        if route == "/info":
+            return 200, {
+                "Containers": len(self.containers),
+                "ContainersRunning": sum(
+                    1 for c in self.containers if c["state"] == "running"
+                ),
+                "ContainersStopped": sum(
+                    1 for c in self.containers if c["state"] != "running"
+                ),
+                "Images": len(self.images),
+                "ServerVersion": "24.0.7",
+            }
+        return 404, {"message": f"page not found: {route}"}
 
     # ------------------------------------------------------------------
     # network / volume create-remove

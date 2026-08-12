@@ -32,14 +32,122 @@ import '../../styles/vscode-workbench.css'
  */
 
 // ── Rule-based prompt analysis (mirrors backend apps/labs/prompt_eval.py) ──
-const ROLE_HINTS = ['you are', 'act as', "you're a", 'you are a', 'as a ', 'imagine you', 'pretend you', 'your role', 'role:', 'persona', 'system prompt']
-const LIMIT_HINTS = ['word', 'words', 'sentence', 'sentences', 'bullet', 'bullets', 'paragraph', 'characters', 'chars', 'under ', 'at most', 'no more than', 'max ', 'maximum', 'limit', 'concise', 'brief', 'short', 'one line', 'tl;dr', 'in 1', 'in 2', 'in 3', 'exactly']
-const EXAMPLE_HINTS = ['example', 'e.g.', 'for instance', 'such as', 'like this', '->', 'sample']
-const FORMAT_HINTS = ['json', 'bullet', 'list', 'table', 'numbered', 'paragraph', 'yaml', 'csv', 'markdown', 'one word', 'one sentence', 'format', 'steps']
+// The hint lists and the matcher below MUST stay byte-for-byte equivalent to
+// prompt_eval.py: the server re-check is the real gate, so any drift makes the
+// UI promise a pass the backend then rejects.
+const ROLE_HINTS = ['you are', 'act as', 'acting as', "you're a", "you're an", 'as a', 'as an', 'imagine you', 'pretend you', 'your role', 'role:', 'persona', 'system prompt', 'you will be', 'assume the role', 'take on the role', 'take on the identity', 'respond as', 'reply as', 'answer as', 'behave like', 'speak as', 'roleplay', 'role-play', 'in the voice of', 'from the perspective of', 'you play', 'your job is', 'your task is to act', 'expert in', 'acts as', 'serve as']
+const LIMIT_HINTS = ['word', 'sentence', 'bullet', 'paragraph', 'character', 'char', 'under', 'at most', 'no more than', 'max', 'maximum', 'limit', 'concise', 'brief', 'briefly', 'short', 'shorter', 'one line', 'single line', 'tl;dr', 'exactly', 'fewer', 'less than', 'no longer than', 'cap', 'token', 'at maximum', 'up to', 'keep it to', 'not exceed', 'one-liner']
+const EXAMPLE_HINTS = ['example', 'e.g.', 'for instance', 'such as', 'like this', '->', 'sample', 'for example', 'demonstrated by', 'as shown', "here's one", 'here is one']
+const FORMAT_HINTS = ['json', 'bullet', 'list', 'table', 'numbered', 'paragraph', 'yaml', 'csv', 'markdown', 'one word', 'one sentence', 'format', 'step', 'schema', 'template', 'heading', 'column', 'field']
 const CONTEXT_HINTS = ['context', 'given', 'based on', 'using the', 'from the', 'here is', 'here are', 'the following', 'according to', '"""', '```', '<document>']
 const DELIMITER_HINTS = ['"""', '```', '<document>', '</document>', '<context>', '<<<', '###', "'''"]
 const CONTRADICTIONS = [['one sentence', 'paragraph'], ['one sentence', 'multi-paragraph'], ['single sentence', 'detailed'], ['brief', 'comprehensive'], ['one word', 'explain in detail']]
 
+// A numeric cap ("in 120 tokens", "3 bullets", "<=200 chars") is a limit even
+// when phrased without any keyword above.
+const NUMERIC_LIMIT_RE = /(?:<=?\s*\d+|\b\d+\s*(?:word|sentence|bullet|line|paragraph|char|character|token|item|point|step)s?\b)/i
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/*
+ * Word-boundary hint matcher. Plain `includes` was the core grading bug:
+ * 'short' fired on 'shortcoming', 'limit' on 'limitations', 'word' on
+ * 'wording', 'persona' on 'personal', and 'as a ' on 'was a '/'has a ' — so
+ * nearly any past-tense sentence satisfied require_any_role. Only a trailing
+ * 's' is allowed; a blanket 'ing'/'ed' would re-break 'word' -> 'wording'.
+ * Longest hints first so 'no more than' wins over 'more'.
+ */
+const compileHints = (hints) => {
+  const uniq = [...new Set(hints.map((h) => h.trim()).filter(Boolean))].sort((a, b) => b.length - a.length)
+  const parts = uniq.map((h) => (/[a-z0-9]$/i.test(h) ? `${escapeRe(h)}s?\\b` : escapeRe(h)))
+  return new RegExp(`(?<![A-Za-z0-9])(?:${parts.join('|')})`, 'i')
+}
+
+const ROLE_RE = compileHints(ROLE_HINTS)
+const LIMIT_RE = compileHints(LIMIT_HINTS)
+const EXAMPLE_RE = compileHints(EXAMPLE_HINTS)
+const FORMAT_RE = compileHints(FORMAT_HINTS)
+
+const assignsRole = (text) => ROLE_RE.test(text)
+const statesLimit = (text) => LIMIT_RE.test(text) || NUMERIC_LIMIT_RE.test(text)
+
+/** Deterministic content reply — mirrors backend prompt_eval.simulate_reply. */
+function simulateClientReply(prompt) {
+  const text = (prompt || '').trim()
+  const low = text.toLowerCase()
+  const words = (text.match(/\S+/g) || []).length
+  const injection = ['ignore previous', 'jailbreak', 'dan mode', 'developer mode']
+  if (injection.some((m) => low.includes(m))) {
+    return {
+      kind: 'refusal',
+      body: 'I cannot override my instructions or enter unrestricted modes.',
+      refused: true,
+    }
+  }
+  const wantsJson = /\bjson\b/.test(low) || low.includes('schema') || text.includes('{"')
+  const hasRole = assignsRole(text)
+  if (wantsJson) {
+    const data = {
+      role: hasRole ? 'expert' : 'assistant',
+      task: 'structured',
+      summary: text.length > 80 ? `${text.slice(0, 80)}…` : text,
+      words_in_prompt: words,
+    }
+    return { kind: 'json', body: JSON.stringify(data, null, 2), refused: false, data }
+  }
+  if (hasRole) {
+    return {
+      kind: 'prose',
+      body: `As your assigned specialist, I will approach this with domain focus. Your request (${words} words) asks for a concrete deliverable.`,
+      refused: false,
+      has_role_tone: true,
+    }
+  }
+  return {
+    kind: 'prose',
+    body: `Here is a generic answer to a ${words}-word prompt without a clear role. Results may be vague.`,
+    refused: false,
+    has_role_tone: false,
+  }
+}
+
+/** Cheap "is this a real word" proxy — no dictionary needed. */
+const looksLikeWord = (token) => {
+  const t = token.toLowerCase().replace(/[^a-z]/g, '')
+  if (t.length < 2) return false
+  if (!/[aeiouy]/.test(t)) return false      // rejects xxx / zzz / qwrt
+  return new Set(t).size > 1                 // rejects aaa / bbb
+}
+
+/*
+ * Reject keyword-stuffed filler ("you are xxx yyy zzz aaa bbb ..."), which used
+ * to clear min_words + require_any_role. Real prompts measure 0.87-0.93
+ * word-like; that gibberish measures 0.13, so 0.6 leaves a wide margin. JSON
+ * prompts ({"name": string}) measure 0.93 and are unaffected.
+ */
+const isGibberish = (raw) => {
+  const tokens = (raw || '').match(/\S+/g) || []
+  if (tokens.length < 6) return false
+  return tokens.filter(looksLikeWord).length / tokens.length < 0.6
+}
+
+/*
+ * Imperative verbs for the live "Clear task" meter. This meter is UI-only — it
+ * drives the quality gauge and the sandbox reply, NOT the completion gate — so
+ * it has no server counterpart to stay in sync with.
+ */
+const ACTION_VERB_RE = compileHints([
+  'summarize', 'summarise', 'write', 'list', 'explain', 'describe', 'compare',
+  'extract', 'classify', 'translate', 'rewrite', 'generate', 'create', 'draft',
+  'analyze', 'analyse', 'review', 'convert', 'return', 'produce', 'identify',
+  'outline', 'suggest', 'recommend', 'find', 'fix', 'debug', 'refactor',
+  'calculate', 'rank', 'sort', 'group', 'label', 'answer', 'respond', 'give',
+  'provide', 'build', 'design', 'plan', 'critique', 'evaluate', 'diagnose',
+])
+
+// Substring match — kept ONLY for author-supplied require/any_of term lists.
+// Scenario YAML ships stems ('instruction' must catch 'instructions', 'param'
+// -> 'parameters'), so those must not get word-boundary treatment.
 const hasAny = (text, needles) => needles.some((n) => text.includes(n))
 const countExamplePairs = (raw) => {
   const arrows = (raw.match(/->|=>|➞|→/g) || []).length
@@ -53,16 +161,24 @@ const countListItems = (raw) => {
 }
 const requestsJson = (text) => text.includes('json') || (text.includes('{') && text.includes('}') && text.includes(':'))
 
+// Exported for unit tests only — these are pure functions, and the grading
+// rules they implement must stay in lockstep with backend prompt_eval.py.
+export { assignsRole, statesLimit, isGibberish, analyzePrompt, evaluateExercise }
+
 /** Score a prompt on the five ingredients — used for the live quality meter. */
 function analyzePrompt(raw) {
   const text = (raw || '').trim().toLowerCase()
   const words = text ? text.split(/\s+/).length : 0
+  // "Clear task" wants an actual imperative verb, not just 6 words of anything —
+  // word count alone let "please help me with this thing" score a full check.
+  const hasActionVerb = ACTION_VERB_RE.test(text)
+  const substantive = !isGibberish(raw || '')
   const checks = [
-    { key: 'role', label: 'Role / persona', ok: hasAny(text, ROLE_HINTS), tip: 'Tell the AI who to be ("You are a…").' },
-    { key: 'context', label: 'Context', ok: hasAny(text, CONTEXT_HINTS) || words > 25, tip: 'Give the background or material it needs.' },
-    { key: 'task', label: 'Clear task', ok: words >= 6, tip: 'State the specific task with an action verb.' },
-    { key: 'constraints', label: 'Constraints', ok: hasAny(text, LIMIT_HINTS), tip: 'Add a length, tone, or "what to avoid".' },
-    { key: 'format', label: 'Output format', ok: hasAny(text, FORMAT_HINTS), tip: 'Ask for bullets, JSON, a table, etc.' },
+    { key: 'role', label: 'Role / persona', ok: assignsRole(text), tip: 'Tell the AI who to be ("You are a…").' },
+    { key: 'context', label: 'Context', ok: hasAny(text, CONTEXT_HINTS) || (substantive && words > 25), tip: 'Give the background or material it needs.' },
+    { key: 'task', label: 'Clear task', ok: words >= 6 && hasActionVerb && substantive, tip: 'State the specific task with an action verb.' },
+    { key: 'constraints', label: 'Constraints', ok: statesLimit(text), tip: 'Add a length, tone, or "what to avoid".' },
+    { key: 'format', label: 'Output format', ok: FORMAT_RE.test(text), tip: 'Ask for bullets, JSON, a table, etc.' },
   ]
   const met = checks.filter((c) => c.ok).length
   const score = Math.round((met / checks.length) * 100)
@@ -78,11 +194,13 @@ function evaluateExercise(raw, success) {
   const missing = []
   const mark = (cond, label) => (cond ? matched : missing).push(label)
 
-  if (s.min_words != null) mark(words >= s.min_words, 'enough detail')
+  // Word COUNT alone was gameable with filler, so min_words also requires the
+  // words to be word-like (mirrors prompt_eval.evaluate_prompt).
+  if (s.min_words != null) mark(words >= s.min_words && !isGibberish(raw || ''), 'enough detail')
   if (s.max_words != null) mark(words <= s.max_words, 'concise enough')
-  if (s.require_any_role) mark(hasAny(text, ROLE_HINTS), 'assigns a role')
-  if (s.mentions_limit) mark(hasAny(text, LIMIT_HINTS), 'states a length/format limit')
-  if (s.mentions_example) mark(hasAny(text, EXAMPLE_HINTS), 'includes an example')
+  if (s.require_any_role) mark(assignsRole(text), 'assigns a role')
+  if (s.mentions_limit) mark(statesLimit(text), 'states a length/format limit')
+  if (s.mentions_example) mark(EXAMPLE_RE.test(text), 'includes an example')
   if (s.has_delimiter) mark(hasAny(raw || '', DELIMITER_HINTS), 'delimits the reference text')
   if (s.requires_json_request) mark(requestsJson(text), 'asks for JSON')
   if (s.no_contradiction) mark(!CONTRADICTIONS.some(([a, b]) => text.includes(a) && text.includes(b)), 'instructions are consistent')
@@ -220,20 +338,14 @@ export default function PromptPlayground({ sessionId, scenario, solved: solvedPr
     const text = sandboxInput.trim()
     if (!text) return
     const analysis = analyzePrompt(text)
-    // Deterministic, rule-based "assistant" reply keyed off prompt quality.
-    let reply
-    if (analysis.score >= 80) {
-      reply = "That's a strong, specific prompt — clear role, task, and format. A real assistant would return exactly the shape you asked for. (This is a rule-based practice reply, not a live model.)"
-    } else if (analysis.score >= 50) {
-      const gap = analysis.checks.find((c) => !c.ok)
-      reply = `Decent prompt. To make the reply more predictable, add: ${gap ? gap.tip : 'a clear format and a constraint.'} (Rule-based practice reply.)`
-    } else {
-      reply = 'That prompt is vague, so the answer would be generic. Add who the AI should be, the exact task, a constraint, and the output format you want. (Rule-based practice reply.)'
-    }
+    // Deterministic content reply — different prompts yield different bodies
+    // (JSON / refusal / role tone), not only coaching tips.
+    const sim = simulateClientReply(text)
+    const reply = `${sim.body}\n\n(Rule-based practice reply — not a live model.)`
     setChat((prev) => [
       ...prev,
       { role: 'user', text },
-      { role: 'assistant', text: reply, analysis },
+      { role: 'assistant', text: reply, analysis, sim },
     ])
     setSandboxInput('')
   }, [sandboxInput])

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Play, Thermometer, Zap, Activity, Cpu } from 'lucide-react'
+import { Play, Thermometer, Zap, Activity, Cpu } from '../../../ui/eagerIcons'
 
 /**
  * Continuous first-person "walk the data hall" animation for the marketing page.

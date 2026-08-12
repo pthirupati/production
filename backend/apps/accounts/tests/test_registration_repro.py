@@ -48,6 +48,7 @@ class EmailOTPRegistrationTest(APITestCase):
                 "password": "Sup3rStr0ng!pw",
                 "first_name": "Fresh",
                 "last_name": "User",
+                "accepted_legal": True,
             },
             format="json",
         )
@@ -60,7 +61,7 @@ class EmailOTPRegistrationTest(APITestCase):
         session_token = self._verified_otp("slow@example.com", age_minutes=5)
         resp = self.client.post(
             "/api/auth/register/",
-            {"session_token": session_token, "password": "Sup3rStr0ng!pw"},
+            {"session_token": session_token, "password": "Sup3rStr0ng!pw", "accepted_legal": True},
             format="json",
         )
         assert resp.status_code == 201, (resp.status_code, dict(resp.data))
@@ -71,7 +72,7 @@ class EmailOTPRegistrationTest(APITestCase):
         session_token = self._verified_otp("stale@example.com", age_minutes=45)
         resp = self.client.post(
             "/api/auth/register/",
-            {"session_token": session_token, "password": "Sup3rStr0ng!pw"},
+            {"session_token": session_token, "password": "Sup3rStr0ng!pw", "accepted_legal": True},
             format="json",
         )
         assert resp.status_code == 400, (resp.status_code, dict(resp.data))
@@ -81,7 +82,7 @@ class EmailOTPRegistrationTest(APITestCase):
         session_token = self._verified_otp("enf@example.com")
         resp = self.client.post(
             "/api/auth/register/",
-            {"session_token": session_token, "password": "Sup3rStr0ng!pw"},
+            {"session_token": session_token, "password": "Sup3rStr0ng!pw", "accepted_legal": True},
             format="json",
         )
         assert resp.status_code == 201, (resp.status_code, dict(resp.data))
@@ -89,17 +90,31 @@ class EmailOTPRegistrationTest(APITestCase):
     def test_full_otp_http_flow(self):
         """send-otp -> verify-otp -> register, like the real frontend."""
         email = "flow@example.com"
+        self._sent_codes = []
+        _real_generate = EmailVerificationOTP.generate.__func__
+
+        def _spy(cls, *args, **kwargs):
+            instance, code, token = _real_generate(cls, *args, **kwargs)
+            self._sent_codes.append(code)
+            return instance, code, token
+
         with mock.patch(
             "apps.notifications.gmail_api.is_gmail_api_configured", return_value=True
         ), mock.patch(
             "apps.accounts.views.dispatch_notification_email", return_value=None
+        ), mock.patch.object(
+            EmailVerificationOTP, "generate", classmethod(_spy)
         ):
             send = self.client.post(
                 "/api/auth/send-otp/", {"email": email}, format="json"
             )
         assert send.status_code == 200, (send.status_code, send.data)
         session_token = send.data["session_token"]
-        code = EmailVerificationOTP.objects.get(session_token=session_token).code
+        # The code is no longer readable from the database — it is hashed (Z4-11) —
+        # so capture the plaintext where the real flow gets it: the value generate()
+        # hands back to be emailed. Reading it out of the DB would have quietly
+        # re-required plaintext storage.
+        code = self._sent_codes[-1]
 
         verify = self.client.post(
             "/api/auth/verify-otp/",
@@ -110,7 +125,7 @@ class EmailOTPRegistrationTest(APITestCase):
 
         reg = self.client.post(
             "/api/auth/register/",
-            {"session_token": session_token, "password": "Sup3rStr0ng!pw"},
+            {"session_token": session_token, "password": "Sup3rStr0ng!pw", "accepted_legal": True},
             format="json",
         )
         assert reg.status_code == 201, (reg.status_code, dict(reg.data))

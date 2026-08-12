@@ -11,18 +11,54 @@
 # all public inbound except SSH). The published ports below bind 0.0.0.0 inside
 # the droplet but the DigitalOcean cloud firewall (scripts/ci-setup-firewalls.sh)
 # restricts 5432/6432 to the D2 private IP only.
+#
+# DATA_BIND_IP (optional): host interface for the published 5432/6432. Unset means
+# 0.0.0.0 and the cloud firewall is the only control — set it to this droplet's
+# private IP in .env.production to add the kernel as a second one.
 
 services:
   database:
     build: ./database
     container_name: fixitlab_db
+    # Postgres 15 puts parallel-query segments in /dev/shm, which Docker caps at
+    # 64 MB by default. With shared_buffers raised to 2 GB (audit Z5-12) that cap
+    # produces "could not resize shared memory segment" on parallel plans — a
+    # failure that only shows up on the larger catalog queries the retune was
+    # meant to speed up.
+    shm_size: 1gb
     volumes:
       - fixitlab_db_data:/var/lib/postgresql/data
     env_file:
       - .env.production
+    # Sized from database/postgresql.conf, NOT picked round: shared_buffers 2G
+    # + shm_size 1G + maintenance_work_mem 512M + work_mem 16M × ~25 active
+    # backends (~0.4G) ≈ 4G of committed allocation before any per-connection
+    # overhead. 6G on the 8G droplet (s-2vcpu-8gb) leaves ~2G for the OS, which
+    # is the load-bearing part: effective_cache_size is set to 6G, and that is a
+    # planner hint about the page cache. Squeeze the cgroup below the working set
+    # and the planner keeps choosing index scans for pages that are no longer
+    # cached. A limit under ~4G would OOM-kill Postgres mid-transaction on
+    # exactly the parallel-query load the shared_buffers retune targeted.
+    # No CPU limit: on 2 vCPU, throttling the DB only moves the queue.
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+        reservations:
+          memory: 2G
     ports:
-      # Reachable from D2 over the VPC; firewall limits source to D2 private IP
-      - "5432:5432"
+      # Reachable from D2 over the VPC; firewall limits source to D2 private IP.
+      # DATA_BIND_IP additionally binds to this droplet's VPC address so the kernel
+      # is a second control alongside the DO cloud firewall (audit O5).
+      #
+      # Opt-in (`:-0.0.0.0`) rather than required (`:?`) unlike app.yml, and the
+      # asymmetry is forced, not a preference: the wired cluster env
+      # (scripts/ci-wire-cluster-env.py) writes APP_PRIVATE_IP into .env.production
+      # but NOT DATA_PRIVATE_IP, and ci-cluster-deploy.sh's deploy_data passes no IP
+      # in the environment either. A `:?` here would therefore fail EVERY data-node
+      # deploy today. Set DATA_BIND_IP=<D3 private IP> in .env.production — or teach
+      # the wiring script to emit it — and this hardens with no further change.
+      - "${DATA_BIND_IP:-0.0.0.0}:5432:5432"
     networks:
       - fixitlab_net
     healthcheck:
@@ -32,9 +68,18 @@ services:
       retries: 5
       start_period: 10s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   pgbouncer:
-    image: edoburu/pgbouncer:latest
+    # Pinned by digest (PgBouncer 1.25.2, resolved 2026-08). `:latest` meant the
+    # connection pooler in front of production Postgres could change underneath a
+    # routine redeploy — and the AUTH_TYPE/SCRAM behaviour documented below is
+    # exactly the kind of thing that shifts between releases. Bump deliberately.
+    image: edoburu/pgbouncer:latest@sha256:4c1ca296ef525f108f5d3552cc337c0c09587cf8dae7f0067fd93349e47dc1cd
     container_name: fixitlab_pgbouncer
     environment:
       - DB_HOST=database
@@ -54,9 +99,18 @@ services:
       - SERVER_IDLE_TIMEOUT=600
       - CLIENT_IDLE_TIMEOUT=0
       - IGNORE_STARTUP_PARAMETERS=extra_float_digits
+    # pgBouncer is a single-threaded connection proxy — it holds per-client packet
+    # buffers, not data. MAX_CLIENT_CONN=1000 above is the sizing input; even at
+    # full occupancy that is tens of MB. 256M is generous and exists to bound a
+    # leak, not to shape normal use.
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     ports:
-      # pgBouncer transaction pool — D2 backend/celery connect here over the VPC
-      - "6432:5432"
+      # pgBouncer transaction pool — D2 backend/celery connect here over the VPC.
+      # Same DATA_BIND_IP opt-in as the database port above; see that comment.
+      - "${DATA_BIND_IP:-0.0.0.0}:6432:5432"
     networks:
       - fixitlab_net
     depends_on:
@@ -69,6 +123,11 @@ services:
       retries: 5
       start_period: 15s
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   fixitlab_db_data:

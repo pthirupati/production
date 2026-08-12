@@ -7,38 +7,31 @@ description: 'CONTEXT: A team operating React frontends has raised a ticket for 
   and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline React application. The architecture is a single
   lab-primary node exposing components, hooks, router, and build output; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: A custom hook batches setState calls in one tick via applyUpdates(state, updates).
   The buggy version computes every update from the same captured starting value (a stale closure), so
   three "+1" updates only add 1. Fix it to thread the running value through the queue.
-
 
   OBJECTIVE: See why several updates in one tick collapse into one when each reads the captured value;
   Thread the accumulator so each update sees the result of the previous one; Support both plain-value
   updates and functional (prev => next) updates. Acceptance criteria: the change is minimal and reversible,
   and success means all hidden tests pass.
 
-
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant components, hooks, router, and build output), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -191,7 +184,6 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 summary: Complete the fix the stale-closure counter updater react lab and verify success with the checker
 estimated_minutes: 25
@@ -202,7 +194,7 @@ tags:
 - fix
 - hands-on
 - react
-linked_tutorial: react-fundamentals
+linked_tutorial: react-frontend-zero-hero
 what_you_will_learn:
 - See why several updates in one tick collapse into one when each reads the captured value
 - Thread the accumulator so each update sees the result of the previous one

@@ -12,7 +12,7 @@ import { LabChromeControls } from '../lab/LabChromeBar'
 import { syncTerraformApplyToAwsConsole, syncTerraformDestroyToClouds, detectCloudProvidersFromHcl } from '../../utils/terraformAwsBridge'
 import { useAwsStore } from '../aws/store/awsStore'
 import {
-  FileCode, FolderOpen, Folder, Play, Plus, Trash2, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History, ExternalLink, ChevronRight, Palette,
+  FileCode, FolderOpen, Folder, Play, Plus, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History, ExternalLink, ChevronRight, Palette,
 } from 'lucide-react'
 import '../../styles/vscode-workbench.css'
 
@@ -394,7 +394,7 @@ export default function TerraformWorkspaceIde({
           {broken.stale_lock && (
             <button type="button" onClick={() => run('force_unlock', {}, 'Unlocked')} className="vsc-btn" style={{ color: '#fbbf24' }}>force-unlock</button>
           )}
-          <button type="button" onClick={onRefresh} className="vsc-btn"><RefreshCw size={11} /></button>
+          <button type="button" onClick={onRefresh} className="vsc-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" title="Refresh" aria-label="Refresh workspace"><RefreshCw size={11} /></button>
           {canTerminal && (
             <button type="button" onClick={() => sendToTerminal(`${cli} plan`)} className="vsc-btn"
               title={terminalReady[terminalHost] ? `Run ${cli} plan in terminal` : 'Opens the terminal and runs once connected'}>

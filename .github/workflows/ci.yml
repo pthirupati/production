@@ -11,8 +11,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Audit Z6-11: ~225k lines of Python had no linter at all, while scenario YAML
+  # and JS were both linted. Scoped to bug-class rules only (see backend/ruff.toml
+  # for why the default rule set is not used) and runs first because it finishes in
+  # seconds — no reason to spend 45 minutes on the suite to learn a name is undefined.
+  python-lint:
+    name: Python lint (ruff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install "ruff>=0.16,<0.17"
+      - name: Lint backend and scripts
+        run: ruff check --config backend/ruff.toml backend/ scripts/
+
   backend:
     runs-on: ubuntu-latest
+    # Full Django suite + scenario lint regularly exceeds 45m on GHA; do not
+    # cancel mid-run as a false "CI fail" (observed cancelled@45m with green steps).
+    timeout-minutes: 90
     services:
       postgres:
         image: postgres:16
@@ -45,6 +65,14 @@ jobs:
       # is how SETUP_COMPLETE.md ended up tracked with 10 live credentials.
       - name: Check for leaked secrets in tracked files
         run: bash scripts/check-no-secrets-in-git.sh
+      - name: Verify no known-bad rotated secrets in CI env
+        # Detect-only (audit §S1). Does not rotate. Uses CI env which must not
+        # contain django-insecure- / guest:guest broker URLs.
+        run: python scripts/verify_secrets_rotated.py
+        env:
+          SECRET_KEY: ci-test-secret-key-not-for-production
+          DATABASE_URL: postgres://fixitlab:fixitlab@localhost:5432/fixitlab_test
+          REDIS_URL: redis://localhost:6379/0
       - name: Lint hero scenario YAML
         run: python scripts/lint_scenarios.py --strict-heroes
       - name: Lint full scenario catalog (no banned learner-facing words)
@@ -59,6 +87,11 @@ jobs:
           SKIP_EMAIL_TESTS: "true"
         run: |
           cd backend
+          # A model change without its migration passes every test — the test DB is
+          # built from the models, not the migrations — and then fails on deploy
+          # against the real schema. Four such changes had already accumulated on
+          # `Scenario` before this gate existed.
+          python manage.py makemigrations --check --dry-run
           python manage.py migrate --run-syncdb
           # Run BOTH the top-level tests/ suite AND every app-level test package
           # (apps/*/tests/). CI previously ran only `tests`, so the 34 app-level
@@ -68,11 +101,19 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Must match production.yml's build Node. This job is the PR-blocking
+          # frontend gate, and it was the sole workflow still on 20 — so a PR
+          # could pass here and then fail at deploy on 24. Verified lint/test/
+          # build all pass on 24 before bumping; the only install-script deps
+          # (esbuild, @parcel/watcher, fsevents) ship prebuilt platform binaries
+          # rather than compiling against Node's ABI, so there is no native
+          # rebuild difference between the two majors.
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install, lint, test, build

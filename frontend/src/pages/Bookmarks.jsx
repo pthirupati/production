@@ -14,11 +14,16 @@ const typeConfig = {
   hack: { icon: Skull,  label: 'Hack', color: 'text-accent-red' },
 }
 
+// 'expert' has no badge-* utility in index.css (only easy/medium/hard exist), so
+// it composes the same chip inline from purple accents. The final fallback keeps
+// an unknown difficulty legible instead of rendering a colourless chip.
 const diffConfig = {
   easy:   'badge-easy',
   medium: 'badge-medium',
   hard:   'badge-hard',
+  expert: 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20',
 }
+const DIFF_FALLBACK = 'bg-surface-800 text-surface-300 border border-surface-700'
 
 export default function Bookmarks() {
   const [bookmarks, setBookmarks] = useState([])
@@ -88,7 +93,7 @@ export default function Bookmarks() {
                       <p className="text-surface-400 text-sm truncate">{scenario.subtitle}</p>
                     )}
                     <div className="flex items-center gap-3 mt-1.5">
-                      <span className={`badge text-xs ${diffConfig[scenario.difficulty] || ''}`}>
+                      <span className={`badge text-xs ${diffConfig[scenario.difficulty] || DIFF_FALLBACK}`}>
                         {scenario.difficulty}
                       </span>
                       <span className="text-xs text-surface-500 flex items-center gap-1">

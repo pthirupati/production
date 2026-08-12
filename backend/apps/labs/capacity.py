@@ -146,5 +146,18 @@ def at_global_capacity(provider: str) -> bool:
             "Global lab capacity reached: %s/%s active labs; "
             "shedding new start.", active, cap,
         )
+        try:
+            from django.core.cache import cache
+            cache.incr("fixitlab:capacity_shed_count")
+        except ValueError:
+            # Key missing — seed then incr.
+            try:
+                from django.core.cache import cache
+                cache.add("fixitlab:capacity_shed_count", 0)
+                cache.incr("fixitlab:capacity_shed_count")
+            except Exception:
+                pass
+        except Exception:
+            pass
         return True
     return False

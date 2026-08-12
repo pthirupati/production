@@ -16,8 +16,8 @@ export default function CloudShell({ onClose }) {
           <span style={{ opacity: 0.6 }}>{region} · /home/cloudshell-user</span>
         </span>
         <span style={{ display: 'flex', gap: 8 }}>
-          <button className="aws-copy-btn" style={{ color: '#cfd6dd' }} onClick={() => setMaximized((m) => !m)}>{maximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
-          <button className="aws-copy-btn" style={{ color: '#cfd6dd' }} onClick={onClose}><X size={16} /></button>
+          <button type="button" className="aws-copy-btn" style={{ color: '#cfd6dd' }} onClick={() => setMaximized((m) => !m)} aria-label={maximized ? 'Restore CloudShell' : 'Maximize CloudShell'}>{maximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
+          <button type="button" className="aws-copy-btn" style={{ color: '#cfd6dd' }} onClick={onClose} aria-label="Close CloudShell"><X size={16} /></button>
         </span>
       </div>
       <div style={{ height: `calc(${typeof height === 'number' ? `${height}px` : height} - 32px)` }}>

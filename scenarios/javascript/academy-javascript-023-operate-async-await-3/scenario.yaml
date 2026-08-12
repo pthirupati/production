@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'CONTEXT: Complete the async await coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab JavaScript/React practice IDE — edit solution.js, Run visible
   tests, then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: async await. The stub in solution.js
   is incomplete so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required function so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -74,7 +70,7 @@ tags:
 - do
 - hands-on
 - javascript
-linked_tutorial: javascript-fundamentals
+linked_tutorial: javascript-language-zero-hero
 what_you_will_learn:
 - Day-2 async/await work completes safely in this environment
 - Changes are verified with before/after checks
@@ -159,4 +155,8 @@ coding_spec:
     code: assert(thenMap('a', x => x + 'b') === 'ab');
   - name: n
     code: assert(thenMap(3, x => x + 1) === 4);
+  - name: s86_repeat_visible
+    code: assert(thenMap(5, x => x * 2) === 10);
+  - name: s86_fn_defined
+    code: assert(typeof thenMap === "function");
   timeout: 8

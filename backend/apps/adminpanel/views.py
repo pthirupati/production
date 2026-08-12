@@ -24,7 +24,6 @@ from apps.question_bank.models import Scenario, Technology, Tag
 from apps.question_bank.serializers import ScenarioAdminSerializer, TechnologySerializer
 from apps.labs.models import LabSession
 from apps.labs.provisioner import get_provisioner, DockerProvisioner, terminate_lab_session
-from apps.leaderboard.models import LeaderboardEntry
 from apps.progress.models import UserScenarioProgress
 from apps.billing.models import Plan, Subscription, TechnologySubscription
 from apps.hints.models import Hint
@@ -1079,8 +1078,20 @@ class AdminUserDetailView(APIView):
         # Admin can reset user password
         new_password = request.data.get("new_password")
         if new_password:
-            if len(new_password) < 8:
-                return Response({"error": "Password must be at least 8 characters"}, status=400)
+            # Same policy as registration and the user-facing reset (audit Z2-6).
+            # This was a bare `len < 8`, which bypassed the whole configured chain:
+            # AUTH_PASSWORD_VALIDATORS requires 10 characters and rejects common,
+            # all-numeric, and user-attribute-similar passwords. So an admin could
+            # set "password" or "12345678" — values the platform refuses to let the
+            # user choose for themselves. Admin resets are precisely the ones most
+            # likely to be weak, since they are typed quickly during support.
+            from django.contrib.auth.password_validation import validate_password
+            from django.core.exceptions import ValidationError as DjangoValidationError
+
+            try:
+                validate_password(new_password, user=user)
+            except DjangoValidationError as exc:
+                return Response({"error": " ".join(exc.messages)}, status=400)
             user.set_password(new_password)
 
         user.save()
@@ -1333,6 +1344,42 @@ class AdminBulkLabsView(APIView):
 
 
 # ─── Analytics ───────────────────────────────────────────────────────
+
+class AdminFunnelView(APIView):
+    """Activation funnel from first-party data (audit Z6-6).
+
+    No third-party analytics: the owner declined a processor, and the privacy
+    policy published in Z4-8 promises consent is asked before any non-essential
+    cookie. This derives the funnel from rows the platform already writes, so it is
+    also retroactive — it answers questions from launch, not from install day.
+    """
+
+    permission_classes = [IsPlatformAdmin]
+    CACHE_KEY = "admin_funnel_v1"
+    CACHE_TTL = 300
+
+    def get(self, request):
+        from .funnel import activation_funnel, technology_conversion, time_to_activation
+
+        try:
+            days = max(1, min(365, int(request.query_params.get("days", 30))))
+        except (TypeError, ValueError):
+            days = 30
+
+        cache_key = f"{self.CACHE_KEY}:{days}"
+        if request.query_params.get("refresh") != "1":
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+
+        payload = {
+            "funnel": activation_funnel(days),
+            "by_technology": technology_conversion(days=max(days, 90)),
+            "time_to_activation": time_to_activation(days),
+        }
+        cache.set(cache_key, payload, self.CACHE_TTL)
+        return Response(payload)
+
 
 class AdminAnalyticsView(APIView):
     permission_classes = [IsPlatformAdmin]
@@ -4262,6 +4309,7 @@ class AdminOrganizationDetailView(APIView):
     def patch(self, request, org_id):
         """Update org settings: webhook_url, webhook_secret, logo_url, primary_color, custom_domain, seat_limit."""
         from apps.accounts.models import Organization
+        from apps.accounts.url_safety import UnsafeURLError, validate_outbound_url
         try:
             org = Organization.objects.get(pk=org_id, is_active=True)
         except Organization.DoesNotExist:
@@ -4270,9 +4318,21 @@ class AdminOrganizationDetailView(APIView):
         allowed = ("webhook_url", "webhook_secret", "logo_url", "primary_color", "custom_domain", "seat_limit", "notes", "billing_email")
         update_fields = []
         for field in allowed:
-            if field in request.data:
-                setattr(org, field, request.data[field])
-                update_fields.append(field)
+            if field not in request.data:
+                continue
+            value = request.data[field]
+            # Same SSRF gate as OrganizationSettingsView (org_views.py) — admin
+            # patch must not be a back door around validate_outbound_url (§S5).
+            if field == "webhook_url":
+                try:
+                    value = validate_outbound_url(value)
+                except UnsafeURLError as exc:
+                    return Response(
+                        {"error": f"Invalid webhook_url: {exc}"},
+                        status=400,
+                    )
+            setattr(org, field, value)
+            update_fields.append(field)
 
         if update_fields:
             org.save(update_fields=update_fields)
@@ -4472,7 +4532,9 @@ class AdminSecurityActionView(APIView):
             deleted, _ = EmailLog.objects.filter(status="failed").delete()
             return Response({"cleared": deleted, "blocked_ips": get_blocked_ips(), "blocked_countries": get_blocked_countries()})
         elif action in _SECURITY_CLEAR_ACTIONS or action == "clear_all":
-            return self._clear_metrics(action, get_blocked_ips, get_blocked_countries)
+            return self._clear_metrics(
+                action, get_blocked_ips, get_blocked_countries, request=request
+            )
         else:
             return Response({"error": "Unknown action"}, status=400)
 
@@ -4481,7 +4543,7 @@ class AdminSecurityActionView(APIView):
             "blocked_countries": get_blocked_countries(),
         })
 
-    def _clear_metrics(self, action, get_blocked_ips, get_blocked_countries):
+    def _clear_metrics(self, action, get_blocked_ips, get_blocked_countries, request=None):
         """Delete the audit/log records backing one (or all) security metric(s).
 
         These are admin-only, irreversible resets of the dashboard counters.
@@ -4527,6 +4589,38 @@ class AdminSecurityActionView(APIView):
             if not audit_action:
                 return Response({"error": "Unknown action"}, status=400)
             cleared, _ = AuditLog.objects.filter(action=audit_action).delete()
+
+        # Record that the trail was cleared, and by whom (audit Z2-4).
+        #
+        # Without this, an operator could wipe every security-relevant audit row —
+        # including the admin-grant records added for Z1-15 — and nothing would say
+        # it had happened. An audit log that can be silently emptied provides the
+        # appearance of accountability rather than the fact of it.
+        #
+        # `admin_action` is deliberately NOT in _SECURITY_CLEAR_ACTIONS, so this row
+        # survives `clear_all` — a meta-audit swept by the very operation it records
+        # would be worse than none, because the gap would look like "nothing
+        # happened".
+        try:
+            from apps.audit.models import AuditLog as _AuditLog
+
+            actor = getattr(request, "user", None)
+            _AuditLog.objects.create(
+                user=actor if getattr(actor, "is_authenticated", False) else None,
+                action="admin_action",
+                resource="/admin/security/clear",
+                metadata={
+                    "event": "security_audit_cleared",
+                    "clear_action": action,
+                    "rows_deleted": cleared,
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "Security audit rows were cleared (action=%s, rows=%s) but the "
+                "meta-audit record FAILED (%s) — the deletion is now unattributed.",
+                action, cleared, exc,
+            )
 
         return Response({
             "cleared": cleared,
@@ -4650,7 +4744,6 @@ class AdminSyncScenariosView(APIView):
     permission_classes = [IsPlatformAdmin]
 
     def post(self, request):
-        from io import StringIO
 
         from django.core.cache import cache
         from django.core.management import call_command
@@ -4796,7 +4889,6 @@ class AdminLabProvisioningView(APIView):
         })
 
     def post(self, request):
-        from io import StringIO
         from django.core.management import call_command
         from django.core.cache import cache
 
@@ -4911,6 +5003,25 @@ class AdminBlogPostsView(APIView):
         if not title:
             return Response({"error": "title is required"}, status=status.HTTP_400_BAD_REQUEST)
         slug = (request.data.get("slug") or slugify(title))[:120]
+        if not slug:
+            # slugify() returns "" for a title that is entirely punctuation or
+            # non-Latin script, and `slug` is unique — so the first such post would
+            # take the empty slug and every one after it would collide.
+            return Response(
+                {"error": "Could not derive a URL slug from that title. Please supply one."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        # `slug` is unique=True and this went straight to create(), so a duplicate
+        # title raised IntegrityError and surfaced as a 500 (audit Z3-12). Checked
+        # rather than caught, so the message can name the conflict.
+        if BlogPost.objects.filter(slug=slug).exists():
+            return Response(
+                {
+                    "error": f"A post with the URL '{slug}' already exists.",
+                    "slug": slug,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         post = BlogPost.objects.create(
             slug=slug,
             title=title,
@@ -4935,6 +5046,24 @@ class AdminBlogPostDetailView(APIView):
             post = BlogPost.objects.get(pk=post_id)
         except BlogPost.DoesNotExist:
             return Response({"error": "Not found"}, status=404)
+
+        # Same collision as create: `slug` is unique, and this wrote through with
+        # setattr, so renaming a post onto an existing URL was a 500 (audit Z3-12).
+        # Excluding this post itself matters — re-saving without changing the slug
+        # would otherwise report a conflict with itself.
+        new_slug = request.data.get("slug")
+        if new_slug is not None:
+            new_slug = str(new_slug).strip()[:120]
+            if not new_slug:
+                return Response(
+                    {"error": "Slug cannot be empty."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if BlogPost.objects.filter(slug=new_slug).exclude(pk=post.pk).exists():
+                return Response(
+                    {"error": f"A post with the URL '{new_slug}' already exists."},
+                    status=status.HTTP_409_CONFLICT,
+                )
 
         for field in ("title", "excerpt", "content", "author_name", "category", "slug"):
             if field in request.data:

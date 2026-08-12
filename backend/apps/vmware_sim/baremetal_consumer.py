@@ -25,11 +25,30 @@ import logging
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.exceptions import StopConsumer
+from channels.utils import await_many_dispatch
 from django.contrib.auth.models import AnonymousUser
+
+from common.ws_slots import acquire_ws_slot, release_ws_slot
 
 logger = logging.getLogger(__name__)
 
 PUSH_INTERVAL_SECONDS = 1.5
+
+# Audit Z5-6. The tick loop exists for one reason: to animate wall-clock progress
+# while a machine is Commissioning/Deploying/etc. Every other state change already
+# arrives instantly over the channel layer (`baremetal_engine._notify_session` →
+# `baremetal_push`), so polling an idle session buys nothing.
+#
+# It cost plenty, though: `_get_state()` is a select_related query plus a Redis get
+# on every tick, and the snapshot comparison suppressed the *send*, not the *work*.
+# 100 idle sockets meant 4,000 DB queries a minute on a 2-vCPU box, sending nothing.
+#
+# So an idle socket backs off geometrically to IDLE_MAX_INTERVAL_SECONDS and snaps
+# straight back to PUSH_INTERVAL_SECONDS the moment anything is transient. Nothing
+# is lost by backing off: the push path is authoritative and immediate.
+IDLE_MAX_INTERVAL_SECONDS = 30.0
+IDLE_BACKOFF_FACTOR = 2.0
 
 # Machine statuses that are still advancing on wall-clock — while any machine
 # is in one of these, keep pushing every tick so progress bars stay live.
@@ -46,6 +65,22 @@ _TRANSIENT_STATUSES = (
 class BaremetalConsumer(AsyncWebsocketConsumer):
     """AsyncWebsocketConsumer streaming bare-metal Lab Environment state."""
 
+    async def __call__(self, scope, receive, send):
+        """Always release the per-user WS slot, even if `disconnect()` never runs.
+
+        Modelled on `TerminalConsumer.__call__` (audit Z5-6): an abrupt drop skips
+        `disconnect`, and without this the slot leaks until its cache TTL expires —
+        so a user who reconnects through a flaky network locks themselves out.
+        """
+        self.scope = scope
+        self.base_send = send
+        try:
+            await await_many_dispatch([receive], self.dispatch)
+        except StopConsumer:
+            pass
+        finally:
+            self._release_connection_slot()
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.session_id = None
@@ -53,6 +88,15 @@ class BaremetalConsumer(AsyncWebsocketConsumer):
         self._tick_task = None
         self._last_snapshot = None
         self._joined_group = False
+        self._tracked_user_id = None
+        self._tick_interval = PUSH_INTERVAL_SECONDS
+
+    def _release_connection_slot(self) -> None:
+        user_id = self._tracked_user_id
+        if user_id is None:
+            return
+        self._tracked_user_id = None   # cleared first, so a repeat call is a no-op
+        release_ws_slot(user_id)
 
     async def connect(self):
         user = self.scope.get("user", AnonymousUser())
@@ -60,8 +104,16 @@ class BaremetalConsumer(AsyncWebsocketConsumer):
             await self.close(code=4001)
             return
 
+        # Same per-user cap as the terminal. Without it one account could open
+        # unlimited sockets, each with its own polling loop.
+        if not acquire_ws_slot(user.id):
+            await self.close(code=4008)
+            return
+        self._tracked_user_id = user.id
+
         session_id = self.scope["url_route"]["kwargs"].get("session_id")
         if not session_id:
+            self._release_connection_slot()
             await self.close(code=4004)
             return
 
@@ -72,6 +124,7 @@ class BaremetalConsumer(AsyncWebsocketConsumer):
                 "type": "error",
                 "message": "Bare metal session not found",
             }))
+            self._release_connection_slot()
             await self.close(code=4004)
             return
 
@@ -91,6 +144,7 @@ class BaremetalConsumer(AsyncWebsocketConsumer):
         self._tick_task = asyncio.ensure_future(self._tick_loop())
 
     async def disconnect(self, close_code):
+        self._release_connection_slot()
         if self._tick_task is not None:
             self._tick_task.cancel()
             self._tick_task = None
@@ -113,7 +167,7 @@ class BaremetalConsumer(AsyncWebsocketConsumer):
     async def _tick_loop(self):
         try:
             while True:
-                await asyncio.sleep(PUSH_INTERVAL_SECONDS)
+                await asyncio.sleep(self._tick_interval)
                 await self._send_state(force=False)
         except asyncio.CancelledError:
             return
@@ -131,6 +185,19 @@ class BaremetalConsumer(AsyncWebsocketConsumer):
         state = payload.get("state") or {}
         transient = self._has_transient_machine(state)
         snapshot = json.dumps(state, default=str, sort_keys=True)
+
+        # Pace the *work*, not just the send. A machine mid-transition needs the
+        # fast tick for its progress bar; an unchanged idle session does not, and
+        # any real mutation reaches us over the channel layer regardless.
+        if transient:
+            self._tick_interval = PUSH_INTERVAL_SECONDS
+        elif snapshot == self._last_snapshot:
+            self._tick_interval = min(
+                self._tick_interval * IDLE_BACKOFF_FACTOR, IDLE_MAX_INTERVAL_SECONDS
+            )
+        else:
+            self._tick_interval = PUSH_INTERVAL_SECONDS
+
         if not force and not transient and snapshot == self._last_snapshot:
             return
         self._last_snapshot = snapshot

@@ -15,19 +15,15 @@ description: 'CONTEXT: ImageDev (PSINFRA/ImageDev board) needs a new H100 Jammy 
   Ubuntu jammy is the source; Packer builds the GPU-ready artifact, then publishes it into MAAS as
   custom/h100-jammy so Bare Metal can Deploy Ready nodes with the factory image.
 
-
   ENVIRONMENT: AI Infrastructure Engineering lab — Packer workspace IDE, MAAS Images pane, Lab Terminal.
   No external cloud. Treat Packer→MAAS as the production image factory path.
-
 
   SYMPTOM / STARTING STATE: custom/h100-jammy is missing from MAAS boot-resources. Ready nodes still
   deploy stock ubuntu/jammy. ImageDev ticket blocks fleet bring-up.
 
-
   OBJECTIVE: Open Packer; validate and build the H100 template (CVE gate must pass); Publish to MAAS;
   confirm Images lists custom/h100-jammy; Deploy a Ready machine selecting that boot resource; leave
   FIXED-OK when the node shows the custom image OS.
-
 
   VERIFY: MAAS Images shows custom/h100-jammy; Deployed machine os references custom/h100-jammy.'
 objectives:

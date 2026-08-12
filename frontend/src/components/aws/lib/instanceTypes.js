@@ -80,6 +80,7 @@ export const AMI_CATALOG = [
   { id: 'ami-k8s-ubuntu2204', name: 'Ubuntu EKS / Kubernetes worker', os: 'ubuntu-22.04', platform: 'Ubuntu', arch: 'x86_64', user: 'ubuntu', desc: 'Kubernetes worker node on Ubuntu 22.04', freeTier: false, workload: 'kubernetes' },
   { id: 'ami-win2022-base', name: 'Microsoft Windows Server 2022 Base', os: 'windows-server-2022', platform: 'Windows', arch: 'x86_64', user: 'Administrator', desc: 'Windows Server 2022 Full Locale English Base', freeTier: false, workload: 'windows' },
   { id: 'ami-win2019-base', name: 'Microsoft Windows Server 2019 Base', os: 'windows-server-2019', platform: 'Windows', arch: 'x86_64', user: 'Administrator', desc: 'Windows Server 2019 Full Locale English Base', freeTier: false, workload: 'windows' },
+  { id: 'ami-0arm64al2023abc01', name: 'Amazon Linux 2023 AMI (ARM64)', os: 'amazon-linux-2023', platform: 'Linux/UNIX', arch: 'arm64', user: 'ec2-user', desc: 'Amazon Linux 2023 AMI arm64 HVM', freeTier: true },
 ]
 
 export function getAmi(id) {

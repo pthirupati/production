@@ -4,7 +4,7 @@ import {
   Plus, FolderPlus, Copy, MoreHorizontal,
 } from 'lucide-react'
 import { VscFileItem } from './VsCodeWorkbench'
-import { buildFileTree, fileBasename } from '../../utils/ide/fileTree'
+import { buildFileTree, fileBasename, newFileBasename } from '../../utils/ide/fileTree'
 
 /**
  * VS Code–style nested file tree with inline New File / New Folder and
@@ -63,13 +63,9 @@ export default function IdeExplorer({
   const startCreate = (kind, parent = '') => {
     if (disabled) return
     setMenu(null)
-    const defaultName = kind === 'folder' ? 'new-folder' : (
-      (language || '').toLowerCase().includes('py') ? 'module.py'
-        : (language || '').toLowerCase().includes('java') ? 'Main.java'
-          : (language || '').toLowerCase().includes('html') ? 'index.html'
-            : (language || '').toLowerCase().match(/js|node/) ? 'module.js'
-              : 'untitled.txt'
-    )
+    // Bare basename, not newFileHint(): `parent` is prepended on commit, so a
+    // src/-prefixed hint would yield src/src/module.py inside a src/ folder.
+    const defaultName = kind === 'folder' ? 'new-folder' : newFileBasename(language)
     setDraft({ kind, parent, value: defaultName })
     if (parent) onToggleDir?.(parent) // ensure parent is expanded
   }
@@ -184,8 +180,9 @@ export default function IdeExplorer({
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onRenameFile(f) }}
-                  className="p-1 text-[var(--vsc-muted)] hover:text-[var(--vsc-text)]"
+                  className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[var(--vsc-muted)] hover:text-[var(--vsc-text)]"
                   title="Rename"
+                  aria-label={`Rename ${f}`}
                 >
                   <Pencil size={11} />
                 </button>
@@ -194,8 +191,9 @@ export default function IdeExplorer({
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onDeleteFile(f) }}
-                  className="p-1 text-red-400 hover:text-red-300"
+                  className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-red-400 hover:text-red-300"
                   title="Delete"
+                  aria-label={`Delete ${f}`}
                 >
                   <Trash2 size={11} />
                 </button>

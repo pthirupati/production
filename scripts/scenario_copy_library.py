@@ -532,7 +532,21 @@ def topic_base(topic: str) -> str:
 
 
 def snippet_for(tech: str, topic: str) -> dict[str, str]:
+    """Copy for one topic, preferring a technology-qualified entry.
+
+    TOPIC_SNIPPETS is keyed on the topic base alone, so the same word in two
+    technologies collided and the later literal silently won. "context" is the
+    live example: React Context and LLM context windows shared a key, so ten
+    published React labs told learners to observe "the model lacks or overflows
+    context". `tech` was already a parameter here and simply went unused.
+
+    A qualified key (`react:context`) is checked first; the bare key stays as the
+    default so nothing else has to change.
+    """
     base = topic_base(topic)
+    qualified = f"{tech}:{base}"
+    if qualified in TOPIC_SNIPPETS:
+        return TOPIC_SNIPPETS[qualified]
     if base in TOPIC_SNIPPETS:
         return TOPIC_SNIPPETS[base]
     profile = TECH_PROFILES.get(tech, {"domain": tech.replace("-", " "), "env": "lab environment", "surface": "CLI and configuration"})

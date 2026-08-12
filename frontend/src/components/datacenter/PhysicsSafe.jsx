@@ -15,7 +15,6 @@ export default class PhysicsSafe extends Component {
   }
 
   componentDidCatch(error, info) {
-    // eslint-disable-next-line no-console
     console.error('Rapier Physics failed — continuing without physics', error, info)
     try { this.props.onFail?.(error) } catch { /* ignore */ }
   }

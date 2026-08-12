@@ -9,6 +9,26 @@ import toast from 'react-hot-toast'
  */
 let refreshPromise = null
 
+/**
+ * Named timeout budgets, so a caller can pick one instead of hardcoding a number.
+ *
+ * The default stays 45s because it is sized for the SLOWEST thing on the shared
+ * instance (lab provisioning). That makes every fast read wait 45s before it
+ * gives up, but lowering the default is not an option: a timeout produces no
+ * `error.response`, so a prematurely-aborted provisioning call falls into the
+ * network branch below and reads as "Request timed out" while the backend keeps
+ * provisioning — orphaning a lab the user believes failed.
+ *
+ * So the default is unchanged and callers opt IN to a tighter budget:
+ *   api.get('/progress/', { timeout: TIMEOUTS.read })
+ */
+export const TIMEOUTS = {
+  read: 10_000,      // plain GETs of already-computed data
+  action: 30_000,    // writes that do real work but aren't provisioning
+  provision: 45_000, // lab start/stop — matches the instance default
+  long: 120_000,     // AI generation / bulk export
+}
+
 const api = axios.create({
   baseURL: '/api',
   headers: {
@@ -18,11 +38,51 @@ const api = axios.create({
     // it on cookie-authenticated state changes; harmless on the Bearer path.
     'X-Requested-With': 'XMLHttpRequest',
   },
-  timeout: 45_000, // 45s default timeout — lab operations can be slow
+  timeout: TIMEOUTS.provision, // 45s default — sized for the slowest lab operation
   // Required so the browser sends the httpOnly access_token / refresh_token
   // cookies with every request (cross-origin and same-origin).
   withCredentials: true,
 })
+
+/**
+ * Retry budget for idempotent reads only.
+ *
+ * Deliberately narrow. A blanket retry would replay POST /labs/{id}/start/ and
+ * double-provision a lab, and would multiply the 429 path that the interceptor
+ * below surfaces exactly once. So we retry only when ALL of these hold:
+ *   - the verb is GET or HEAD (idempotent by contract)
+ *   - the failure is a transport error or a 502/503/504 — never a 4xx, never a
+ *     500 (a real application crash will crash again; retrying just delays the
+ *     error and triples the load on an already-sick backend)
+ *   - the caller did not opt out with `noRetry: true`
+ * 401 is excluded structurally: it is handled and returned before we get here,
+ * and it has its own single-flight replay that must not be stacked on top of.
+ */
+const RETRY_MAX = 2
+const RETRY_BASE_MS = 300
+const RETRYABLE_STATUS = new Set([502, 503, 504])
+
+function retryDelay(attempt) {
+  // Exponential backoff with full jitter: 300ms then 600ms, each randomized
+  // across [0, delay) so a burst of parallel reads that failed together does
+  // not re-hit the backend in a synchronized second wave.
+  return Math.random() * RETRY_BASE_MS * 2 ** attempt
+}
+
+function isRetryable(error) {
+  const original = error.config
+  if (!original || original.noRetry === true) return false
+  const method = (original.method || 'get').toLowerCase()
+  if (method !== 'get' && method !== 'head') return false
+  if ((original._retryCount || 0) >= RETRY_MAX) return false
+  if (!error.response) {
+    // Transport-level failure. Exclude explicit cancellation — an aborted
+    // request (see useFetch) must stay aborted, not quietly fire again.
+    if (axios.isCancel?.(error) || error.code === 'ERR_CANCELED') return false
+    return true
+  }
+  return RETRYABLE_STATUS.has(error.response.status)
+}
 
 // Attach JWT token; strip JSON Content-Type for multipart uploads
 api.interceptors.request.use((config) => {
@@ -41,6 +101,16 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // ── Retry idempotent reads BEFORE any user-visible handling ──
+    // Placed first on purpose: a transient blip that succeeds on attempt 2 must
+    // never flash a "Network error" toast, and must never be counted as a 5xx.
+    if (isRetryable(error)) {
+      const original = error.config
+      original._retryCount = (original._retryCount || 0) + 1
+      await new Promise((resolve) => setTimeout(resolve, retryDelay(original._retryCount - 1)))
+      return api(original)
+    }
+
     // ── Network / timeout error (no response from server) ──
     if (!error.response) {
       const message = error.code === 'ECONNABORTED'
@@ -114,6 +184,39 @@ api.interceptors.response.use(
           // rather than a generic "server error" popup.
           redirectToLogin('Your session has expired. Please sign in again.')
         }
+      }
+    }
+
+    // ── 403 Forbidden — entitlement/permission denial ──
+    //
+    // Centralized here so every module stops inventing its own message, but
+    // deliberately quiet by default. Several api modules use 403 as a SOFT-DENY
+    // signal they handle themselves: vmware.js/monitoring.js re-throw
+    // SUBSCRIPTION_REQUIRED to drive a paywall, and nmap.js/wireshark.js lump
+    // 403 in with 404/400 to fall back to a demo sandbox. Every one of those
+    // calls already passes `silentError: true`, so honoring `isSilent` keeps
+    // their local handling authoritative and fires no spurious toast.
+    //
+    // Scoped to GET for the same reason. A 403 on a write is an action the user
+    // explicitly triggered, and those call sites already render their own
+    // feedback next to the button they clicked — TechnologyDetail.jsx toasts
+    // "Subscribe to this technology…" after a 403 from POST /labs/{id}/start/,
+    // and ScenarioDetail.jsx deliberately stays silent on a 403 from
+    // POST /jira/tickets/scenario/{id}/. Neither passes `silentError`, so
+    // toasting writes here would double up on the first and break the second.
+    const isRead = (original?.method || 'get').toLowerCase() === 'get'
+    if (error.response.status === 403 && isRead && !isAuthRequest && !isSilent) {
+      const isAdminPoll = /^\/admin\//.test(path)
+      const data = error.response.data
+      const code = data?.code
+      // Subscription denials get the actionable message; a plain permission
+      // denial gets a neutral one. Never redirect — the caller decides whether
+      // a 403 means "upgrade", "not yours", or "ignore".
+      const msg = code === 'SUBSCRIPTION_REQUIRED' || code === 'SUBSCRIPTION_EXPIRED'
+        ? (data?.detail || data?.error || 'This feature requires an active subscription.')
+        : (data?.detail || data?.error || data?.message || 'You do not have access to this resource.')
+      if (!isAdminPoll) {
+        toast.error(msg.length > 120 ? msg.slice(0, 120) + '…' : msg, { id: 'forbidden', duration: 5000 })
       }
     }
 

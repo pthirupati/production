@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Play } from 'lucide-react'
+import { ArrowRight, Play } from '../../../ui/eagerIcons'
 import InterviewShowcase from '../components/InterviewShowcase'
 import { interviewBullets } from '../data/homeContent'
 import { fadeLeft, fadeRight, viewportOnce } from '../../../ui/motion'

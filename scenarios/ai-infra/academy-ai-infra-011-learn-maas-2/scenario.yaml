@@ -14,13 +14,10 @@ jira_priority: Low
 description: 'CONTEXT: Bare Metal / AI Infra — gpu-node-01 has already been commissioned and is Ready;
   the next step in the MAAS lifecycle is Deploy, which installs an OS image via PXE, Curtin, and cloud-init.
 
-
   ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin.
-
 
   SYMPTOM / STARTING STATE: gpu-node-01 is Ready in MAAS but has no OS installed; nothing has been deployed
   yet.
-
 
   OBJECTIVE: Open Bare Metal → Machines; select the Ready node; Deploy the default Ubuntu image; watch
   the PXE → Curtin → cloud-init progress; confirm status reaches Deployed and the node responds on Lab

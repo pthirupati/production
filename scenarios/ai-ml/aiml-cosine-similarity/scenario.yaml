@@ -6,39 +6,32 @@ description: 'CONTEXT: A team operating AI/ML workflows has raised a ticket for 
   Vectors`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline ML practice workspace. The architecture is a single
   lab-primary node exposing datasets, training scripts, metrics, and model artifacts; treat it as the
   production host for this incident. All tools run locally — no paid APIs or external cloud calls are
   required.
-
 
   SYMPTOM / STARTING STATE: Embeddings are compared by the angle between them, not their raw magnitude.
   Implement cosine_similarity(a, b) from scratch with stdlib math — dot product over the product of norms
   — so two vectors pointing the same direction score 1.0 regardless of length, and orthogonal vectors
   score 0.0.
 
-
   OBJECTIVE: Compute the dot product of two equal-length vectors; Divide by the product of the Euclidean
   norms; Return 0.0 safely when either vector is all zeros. Acceptance criteria: the change is minimal
   and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant datasets, training scripts, metrics, and model artifacts), changing one thing at
   a time. Check your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -183,7 +176,6 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 summary: Complete the cosine similarity between vectors ai ml lab and verify success with the checker
 estimated_minutes: 15
@@ -194,7 +186,7 @@ tags:
 - ai-ml
 - do
 - hands-on
-linked_tutorial: ai-ml-fundamentals
+linked_tutorial: ai-infrastructure-zero-hero
 what_you_will_learn:
 - Compute the dot product of two equal-length vectors
 - Divide by the product of the Euclidean norms

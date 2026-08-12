@@ -73,3 +73,10 @@ google-auth-httplib2>=0.4.0
 # HashiCorp Vault (AppRole secret injection at Django startup)
 hvac>=2.4.0
 
+# Python linting (audit Z6-11). Pinned to a minor series: ruff adds rules between
+# releases, so an unpinned upgrade could turn CI red on code nobody touched.
+ruff>=0.16,<0.17
+
+# TOTP multi-factor authentication (audit Z2-3). RFC 6238; validated against the
+# spec test vectors in tests/test_mfa.py.
+pyotp>=2.9,<3

@@ -1,4 +1,5 @@
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.utils.html import format_html
 
 from .models import (
     CertEarnedCertificate,
@@ -59,6 +60,54 @@ class ExamAttemptAdmin(admin.ModelAdmin):
 
 @admin.register(CertEarnedCertificate)
 class CertEarnedCertificateAdmin(admin.ModelAdmin):
-    list_display = ("certificate_id", "user", "track", "score", "issued_at", "expires_at")
-    list_filter = ("track",)
+    list_display = (
+        "certificate_id", "user", "track", "score",
+        "validity", "issued_at", "expires_at",
+    )
+    list_filter = ("track", "revoked")
     search_fields = ("certificate_id", "user__email", "holder_name")
+    readonly_fields = ("revoked_at",)
+    actions = ("action_revoke_grader_defect", "action_revoke", "action_reinstate")
+
+    @admin.display(description="Status", ordering="revoked")
+    def validity(self, obj):
+        if obj.revoked:
+            return format_html(
+                '<b style="color:#b91c1c">REVOKED</b><br><small>{}</small>',
+                (obj.revoked_reason or "no reason recorded")[:60],
+            )
+        if obj.is_expired:
+            return format_html('<span style="color:#d97706">expired</span>')
+        return format_html('<span style="color:#15803d">valid</span>')
+
+    @admin.action(description="Revoke — issued against a defective grader")
+    def action_revoke_grader_defect(self, request, queryset):
+        """The reason this feature exists.
+
+        A number of certificates were earned against fail-open graders (audit
+        section G). Pre-filling the reason keeps the public verification message
+        honest and consistent instead of leaving revoked_reason blank.
+        """
+        n = 0
+        for cert in queryset.filter(revoked=False):
+            cert.revoke("Issued against a scenario grader later found defective; "
+                        "re-take the exam to earn it again.")
+            n += 1
+        messages.success(request, f"{n} certificate(s) revoked (grader defect).")
+
+    @admin.action(description="Revoke selected certificates")
+    def action_revoke(self, request, queryset):
+        n = 0
+        for cert in queryset.filter(revoked=False):
+            cert.revoke("Revoked by an administrator.")
+            n += 1
+        messages.success(request, f"{n} certificate(s) revoked.")
+
+    @admin.action(description="Reinstate selected certificates")
+    def action_reinstate(self, request, queryset):
+        """Revocation must be reversible — an operator mistake should not be
+        permanent, and deleting was never a real option (see the model comment)."""
+        n = queryset.filter(revoked=True).update(
+            revoked=False, revoked_at=None, revoked_reason="",
+        )
+        messages.success(request, f"{n} certificate(s) reinstated.")

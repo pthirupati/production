@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight } from '../../ui/eagerIcons'
 import TechIcon from './TechIcon'
 import { sortTechnologies } from '../../constants/techCatalog'
 

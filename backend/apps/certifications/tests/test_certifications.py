@@ -87,10 +87,14 @@ class CertificationsTestCase(APITestCase):
         resp = self.client.get("/api/certifications/")
         self.assertEqual(resp.status_code, 200)
         codes = {t["code"] for t in resp.data["tracks"]}
-        # All seven seeded tracks should be active and listed.
+        # Every YAML under management/commands/data/ is seeded and listed.
         self.assertEqual(
             codes,
-            {"RHCSA", "RHCE", "CKA", "CKAD", "CKS", "LFCS", "TF-ASSOCIATE"},
+            {
+                "RHCSA", "RHCE", "CKA", "CKAD", "CKS", "LFCS", "TF-ASSOCIATE",
+                "AWS-SAA", "AZ-104", "GCP-ACE",
+                "FL-PYDEV", "FL-SEC", "FL-NET", "FL-ARCH-EXPERT",
+            },
         )
 
     def test_track_detail_anonymous_zero_progress(self):
@@ -149,6 +153,36 @@ class CertificationsTestCase(APITestCase):
         self.assertFalse(submit.data["passed"])
         self.assertEqual(submit.data["status"], "failed")
         self.assertIsNone(submit.data["certificate"])
+
+    def test_exam_proctoring_signals_are_report_only(self):
+        self.client.force_authenticate(user=self.user)
+        start = self.client.post("/api/certifications/rhcsa/exam/start/")
+        self.assertEqual(start.status_code, 201)
+        aid = start.data["id"]
+        self.assertEqual(start.data["proctoring"]["tab_switches"], 0)
+
+        r1 = self.client.post(
+            f"/api/certifications/exam/{aid}/proctoring/",
+            {"event": "tab_switch"},
+            format="json",
+        )
+        self.assertEqual(r1.status_code, 200)
+        self.assertEqual(r1.data["proctoring"]["tab_switches"], 1)
+
+        r2 = self.client.post(
+            f"/api/certifications/exam/{aid}/proctoring/",
+            {"event": "paste", "source": "page"},
+            format="json",
+        )
+        self.assertEqual(r2.status_code, 200)
+        self.assertEqual(r2.data["proctoring"]["paste_events"], 1)
+
+        submit = self.client.post(f"/api/certifications/exam/{aid}/submit/")
+        self.assertEqual(submit.status_code, 200)
+        self.assertEqual(submit.data["proctoring"]["tab_switches"], 1)
+        self.assertEqual(submit.data["proctoring"]["paste_events"], 1)
+        # Signals never block grading.
+        self.assertIn(submit.data["status"], ("failed", "passed", "expired"))
 
     def test_exam_ignores_pre_exam_completions(self):
         """Integrity: labs completed BEFORE the exam window must not count."""

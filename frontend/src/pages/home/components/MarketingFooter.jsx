@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Terminal } from 'lucide-react'
+import { Terminal } from '../../../ui/eagerIcons'
 import { footerColumns } from '../data/homeContent'
 
 export default function MarketingFooter() {
@@ -37,6 +37,8 @@ export default function MarketingFooter() {
         <div className="flex gap-[22px]">
           <Link to="/privacy" className="fx-marketing-footer-link">Privacy</Link>
           <Link to="/terms" className="fx-marketing-footer-link">Terms</Link>
+          <Link to="/refunds" className="fx-marketing-footer-link">Refunds</Link>
+          <Link to="/acceptable-use" className="fx-marketing-footer-link">Acceptable use</Link>
           <Link to="/contact" className="fx-marketing-footer-link">Contact</Link>
         </div>
       </div>

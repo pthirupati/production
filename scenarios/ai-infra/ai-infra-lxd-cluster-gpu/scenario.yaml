@@ -14,12 +14,9 @@ jira_priority: High
 description: 'CONTEXT: AI Infra Engineering owns LXD on MAAS GPU fleets — cluster members, projects,
   storage pools, and gpu-passthrough profiles for inference containers.
 
-
   ENVIRONMENT: Lab Terminal (lxc/lxd) + Bare Metal. Datacenter twin for rack context.
 
-
   SYMPTOM: Single-node LXD only; gpu-passthrough profile incomplete; no cluster storage pool.
-
 
   OBJECTIVE: Inspect cluster/members; ensure gpu-passthrough profile; launch container with GPU
   profile; FIXED-OK.'

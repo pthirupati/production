@@ -45,7 +45,7 @@ export default function VmotionWizard({ vm, hosts, onClose, onAction }) {
       <div className="vm-modal w-[520px] max-w-[95vw]">
         <div className="vm-modal-header">
           <span>vMotion Wizard — {vm.name}</span>
-          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white">✕</button>
         </div>
         <div className="px-4 py-2 border-b border-[#2d3a4a] flex gap-1 flex-wrap">
           {STEPS.map((s, i) => (

@@ -4,6 +4,7 @@ import { Minus, Plus, Trash2, Search, Check } from 'lucide-react'
 import { useAwsStore, scoped } from '../../store/awsStore'
 import { Button, Badge, Breadcrumb, SectionLabel } from '../../ui/primitives'
 import { AMI_CATALOG, INSTANCE_TYPES, INSTANCE_FAMILIES, getInstanceType, VOLUME_TYPES } from '../../lib/instanceTypes'
+import { amiArchMatchesInstanceType, amiEnaMatchesInstanceType } from '../../lib/validators'
 import { BASE } from '../../layout/serviceNav'
 
 const STEPS = [
@@ -116,6 +117,12 @@ export default function LaunchWizard() {
     if (!sgIds.length) e.sg = 'Select at least one security group'
     if (!volumes.length) e.storage = 'Add at least one volume'
     if (volumes.some((v) => !v.size || v.size < 1)) e.storage = 'Every volume needs a size of at least 1 GiB'
+    if (!amiArchMatchesInstanceType(selectedAmi?.arch, it?.arch)) {
+      e.arch = `AMI architecture (${selectedAmi?.arch}) is incompatible with instance type ${type} (${it?.arch})`
+    }
+    if (!amiEnaMatchesInstanceType(selectedAmi, type)) {
+      e.ena = `Instance type ${type} requires the ENA driver, which is not present in the selected AMI`
+    }
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -277,6 +284,7 @@ export default function LaunchWizard() {
               </table>
             </div>
             <div className="aws-hint">Selected: {it.type} · {it.family} · {it.arch} · {it.net}</div>
+            {errors.arch && <div className="aws-field-error">{errors.arch}</div>}
           </Section>
 
           <Section id="keypair" label="Key pair (login)">

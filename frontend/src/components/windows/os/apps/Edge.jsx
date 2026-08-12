@@ -84,18 +84,19 @@ export default function Edge() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', background: '#f3f3f3', borderBottom: '1px solid #ddd' }}>
-        <button type="button" className="winos-btn" disabled={histIdx <= 0} onClick={back} title="Back"><ArrowLeft size={14} /></button>
-        <button type="button" className="winos-btn" disabled={histIdx >= history.length - 1} onClick={forward} title="Forward"><ArrowRight size={14} /></button>
-        <button type="button" className="winos-btn" onClick={() => navigate(url)} title="Refresh"><RotateCw size={14} className={loading ? 'animate-spin' : ''} /></button>
-        <button type="button" className="winos-btn" onClick={() => navigate(DEFAULT_URL)} title="Home"><Home size={14} /></button>
+        <button type="button" className="winos-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" disabled={histIdx <= 0} onClick={back} title="Back" aria-label="Back"><ArrowLeft size={14} /></button>
+        <button type="button" className="winos-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" disabled={histIdx >= history.length - 1} onClick={forward} title="Forward" aria-label="Forward"><ArrowRight size={14} /></button>
+        <button type="button" className="winos-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" onClick={() => navigate(url)} title="Refresh" aria-label="Refresh"><RotateCw size={14} className={loading ? 'animate-spin' : ''} /></button>
+        <button type="button" className="winos-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" onClick={() => navigate(DEFAULT_URL)} title="Home" aria-label="Home"><Home size={14} /></button>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && navigate(input)}
+          aria-label="Address bar"
           style={{ flex: 1, fontSize: 12, padding: '5px 10px', border: '1px solid #ccc', borderRadius: 14, outline: 'none' }}
         />
-        <button type="button" className="winos-btn" title="Favorites"><Star size={14} /></button>
-        <button type="button" className="winos-btn" title="Settings and more"><MoreHorizontal size={14} /></button>
+        <button type="button" className="winos-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" title="Favorites" aria-label="Favorites"><Star size={14} /></button>
+        <button type="button" className="winos-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" title="Settings and more" aria-label="Settings and more"><MoreHorizontal size={14} /></button>
       </div>
       <div style={{ flex: 1, overflow: 'auto', background: '#fff' }}>
         {loading ? (

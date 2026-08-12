@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Mic2, Play } from 'lucide-react'
+import { Mic2, Play } from '../../../ui/eagerIcons'
 
 const WAVE_DELAYS = ['0s', '0.08s', '0.16s', '0.24s', '0.04s', '0.12s', '0.2s', '0.28s', '0.06s']
 const STAR_SCORES = [

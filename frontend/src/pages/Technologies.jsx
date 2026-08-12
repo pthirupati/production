@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Layers, ArrowRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useDataStore } from '../store/dataStore'
 import { mergeTechnologies } from '../constants/techCatalog'
@@ -9,8 +9,10 @@ import { TechCardGrid } from '../components/marketing'
 import { PageHeader } from '../components/design'
 import ScrollReveal from '../ui/ScrollReveal'
 import { fadeUp, staggerContainer } from '../ui/motion'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 export default function Technologies() {
+  usePageTitle('Technologies', 'Every technology track on FixitLab — Linux, Kubernetes, Docker, AWS, VMware, networking, databases and AI infrastructure.')
   const getTechnologies = useDataStore(s => s.getTechnologies)
   const [technologies, setTechnologies] = useState([])
   const [loading, setLoading] = useState(true)

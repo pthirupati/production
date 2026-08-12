@@ -1,0 +1,40 @@
+technology_slug: dellemc
+title: Dell EMC Storage Pool Cutover
+slug: dellemc-storage-pool-cutover
+architecture_type: custom
+description: Expand a storage pool and migrate a LUN with zero planned downtime.
+objectives:
+- Complete the dellemc lab path for this project
+- Document acceptance evidence in the task checklist
+- Hand off a short runbook note
+difficulty: beginner
+estimated_hours: 3
+order: 1
+tasks:
+- jira_key: DEL1-1
+  title: Scope the environment
+  description: Inventory the starting state and constraints.
+  acceptance_criteria: Scope note lists inputs and success criteria.
+  hint: Start from the technology console overview.
+  order: 1
+- jira_key: DEL1-2
+  title: Apply the primary change
+  description: Execute the core configuration change for this project.
+  acceptance_criteria: Primary change is visible in the simulator state.
+  hint: Use the guided console for this technology.
+  order: 2
+  depends_on: DEL1-1
+- jira_key: DEL1-3
+  title: Validate and hand off
+  description: Run the check path and write a one-page handoff.
+  acceptance_criteria: Check Solution passes; handoff note attached.
+  hint: Use Check Solution after the change.
+  order: 3
+  depends_on: DEL1-2
+- jira_key: DEL1-4
+  title: Harden and document leftovers
+  description: Close residual findings and attach evidence for review.
+  acceptance_criteria: Residual checklist is empty; evidence linked in the ticket.
+  hint: Re-run Check Solution and capture the green result.
+  order: 4
+  depends_on: DEL1-3

@@ -42,7 +42,6 @@ export default function CertificateVerify() {
       setCertId(fromUrl)
       verifyId(fromUrl)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
   const handleVerify = async (e) => {
@@ -115,7 +114,16 @@ export default function CertificateVerify() {
             <div className="w-16 h-16 rounded-full bg-accent-red/15 border border-accent-red/30 flex items-center justify-center mx-auto mb-4">
               <XCircle size={32} className="text-accent-red" />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Certificate Not Found</h2>
+            {/* A revoked or expired certificate WAS found — it just no longer
+                stands. Heading that "Not Found" reads as a typo or a bug and
+                hides the fact that it was deliberately withdrawn. */}
+            <h2 className="text-2xl font-bold text-white mb-2">
+              {result.revoked
+                ? 'Certificate Revoked'
+                : result.is_expired
+                  ? 'Certificate Expired'
+                  : 'Certificate Not Found'}
+            </h2>
             <p className="text-surface-400">{result.error || 'This certificate ID could not be verified. Check the ID and try again.'}</p>
           </FixitPanel>
         )}

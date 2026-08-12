@@ -3,8 +3,12 @@
  *
  * Unified voice hook for FixitLab interview room.
  *
- * TTS priority:  ElevenLabs/Polly (server) → Browser SpeechSynthesis (fallback)
- * STT priority:  Whisper API (server, chunked) → Browser SpeechRecognition (fallback)
+ * TTS:  Browser SpeechSynthesis by default. When the backend reports
+ *       uses_server_tts (Piper / IndicF5 via FIXITLAB_* env), speak() POSTs to
+ *       /api/interviews/tts/synthesize/ and plays the returned audio.
+ * STT:  Browser SpeechRecognition by default. When uses_server_stt is set
+ *       (faster-whisper / IndicWhisper / vosk), listen() can POST recorded
+ *       blobs to /api/interviews/stt/transcribe/.
  *
  * Both paths are transparent to callers — the same speak() / listen() API
  * works regardless of which backend is active.
@@ -85,8 +89,15 @@ function _voiceNaturalnessScore(voice, locale) {
   // but not enough to override a clearly-natural online voice.
   if (voice.localService) score += 6
 
-  // Prefer English overall for these interviews.
-  if (voice.lang?.startsWith('en')) score += 8
+  // Tie-breaker toward the ROUND's language, not English specifically. This
+  // used to be an unconditional `startsWith('en') += 8`, which handed English
+  // voices a bonus even when the caller asked for a non-English locale — on a
+  // hi-IN round an en-US voice scored 8 above an equally-natural hi-IN one and
+  // could win outright once the +18 family match tied. Keying off `base` keeps
+  // the original intent (English rounds still get it, since base === 'en') and
+  // makes the scorer correct for every other locale without needing a separate
+  // round-language plumb-through.
+  if (voice.lang?.startsWith(base)) score += 8
 
   return score
 }
@@ -528,7 +539,9 @@ function speakBrowserUtterance(seg, { voice, locale, rate, pitch }) {
     u.lang = (voice && voice.lang) || locale || 'en-US'
     u.rate = rate
     u.pitch = pitch
-    u.volume = 1
+    // Soft AEC half: slightly below unity reduces speaker→mic bleed into STT
+    // without muting the track (barge-in VAD needs the mic open).
+    u.volume = 0.82
     if (voice) u.voice = voice
     u.onstart = () => { started = true }
     u.onend = done
@@ -595,7 +608,7 @@ function getCsrfToken() {
 }
 
 // ---------------------------------------------------------------------------
-// MediaRecorder-based audio capture (for Whisper STT)
+// MediaRecorder-based audio capture (for server STT)
 // ---------------------------------------------------------------------------
 
 class AudioRecorder {
@@ -641,7 +654,7 @@ class AudioRecorder {
 }
 
 // ---------------------------------------------------------------------------
-// Server STT (Whisper)
+// Server STT (Vosk — active only when the backend reports uses_server_stt)
 // ---------------------------------------------------------------------------
 
 async function serverTranscribe(blob, mimeType, prompt = '') {
@@ -721,7 +734,64 @@ export function useInterviewVoice() {
       window.speechSynthesis.onvoiceschanged = refresh
       refresh()
       const timers = [400, 1200, 2800].map((ms) => setTimeout(refresh, ms))
-      return () => { timers.forEach(clearTimeout) }
+      return () => {
+        timers.forEach(clearTimeout)
+        // onvoiceschanged is a single-slot global. Only null it if OUR handler
+        // is still installed — if a second consumer mounted after us and
+        // overwrote the slot, clearing it unconditionally would silently kill
+        // their voice-list refresh (this hook already has two call sites:
+        // InterviewRoom and AsyncVideoRoom).
+        if (window.speechSynthesis?.onvoiceschanged === refresh) {
+          window.speechSynthesis.onvoiceschanged = null
+        }
+      }
+    }
+  }, [])
+
+  // Unmount teardown: the mic and TTS are global singletons, so leaving the
+  // room without stopping them leaves the recognizer live and the interviewer
+  // talking over the next page. InterviewRoom happens to call
+  // cancelSpeech()/stopListening() in its own cleanup, but AsyncVideoRoom does
+  // not — and a hook that owns global hardware should not depend on every
+  // consumer remembering to. Owned here so both call sites are safe.
+  //
+  // Deliberately NOT stopListening(): that routes through _finishLive/onend,
+  // which settles the turn as 'manual' and hands the caller an empty answer to
+  // submit. Under React 18 StrictMode the dev double-mount would fire that on
+  // every entry. Instead we detach the handlers FIRST (same order settle() uses
+  // at :1134-1139) so no late onend/onresult can resolve anything, then abort()
+  // — which discards results outright rather than finalizing them.
+  useEffect(() => {
+    return () => {
+      const r = recognizerRef.current
+      if (r) {
+        recognizerRef.current = null
+        r.onresult = null
+        r.onend = null
+        r.onerror = null
+        r.onspeechstart = null
+        r._finishLive = null
+        // abort() discards in-flight audio; stop() would try to finalize it.
+        try { r.abort() } catch { try { r.stop() } catch { /* already dead */ } }
+      }
+      // Release a pending listen() promise so its await doesn't hang forever.
+      if (audioRecorder.current?._resolve) {
+        audioRecorder.current._resolve()
+        audioRecorder.current._resolve = null
+      }
+      try { audioRecorder.current?.stop?.() } catch { /* not recording */ }
+
+      // Drop the speech hold before stopping audio — stopAudio() refuses to
+      // cancel the synth while a hold is active, which is correct during a
+      // Join→startRound await but would leave the interviewer speaking here.
+      releaseSpeechHold()
+      stopAudio()
+      if (speakPauseTimerRef.current) {
+        clearTimeout(speakPauseTimerRef.current)
+        speakPauseTimerRef.current = null
+      }
+      // Invalidate any in-flight segmented utterance queue.
+      speakTokenRef.current += 1
     }
   }, [])
 
@@ -885,7 +955,7 @@ export function useInterviewVoice() {
   }, [])
 
   // ------------------------------------------------------------------
-  // listen() — Whisper (server) with browser SpeechRecognition fallback
+  // listen() — Vosk (server, when enabled) with browser SpeechRecognition fallback
   // Returns { transcript, filteredText, confidence, provider }
   // ------------------------------------------------------------------
   const listen = useCallback(async (mediaStream, options = {}) => {
@@ -893,14 +963,14 @@ export function useInterviewVoice() {
       locale = 'en-US',
       maxDuration = 60000,       // ms — max recording time
       onInterim = null,          // callback(text) for live transcript display
-      techPrompt = '',           // hint for Whisper vocabulary
+      techPrompt = '',           // vocabulary hint forwarded to the server STT
     } = options
 
     setIsListening(true)
     setInterimTranscript('')
 
     try {
-      // --- Server-side Whisper path ---
+      // --- Server-side STT path (Vosk) ---
       if (configRef.current.uses_server_stt && mediaStream) {
         await audioRecorder.current.start(mediaStream)
 
@@ -959,7 +1029,9 @@ export function useInterviewVoice() {
         r.interimResults = true
 
         let finalText = ''           // accumulated finalized speech
-        let lastConfidence = 0.8
+        // Chrome often reports confidence: 0 on interim/final; do NOT seed a fake
+        // 0.8 — that made clarity recovery (threshold ~0.42) unreachable (§Y1g).
+        let lastConfidence = 0
         let settled = false
         recognizerRef.current = r
 
@@ -987,7 +1059,12 @@ export function useInterviewVoice() {
             const chunk = res[0].transcript
             if (res.isFinal) {
               finalText += (finalText ? ' ' : '') + chunk.trim()
-              lastConfidence = res[0].confidence || lastConfidence
+              {
+                const c = res[0].confidence
+                if (typeof c === 'number' && Number.isFinite(c) && c > 0) {
+                  lastConfidence = c
+                }
+              }
             } else {
               interim += chunk
             }
@@ -1056,11 +1133,11 @@ export function useInterviewVoice() {
     const {
       locale = 'en-US',
       maxDuration = 90000,        // hard safety cap
-      silenceMs = 2800,           // BASE trailing quiet after speech → auto-submit
-      minSpeechMs = 1200,         // require this much speech before we arm silence
-      maxSilenceMs = 4500,        // upper bound on the dynamic window
-      perSentenceMs = 400,        // window growth per sentence boundary
-      minWordsForSilence = 3,     // minimum words before trailing silence auto-submits
+      silenceMs = 550,            // BASE trailing quiet after speech → auto-submit (Silero target 400–700)
+      minSpeechMs = 400,          // require this much speech before we arm silence
+      maxSilenceMs = 3200,        // upper bound on the dynamic window
+      perSentenceMs = 350,        // window growth per sentence boundary
+      minWordsForSilence = 2,     // minimum words before trailing silence auto-submits
       onInterim = null,
       onSilenceCountdown = null,  // (remainingMs|null, totalMs) for the affordance
     } = options
@@ -1085,7 +1162,9 @@ export function useInterviewVoice() {
       let finalText = ''
       let lastInterim = ''           // most recent interim — Chrome can be slow
                                      // to promote it to final on a pause.
-      let lastConfidence = 0.8
+      // Chrome often reports confidence: 0 on interim/final; do NOT seed a fake
+      // 0.8 — that made clarity recovery (threshold ~0.42) unreachable (§Y1g).
+      let lastConfidence = 0
       let hadSpeech = false
       let hadFinal = false           // at least one finalized result has landed
       let speechStartedAt = 0        // first real speech (ms) — gates min duration
@@ -1188,7 +1267,12 @@ export function useInterviewVoice() {
           const chunk = res[0].transcript
           if (res.isFinal) {
             finalText += (finalText ? ' ' : '') + chunk.trim()
-            lastConfidence = res[0].confidence || lastConfidence
+            {
+                const c = res[0].confidence
+                if (typeof c === 'number' && Number.isFinite(c) && c > 0) {
+                  lastConfidence = c
+                }
+              }
             hadFinal = true
           } else {
             interim += chunk
@@ -1242,7 +1326,7 @@ export function useInterviewVoice() {
   }, [])
 
   // Stop the active capture and finalize it. Works for the live hands-free turn
-  // (listenLive), the server-Whisper path (resolves the recorder), and the
+  // (listenLive), the server-STT path (resolves the recorder), and the
   // explicit browser path (stops the recognizer so its onend resolves with the
   // accumulated transcript). Called by the Stop button, skip-on-silence, and
   // barge-in handling.

@@ -9,8 +9,20 @@ Provides:
 
 from __future__ import annotations
 
+import hashlib
 import random
 import re
+
+
+def _seeded_rng(*parts) -> random.Random:
+    """Deterministic RNG from conversation / answer material (audit §Y1g).
+
+    Comment sites previously claimed seeding then called ``random.Random()``
+    with no seed — nondeterministic and untestable across processes.
+    """
+    blob = "|".join("" if p is None else str(p) for p in parts)
+    digest = hashlib.blake2b(blob.encode("utf-8", errors="replace"), digest_size=8).digest()
+    return random.Random(int.from_bytes(digest, "big"))
 
 
 # ---------------------------------------------------------------------------
@@ -44,20 +56,18 @@ _STAR_RESULT = [
 ]
 
 _TECHNICAL_DEPTH = [
-    "because", "the reason", "tradeoff", "alternative", "we considered",
-    "instead of", "compared to", "bottleneck", "root cause", "underlying",
-    "specifically", "technically", "internally", "the way it works",
-    "under the hood", "the algorithm", "complexity", "race condition",
-    "idempotent", "eventual consistency", "cap theorem", "backpressure",
-    "circuit breaker", "retry logic", "exponential backoff", "sla", "rto", "rpo",
-    "metrics", "dashboards", "alerting", "oncall", "runbook", "postmortem",
+    # Kept for import compatibility; scoring uses analysis.score_technical_depth.
+    "root cause", "tradeoff", "bottleneck", "under the hood", "race condition",
+    "idempotent", "eventual consistency", "backpressure", "circuit breaker",
+    "exponential backoff", "runbook", "postmortem",
 ]
 
 _CONCRETE_EVIDENCE = [
-    "%", "second", "millisecond", "request", "query", "pod", "node",
-    "gb", "mb", "tps", "rps", "99th percentile", "p99", "p95", "p50",
-    "container", "replica", "namespace", "instance", "cluster", "endpoint",
-    "region", "availability zone", "cidr", "cpu", "memory", "disk",
+    # Kept for import compatibility; scoring uses analysis.score_concrete_evidence.
+    # Ambiguous English ("second", "request") intentionally removed.
+    "millisecond", "pod", "node", "gb", "mb", "tps", "rps", "99th percentile",
+    "p99", "p95", "p50", "container", "replica", "namespace", "instance",
+    "cluster", "endpoint", "region", "availability zone", "cidr", "cpu", "memory", "disk",
 ]
 
 # Filler words stripped before keyword scoring so "um, I'd restart nginx" still hits.
@@ -669,8 +679,13 @@ def _assess_quality(answer: str, question: str = "") -> str:
     if word_count <= 2 and low.rstrip(".!?") in _FILLER_ONLY:
         return "skipped"
 
-    depth_hits = sum(1 for k in _TECHNICAL_DEPTH if k in low)
-    concrete_hits = sum(1 for k in _CONCRETE_EVIDENCE if k in low)
+    from apps.interviews.services.conversation.analysis import (
+        score_concrete_evidence,
+        score_technical_depth,
+    )
+
+    depth_hits = score_technical_depth(text) // 20
+    concrete_hits = score_concrete_evidence(text) // 20
     action_hits = sum(1 for k in _STAR_ACTION if k in low)
     result_hits = sum(1 for k in _STAR_RESULT if k in low)
     command_like = bool(_COMMAND_TOKENS.search(low))
@@ -888,7 +903,12 @@ def generate_interviewer_reply(
     used = _prior_interviewer_lines(conversation_tail)
     last_line = _last_interviewer_line(conversation_tail)
     # Seed RNG off what's been said so picks vary turn-to-turn but stay free.
-    rng = random.Random()
+    rng = _seeded_rng(
+        candidate_answer,
+        "".join((m.get("content") or "")[:40] for m in (conversation_tail or [])),
+        quality,
+        correctness,
+    )
     phrase = _extract_quote_phrase(candidate_answer) if quality not in ("skipped",) else None
 
     def verdict_reaction() -> str:
@@ -908,6 +928,23 @@ def generate_interviewer_reply(
             # Collided with the previous line — append a distinct, unused tail.
             extra = _pick_unused(_GENERIC_FOLLOWUPS, used, rng)
             text = f"{text} {extra}".strip() if extra else f"{text} Tell me more."
+        # Optional self-hosted LLM phrasing (audit Y1f) — rules still decided content.
+        try:
+            from .voice_stack import llm_generate_reply
+
+            polished = llm_generate_reply(
+                system=(
+                    "You are a concise technical interviewer reacting to a candidate. "
+                    "Rewrite the line below in natural spoken English. Keep meaning, "
+                    "under 45 words, no preamble."
+                ),
+                user=text,
+                max_tokens=100,
+            )
+            if polished and len(polished.strip()) > 12:
+                text = polished.strip()
+        except Exception:  # noqa: BLE001
+            pass
         return text
 
     # Human acknowledgement that quotes the candidate when possible — built up
@@ -1120,7 +1157,7 @@ def generate_round_closing(
     pool = _CLOSING_PASSED if passed else _CLOSING_Mixed
     if round_type == "hr":
         pool = _CLOSING_HR
-    rng = random.Random()
+    rng = _seeded_rng(round_type, passed, tone, name, mem.get("strong_streak", 0))
     line = rng.choice(pool)
     if tone == "nervous" and passed:
         line = f"{line} You settled in well as we went — trust that pace."
@@ -1149,7 +1186,12 @@ def generate_clarify_probe(
     through "the cache TTL" concretely') so the re-prompt reads like a real
     interviewer pressing for specifics rather than a canned retry."""
     used = _prior_interviewer_lines(conversation_tail or [])
-    rng = random.Random()
+    rng = _seeded_rng(
+        candidate_answer,
+        question_text,
+        "".join((m.get("content") or "")[:40] for m in (conversation_tail or [])),
+        correctness,
+    )
     phrase = _extract_quote_phrase(candidate_answer)
     partial = correctness == "partial"
     if phrase:
@@ -1179,7 +1221,12 @@ def generate_transition_bridge(
 ) -> str:
     """Short spoken bridge before the next question — keeps pacing human."""
     used = _prior_interviewer_lines(conversation_tail or [])
-    rng = random.Random()
+    rng = _seeded_rng(
+        round_type,
+        quality,
+        correctness,
+        "".join((m.get("content") or "")[:40] for m in (conversation_tail or [])),
+    )
     if quality == "skipped":
         pool = _TRANSITION_SKIPPED
     elif correctness == "correct":
@@ -1228,7 +1275,11 @@ def generate_force_advance_reply(
     conversation_tail: list[dict] | None = None,
 ) -> str:
     used = _prior_interviewer_lines(conversation_tail or [])
-    rng = random.Random()
+    rng = _seeded_rng(
+        had_partial_answer,
+        has_next_question,
+        "".join((m.get("content") or "")[:40] for m in (conversation_tail or [])),
+    )
     if not has_next_question:
         return _pick_unused(_FORCE_ADVANCE_END, used, rng) or _FORCE_ADVANCE_END[0]
     if had_partial_answer:
@@ -1243,7 +1294,11 @@ def generate_unclear_audio_reply(
     conversation_tail: list[dict] | None = None,
 ) -> str:
     used = _prior_interviewer_lines(conversation_tail or [])
-    rng = random.Random()
+    rng = _seeded_rng(
+        question_text,
+        partial_transcript,
+        "".join((m.get("content") or "")[:40] for m in (conversation_tail or [])),
+    )
     q = (question_text or "").strip()
     words = len((partial_transcript or "").split())
     if words >= 3:
@@ -1352,8 +1407,29 @@ def generate_clarification_reply(
     # generic
     definition = _define_term(candidate_question, question_text)
     if definition:
-        return f"Fair question. {definition} So, back to it — {reask}"
-    return f"Fair question — answer it the way you'd explain it to a teammate. {reask}"
+        base = f"Fair question. {definition} So, back to it — {reask}"
+    else:
+        base = f"Fair question — answer it the way you'd explain it to a teammate. {reask}"
+
+    # Optional self-hosted LLM phrasing (audit Y1f). Rules still decide *what*;
+    # the LLM only rewrites *how* when FIXITLAB_LLM_GENERATE_URL is set.
+    try:
+        from .voice_stack import llm_generate_reply
+
+        polished = llm_generate_reply(
+            system=(
+                "You are a concise technical interviewer. Rewrite the reply below in natural "
+                "spoken English (or matching the candidate's language). Keep the same meaning, "
+                "keep the re-ask of the original question, under 80 words. No preamble."
+            ),
+            user=base,
+            max_tokens=160,
+        )
+        if polished and len(polished.strip()) > 20:
+            return polished.strip()
+    except Exception:  # noqa: BLE001
+        pass
+    return base
 
 
 def is_candidate_question(text: str, input_type: str | None = None) -> bool:
@@ -1410,61 +1486,19 @@ def compute_answer_scores(
     round_type: str,
     expected_keywords: list[str] | None = None,
 ) -> dict:
-    """Return structured score breakdown — fully free, no external API."""
-    quality = _assess_quality(candidate_answer, question_text)
-    star = _score_star_coverage(candidate_answer)
-    topic = _detect_topic(f"{question_text} {candidate_answer}")
-    word_count = len(candidate_answer.split()) if candidate_answer else 0
-    scored_text = _normalize_answer_for_scoring(candidate_answer)
-    low = scored_text
+    """Return structured score breakdown — fully free, no external API.
 
-    depth_score = min(100, sum(1 for k in _TECHNICAL_DEPTH if k in low) * 12)
-    concrete_score = min(100, sum(1 for k in _CONCRETE_EVIDENCE if k in low) * 15)
-    star_score = round(sum(star.values()) / 4 * 100)
-    length_score = min(100, word_count * 1.5) if word_count < 70 else min(100, word_count * 0.8)
+    Prefer ``conversation.scorer.compute_semantic_scores`` for new call sites;
+    this wrapper keeps the older import path and shares the I1 depth/concrete fix.
+    """
+    from apps.interviews.services.conversation.scorer import compute_semantic_scores
 
-    expected_hit_rate = 0.0
-    if expected_keywords:
-        # Keywords come from JSONField data that may have been seeded or edited
-        # with non-string entries (None, ints). Coerce defensively so a single
-        # bad keyword can never crash live answer scoring (was a raw 500).
-        clean_keywords = [str(k).lower() for k in expected_keywords if k not in (None, "")]
-        if clean_keywords:
-            _, expected_hit_rate = _count_keyword_hits(candidate_answer, clean_keywords)
-        else:
-            expected_keywords = None
-
-    if round_type in ("behavioral", "hr"):
-        composite = depth_score * 0.20 + concrete_score * 0.15 + star_score * 0.45 + length_score * 0.20
-    elif round_type in ("system_design", "live_coding"):
-        composite = depth_score * 0.45 + concrete_score * 0.35 + star_score * 0.05 + length_score * 0.15
-    else:
-        composite = depth_score * 0.35 + concrete_score * 0.30 + star_score * 0.15 + length_score * 0.20
-
-    if expected_keywords:
-        composite = composite * 0.7 + expected_hit_rate * 100 * 0.3
-
-    has_keywords = bool(expected_keywords)
-    quality = _refine_quality(
-        quality,
-        keyword_hit_rate=expected_hit_rate,
-        topic=topic,
-        word_count=word_count,
-        has_keywords=has_keywords,
+    return compute_semantic_scores(
+        candidate_answer=candidate_answer,
+        question_text=question_text,
+        round_type=round_type,
+        expected_keywords=expected_keywords,
     )
-
-    return {
-        "quality": quality,
-        "composite_score": round(min(100, max(0, composite))),
-        "depth_score": depth_score,
-        "concrete_score": concrete_score,
-        "star_score": star_score,
-        "star_coverage": star,
-        "word_count": word_count,
-        "topic_detected": topic,
-        "keyword_hit_rate": round(expected_hit_rate, 2),
-        "feedback": _generate_feedback(quality, star, topic, round_type),
-    }
 
 
 def _generate_feedback(quality: str, star: dict, topic: str | None, round_type: str) -> str:

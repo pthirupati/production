@@ -6,37 +6,30 @@ description: 'CONTEXT: A team operating JavaScript has raised a ticket for `Fix 
   resolve it. Business impact: reduced service reliability and blocked users until the underlying state
   is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project. The architecture is
   a single lab-primary node exposing modules, browser console, and Node tooling; treat it as the production
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: addUp(values) should numerically sum an array that may contain numeric STRINGS
   (like ''3''), but reduce uses `+` directly, so a string operand turns the whole thing into string concatenation
   (''0'' + 3 -> ''03''). Coerce each value to a Number before adding.
 
-
   OBJECTIVE: See numbers concatenated instead of added; Convert each value to a Number before summing;
   Return a numeric total. Acceptance criteria: the change is minimal and reversible, and success means
   all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant modules, browser console, and Node tooling), changing one thing at a time. Check
   your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -145,7 +138,6 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 technology: javascript
 summary: Complete the fix the string-concatenation bug in addup javascript lab and verify success with
@@ -158,7 +150,7 @@ tags:
 - fix
 - hands-on
 - javascript
-linked_tutorial: javascript-fundamentals
+linked_tutorial: javascript-language-zero-hero
 what_you_will_learn:
 - See numbers concatenated instead of added
 - Convert each value to a Number before summing

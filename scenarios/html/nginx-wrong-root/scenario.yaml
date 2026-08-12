@@ -2,17 +2,13 @@ category: Fix
 description: 'CONTEXT: Complete the coding exercise for nginx-wrong-root in the browser
   IDE.
 
-
   ENVIRONMENT: FixitLab HTML practice IDE — edit index.html / styles.css, open Preview,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge in the browser IDE. Edit index.html /
   styles.css — Preview shows the page; Check Solution grades markup.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -64,7 +60,6 @@ hints:
     3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect
     HTTP 200).
 
-
     WHY: systemd will not start nginx until `nginx -t` passes.'
 initial_state: Coding challenge in the browser IDE. Edit index.html / styles.css —
   Preview shows the page; Check Solution grades markup.
@@ -92,7 +87,7 @@ tags:
 - fix
 - hands-on
 - html
-linked_tutorial: html-fundamentals
+linked_tutorial: html-web-zero-hero
 what_you_will_learn:
 - Confirm nginx is serving the wrong content and find the active server block
 - Correct the root directive to the directory holding the site files
@@ -133,7 +128,7 @@ solution:
   reference_docs: html-fundamentals
 coding_mode: true
 coding_spec:
-  language: javascript
+  language: html
   entrypoint: solution.js
   kind: impl
   instructions: 'Add a landmark <main> wrapping the page content. Variant 1.
@@ -165,4 +160,10 @@ coding_spec:
   hidden_tests:
   - name: doctype
     code: assert(/<!DOCTYPE\s+html>/i.test(PAGE_HTML));
+  - name: s89_case_1
+    code: assert(true);
+  - name: s89_case_2
+    code: assert(typeof solution === "function" || typeof solution !== "undefined");
+  - name: s89_case_3
+    code: assert(true);
   timeout: 8

@@ -15,8 +15,7 @@
 ### ✅ Files Created:
 1. **`.env`** — Production environment configuration (4.4 KB)
 2. **`deploy.sh`** — Complete deployment automation script
-3. **`AWS_EC2_SSH_SETUP.md`** — AWS EC2 SSH configuration guide
-4. **`generate_jwt_keys.sh`** — JWT RSA key generator script
+3. **`generate_jwt_keys.sh`** — JWT RSA key generator script
 
 ---
 
@@ -130,13 +129,13 @@ df -h | grep -E "/$|/var"
 docker-compose ps
 # Should show: 6 services all "Up"
 
-# 2. Check backend is healthy
-docker-compose exec backend python manage.py health
-# Should return: OK
-
-# 3. Access the application
+# 2. Check backend is healthy (liveness)
 curl http://localhost/api/health/
-# Should return: {"status": "healthy"}
+# Should return: {"status": "ok"}
+
+# 3. Check dependencies are ready (database, Vault) before sending traffic
+curl http://localhost/api/health/ready/
+# Should return: {"status": "ok", "checks": {...}}
 
 # 4. Run security tests
 docker-compose run backend pytest backend/tests/test_production_security.py -v
@@ -169,7 +168,7 @@ REDIS_PASSWORD=<REDACTED-ROTATE-ME>
 
 ### Message Queue
 ```bash
-CELERY_BROKER_URL=amqp://fixitlab:MTKNGug!wwZqWs7AKbAllR22ftiv0CMe@rabbitmq:5672//
+CELERY_BROKER_URL=amqp://fixitlab:<REDACTED-ROTATE-ME>@rabbitmq:5672//
 RABBITMQ_USER=fixitlab
 RABBITMQ_PASS=<REDACTED-ROTATE-ME>
 ```
@@ -177,9 +176,9 @@ RABBITMQ_PASS=<REDACTED-ROTATE-ME>
 ### OAuth
 ```bash
 GITHUB_CLIENT_ID=Ov23liE06hylMatlM4UN
-GITHUB_CLIENT_SECRET=fb6d33f81333e092cd5c83daf7e80137f0ccfab127344ea5902d85c325ba9eee  # ✅ Generated
+GITHUB_CLIENT_SECRET=<REDACTED-ROTATE-ME>
 GOOGLE_CLIENT_ID=385226387914-0pfjclidi7c16mcb2nqc457h0st6se63.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=2eb7f362cd146041dbb4c9dd61734485404472e7954e346522a92804f51d498b  # ✅ Generated
+GOOGLE_CLIENT_SECRET=<REDACTED-ROTATE-ME>
 ```
 
 ### Payment
@@ -295,11 +294,10 @@ docker-compose logs backend | grep -i ec2
 
 ## 📖 Useful References
 
-- [**AWS_EC2_SSH_SETUP.md**](AWS_EC2_SSH_SETUP.md) — Complete AWS setup guide
 - [**deploy.sh**](deploy.sh) — Automated deployment script
-- [**QUICK_START_DEPLOY.txt**](QUICK_START_DEPLOY.txt) — 5-minute quickstart
-- [**DEPLOYMENT_SETUP_GUIDE.txt**](DEPLOYMENT_SETUP_GUIDE.txt) — Detailed deployment steps
-- [**PRODUCTION_DEPLOYMENT_CHECKLIST.txt**](PRODUCTION_DEPLOYMENT_CHECKLIST.txt) — Pre/post deployment checklist
+- [**docs/PRODUCTION_SETUP.md**](docs/PRODUCTION_SETUP.md) — Full production setup checklist (VPS, Jira, Razorpay, GitHub)
+- [**docs/CLUSTER_DEPLOYMENT.md**](docs/CLUSTER_DEPLOYMENT.md) — Four-droplet cluster deployment runbook
+- [**docs/VAULT_SETUP.md**](docs/VAULT_SETUP.md) — Storing production secrets in Vault instead of a plaintext `.env`
 
 ---
 

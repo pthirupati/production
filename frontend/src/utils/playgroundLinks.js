@@ -18,8 +18,27 @@ const PLAYGROUND_TO_TECHNOLOGY = {
   java: 'java',
   sql: 'database',
   security: 'security',
+  // §C6 — divergent playground_slug taxonomy → canonical Technology.slug
   git: 'devops',
+  github: 'devops',
+  gitlab: 'devops',
   jenkins: 'devops',
+  aiml: 'ai-ml',
+  monitoring: 'prometheus',
+  mongodb: 'database',
+  nginx: 'linux',
+  redis: 'database',
+  simulation: 'simulation',
+  baremetal: 'baremetal',
+  gpu: 'gpu',
+  html: 'html',
+  nodejs: 'nodejs',
+  postgresql: 'postgresql',
+  sqlite: 'sqlite',
+  terraform: 'terraform',
+  peoplesoft: 'peoplesoft',
+  aws: 'aws',
+  networking: 'networking',
 }
 
 /** Playground slugs that open the public ephemeral playground (no login). */

@@ -20,8 +20,10 @@ export default function LeftNav({ service, collapsed = false, onExpand }) {
     return (
       <nav className="aws-leftnav aws-leftnav-collapsed" aria-label={`${cfg.title} navigation (collapsed)`}>
         <button
+          type="button"
           className="aws-leftnav-rail-toggle"
           title={`Expand ${cfg.title} navigation`}
+          aria-label={`Expand ${cfg.title} navigation`}
           onClick={() => onExpand?.()}
         >
           <Icons.PanelLeft size={16} />
@@ -51,7 +53,7 @@ export default function LeftNav({ service, collapsed = false, onExpand }) {
       <div className="aws-leftnav-title">
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Icon size={16} /> {cfg.title}</span>
         {onExpand && (
-          <button className="aws-leftnav-collapse-btn" title="Collapse navigation" onClick={() => onExpand(true)}>
+          <button type="button" className="aws-leftnav-collapse-btn" title="Collapse navigation" aria-label="Collapse navigation" onClick={() => onExpand(true)}>
             <Icons.PanelLeftClose size={15} />
           </button>
         )}

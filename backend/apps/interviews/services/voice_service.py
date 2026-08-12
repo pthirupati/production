@@ -32,35 +32,38 @@ def voice_config_payload() -> dict:
 
 
 def _default_voices() -> list[dict]:
+    # Leave browser_voice_hint empty so the client ranker
+    # (_voiceNaturalnessScore) can pick Edge Natural / neural voices instead of
+    # hard-pinning to stale named voices like "Daniel" / "Samantha" (audit §Y1g).
     return [
         {
             "code": "indian-female", "label": "Indian Female", "locale": "en-IN",
-            "gender": "female", "region": "india", "browser_voice_hint": "Neerja",
+            "gender": "female", "region": "india", "browser_voice_hint": "",
             "pitch": 1.0, "rate": 0.95, "is_default": True,
         },
         {
             "code": "indian-male", "label": "Indian Male", "locale": "en-IN",
-            "gender": "male", "region": "india", "browser_voice_hint": "Prabhat",
+            "gender": "male", "region": "india", "browser_voice_hint": "",
             "pitch": 0.95, "rate": 0.92, "is_default": False,
         },
         {
             "code": "uk-female", "label": "UK Female", "locale": "en-GB",
-            "gender": "female", "region": "uk", "browser_voice_hint": "Sonia",
+            "gender": "female", "region": "uk", "browser_voice_hint": "",
             "pitch": 1.0, "rate": 0.94, "is_default": False,
         },
         {
             "code": "uk-male", "label": "UK Male", "locale": "en-GB",
-            "gender": "male", "region": "uk", "browser_voice_hint": "Ryan",
+            "gender": "male", "region": "uk", "browser_voice_hint": "",
             "pitch": 0.9, "rate": 0.93, "is_default": False,
         },
         {
             "code": "us-female", "label": "US Female", "locale": "en-US",
-            "gender": "female", "region": "us", "browser_voice_hint": "Samantha",
+            "gender": "female", "region": "us", "browser_voice_hint": "",
             "pitch": 1.0, "rate": 0.96, "is_default": False,
         },
         {
             "code": "us-male", "label": "US Male", "locale": "en-US",
-            "gender": "male", "region": "us", "browser_voice_hint": "Daniel",
+            "gender": "male", "region": "us", "browser_voice_hint": "",
             "pitch": 0.92, "rate": 0.94, "is_default": False,
         },
     ]

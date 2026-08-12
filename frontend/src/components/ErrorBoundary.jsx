@@ -1,6 +1,7 @@
 import { Component } from 'react'
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react'
+import { AlertTriangle, RefreshCw, Home } from '../ui/eagerIcons'
 import { isChunkLoadError } from '../utils/lazyWithRetry'
+import { reportClientError } from '../utils/reportClientError'
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -14,6 +15,14 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('ErrorBoundary caught:', error, errorInfo)
+    // Audit Z6-6: previously this console.error was the only record, so a white
+    // screen in production was invisible until someone wrote in. A chunk-load error
+    // is a stale deploy, not a code bug, so it is reported under its own kind rather
+    // than mixed in with real crashes.
+    reportClientError(error, {
+      componentStack: errorInfo?.componentStack,
+      kind: isChunkLoadError(error) ? 'chunk_load' : 'react_error_boundary',
+    })
     if (isChunkLoadError(error)) {
       const key = 'fixitlab-chunk-reload'
       if (!sessionStorage.getItem(key)) {
@@ -50,7 +59,12 @@ export default class ErrorBoundary extends Component {
               </p>
             </div>
             {this.state.error && (
-              <pre className="text-xs text-surface-500 bg-surface-900 border border-surface-800 rounded-lg p-3 text-left overflow-auto max-h-32">
+              /* surface-400, not surface-500: this is the only copy telling the user
+                 WHAT broke, so it has to clear AA. On surface-900 the 500 token
+                 measures 3.50:1 in light mode (--s-500 120,135,155 on --s-900
+                 248,250,252); 400 measures 6.16:1. Fixed here rather than by
+                 redefining --s-500, which is shared with borders/disabled states. */
+              <pre className="text-xs text-surface-400 bg-surface-900 border border-surface-800 rounded-lg p-3 text-left overflow-auto max-h-32">
                 {this.state.error.message}
               </pre>
             )}

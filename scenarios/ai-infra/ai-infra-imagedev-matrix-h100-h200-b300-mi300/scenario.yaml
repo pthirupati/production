@@ -16,15 +16,12 @@ description: 'CONTEXT: ImageDev (PSINFRA board) needs one Packer template matrix
   then publishes each artifact into MAAS so Bare Metal can Deploy the right image per rack.
   AI Infra Engineering owns this multi-SKU image factory path, not the application GPU course.
 
-
   ENVIRONMENT: Packer workspace IDE + Bare Metal (MAAS) Images pane + Lab Terminal. No external
   cloud calls — treat the Packer→MAAS matrix as the production factory pipeline.
-
 
   SYMPTOM / STARTING STATE: Only a subset of the matrix builds cleanly; MAAS boot-resources is
   missing one or more of custom/h100-jammy, custom/h200-jammy, custom/b300-jammy, and
   custom/mi300-jammy. Fleet bring-up is blocked for whichever SKU is missing.
-
 
   OBJECTIVE: Open Packer; validate and build each SKU in the matrix (CVE gate must pass per
   variant); Publish every successful artifact to MAAS; confirm Images lists all four

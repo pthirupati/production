@@ -34,7 +34,7 @@ export default function VmwareOvfDeployModal({ contentLibrary, hosts, datastores
       <div className="vm-modal w-[480px] max-w-[95vw]">
         <div className="vm-modal-header">
           <span>Deploy from Content Library (OVF/OVA)</span>
-          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white">✕</button>
         </div>
         <div className="vm-modal-body space-y-3">
           <div>

@@ -15,12 +15,9 @@ description: 'CONTEXT: Networking / Bare Metal — GPU fabric underlay BGP on Vy
   in Idle/Active. AI Infra Engineering owns the VyOS underlay that MAAS PXE and LXD
   overlays depend on.
 
-
   ENVIRONMENT: Lab Terminal VyOS CLI (configure/commit/compare/rollback) + Bare Metal.
 
-
   SYMPTOM: BGP neighbor down; routes missing. Fix, commit, verify show ip bgp summary.
-
 
   OBJECTIVE: Enter configure; fix neighbor/ASN; commit; verify BGP Established; FIXED-OK.'
 objectives:

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { WifiOff } from 'lucide-react'
+import { WifiOff } from '../ui/eagerIcons'
 
 /**
  * Shows a fixed banner when the user goes offline.

@@ -41,7 +41,7 @@ def _log_email(subject, to_email, template, status, error=""):
         logger.debug(f"Could not log email to database: {e}")
 
 
-def _send_via_sendgrid(subject, to_email, html_content, text_content):
+def _send_via_sendgrid(subject, to_email, html_content, text_content, headers=None):
     """Send via SendGrid HTTP API (works when hosting provider blocks SMTP ports)."""
     api_key = getattr(settings, "SENDGRID_API_KEY", "") or ""
     if not api_key:
@@ -59,6 +59,12 @@ def _send_via_sendgrid(subject, to_email, html_content, text_content):
             {"type": "text/html", "value": html_content},
         ],
     }
+    # SendGrid takes custom RFC headers as a top-level "headers" map. Note the
+    # local name shadowing below: the requests call has its OWN headers kwarg for
+    # the Authorization bearer, which is why this goes into the payload, not there.
+    extra = {k: v for k, v in (headers or {}).items() if v}
+    if extra:
+        payload["headers"] = extra
     resp = requests.post(
         "https://api.sendgrid.com/v3/mail/send",
         json=payload,
@@ -70,7 +76,7 @@ def _send_via_sendgrid(subject, to_email, html_content, text_content):
     return True
 
 
-def _deliver(subject, to_email, html_content, text_content):
+def _deliver(subject, to_email, html_content, text_content, headers=None):
     """
     Delivery order (first match wins):
     1. Gmail API (HTTPS) — works on DigitalOcean with your Gmail account
@@ -80,11 +86,11 @@ def _deliver(subject, to_email, html_content, text_content):
     from .gmail_api import is_gmail_api_configured, send_via_gmail_api
 
     if is_gmail_api_configured():
-        send_via_gmail_api(subject, to_email, html_content, text_content)
+        send_via_gmail_api(subject, to_email, html_content, text_content, headers=headers)
         return "gmail_api"
 
     if getattr(settings, "SENDGRID_API_KEY", ""):
-        _send_via_sendgrid(subject, to_email, html_content, text_content)
+        _send_via_sendgrid(subject, to_email, html_content, text_content, headers=headers)
         return "sendgrid"
 
     email = EmailMultiAlternatives(
@@ -92,13 +98,14 @@ def _deliver(subject, to_email, html_content, text_content):
         body=text_content,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[to_email],
+        headers={k: v for k, v in (headers or {}).items() if v} or None,
     )
     email.attach_alternative(html_content, "text/html")
     email.send(fail_silently=False)
     return "smtp"
 
 
-def send_email(subject, to_email, template, context=None):
+def send_email(subject, to_email, template, context=None, headers=None):
     """
     Send HTML email using a template.
     Falls back gracefully if template is missing or email delivery fails.
@@ -126,7 +133,7 @@ def send_email(subject, to_email, template, context=None):
         return True
 
     try:
-        via = _deliver(subject, to_email, html_content, text_content)
+        via = _deliver(subject, to_email, html_content, text_content, headers=headers)
         logger.info(f"Email sent via {via}: '{subject}' to {to_email}")
         _log_email(subject, to_email, template, "sent")
         return True

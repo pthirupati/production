@@ -77,6 +77,7 @@ class Scenario(models.Model):
         ("easy", "Easy"),
         ("medium", "Medium"),
         ("hard", "Hard"),
+        ("expert", "Expert"),
     ]
 
     TYPE_CHOICES = [
@@ -263,6 +264,21 @@ class Scenario(models.Model):
     certification_only = models.BooleanField(
         default=False,
         help_text="Show only under certification tracks — excluded from normal technology scenario lists",
+    )
+    # ── Linked tutorial ──
+    # The scenario YAML has carried a ``linked_tutorial`` key for a while but it was
+    # never a model field, so the value was dropped on ingest and the "read the
+    # theory before the lab" link could never be rendered (audit §B1/L1071).
+    # This holds a tutorials course_slug (courses live as data in apps.tutorials,
+    # not as a FK-able model, so a plain slug is the only join key available).
+    # Blank means "no tutorial linked yet" — validation that the slug resolves to a
+    # real course belongs in validate_scenario_catalog, not in a DB constraint,
+    # because the tutorial catalog is generated and can legitimately lag the labs.
+    linked_tutorial = models.SlugField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="tutorials course_slug for the theory course backing this lab (blank = none)",
     )
     coding_spec = models.JSONField(
         default=dict,

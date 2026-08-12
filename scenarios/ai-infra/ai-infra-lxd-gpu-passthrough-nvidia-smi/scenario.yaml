@@ -16,14 +16,11 @@ description: 'CONTEXT: Bare Metal ticket — an inference team needs an LXD cont
   container, not just on the host. AI Infra Engineering owns LXD GPU-passthrough profiles on
   MAAS-deployed fleets.
 
-
   ENVIRONMENT: LXD console + Bare Metal + Lab Terminal on gpu-node-01. Treat the container as
   the production inference sandbox for this ticket.
 
-
   SYMPTOM / STARTING STATE: gpu-passthrough profile is missing or incomplete; the container
   launches but nvidia-smi inside it reports no devices found.
-
 
   OBJECTIVE: Inspect/fix the gpu-passthrough LXD profile so it maps the physical GPU device;
   launch (or restart) the container with that profile; run nvidia-smi inside the container and

@@ -14,12 +14,9 @@ jira_priority: Medium
 description: 'CONTEXT: AI Infra / ImageDev — a Dell Precision workstation with NVIDIA RTX A4000 must be
   enlisted and commissioned in MAAS for a graphics / light-inference fleet row (1× Ada/Ampere SKU, not SXM).
 
-
   ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin.
 
-
   SYMPTOM: Node is New; not commissioned; nvidia-smi must report RTX A4000 after deploy.
-
 
   OBJECTIVE: Commission and deploy via MAAS; confirm nvidia-smi -L shows RTX A4000; leave the node Ready
   for AWX follow-on.'

@@ -10,6 +10,11 @@ export default function SessionReplay() {
   const [replay, setReplay] = useState(null)
   const [commands, setCommands] = useState(null)
   const [loading, setLoading] = useState(true)
+  // Tracked per call, not as one page-level flag: a session can legitimately
+  // have a terminal recording but no command log (or vice versa), so a single
+  // "load failed" bit would mislabel one of the two tabs.
+  const [replayFailed, setReplayFailed] = useState(false)
+  const [commandsFailed, setCommandsFailed] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [speed, setSpeed] = useState(1)
@@ -22,14 +27,29 @@ export default function SessionReplay() {
   const timerRef = useRef(null)
 
   useEffect(() => {
-    Promise.all([
-      labApi.getSessionReplay(sessionId).catch(() => null),
-      labApi.getCommandHistory(sessionId).catch(() => null),
+    // allSettled, not Promise.all with per-call .catch(() => null): the old form
+    // collapsed "the fetch failed" and "nothing was recorded" into the same null,
+    // so a backend blip rendered the same "No terminal recording available" copy
+    // as a real empty session and a user could conclude their lab work was lost.
+    // (The outer .catch was also dead code — the inner catches made the Promise
+    // .all unrejectable, so the failure toast never fired.)
+    let active = true
+    setReplayFailed(false)
+    setCommandsFailed(false)
+    Promise.allSettled([
+      labApi.getSessionReplay(sessionId),
+      labApi.getCommandHistory(sessionId),
     ]).then(([rep, cmds]) => {
-      setReplay(rep)
-      setCommands(cmds)
-    }).catch(() => toast.error('Failed to load session data'))
-      .finally(() => setLoading(false))
+      if (!active) return
+      setReplay(rep.status === 'fulfilled' ? rep.value : null)
+      setCommands(cmds.status === 'fulfilled' ? cmds.value : null)
+      setReplayFailed(rep.status === 'rejected')
+      setCommandsFailed(cmds.status === 'rejected')
+      if (rep.status === 'rejected' || cmds.status === 'rejected') {
+        toast.error('Failed to load session data')
+      }
+    }).finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [sessionId])
 
   const handleLoadReview = async () => {
@@ -190,15 +210,15 @@ export default function SessionReplay() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {playing ? (
-                      <button onClick={handlePause} className="p-2 rounded-lg bg-surface-800 text-white hover:bg-surface-700" title="Pause">
+                      <button type="button" onClick={handlePause} className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg bg-surface-800 text-white hover:bg-surface-700" title="Pause" aria-label="Pause">
                         <Pause size={16} />
                       </button>
                     ) : (
-                      <button onClick={handlePlay} className="p-2 rounded-lg bg-accent-cyan text-surface-950 hover:bg-accent-cyan/80" title="Play">
+                      <button type="button" onClick={handlePlay} className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg bg-accent-cyan text-surface-950 hover:bg-accent-cyan/80" title="Play" aria-label="Play">
                         <Play size={16} />
                       </button>
                     )}
-                    <button onClick={handleReset} className="p-2 rounded-lg bg-surface-800 text-surface-400 hover:text-white" title="Reset">
+                    <button type="button" onClick={handleReset} className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg bg-surface-800 text-surface-400 hover:text-white" title="Reset" aria-label="Reset">
                       <RotateCcw size={16} />
                     </button>
 
@@ -223,6 +243,17 @@ export default function SessionReplay() {
                 </div>
               </div>
             </>
+          ) : replayFailed ? (
+            <div className="p-12 text-center" data-testid="replay-load-error">
+              <AlertCircle size={32} className="mx-auto text-accent-red/70 mb-3" />
+              <p className="text-surface-300">Couldn't load the terminal recording</p>
+              <p className="text-surface-500 text-sm mt-1">
+                This is a loading problem, not a missing recording — your session data is safe.
+              </p>
+              <button onClick={() => window.location.reload()} className="btn-secondary text-sm px-4 py-2 mt-4">
+                Retry
+              </button>
+            </div>
           ) : (
             <div className="p-12 text-center">
               <Terminal size={32} className="mx-auto text-surface-700 mb-3" />
@@ -252,6 +283,17 @@ export default function SessionReplay() {
                   </div>
                 </div>
               ))}
+            </div>
+          ) : commandsFailed ? (
+            <div className="p-12 text-center" data-testid="commands-load-error">
+              <AlertCircle size={32} className="mx-auto text-accent-red/70 mb-3" />
+              <p className="text-surface-300">Couldn't load the command log</p>
+              <p className="text-surface-500 text-sm mt-1">
+                This is a loading problem, not a missing log — your session data is safe.
+              </p>
+              <button onClick={() => window.location.reload()} className="btn-secondary text-sm px-4 py-2 mt-4">
+                Retry
+              </button>
             </div>
           ) : (
             <div className="p-12 text-center">

@@ -41,9 +41,19 @@ class NotificationPreference(models.Model):
     email_lab_completed = models.BooleanField(default=False, help_text="Email when completing a lab")
     email_lab_expired = models.BooleanField(default=False, help_text="Email when a lab session expires")
     email_subscription = models.BooleanField(default=True, help_text="Email for subscription confirmations")
+    # Marketing consent must be opt-IN (audit Z4-8). This defaulted to True, which
+    # is pre-ticked consent: invalid under GDPR Art.4(11)/Recital 32 and inconsistent
+    # with DPDP's affirmative-action standard. The fields above stay True because
+    # they are transactional — an achievement or subscription-receipt email is
+    # service communication about something the user did, not marketing.
+    #
+    # NOTE: this changes the default for NEW rows only. Existing users are
+    # deliberately left as-is; mass-flipping the installed base to False is a
+    # revenue-affecting decision for the owner, not something a schema change should
+    # do silently. See the data-migration note in the audit doc (Z4-8).
     email_marketing = models.BooleanField(
-        default=True,
-        help_text="Subscribe reminders, product tips, and benefit emails",
+        default=False,
+        help_text="Subscribe reminders, product tips, and benefit emails (opt-in)",
     )
 
     # In-app preferences

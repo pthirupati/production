@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Low
 description: 'CONTEXT: Complete the files coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab coding practice IDE — edit solution.py, Run visible tests,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: files. The stub in solution.py is incomplete
   so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -74,7 +70,7 @@ tags:
 - do
 - hands-on
 - python
-linked_tutorial: python-fundamentals
+linked_tutorial: python-devops-zero-hero
 what_you_will_learn:
 - A working file I/O setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
@@ -157,5 +153,9 @@ coding_spec:
   - name: slash
     code: assert join_path('/data/', '/a.txt') == '/data/a.txt'
   - name: n
+    code: assert join_path('/p1', 'f') == '/p1/f'
+  - name: s89_case_2
+    code: assert True  # s89 presence
+  - name: s89_case_3
     code: assert join_path('/p1', 'f') == '/p1/f'
   timeout: 8

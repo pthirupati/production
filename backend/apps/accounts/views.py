@@ -1,6 +1,9 @@
 import logging
+import secrets
+
 from django.contrib.auth import authenticate, get_user_model
 from django.conf import settings
+from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from rest_framework.response import Response
@@ -8,7 +11,13 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework import status
-from common.throttles import LoginRateThrottle, OTPRateThrottle, PasswordResetRateThrottle, TokenRefreshThrottle
+from common.throttles import (
+    ContactRateThrottle,
+    LoginRateThrottle,
+    OTPRateThrottle,
+    PasswordResetRateThrottle,
+    TokenRefreshThrottle,
+)
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
@@ -243,16 +252,43 @@ class RegisterView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        # Accept pending org invites for this email
+        # Accept pending org invites for this email.
+        #
+        # SECURITY (audit Z2-2): this used to match on email alone and grant
+        # `invite.role` verbatim — so a pending invite silently made whoever next
+        # registered that address an organisation **admin**, for the full 14-day
+        # window. A typo'd invite, or an address that changes hands, was enough.
+        # The unique `token` existed for exactly this and was never checked.
+        #
+        # An email match now confers MEMBER only. The invited role is honoured just
+        # when the request carries the matching token — i.e. the person demonstrably
+        # received the invite email. Auto-join still works without it, so no
+        # legitimate flow breaks; it simply cannot hand out privilege any more.
         from .models import PendingOrgInvite, OrganizationMember
+
+        supplied_token = str(request.data.get("invite_token") or "").strip()
+        _ELEVATED = {"admin", "owner"}
         for invite in PendingOrgInvite.objects.filter(
             email__iexact=user.email, accepted_at__isnull=True, expires_at__gt=timezone.now(),
         ).select_related("organization"):
+            token_ok = bool(
+                supplied_token
+                and invite.token
+                and secrets.compare_digest(supplied_token, invite.token)
+            )
+            granted_role = invite.role
+            if invite.role in _ELEVATED and not token_ok:
+                granted_role = "member"
+                logger.warning(
+                    "Org invite for %s requested role %r without a valid token — "
+                    "granting 'member' instead (org=%s)",
+                    user.email, invite.role, invite.organization_id,
+                )
             if invite.organization.member_count < invite.organization.seat_limit:
                 OrganizationMember.objects.get_or_create(
                     organization=invite.organization,
                     user=user,
-                    defaults={"role": invite.role, "invited_email": user.email},
+                    defaults={"role": granted_role, "invited_email": user.email},
                 )
             invite.accepted_at = timezone.now()
             invite.save(update_fields=["accepted_at"])
@@ -441,6 +477,41 @@ class LoginView(APIView):
             )
             return Response({"error": "Account is disabled"}, status=403)
 
+        # ── Second factor (audit Z2-3) ────────────────────────────────────────
+        #
+        # Checked AFTER the password, so this never reveals whether an account
+        # exists or has MFA — an unauthenticated caller cannot reach it.
+        #
+        # Staff and superusers are required to have MFA, but the ones that exist
+        # today have no device. Refusing them outright would lock every
+        # administrator out of the platform on deploy, so a required-but-unenrolled
+        # account is sent to enrolment instead. That is the difference between
+        # rolling out MFA and causing an outage.
+        from .mfa_models import mfa_recommended_for, mfa_required_for
+        from .mfa_views import issue_mfa_challenge
+
+        device = getattr(user, "mfa_device", None)
+        if device and device.enabled:
+            structured_logger.info(
+                "Login passed password, awaiting MFA", user_id=user.id,
+                tags=["auth", "mfa"],
+            )
+            return Response(
+                {
+                    "mfa_required": True,
+                    "mfa_token": issue_mfa_challenge(user),
+                    "message": "Enter the 6-digit code from your authenticator app.",
+                },
+                status=status.HTTP_200_OK,
+            )
+        if mfa_required_for(user):
+            # Staff without a confirmed device: allow the session so they can set
+            # MFA up, and flag it loudly. `mfa_enrollment_required` is what the UI
+            # uses to force them through setup before anything else.
+            logger.warning(
+                "Staff account %s signed in without MFA enrolled", user.id
+            )
+
         # Update last_login timestamp
         from django.utils import timezone as tz
         user.last_login = tz.now()
@@ -472,6 +543,14 @@ class LoginView(APIView):
                 "is_staff": user.is_staff,
                 "date_joined": user.date_joined.isoformat(),
             },
+            "mfa_enrollment_required": bool(
+                (user.is_staff or user.is_superuser)
+                and not (device and device.enabled)
+            ),
+            # Suggested, never required (audit Z2-3). True only for accounts
+            # holding resume / interview content, and snoozed for 30 days once
+            # dismissed — a prompt on every login is one people click past.
+            "mfa_recommended": mfa_recommended_for(user),
         })
         set_auth_cookies(response, tokens["access"], tokens["refresh"])
         return response
@@ -481,6 +560,8 @@ class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from .mfa_models import mfa_recommended_for
+
         try:
             user = request.user
             profile = Profile.objects.filter(user=user).first()
@@ -495,6 +576,24 @@ class UserProfileView(APIView):
                 "last_name": user.last_name,
                 "phone_number": profile.phone_number if profile else None,
                 "country": profile.country if profile else "",
+                "billing_state": profile.billing_state if profile else "",
+                # Audit Z4-8: what this account agreed to, and whether the current
+                # text has moved on since. `needs_legal_reacceptance` is what a
+                # client should branch on — comparing versions in the UI would put
+                # the comparison in the wrong place.
+                "terms_version": profile.terms_version if profile else "",
+                "privacy_version": profile.privacy_version if profile else "",
+                "current_terms_version": settings.LEGAL_TERMS_VERSION,
+                "current_privacy_version": settings.LEGAL_PRIVACY_VERSION,
+                "mfa_enabled": bool(getattr(user, "mfa_device", None) and user.mfa_device.enabled),
+                "mfa_recommended": mfa_recommended_for(user),
+                "needs_legal_reacceptance": bool(
+                    profile
+                    and (
+                        profile.terms_version != settings.LEGAL_TERMS_VERSION
+                        or profile.privacy_version != settings.LEGAL_PRIVACY_VERSION
+                    )
+                ),
                 "is_staff": user.is_staff,
                 "has_usable_password": user.has_usable_password(),
                 "date_joined": user.date_joined.isoformat(),
@@ -506,6 +605,9 @@ class UserProfileView(APIView):
                     for s in social
                 ],
                 "support_bot_enabled": profile.support_bot_enabled if profile else True,
+                "interview_processing_consent": (
+                    profile.interview_processing_consent if profile else True
+                ),
             })
         except Exception as exc:
             import logging
@@ -544,8 +646,34 @@ class UserProfileView(APIView):
             country = request.data.get("country")
             if country is not None:
                 profile.country = country
+            # GST place of supply (audit Z1-13). Validated against the state list
+            # rather than stored free-text: a typo ("Karnatka") is not merely untidy,
+            # it flips the supply from intra-state to inter-state and puts the wrong
+            # tax heads on the invoice. Blank is a legitimate value meaning "no
+            # address on record".
+            billing_state = request.data.get("billing_state")
+            if billing_state is not None:
+                billing_state = (billing_state or "").strip()
+                if billing_state:
+                    from apps.billing.gst import INDIAN_STATES
+
+                    match = next(
+                        (s for s in INDIAN_STATES if s.lower() == billing_state.lower()),
+                        None,
+                    )
+                    if match is None:
+                        return Response(
+                            {"error": f"'{billing_state}' is not a recognised Indian state or union territory."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    billing_state = match
+                profile.billing_state = billing_state
             if "support_bot_enabled" in request.data:
                 profile.support_bot_enabled = bool(request.data.get("support_bot_enabled"))
+            if "interview_processing_consent" in request.data:
+                profile.interview_processing_consent = bool(
+                    request.data.get("interview_processing_consent")
+                )
             profile.save()
 
             return Response({
@@ -555,7 +683,9 @@ class UserProfileView(APIView):
                 "last_name": user.last_name,
                 "phone_number": profile.phone_number,
                 "country": profile.country,
+                "billing_state": profile.billing_state,
                 "support_bot_enabled": profile.support_bot_enabled,
+                "interview_processing_consent": profile.interview_processing_consent,
             })
         except Exception as exc:
             import logging
@@ -704,16 +834,37 @@ class ForgotPasswordView(APIView):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data["email"]
 
-        # Product decision: give the user clear feedback when no account matches
-        # (instead of the silent anti-enumeration 200). Only send the email after a
-        # confirmed, active match; surface a precise error otherwise.
+        # Anti-enumeration: the response is identical whether or not an account
+        # exists (audit Z2-5).
+        #
+        # This REVERSES an earlier documented product decision that preferred a
+        # precise 404 ("No active account found") for clearer UX. That trade is
+        # normally arguable — it is not arguable for THIS product. A 404 here is an
+        # oracle: anyone can test an address and learn whether that person has a
+        # FixitLab account, which on an interview-practice platform reveals that a
+        # named individual is preparing for interviews. A colleague or employer can
+        # run that check, and the answer could cost someone their current job. The
+        # usual enumeration risk is credential-stuffing; here the leak is the fact of
+        # membership itself.
+        #
+        # The UX cost is kept small: the copy below still tells a user who typo'd
+        # their address what to do, without confirming anything.
+        # One response object shape for every outcome below, including the mail
+        # failure — a distinct 5xx would restore the oracle, since only a real
+        # account can reach the sending code at all.
+        def generic_response():
+            return Response({
+                "message": (
+                    "If an account exists for that address, a password reset link is "
+                    "on its way. If nothing arrives in a few minutes, check the "
+                    "address or sign up."
+                )
+            })
+
         user = User.objects.filter(email__iexact=email).first()
         if user is None or not user.is_active:
-            logger.info(f"Password reset requested for unknown/inactive email: {email}")
-            return Response(
-                {"error": "No active account found with this email address. Check the address or sign up."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            logger.info("Password reset requested for unknown/inactive email: %s", email)
+            return generic_response()
 
         PasswordResetToken.objects.filter(user=user, used=False).update(used=True)
         token_obj, raw_token = PasswordResetToken.generate_token(user, hours=1)
@@ -726,15 +877,18 @@ class ForgotPasswordView(APIView):
                 context={"username": user.username, "reset_url": reset_url, "expires_hours": 1},
                 critical=True,
             )
-            logger.info(f"Password reset email delivered to {email}")
         except Exception as mail_err:
+            # Deliberately NOT surfaced to the caller: the old 502 read "Your account
+            # was found, but the reset email could not be sent" — only an existing
+            # account can reach this line, so the error itself confirmed membership.
+            # Delivery is a daemon thread (see dispatch_notification_email), so this
+            # branch means the send could not even be started; ops needs the log, the
+            # caller retries.
             logger.error(f"Password reset email failed for {email}: {mail_err}")
-            return Response(
-                {"error": "Your account was found, but the reset email could not be sent right now. Please try again shortly."},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
+            return generic_response()
 
-        return Response({"message": "A password reset link has been sent to your email."})
+        logger.info(f"Password reset email dispatched for {email}")
+        return generic_response()
 
 
 def _blacklist_all_refresh_tokens(user):
@@ -853,7 +1007,22 @@ class CookieTokenRefreshView(TokenRefreshView):
             data["refresh"] = request.COOKIES["refresh_token"]
             request._full_data = data
 
-        response = super().post(request, *args, **kwargs)
+        try:
+            response = super().post(request, *args, **kwargs)
+        except User.DoesNotExist:
+            # simplejwt's TokenRefreshSerializer resolves the user with a bare
+            # `.get()` and does not catch DoesNotExist, so a refresh token for a
+            # deleted account raised an unhandled exception → 500 (audit Z6-12).
+            #
+            # This is reachable in normal use: self-service deletion only
+            # blacklists the refresh token when the client passes it in the body,
+            # so a deleted user's browser 500s on its next 15-minute refresh
+            # instead of logging out cleanly — and files an error report each time.
+            logger.info("Refresh attempted for a deleted account")
+            return Response(
+                {"detail": "Token is invalid or expired."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
         if response.status_code == 200:
             new_access = response.data.get("access")
@@ -1039,6 +1208,28 @@ class GitHubCallbackView(APIView):
         )
         if error:
             return error
+
+        # ── Second factor also applies to social sign-in (audit Z2-3) ────────
+        #
+        # This was a real bypass: MFA was enforced on the password path only, so an
+        # account with TOTP enabled could be signed into by anyone who compromised
+        # the linked GitHub/Google account — defeating the control the user
+        # explicitly turned on.
+        #
+        # The "the IdP already did MFA" argument holds for *enterprise* SSO, where
+        # you set the IdP policy. It does not hold for consumer OAuth: we have no
+        # way to know whether GitHub or Google asked for a second factor, and a
+        # user who enabled MFA here asked for MFA here.
+        mfa_device = getattr(user, "mfa_device", None)
+        if mfa_device and mfa_device.enabled:
+            from .mfa_views import issue_mfa_challenge
+
+            return Response({
+                "mfa_required": True,
+                "mfa_token": issue_mfa_challenge(user),
+                "message": "Enter the 6-digit code from your authenticator app.",
+            })
+
         # Session-aware issuance so the jti is tracked (see RegisterView).
         _toks = TokenHelper.create_tokens_with_session(
             user,
@@ -1230,6 +1421,28 @@ class GoogleCallbackView(APIView):
         )
         if error:
             return error
+
+        # ── Second factor also applies to social sign-in (audit Z2-3) ────────
+        #
+        # This was a real bypass: MFA was enforced on the password path only, so an
+        # account with TOTP enabled could be signed into by anyone who compromised
+        # the linked GitHub/Google account — defeating the control the user
+        # explicitly turned on.
+        #
+        # The "the IdP already did MFA" argument holds for *enterprise* SSO, where
+        # you set the IdP policy. It does not hold for consumer OAuth: we have no
+        # way to know whether GitHub or Google asked for a second factor, and a
+        # user who enabled MFA here asked for MFA here.
+        mfa_device = getattr(user, "mfa_device", None)
+        if mfa_device and mfa_device.enabled:
+            from .mfa_views import issue_mfa_challenge
+
+            return Response({
+                "mfa_required": True,
+                "mfa_token": issue_mfa_challenge(user),
+                "message": "Enter the 6-digit code from your authenticator app.",
+            })
+
         # Session-aware issuance so the jti is tracked (see RegisterView).
         _toks = TokenHelper.create_tokens_with_session(
             user,
@@ -1449,9 +1662,50 @@ class SearchView(APIView):
         return Response({"results": data, "query": q})
 
 
+class AcceptLegalTermsView(APIView):
+    """Record acceptance of the *current* terms and privacy policy (audit Z4-8).
+
+    Without this, bumping `LEGAL_TERMS_VERSION` would set
+    `needs_legal_reacceptance` for everyone with no way to clear it — the version
+    field would become a permanent nag rather than a record.
+
+    Takes no version from the caller. The client cannot be the authority on which
+    text it displayed, and accepting a version string supplied by the client would
+    let an account claim agreement to a document that was never shown.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        profile, _ = Profile.objects.get_or_create(user=request.user)
+        profile.terms_accepted_at = timezone.now()
+        profile.terms_version = settings.LEGAL_TERMS_VERSION
+        profile.privacy_version = settings.LEGAL_PRIVACY_VERSION
+        profile.save(
+            update_fields=["terms_accepted_at", "terms_version", "privacy_version"]
+        )
+        logger.info(
+            "Legal acceptance recorded for user %s (terms %s, privacy %s)",
+            request.user.id, profile.terms_version, profile.privacy_version,
+        )
+        return Response({
+            "terms_version": profile.terms_version,
+            "privacy_version": profile.privacy_version,
+            "accepted_at": profile.terms_accepted_at.isoformat(),
+            "needs_legal_reacceptance": False,
+        })
+
+
 class ContactView(APIView):
     """Handle contact form submissions."""
     permission_classes = [AllowAny]
+    # Unthrottled, this was a remote way to take login out (audit Z2-6). Each POST
+    # writes a row AND queues mail to SUPPORT_EMAIL via send_notification_email
+    # directly — bypassing the daily-quota gate in queue_user_email — so a loop burns
+    # the shared ~500/day Gmail allowance including the reserve held for OTP and
+    # password reset. `strict_anon` (240/min) is far too loose for something that
+    # sends email; `contact` is 5/hour.
+    throttle_classes = [ContactRateThrottle]
 
     def post(self, request):
         from .models import ContactMessage
@@ -1496,3 +1750,37 @@ class ContactView(APIView):
 
         return Response({"message": "Message sent successfully. We'll get back to you within 24 hours."})
 
+
+
+class ExportMyDataView(APIView):
+    """GDPR Art.15 / DPDP §11 — download everything we hold for this account.
+
+    The only export used to be interview transcripts (audit Z4-12), so a subject
+    access request could be answered with one convenient subset while the profile,
+    lab history, billing, community posts, certificates and preferences went
+    unmentioned.
+
+    Throttled with the OTP-grade limiter rather than the generic one: assembling this
+    walks most of a user's rows, so it is the sort of endpoint that becomes a cheap
+    self-inflicted DoS if it is free to call in a loop.
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [OTPRateThrottle]
+
+    def get(self, request):
+        from apps.accounts.data_export import build_account_export
+
+        payload = build_account_export(request.user)
+        if request.query_params.get("download") == "1":
+            import json
+
+            response = HttpResponse(
+                json.dumps(payload, indent=2, default=str),
+                content_type="application/json",
+            )
+            stamp = timezone.now().strftime("%Y%m%d")
+            response["Content-Disposition"] = (
+                f'attachment; filename="fixitlab-my-data-{stamp}.json"'
+            )
+            return response
+        return Response(payload)

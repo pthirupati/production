@@ -58,17 +58,32 @@ class StaticViewSitemap(_FrontendSitemap):
 
     changefreq = "weekly"
 
-    # {path: priority} — real routes from frontend/src/router/AppRouter.jsx
+    # {path: priority} — measured against frontend/src/router/AppRouter.jsx public
+    # routes (session 26). Auth-gated paths (dashboard, leaderboard, lab runner)
+    # are deliberately omitted. /unsubscribe is email-deep-link-only — omit.
     ROUTES = {
         "/": 1.0,
         "/pricing": 0.7,
         "/about": 0.5,
         "/contact": 0.4,
+        "/contact-sales": 0.3,
+        "/faq": 0.6,
+        "/blog": 0.7,
+        "/changelog": 0.4,
         "/scenarios": 0.9,
         "/technologies": 0.9,
         "/tutorials": 0.8,
         "/certifications": 0.7,
         "/playgrounds": 0.6,
+        "/projects": 0.7,
+        "/journeys": 0.6,
+        "/mock-interviews": 0.7,
+        "/verify-certificate": 0.5,
+        "/register": 0.6,
+        "/privacy": 0.3,
+        "/terms": 0.3,
+        "/refunds": 0.4,
+        "/acceptable-use": 0.3,
     }
 
     def items(self):
@@ -150,13 +165,7 @@ class TutorialSitemap(_FrontendSitemap):
 
 
 class ProjectSitemap(_FrontendSitemap):
-    """Active projects.
-
-    Projects have no dedicated public detail route — they surface inside the
-    technology hub page and launch via an API action — so we emit the crawlable
-    technology-detail URL each project lives on, de-duplicated so we never list
-    the same technology twice or emit a URL for a coming-soon technology.
-    """
+    """Active projects at /projects/<slug> (public catalog since §C3)."""
 
     changefreq = "monthly"
     priority = 0.5
@@ -164,24 +173,61 @@ class ProjectSitemap(_FrontendSitemap):
     def items(self):
         from apps.question_bank.models import Project
 
-        seen: set[str] = set()
-        ordered_slugs: list[str] = []
-        qs = (
+        return list(
             Project.objects.filter(is_active=True, technology__coming_soon=False)
-            .values_list("technology__slug", flat=True)
-            .order_by("technology__slug")
+            .only("slug")
+            .order_by("slug")
         )
-        for slug in qs:
-            if slug and slug not in seen:
-                seen.add(slug)
-                ordered_slugs.append(slug)
-        return ordered_slugs
 
-    def location(self, slug):
-        return f"/technologies/{slug}"
+    def location(self, obj):
+        return f"/projects/{obj.slug}"
 
-    def lastmod(self, slug):
-        return None
+    def lastmod(self, obj):
+        return None  # Project has created_at only, no updated_at
+
+
+class BlogSitemap(_FrontendSitemap):
+    """Published blog posts: /blog/<slug>."""
+
+    changefreq = "weekly"
+    priority = 0.6
+
+    def items(self):
+        from apps.adminpanel.models import BlogPost
+
+        return list(
+            BlogPost.objects.filter(is_published=True)
+            .only("slug", "updated_at", "published_at")
+            .order_by("slug")
+        )
+
+    def location(self, obj):
+        return f"/blog/{obj.slug}"
+
+    def lastmod(self, obj):
+        return obj.updated_at or obj.published_at
+
+
+class JourneySitemap(_FrontendSitemap):
+    """Published learning journeys: /journeys/<slug>."""
+
+    changefreq = "monthly"
+    priority = 0.5
+
+    def items(self):
+        from apps.question_bank.models import LearningJourney
+
+        return list(
+            LearningJourney.objects.filter(is_active=True)
+            .only("slug", "updated_at")
+            .order_by("slug")
+        )
+
+    def location(self, obj):
+        return f"/journeys/{obj.slug}"
+
+    def lastmod(self, obj):
+        return obj.updated_at
 
 
 SITEMAPS = {
@@ -190,4 +236,6 @@ SITEMAPS = {
     "scenarios": ScenarioSitemap,
     "tutorials": TutorialSitemap,
     "projects": ProjectSitemap,
+    "blog": BlogSitemap,
+    "journeys": JourneySitemap,
 }

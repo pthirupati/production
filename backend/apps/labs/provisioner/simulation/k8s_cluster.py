@@ -13,6 +13,25 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+# How many schedulable MIG instances each supported profile carves out of one
+# physical A100/H100. Mirrors the NVIDIA MIG geometry: the memory slice count
+# divides into 7 compute instances per GPU.
+MIG_PROFILE_SLICES: dict[str, int] = {
+    "1g.5gb": 7,
+    "1g.10gb": 7,
+    "2g.10gb": 3,
+    "2g.20gb": 3,
+    "3g.20gb": 2,
+    "3g.40gb": 2,
+    "4g.20gb": 1,
+    "7g.40gb": 1,
+    "7g.80gb": 1,
+}
+
+# Values a GPU Operator MIG config map uses to mean "no MIG, whole GPUs".
+MIG_DISABLED_VALUES = frozenset({"all-disabled", "disabled", "none", "off", "false"})
+
+
 @dataclass
 class K8sNode:
     name: str
@@ -24,9 +43,23 @@ class K8sNode:
     # scheduled onto from kubectl — only a VMware reset (via the bridge) clears it.
     vm_hung: bool = False
     # NVIDIA / AMD device-plugin advertised GPUs (nvidia.com/gpu or amd.com/gpu).
+    # gpu_capacity stays the *physical* GPU count; MIG and time-slicing multiply it
+    # into the advertised allocatable count rather than replacing it, so existing
+    # scenarios that seed gpu_capacity=8 keep advertising 8 until partitioned.
     gpu_capacity: int = 0
     gpu_allocatable: int = 0
     gpu_resource: str = "nvidia.com/gpu"
+    # MIG profile applied by the GPU operator, e.g. "1g.10gb". Empty means the GPU is
+    # whole (MIG disabled). A profile of Ng.Mgb splits each physical GPU into
+    # MIG_PROFILE_SLICES[profile] independently schedulable instances.
+    mig_profile: str = ""
+    # Time-slicing replica count from the device plugin's sharing config. 1 = off.
+    # Time-sliced replicas are oversubscription: they multiply allocatable but not
+    # capacity, exactly as the NVIDIA device plugin reports it.
+    gpu_time_slicing_replicas: int = 1
+    # Real taint model: list of (key, value, effect) triples. Rendered by
+    # describe_node and honoured by the scheduler via tolerations on pods.
+    taints: list[tuple[str, str, str]] = field(default_factory=list)
     labels: dict[str, str] = field(default_factory=dict)
 
 
@@ -46,6 +79,15 @@ class K8sPod:
     ip: str = "10.244.1.5"
     containers: list[str] = field(default_factory=lambda: ["app"])
     owner: str = ""  # deployment/rs that owns this pod
+    # Tolerations the pod carries, as (key, value, effect). An empty value means
+    # Exists-style matching (tolerates any value for that key).
+    tolerations: list[tuple[str, str, str]] = field(default_factory=list)
+    # nvidia.com/gpu (or amd.com/gpu) units requested by the pod's containers.
+    gpu_request: int = 0
+    gpu_resource: str = "nvidia.com/gpu"
+
+    def gpu_resource_name(self) -> str:
+        return self.gpu_resource or "nvidia.com/gpu"
 
 
 @dataclass
@@ -156,6 +198,8 @@ class K8sCluster:
         self.hpas: list[K8sHPA] = []
         self.daemonsets: list[K8sDaemonSet] = []
         self._gpu_plugin_broken: bool = False
+        # Node autoscaler is off until a scenario or the learner enables it.
+        self._autoscaler: dict | None = None
         self._apply_scenario(scenario_slug)
         # After seeding, fold in any cross-tech VMware node action so the very
         # first `kubectl get nodes` already reflects a node added/reset in VMware.
@@ -548,7 +592,12 @@ class K8sCluster:
         for p in self.pods:
             if p.status != "Pending":
                 continue
-            node = self._pick_node_for(p.owner)
+            # Taints and GPU requests gate placement: a pod with no node that
+            # admits it stays Pending with a message naming the real blocker.
+            if not any(self._node_admits(p, n) for n in targets):
+                p.events = [self._unschedulable_event(p)]
+                continue
+            node = self._pick_node_for(p.owner, pod=p)
             p.status = "Running"
             p.ready = "1/1"
             p.node = node
@@ -621,6 +670,158 @@ class K8sCluster:
             lines.append(f"{n.name:<14} {status:<26} {roles:<15} 30d   {n.version}")
         return "\n".join(lines)
 
+    # ------------------------------------------------------------------
+    # GPU partitioning (MIG / time-slicing) and taints
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def gpu_slices_per_device(node: K8sNode) -> int:
+        """Schedulable units each physical GPU on this node advertises.
+
+        MIG partitions a GPU into real, isolated instances; time-slicing then
+        oversubscribes each of those. The device plugin multiplies the two, which
+        is why a 1g.10gb node with 4 time-sliced replicas advertises 28 per GPU.
+        """
+        mig = MIG_PROFILE_SLICES.get(node.mig_profile, 1) if node.mig_profile else 1
+        return max(1, mig) * max(1, node.gpu_time_slicing_replicas)
+
+    def advertised_gpu(self, node: K8sNode) -> int:
+        """Allocatable nvidia.com/gpu after MIG + time-slicing expansion.
+
+        Returns 0 when the device plugin has not advertised the GPUs at all, so a
+        broken-plugin scenario still reports 0 regardless of the MIG geometry.
+        """
+        if node.gpu_allocatable <= 0:
+            return 0
+        return node.gpu_allocatable * self.gpu_slices_per_device(node)
+
+    def set_mig_profile(self, node_name: str, profile: str) -> str:
+        """Apply (or clear, with an empty profile) a MIG geometry on a GPU node."""
+        node = self.find_node(node_name)
+        if not node:
+            return f"Error from server (NotFound): nodes \"{node_name}\" not found"
+        if profile and profile not in MIG_PROFILE_SLICES:
+            supported = ", ".join(sorted(MIG_PROFILE_SLICES))
+            return f"error: unsupported MIG profile \"{profile}\" (supported: {supported})"
+        if node.gpu_capacity <= 0:
+            return f"error: node \"{node_name}\" advertises no GPUs; cannot configure MIG"
+        node.mig_profile = profile
+        if profile:
+            node.labels["nvidia.com/mig.config"] = profile
+            node.labels.setdefault("nvidia.com/gpu.product", "NVIDIA-A100-SXM4-40GB")
+        else:
+            node.labels.pop("nvidia.com/mig.config", None)
+        self._schedule_pending_pods()
+        return (f"node/{node_name} MIG profile set to {profile or 'none'}; "
+                f"{node.gpu_resource} allocatable now {self.advertised_gpu(node)}")
+
+    def set_gpu_time_slicing(self, node_name: str, replicas: int) -> str:
+        """Configure device-plugin time-slicing replicas on a GPU node."""
+        node = self.find_node(node_name)
+        if not node:
+            return f"Error from server (NotFound): nodes \"{node_name}\" not found"
+        if replicas < 1:
+            return "error: time-slicing replicas must be >= 1"
+        if node.gpu_capacity <= 0:
+            return f"error: node \"{node_name}\" advertises no GPUs; cannot configure sharing"
+        node.gpu_time_slicing_replicas = replicas
+        node.labels["nvidia.com/gpu.replicas"] = str(replicas)
+        self._schedule_pending_pods()
+        return (f"node/{node_name} time-slicing replicas set to {replicas}; "
+                f"{node.gpu_resource} allocatable now {self.advertised_gpu(node)}")
+
+    def taint_node(self, node_name: str, key: str, value: str, effect: str,
+                   remove: bool = False) -> str:
+        """kubectl taint nodes <node> key=value:Effect [-]"""
+        node = self.find_node(node_name)
+        if not node:
+            return f"Error from server (NotFound): nodes \"{node_name}\" not found"
+        valid = ("NoSchedule", "PreferNoSchedule", "NoExecute")
+        if effect not in valid:
+            return f"error: invalid taint effect: {effect}, unsupported taint effect"
+        existing = next((t for t in node.taints if t[0] == key and t[2] == effect), None)
+        if remove:
+            if not existing:
+                return (f"error: taint \"{key}:{effect}\" not found on node "
+                        f"\"{node_name}\"")
+            node.taints.remove(existing)
+            # Removing a taint can unblock pods that were stuck Pending on it.
+            self._schedule_pending_pods()
+            return f"node/{node_name} untainted"
+        if existing:
+            if existing[1] == value:
+                return (f"error: node {node_name} already has {key} taint(s) with "
+                        f"same effect(s) and --overwrite is false")
+            node.taints.remove(existing)
+        node.taints.append((key, value, effect))
+        # A NoExecute taint evicts running pods that do not tolerate it.
+        if effect == "NoExecute":
+            self._evict_untolerated(node)
+        return f"node/{node_name} tainted"
+
+    @staticmethod
+    def _tolerates(pod: K8sPod, taint: tuple[str, str, str]) -> bool:
+        key, value, effect = taint
+        for tk, tv, te in pod.tolerations:
+            if tk != key:
+                continue
+            # An empty toleration effect matches every effect (Kubernetes semantics).
+            if te and te != effect:
+                continue
+            # An empty toleration value is Exists-style: any value for that key.
+            if not tv or tv == value:
+                return True
+        return False
+
+    def _node_admits(self, pod: K8sPod, node: K8sNode) -> bool:
+        """True if the pod tolerates every scheduling-blocking taint on the node."""
+        for taint in node.taints:
+            if taint[2] == "PreferNoSchedule":
+                continue
+            if not self._tolerates(pod, taint):
+                return False
+        if pod.gpu_request > 0 and self.advertised_gpu(node) < pod.gpu_request:
+            return False
+        return True
+
+    def _evict_untolerated(self, node: K8sNode) -> None:
+        """NoExecute eviction: move non-tolerating pods on this node back to Pending."""
+        blocking = [t for t in node.taints if t[2] == "NoExecute"]
+        if not blocking:
+            return
+        for p in self.pods:
+            if p.node != node.name or p.status != "Running":
+                continue
+            if all(self._tolerates(p, t) for t in blocking):
+                continue
+            p.status = "Pending"
+            p.ready = "0/1"
+            p.node = "<none>"
+            p.events = [self._unschedulable_event(p)]
+        for dep in self.deployments:
+            dep.ready = sum(1 for p in self.pods
+                            if p.owner == dep.name and p.status == "Running")
+        self._sync_endpoints()
+
+    def _unschedulable_event(self, pod: K8sPod) -> str:
+        """Build a FailedScheduling message that names the real blocking reason."""
+        total = len(self.nodes)
+        tainted = sum(1 for n in self.nodes
+                      if any(t[2] != "PreferNoSchedule" and not self._tolerates(pod, t)
+                             for t in n.taints))
+        gpu_short = sum(1 for n in self.nodes
+                        if pod.gpu_request > 0
+                        and self.advertised_gpu(n) < pod.gpu_request)
+        reasons = []
+        if tainted:
+            reasons.append(f"{tainted} node(s) had untolerated taint")
+        if gpu_short:
+            reasons.append(f"{gpu_short} Insufficient {pod.gpu_resource_name()}")
+        if not reasons:
+            reasons.append(f"{total} Insufficient cpu")
+        return (f"Warning FailedScheduling: 0/{total} nodes are available: "
+                + ", ".join(reasons) + ".")
+
     def get_nodes_gpu_columns(self) -> str:
         """kubectl get nodes -o custom-columns=NAME:...,GPU:.status.allocatable.nvidia\\.com/gpu"""
         lines = ["NAME           GPU"]
@@ -628,7 +829,8 @@ class K8sCluster:
             if n.gpu_capacity <= 0 and "control-plane" in (n.roles or []):
                 gpu = "<none>"
             else:
-                gpu = str(n.gpu_allocatable) if n.gpu_allocatable else "<none>"
+                advertised = self.advertised_gpu(n)
+                gpu = str(advertised) if advertised else "<none>"
             lines.append(f"{n.name:<14} {gpu}")
         return "\n".join(lines)
 
@@ -928,13 +1130,21 @@ class K8sCluster:
         if not node:
             return f"Error from server (NotFound): nodes \"{name}\" not found"
         roles = ",".join(node.roles) if node.roles else "<none>"
-        taints = "<none>" if node.schedulable else "node.kubernetes.io/unschedulable:NoSchedule"
+        # Cordoning is still rendered as the synthetic unschedulable taint (kubectl
+        # does the same), and explicit taints are appended after it.
+        rendered = [f"{k}={v}:{e}" if v else f"{k}:{e}" for k, v, e in node.taints]
+        if not node.schedulable:
+            rendered.insert(0, "node.kubernetes.io/unschedulable:NoSchedule")
+        taints = "\n                    ".join(rendered) if rendered else "<none>"
         pods_here = [p.name for p in self.pods if p.node == node.name]
         labels = node.labels or {}
         label_lines = "\n".join(f"                    {k}={v}" for k, v in sorted(labels.items())) or "                    <none>"
         res = node.gpu_resource or "nvidia.com/gpu"
-        cap_gpu = node.gpu_capacity
-        alloc_gpu = node.gpu_allocatable
+        # MIG carves real instances, so it expands Capacity as well. Time-slicing is
+        # pure oversubscription and only shows up in Allocatable.
+        mig = MIG_PROFILE_SLICES.get(node.mig_profile, 1) if node.mig_profile else 1
+        cap_gpu = node.gpu_capacity * mig
+        alloc_gpu = self.advertised_gpu(node)
         return (
             f"Name:               {node.name}\n"
             f"Roles:              {roles}\n"
@@ -1115,6 +1325,8 @@ class K8sCluster:
             existing.sort(key=lambda p: 0 if p.status == "Pending" else 1)
             remove = [p.name for p in existing[: len(existing) - replicas]]
             self.pods = [p for p in self.pods if p.name not in remove]
+        # A node autoscaler reacts to the pods this scale left unschedulable.
+        self.reconcile_cluster_autoscaler()
         dep.ready = sum(1 for p in self.pods if p.owner == dep.name and p.status == "Running")
         self._sync_endpoints()
         return f"deployment.apps/{dep.name} scaled"
@@ -1133,14 +1345,121 @@ class K8sCluster:
                 return True
         return False
 
-    def _pick_node_for(self, owner: str, per_node: int = 2) -> str:
-        for node in self._worker_nodes():
+    def _pick_node_for(self, owner: str, per_node: int = 2,
+                       pod: K8sPod | None = None) -> str:
+        admits = [n for n in self._worker_nodes()
+                  if pod is None or self._node_admits(pod, n)]
+        for node in admits:
             here = sum(1 for p in self.pods
                        if p.node == node.name and p.status == "Running" and p.owner == owner)
             if here < per_node:
                 return node.name
-        wn = self._worker_nodes()
-        return wn[0].name if wn else "worker-1"
+        return admits[0].name if admits else "worker-1"
+
+    def _place_new_pod(self, pod: K8sPod) -> None:
+        """Admission-check a freshly created pod against taints and GPU capacity.
+
+        Clusters with no taints and pods with no GPU request keep the legacy
+        "it just runs on worker-1" placement, so this only starts gating once a
+        scenario actually has something to gate on.
+        """
+        if pod.status != "Running":
+            return
+        if pod.gpu_request <= 0 and not any(n.taints for n in self.nodes):
+            return
+        if any(self._node_admits(pod, n) for n in self._worker_nodes()):
+            pod.node = self._pick_node_for(pod.owner, pod=pod)
+            return
+        pod.status, pod.ready, pod.node = "Pending", "0/1", "<none>"
+        pod.events = [self._unschedulable_event(pod)]
+
+    # ------------------------------------------------------------------
+    # Cluster (node) autoscaling
+    # ------------------------------------------------------------------
+
+    def enable_cluster_autoscaler(self, min_nodes: int = 1, max_nodes: int = 5,
+                                  template: K8sNode | None = None) -> str:
+        """Turn on the node autoscaler so unschedulable pods trigger node scale-up."""
+        if max_nodes < min_nodes:
+            return "error: --max-nodes must be >= --min-nodes"
+        self._autoscaler = {
+            "min": max(0, min_nodes),
+            "max": max_nodes,
+            "template": template,
+        }
+        added = self.reconcile_cluster_autoscaler()
+        msg = f"cluster-autoscaler enabled (min={min_nodes}, max={max_nodes})"
+        return msg + (f"; scaled up {added} node(s)" if added else "")
+
+    def _autoscaler_node_template(self) -> K8sNode:
+        """Shape of a newly provisioned node, copied from an existing worker."""
+        cfg = getattr(self, "_autoscaler", None) or {}
+        tmpl = cfg.get("template")
+        existing = [n for n in self.nodes if "control-plane" not in n.roles]
+        base = tmpl or (existing[0] if existing else None)
+        index = len(existing) + 1
+        name = f"worker-{index}"
+        while self.find_node(name):
+            index += 1
+            name = f"worker-{index}"
+        if base is None:
+            return K8sNode(name, roles=[])
+        return K8sNode(
+            name,
+            roles=[],
+            version=base.version,
+            gpu_capacity=base.gpu_capacity,
+            gpu_allocatable=base.gpu_allocatable,
+            gpu_resource=base.gpu_resource,
+            mig_profile=base.mig_profile,
+            gpu_time_slicing_replicas=base.gpu_time_slicing_replicas,
+            # Taints are NOT inherited: a fresh autoscaled node comes up clean, which
+            # is what lets it absorb the pods that the tainted node rejected.
+            labels=dict(base.labels),
+        )
+
+    def reconcile_cluster_autoscaler(self) -> int:
+        """Add nodes while pods stay Pending; remove idle nodes above min. Returns nodes added."""
+        cfg = getattr(self, "_autoscaler", None)
+        if not cfg:
+            return 0
+        added = 0
+        # Scale up one node at a time until nothing is Pending or we hit max.
+        while True:
+            pending = [p for p in self.pods if p.status == "Pending"]
+            workers = [n for n in self.nodes if "control-plane" not in n.roles]
+            if not pending or len(workers) >= cfg["max"]:
+                break
+            candidate = self._autoscaler_node_template()
+            # Only provision if the new node would actually admit a pending pod,
+            # otherwise the autoscaler would spin forever adding useless nodes.
+            if not any(self._node_admits(p, candidate) for p in pending):
+                break
+            self.nodes.append(candidate)
+            added += 1
+            before = sum(1 for p in self.pods if p.status == "Pending")
+            self._schedule_pending_pods()
+            if sum(1 for p in self.pods if p.status == "Pending") == before:
+                break
+        return added
+
+    def scale_down_idle_nodes(self) -> int:
+        """Remove empty worker nodes above the autoscaler minimum. Returns nodes removed."""
+        cfg = getattr(self, "_autoscaler", None)
+        if not cfg:
+            return 0
+        removed = 0
+        while True:
+            workers = [n for n in self.nodes if "control-plane" not in n.roles]
+            if len(workers) <= max(1, cfg["min"]):
+                break
+            idle = next((n for n in workers
+                         if not any(p.node == n.name for p in self.pods)), None)
+            if idle is None:
+                break
+            self.nodes.remove(idle)
+            removed += 1
+        return removed
 
     def autoscale(self, dep_name: str, min_r: int, max_r: int, cpu: int) -> str:
         dep = self.find_deployment(dep_name)
@@ -1358,7 +1677,48 @@ class K8sCluster:
                 p.status = "Running"
                 p.ready = "1/1"
         self._sync_endpoints()
+        # The GPU Operator watches its config maps and repartitions the GPUs.
+        problems = self._apply_gpu_operator_configmap(name, data)
+        if problems:
+            return f"configmap/{name} created\n{problems}"
         return f"configmap/{name} created"
+
+    def _apply_gpu_operator_configmap(self, name: str, data: dict[str, str]) -> str:
+        """React to a GPU Operator / device-plugin ConfigMap the way the operator does.
+
+        Two config maps matter: the MIG config (a profile such as ``1g.10gb`` or
+        ``all-disabled``) and the device-plugin sharing config, whose nested
+        ``sharing.timeSlicing.resources[].replicas`` our flat YAML reader
+        collapses down to a ``replicas`` key.
+
+        Applying succeeds silently — the learner observes it through the node's
+        allocatable count, exactly as with the real operator. Only rejections
+        (an unknown profile, a node with no GPUs) are surfaced.
+        """
+        gpu_nodes = [n for n in self.nodes if n.gpu_capacity > 0]
+        if not gpu_nodes:
+            return ""
+        hint = data.get("node") or data.get("nodeName") or data.get("node-name") or ""
+        targets = [n for n in gpu_nodes if n.name == hint] or gpu_nodes
+
+        results: list[str] = []
+        profile = next((data[k] for k in ("nvidia.com/mig.config", "mig.config",
+                                          "mig-config", "mig") if data.get(k)), "")
+        if not profile:
+            profile = next((v for v in data.values() if v in MIG_PROFILE_SLICES), "")
+        if not profile and any("mig" in k.lower() for k in data):
+            profile = next((v for v in data.values()
+                            if v.lower() in MIG_DISABLED_VALUES), "")
+        if profile:
+            wanted = "" if profile.lower() in MIG_DISABLED_VALUES else profile
+            results += [self.set_mig_profile(n.name, wanted) for n in targets]
+
+        replicas = data.get("replicas") or data.get("nvidia.com/gpu.replicas") or ""
+        if replicas.isdigit():
+            results += [self.set_gpu_time_slicing(n.name, int(replicas))
+                        for n in targets]
+        return "\n".join(r for r in results if r.startswith("error")
+                         or r.startswith("Error"))
 
     def create_secret(self, name: str, namespace: str, data: dict[str, str], stype: str = "Opaque") -> str:
         existing = next((s for s in self.secrets if s.name == name and s.namespace == namespace), None)
@@ -1457,7 +1817,14 @@ class K8sCluster:
         # selector / matchLabels app:
         sel = re.search(r"app:\s*(\S+)", doc)
         data["app"] = sel.group(1).strip('"\'') if sel else data["name"]
-        # configmap / secret data block
+        # resources.limits/requests: nvidia.com/gpu (or amd.com/gpu)
+        gpu = re.search(r"^\s*(nvidia\.com/gpu|amd\.com/gpu):\s*[\"']?(\d+)",
+                        doc, flags=re.MULTILINE)
+        data["gpu"] = int(gpu.group(2)) if gpu else 0
+        data["gpuResource"] = gpu.group(1) if gpu else "nvidia.com/gpu"
+        data["tolerations"] = self._parse_tolerations(doc)
+        # configmap / secret data block. Keys may be qualified names such as
+        # nvidia.com/mig.config, so "/" is part of the key charset.
         kv: dict[str, str] = {}
         in_data = False
         for raw in doc.splitlines():
@@ -1465,13 +1832,79 @@ class K8sCluster:
                 in_data = True
                 continue
             if in_data:
-                m = re.match(r"^\s{2,}([\w.\-]+):\s*(.*)$", raw)
+                m = re.match(r"^\s{2,}([\w./\-]+):\s*(.*)$", raw)
                 if m and not raw.strip().startswith("#"):
                     kv[m.group(1)] = m.group(2).strip().strip('"\'')
                 elif raw.strip() and not raw.startswith(" "):
                     in_data = False
         data["data"] = kv
         return data
+
+    @staticmethod
+    def _parse_tolerations(doc: str) -> list[tuple[str, str, str]]:
+        """Pull a pod spec's ``tolerations:`` list into (key, value, effect) triples.
+
+        Handles the two forms learners actually write::
+
+            tolerations:
+            - key: "nvidia.com/gpu"
+              operator: "Equal"
+              value: "present"
+              effect: "NoSchedule"
+            - key: dedicated
+              operator: Exists
+              effect: NoExecute
+
+        ``operator: Exists`` drops the value, which is exactly how the scheduler
+        (and :meth:`_tolerates`) treats an empty toleration value.
+        """
+        lines = doc.splitlines()
+        items: list[dict[str, str]] = []
+        i = 0
+        while i < len(lines):
+            head = re.match(r"^(\s*)tolerations:\s*$", lines[i])
+            if not head:
+                i += 1
+                continue
+            indent = len(head.group(1))
+            i += 1
+            current: dict[str, str] = {}
+            while i < len(lines):
+                raw = lines[i]
+                if not raw.strip() or raw.lstrip().startswith("#"):
+                    i += 1
+                    continue
+                entry = re.match(r"^\s*-\s*(.*)$", raw)
+                # YAML allows the list items either indented under the key or at
+                # the key's own column; only a non-item at that column ends it.
+                ind = len(raw) - len(raw.lstrip())
+                if ind < indent or (ind == indent and not entry):
+                    break
+                if entry:
+                    if current:
+                        items.append(current)
+                    current = {}
+                    rest = entry.group(1)
+                else:
+                    rest = raw.strip()
+                field_kv = re.match(r"^([\w./\-]+):\s*(.*)$", rest)
+                if field_kv:
+                    current[field_kv.group(1)] = field_kv.group(2).strip().strip('"\'')
+                i += 1
+            if current:
+                items.append(current)
+
+        tolerations: list[tuple[str, str, str]] = []
+        for item in items:
+            key = item.get("key", "")
+            if not key:
+                # A bare `operator: Exists` tolerates every taint; the cluster's
+                # toleration model is key-scoped, so there is nothing to record.
+                continue
+            exists = item.get("operator", "Equal").lower() == "exists"
+            value = "" if exists else item.get("value", "")
+            tolerations.append((key, value, item.get("effect", "")))
+        return tolerations
 
     def _apply_one_doc(self, doc: str, create: bool) -> str:
         m = self._parse_manifest(doc)
@@ -1500,14 +1933,27 @@ class K8sCluster:
             # (Re)create pods to match desired replicas.
             self.pods = [p for p in self.pods if p.owner != name]
             for i in range(dep.replicas):
-                self.pods.append(K8sPod(
+                pod = K8sPod(
                     f"{name}-{abs(hash(name + str(i))) % 100000:05d}",
                     namespace=ns,
                     status="Running" if healthy else "ImagePullBackOff",
                     ready="1/1" if healthy else "0/1",
                     image=image, labels={"app": app}, owner=name,
-                ))
-            dep.ready = dep.replicas if healthy else 0
+                    tolerations=list(m["tolerations"]),
+                    gpu_request=m["gpu"], gpu_resource=m["gpuResource"],
+                )
+                self.pods.append(pod)
+                self._place_new_pod(pod)
+            dep.ready = sum(1 for p in self.pods
+                            if p.owner == name and p.status == "Running")
+            if "cluster-autoscaler" in name:
+                # The autoscaler deployment carries its bounds as a container arg:
+                #   --nodes=1:5:worker-pool
+                bounds = re.search(r"--nodes[=\s]+(\d+):(\d+)", doc)
+                note = (self.enable_cluster_autoscaler(int(bounds.group(1)),
+                                                       int(bounds.group(2)))
+                        if bounds else self.enable_cluster_autoscaler())
+                return f"deployment.apps/{name} {verb}\n{note}"
             return f"deployment.apps/{name} {verb}"
 
         if kind == "pod":
@@ -1518,13 +1964,20 @@ class K8sCluster:
             healthy = "broken" not in image and "missing" not in image
             if existing:
                 existing.image = image
+                existing.tolerations = list(m["tolerations"])
+                existing.gpu_request = m["gpu"]
+                existing.gpu_resource = m["gpuResource"]
                 return f"pod/{name} configured"
-            self.pods.append(K8sPod(
+            pod = K8sPod(
                 name, namespace=ns,
                 status="Running" if healthy else "ImagePullBackOff",
                 ready="1/1" if healthy else "0/1",
                 image=image, labels={"app": app}, owner="",
-            ))
+                tolerations=list(m["tolerations"]),
+                gpu_request=m["gpu"], gpu_resource=m["gpuResource"],
+            )
+            self.pods.append(pod)
+            self._place_new_pod(pod)
             return f"pod/{name} created"
 
         if kind == "service":

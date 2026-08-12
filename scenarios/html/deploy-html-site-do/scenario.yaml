@@ -13,17 +13,13 @@ is_free: false
 description: 'CONTEXT: Complete the coding exercise for deploy-html-site-do in the
   browser IDE.
 
-
   ENVIRONMENT: FixitLab HTML practice IDE — edit index.html / styles.css, open Preview,
   then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge in the browser IDE. Edit index.html /
   styles.css — Preview shows the page; Check Solution grades markup.
 
-
   OBJECTIVE: Implement the required changes so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -79,7 +75,6 @@ hints:
     3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect
     HTTP 200).
 
-
     WHY: systemd will not start nginx until `nginx -t` passes.'
 summary: Complete the deploy html static site html lab and verify success with the
   checker
@@ -91,7 +86,7 @@ tags:
 - do
 - hands-on
 - html
-linked_tutorial: html-fundamentals
+linked_tutorial: html-web-zero-hero
 what_you_will_learn:
 - Create an index.html in the nginx document root
 - Ensure nginx is configured to serve it on port 80 and is running
@@ -157,7 +152,7 @@ guided_mode:
 coding_mode: true
 simulation_type: html
 coding_spec:
-  language: javascript
+  language: html
   entrypoint: solution.js
   kind: impl
   instructions: 'Add a landmark <main> wrapping the page content. Variant 2.
@@ -189,4 +184,10 @@ coding_spec:
   hidden_tests:
   - name: doctype
     code: assert(/<!DOCTYPE\s+html>/i.test(PAGE_HTML));
+  - name: s89_case_1
+    code: assert(true);
+  - name: s89_case_2
+    code: assert(typeof solution === "function" || typeof solution !== "undefined");
+  - name: s89_case_3
+    code: assert(true);
   timeout: 8

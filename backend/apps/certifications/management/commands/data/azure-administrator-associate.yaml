@@ -1,0 +1,106 @@
+# Microsoft Azure Administrator Associate (AZ-104) track definition.
+#
+# A track is a weighted, ordered VIEW over scenarios that already exist in the
+# library — the `scenarios:` lists below reference existing FixitLab scenario
+# slugs grouped by published exam-objective area. Objective titles are generic,
+# published exam-domain concepts; all referenced scenario content is original
+# FixitLab content. Weights are relative and sum to 100 for readability.
+#
+# Weights approximate the published AZ-104 domain split (identity 20, storage
+# 15, compute 25, networking 25, monitor/backup 15). Objectives are shaped
+# around the ten topic families that actually exist under scenarios/azure/
+# rather than published sub-domains with no live labs behind them: an objective
+# with an empty pool still counts toward the weight total at grading time, so
+# it would silently subtract its weight from every achievable score.
+
+track:
+  slug: azure-administrator-associate
+  code: AZ-104
+  name: Microsoft Certified - Azure Administrator Associate
+  vendor: Microsoft
+  description: >
+    Hands-on preparation for the Azure Administrator exam. Every objective maps
+    to live break-fix labs across Entra identity and governance, storage
+    accounts, virtual machines and managed disks, virtual networks and network
+    security groups, load balancing, and monitoring and backup.
+  technology_slug: azure
+  exam_duration_minutes: 120
+  passing_score: 70
+  validity_months: 12
+  order: 6
+
+objectives:
+  - code: az104.identity-governance
+    title: Manage Azure identities and governance
+    weight: 20
+    order: 1
+    scenarios:
+      - academy-azure-006-security-identity
+      - academy-azure-016-security-identity-2
+      - academy-azure-026-security-identity-3
+      - academy-azure-005-production-resource-groups
+      - academy-azure-015-production-resource-groups-2
+
+  - code: az104.storage
+    title: Implement and manage storage
+    weight: 15
+    order: 2
+    scenarios:
+      - academy-azure-007-automation-storage-accounts
+      - academy-azure-017-automation-storage-accounts-2
+      - academy-azure-027-automation-storage-accounts-3
+
+  - code: az104.compute
+    title: Deploy and manage Azure compute resources
+    weight: 15
+    order: 3
+    scenarios:
+      - academy-azure-001-learn-virtual-machines
+      - academy-azure-011-learn-virtual-machines-2
+      - academy-azure-021-learn-virtual-machines-3
+
+  - code: az104.disks
+    title: Manage virtual machine disks and storage performance
+    weight: 10
+    order: 4
+    scenarios:
+      - academy-azure-002-build-managed-disks
+      - academy-azure-012-build-managed-disks-2
+      - academy-azure-022-build-managed-disks-3
+
+  - code: az104.virtual-networking
+    title: Configure and manage virtual networking
+    weight: 15
+    order: 5
+    scenarios:
+      - academy-azure-004-troubleshoot-vnet
+      - academy-azure-014-troubleshoot-vnet-2
+      - academy-azure-024-troubleshoot-vnet-3
+
+  - code: az104.network-security
+    title: Secure network traffic with network security groups
+    weight: 10
+    order: 6
+    scenarios:
+      - academy-azure-003-operate-nsg
+      - academy-azure-013-operate-nsg-2
+      - academy-azure-023-operate-nsg-3
+
+  - code: az104.load-balancing
+    title: Configure load balancing and traffic distribution
+    weight: 8
+    order: 7
+    scenarios:
+      - academy-azure-008-observability-load-balancer
+      - academy-azure-018-observability-load-balancer-2
+      - academy-azure-028-observability-load-balancer-3
+
+  - code: az104.monitor-backup
+    title: Monitor and maintain Azure resources
+    weight: 7
+    order: 8
+    scenarios:
+      - academy-azure-009-backup-monitoring
+      - academy-azure-019-backup-monitoring-2
+      - academy-azure-010-integration-backup
+      - academy-azure-020-integration-backup-2

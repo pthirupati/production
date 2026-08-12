@@ -93,8 +93,6 @@ SERVICE_DESC: dict[str, str] = {
     "gunicorn": "Gunicorn Python WSGI Server",
     "gitlab-runner": "GitLab Runner",
     "jenkins": "Jenkins Automation Server",
-    "memcached": "Memcached",
-    "rabbitmq-server": "RabbitMQ broker",
 }
 
 TECH_SERVICE_POOLS: dict[str, list[str]] = {
@@ -134,6 +132,15 @@ TECH_SERVICE_POOLS: dict[str, list[str]] = {
 
 # Keyword → graded systemd unit (must match topic_faults planting).
 # First match wins. Keep in sync with topic_faults.py keyword lists.
+#
+# topic_faults also defines GPU/LLM/TRAINING/RAG families that plant units
+# (vllm, training-job, qdrant). They are deliberately NOT mirrored here:
+# this script only walks academy-* folders, the LLM/TRAINING/RAG families skip
+# academy-* entirely, and academy-gpu-* classifies as mode "gpu" so it never
+# reaches assign_service_unit. Verified by classifying academy-gpu-001 (-> gpu)
+# and academy-ai-ml-007 (-> service, but no AI family fires). If an AI family is
+# ever allowed to fire on an academy-* slug, add its unit here or the graded
+# unit and the planted unit will disagree.
 TOPIC_UNIT_RULES: list[tuple[tuple[str, ...], str]] = [
     (("git-flow", "git-merge", "learn-git", "ci-pipeline", "cicd", "gitlab-ci",
       "jenkins", "artifacts", "cd-release", "change-management", "incident-response"),

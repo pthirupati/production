@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import PublicLayout from '../components/layout/PublicLayout'
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
@@ -7,6 +8,8 @@ import {
   HelpCircle, ChevronDown, Search, X,
   Rocket, CreditCard, Terminal, Brain, Award, UserCircle
 } from 'lucide-react'
+import { usePageTitle } from '../hooks/usePageTitle'
+import { PAYMENT_EMAIL, SUPPORT_EMAIL } from '../constants/contact'
 
 const CATEGORY_META = {
   'Getting Started':         { icon: Rocket,     color: 'text-accent-cyan',   bg: 'bg-accent-cyan/10',   border: 'border-accent-cyan/20'   },
@@ -49,11 +52,22 @@ const FAQ_ITEMS = [
         // actually does since RazorpayRefundView started revoking entitlement —
         // previously a refunded user silently kept a year of paid access.
         q: 'Can I get a refund?',
-        a: 'Yes — within 7 days of purchase. Email fixitlab.payment@gmail.com with your subscription ID and we will process it manually, usually within two business days. Refunds are returned to the original payment method by the payment gateway. Note that a full refund ends access to that technology; a partial refund does not.',
+        a: (
+          <>
+            Yes — within 7 days of purchase. Email {PAYMENT_EMAIL} with your subscription ID
+            and we will process it manually, usually within two business days. Refunds are
+            returned to the original payment method by the payment gateway. A full refund
+            ends access to that technology; a partial refund does not.{' '}
+            <Link to="/refunds" className="text-accent-cyan hover:underline">
+              Full refunds &amp; cancellation policy
+            </Link>
+            .
+          </>
+        ),
       },
       {
         q: 'Do you offer student discounts?',
-        a: 'Yes! Students with a valid .edu email can get discounted access. Contact fixitlab.techsupport@gmail.com with your student ID for verification.',
+        a: `Yes! Students with a valid .edu email can get discounted access. Contact ${SUPPORT_EMAIL} with your student ID for verification.`,
       },
       {
         q: 'What happens when my subscription expires?',
@@ -133,7 +147,7 @@ const FAQ_ITEMS = [
     items: [
       {
         q: 'How do I contact support?',
-        a: 'Email us at fixitlab.techsupport@gmail.com or use the Contact page. We typically respond within 24 hours.',
+        a: `Email us at ${SUPPORT_EMAIL} or use the Contact page. We typically respond within 24 hours.`,
       },
       {
         q: 'Can I delete my account?',
@@ -166,6 +180,7 @@ function FAQItem({ question, answer }) {
 }
 
 export default function FAQ() {
+  usePageTitle('FAQ', 'Answers about labs, subscriptions, certificates and AI interviews on FixitLab.')
   const [search, setSearch] = useState('')
 
   const filtered = useMemo(() => {
@@ -212,8 +227,10 @@ export default function FAQ() {
           />
           {search && (
             <button
+              type="button"
               onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-md text-surface-400 hover:text-white hover:bg-surface-700 transition-colors"
+              aria-label="Clear search"
+              className="absolute right-3 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-surface-400 hover:text-white hover:bg-surface-700 transition-colors"
             >
               <X size={14} />
             </button>
@@ -275,7 +292,7 @@ export default function FAQ() {
             <HelpCircle size={28} className="text-accent-cyan mx-auto mb-3" />
             <h3 className="text-xl font-bold text-white mb-2">Still have questions?</h3>
             <p className="text-surface-400 mb-5 text-sm">Our support team is here to help. Typically responds within 24 hours.</p>
-            <a href="mailto:fixitlab.techsupport@gmail.com" className="btn-primary inline-flex items-center gap-2">
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="btn-primary inline-flex items-center gap-2">
               Contact Support
             </a>
           </div>

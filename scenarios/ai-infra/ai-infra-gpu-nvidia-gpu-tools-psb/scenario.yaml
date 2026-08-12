@@ -15,12 +15,9 @@ description: 'CONTEXT: ImageDev publish gate — before a custom H100/H200 image
   boot resource, run nvidia_gpu_tools.py Platform Security Boot (PSB) and PPCIe / CC-mode probes. Failures
   block publish.
 
-
   ENVIRONMENT: Lab Terminal + Packer IDE + Bare Metal (MAAS publish path).
 
-
   SYMPTOM: Publish blocked until PSB/PPCIe PASS evidence exists.
-
 
   OBJECTIVE: Run nvidia_gpu_tools.py --psb and --ppcie (or --cc-mode); confirm PASS; FIXED-OK.'
 objectives:

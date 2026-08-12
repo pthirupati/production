@@ -7,6 +7,24 @@
 # The secret is NOT listed here — create it out-of-band from the rotated
 # .env.production (see secret.example.yaml) or via Sealed/External Secrets.
 #
+# Hardening shipped in the workload files (no separate resources to list —
+# PodDisruptionBudgets and NetworkPolicies live beside the Deployment they
+# guard, so they cannot drift out of sync with its selector):
+#   - securityContext: allowPrivilegeEscalation=false + drop ALL capabilities
+#     (frontend keeps NET_BIND_SERVICE for :80) and a RuntimeDefault seccomp
+#     profile. runAsNonRoot is NOT set — both images run as root today; see the
+#     inline notes in backend.yaml / frontend.yaml before changing that.
+#   - PodDisruptionBudget minAvailable=1 for backend, frontend, celery-worker.
+#     celery-beat is exempt (single-replica singleton — a PDB would deadlock
+#     node drains).
+#   - NetworkPolicy is INGRESS-ONLY. Egress is left open on purpose: datastores
+#     may be managed services outside the cluster and the backend calls
+#     third-party HTTPS APIs, so a default-deny egress would blackhole traffic
+#     as timeouts. PREREQUISITE: the ingress policies match the controller via
+#     `kubernetes.io/metadata.name: ingress-nginx`. Kubernetes sets that label
+#     automatically; if the controller lives in a differently-named namespace,
+#     patch the selector in an overlay or inbound traffic will be dropped.
+#
 # Image tags: override at deploy time without editing files, e.g.
 #   kustomize edit set image \
 #     fixitlab/fixitlab-backend=$NS/fixitlab-backend:$TAG \

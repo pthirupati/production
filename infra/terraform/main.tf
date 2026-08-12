@@ -8,12 +8,31 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.5"
+    }
   }
 
+  # State locking is not optional here: provision-eks.sh runs
+  # `terraform apply -auto-approve` from CI, so two overlapping workflow runs
+  # would otherwise write this state concurrently and silently corrupt it.
+  # `encrypt` matters because the state holds RDS/Redis endpoints in cleartext.
+  #
+  # The lock table must exist before `init`. Terraform cannot create its own
+  # backend, so bootstrap it once, out of band:
+  #   aws dynamodb create-table --table-name fixitlab-terraform-locks \
+  #     --attribute-definitions AttributeName=LockID,AttributeType=S \
+  #     --key-schema AttributeName=LockID,KeyType=HASH \
+  #     --billing-mode PAY_PER_REQUEST --region us-east-1
+  # If state already exists remotely, adopt the lock with
+  # `terraform init -migrate-state` — a plain `init` will refuse.
   backend "s3" {
-    bucket = "fixitlab-terraform-state"
-    key    = "infrastructure/terraform.tfstate"
-    region = "us-east-1"
+    bucket         = "fixitlab-terraform-state"
+    key            = "infrastructure/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "fixitlab-terraform-locks"
+    encrypt        = true
   }
 }
 
@@ -41,6 +60,40 @@ variable "db_instance_class" {
 
 variable "domain_name" {
   default = "fixitlab.in"
+}
+
+# ACM cert for the CloudFront aliases. CloudFront only accepts certs from
+# us-east-1 regardless of var.aws_region. Left empty by default so a mistake
+# is a loud plan-time error rather than an apply against someone else's ARN;
+# the old literal "arn:aws:acm:...:ACCOUNT:certificate/CERT-ID" could never
+# apply at all. Pass it at apply time:
+#   terraform apply -var acm_certificate_arn=arn:aws:acm:us-east-1:123456789012:certificate/abc
+variable "acm_certificate_arn" {
+  description = "ARN of an ISSUED ACM certificate in us-east-1 covering var.domain_name."
+  type        = string
+  default     = ""
+
+  validation {
+    condition = (
+      var.acm_certificate_arn == "" ||
+      can(regex("^arn:aws:acm:us-east-1:[0-9]{12}:certificate/", var.acm_certificate_arn))
+    )
+    error_message = "acm_certificate_arn must be a us-east-1 ACM ARN with a 12-digit account id (CloudFront requires us-east-1)."
+  }
+}
+
+# CIDRs allowed to reach the EKS public API endpoint. Empty (the default)
+# keeps the endpoint private-only. Set to your VPN/office egress IPs if you
+# need kubectl from outside the VPC — never 0.0.0.0/0.
+variable "cluster_public_access_cidrs" {
+  description = "CIDRs allowed to reach the EKS public API endpoint. Empty means private-only."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = !contains(var.cluster_public_access_cidrs, "0.0.0.0/0")
+    error_message = "Refusing 0.0.0.0/0: that exposes the Kubernetes API to the whole internet."
+  }
 }
 
 # ──── VPC ───────────────────────────────────────────────────
@@ -89,7 +142,12 @@ module "eks" {
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
-  cluster_endpoint_public_access = true
+  # Private by default. The API server is only reachable from inside the VPC
+  # unless an explicit CIDR allowlist is supplied, and the variable's own
+  # validation refuses 0.0.0.0/0 — so "public" can never mean "to everyone".
+  cluster_endpoint_private_access      = true
+  cluster_endpoint_public_access       = length(var.cluster_public_access_cidrs) > 0
+  cluster_endpoint_public_access_cidrs = var.cluster_public_access_cidrs
 
   eks_managed_node_groups = {
     # Application nodes — handle API, WebSocket, frontend
@@ -149,13 +207,48 @@ resource "aws_security_group" "rds" {
   }
 }
 
+# The master password is generated here and never written to the repo. It does
+# land in Terraform state, which is why the S3 backend above sets encrypt=true.
+# Rotate by tainting this resource; consumers read the Secrets Manager secret
+# below rather than the cluster resource, so rotation does not require an app
+# redeploy. Excludes characters RDS rejects in a master password (/ @ " space).
+resource "random_password" "rds_master" {
+  length           = 32
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
+}
+
+resource "aws_secretsmanager_secret" "rds_master" {
+  name        = "fixitlab/rds/master"
+  description = "Aurora PostgreSQL master credentials for fixitlab-db."
+
+  tags = {
+    Environment = var.environment
+    Project     = "fixitlab"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "rds_master" {
+  secret_id = aws_secretsmanager_secret.rds_master.id
+  secret_string = jsonencode({
+    username = aws_rds_cluster.fixitlab.master_username
+    password = random_password.rds_master.result
+    engine   = "postgres"
+    host     = aws_rds_cluster.fixitlab.endpoint
+    port     = 5432
+    dbname   = aws_rds_cluster.fixitlab.database_name
+  })
+}
+
 resource "aws_rds_cluster" "fixitlab" {
   cluster_identifier = "fixitlab-db"
   engine             = "aurora-postgresql"
   engine_version     = "15.4"
   database_name      = "fixitlab"
   master_username    = "fixitlab"
-  master_password    = "change-me-use-secrets-manager"
+  master_password    = random_password.rds_master.result
+
+  storage_encrypted = true
 
   db_subnet_group_name   = aws_db_subnet_group.fixitlab.name
   vpc_security_group_ids = [aws_security_group.rds.id]
@@ -250,7 +343,11 @@ resource "aws_s3_bucket_public_access_block" "static" {
 resource "aws_cloudfront_distribution" "fixitlab" {
   enabled             = true
   default_root_object = "index.html"
-  aliases             = [var.domain_name, "www.${var.domain_name}"]
+
+  # Custom aliases require a matching ACM cert, so they are tied to the same
+  # variable as viewer_certificate below. Without a cert this serves on the
+  # default *.cloudfront.net name instead of failing the whole apply.
+  aliases = var.acm_certificate_arn == "" ? [] : [var.domain_name, "www.${var.domain_name}"]
 
   origin {
     domain_name = aws_s3_bucket.static.bucket_regional_domain_name
@@ -282,10 +379,23 @@ resource "aws_cloudfront_distribution" "fixitlab" {
     geo_restriction { restriction_type = "none" }
   }
 
-  viewer_certificate {
-    acm_certificate_arn      = "arn:aws:acm:us-east-1:ACCOUNT:certificate/CERT-ID"
-    ssl_support_method       = "sni-only"
-    minimum_protocol_version = "TLSv1.2_2021"
+  # One block or the other: CloudFront rejects acm_certificate_arn together
+  # with cloudfront_default_certificate. dynamic{} picks exactly one so the
+  # default (no cert) still applies cleanly on the *.cloudfront.net name.
+  dynamic "viewer_certificate" {
+    for_each = var.acm_certificate_arn == "" ? [1] : []
+    content {
+      cloudfront_default_certificate = true
+    }
+  }
+
+  dynamic "viewer_certificate" {
+    for_each = var.acm_certificate_arn == "" ? [] : [1]
+    content {
+      acm_certificate_arn      = var.acm_certificate_arn
+      ssl_support_method       = "sni-only"
+      minimum_protocol_version = "TLSv1.2_2021"
+    }
   }
 
   tags = {
@@ -306,6 +416,13 @@ output "rds_endpoint" {
 
 output "redis_endpoint" {
   value = aws_elasticache_replication_group.fixitlab.primary_endpoint_address
+}
+
+# ARN, not the credential itself — the app resolves this at runtime so the
+# password never transits Terraform outputs or CI logs.
+output "rds_master_secret_arn" {
+  value       = aws_secretsmanager_secret.rds_master.arn
+  description = "Secrets Manager ARN holding the Aurora master username/password."
 }
 
 output "ecr_backend_url" {

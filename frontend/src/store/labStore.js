@@ -40,7 +40,7 @@ export const useLabStore = create((set, get) => ({
             || state.timerSessionId === boundSessionId
           if (stillBound && state.onExpireCallback) {
             const cb = state.onExpireCallback
-            try { cb() } catch (_) { /* swallow */ }
+            try { cb() } catch { /* swallow */ }
           }
           return {
             timeRemaining: 0,

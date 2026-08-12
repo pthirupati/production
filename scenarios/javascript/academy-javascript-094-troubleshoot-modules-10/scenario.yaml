@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'CONTEXT: Complete the modules coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab JavaScript/React practice IDE — edit solution.js, Run visible
   tests, then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: modules. The stub in solution.js is
   incomplete so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required function so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -75,7 +71,7 @@ tags:
 - fix
 - hands-on
 - javascript
-linked_tutorial: javascript-fundamentals
+linked_tutorial: javascript-language-zero-hero
 what_you_will_learn:
 - 'The incident symptom is clear: module upgrades break dependents or outputs changed
   unexpectedly'
@@ -159,4 +155,8 @@ coding_spec:
     code: const id=x=>x; assert(compose(id,id)(5)===5);
   - name: order
     code: assert(compose(x=>x+10, x=>x*2)(2)===14);
+  - name: s88_fn_defined
+    code: assert(typeof compose === "function");
+  - name: s88_repeat
+    code: assert(typeof compose === "function");
   timeout: 8

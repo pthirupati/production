@@ -203,7 +203,7 @@
 
 /* Layout */
 .aws-topnav { height: 48px; background: var(--aws-nav-bg); display: flex; align-items: center; color: var(--aws-nav-text); padding: 0 12px; gap: 12px; position: sticky; top: 0; z-index: 100; }
-.aws-topnav-btn { background: transparent; border: none; color: var(--aws-nav-text); height: 32px; padding: 0 10px; border-radius: var(--aws-radius); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; }
+.aws-topnav-btn { background: transparent; border: none; color: var(--aws-nav-text); height: 44px; min-height: 44px; min-width: 44px; padding: 0 10px; border-radius: var(--aws-radius); display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; font-size: 14px; }
 .aws-topnav-btn:hover { background: var(--aws-nav-hover); }
 /* Favorites bar — pinned services, sits as a slim strip under the top row */
 .aws-favbar { position: absolute; top: 48px; left: 0; right: 0; height: 34px; background: var(--aws-darker-blue); display: flex; align-items: center; gap: 4px; padding: 0 12px; overflow-x: auto; z-index: 99; box-shadow: 0 1px 0 rgba(0,0,0,0.25); }
@@ -289,12 +289,50 @@
   .aws-modal-body { padding: 14px; }
   .aws-modal-footer { padding: 12px 14px; flex-wrap: wrap; }
 
-  /* 220px of a 375px viewport is 59% for navigation alone. */
-  .aws-leftnav { width: 148px; min-width: 148px; }
-  .aws-leftnav-item { padding: 7px 10px; font-size: 13px; }
-  .aws-leftnav-group,
-  .aws-leftnav-title { padding-left: 10px; padding-right: 10px; }
+  /* 220px of a 375px viewport is 59% for navigation alone; the previous fix
+     only shrank that to 148px (39.5%), which is not a collapse.
 
-  /* Wide tables must scroll rather than force the page wider. */
-  .aws-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+     The 48px .aws-leftnav-collapsed rail can't be used here: it only renders
+     from LeftNav's `collapsed` branch, and the sole call site
+     (components/aws/AwsConsole.jsx:76) passes neither `collapsed` nor
+     `onExpand`, so that branch is unreachable and the in-nav collapse button
+     is suppressed. Wiring it needs JSX changes outside this file's scope.
+
+     Collapse in CSS instead: the nav occupies a 44px rail (11.7% of 375px,
+     and 44px keeps the WCAG 2.5.5 touch target) and expands to a 208px
+     OVERLAY on hover/focus-within. Overlaying rather than reflowing is what
+     makes this a real collapse — expanding no longer steals width from the
+     content pane. position:absolute is safe because .aws-sim-body (:242) is
+     the flex row and .aws-leftnav is its direct child; we give the rail an
+     explicit flex-basis so the row still reserves 44px. focus-within keeps it
+     keyboard-reachable, which a hover-only rule would not. */
+  .aws-sim-body { position: relative; }
+  .aws-leftnav {
+    width: 44px;
+    min-width: 44px;
+    flex: 0 0 44px;
+    overflow-x: hidden;
+    transition: width 0.15s ease, min-width 0.15s ease;
+  }
+  .aws-leftnav:hover,
+  .aws-leftnav:focus-within {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 90;
+    width: 208px;
+    min-width: 208px;
+    box-shadow: var(--aws-shadow-lg);
+  }
+  /* Collapsed rail shows only the first glyph of each label; expanding
+     restores the full text. nowrap stops labels wrapping to many lines
+     inside the 44px rail, which would make it tall and unreadable. */
+  .aws-leftnav-item { padding: 7px 10px; font-size: 13px; white-space: nowrap; }
+  .aws-leftnav-group,
+  .aws-leftnav-title { padding-left: 10px; padding-right: 10px; white-space: nowrap; }
+
+  /* Wide tables must scroll rather than force the page wider. .aws-table-wrap
+     was dead CSS (zero JSX usages), so target the real parent via :has(). */
+  :has(> .aws-table) { overflow-x: auto; -webkit-overflow-scrolling: touch; min-width: 0; }
 }

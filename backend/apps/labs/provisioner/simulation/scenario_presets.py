@@ -5,6 +5,28 @@ from __future__ import annotations
 from .rhel_os import RHELOSState, SimBlockDevice, SimUser
 
 
+# Academy families that historically recycled nginx/crond/rsyslog breaks (audit G3
+# "9 worst"). Topic-aware faults own these instead of ACADEMY_SERVICE_PRESETS.
+_TOPIC_WINS_ACADEMY_PREFIXES = (
+    "academy-netapp-",
+    "academy-dellemc-",
+    "academy-datacenter-",
+    "academy-soc-",
+    "academy-opentelemetry-",
+    "academy-service-mesh-",
+    "academy-commvault-",
+    "academy-ai-infra-",
+    "academy-azure-",
+    "academy-gcp-",
+    "academy-openstack-",
+)
+
+
+def _topic_fault_wins_over_academy_preset(slug: str) -> bool:
+    low = (slug or "").lower()
+    return any(low.startswith(p) for p in _TOPIC_WINS_ACADEMY_PREFIXES)
+
+
 def apply_scenario_preset(slug: str, state: RHELOSState) -> None:
     """Configure simulated OS to match scenario slug."""
     low = (slug or "").lower()
@@ -22,6 +44,12 @@ def apply_scenario_preset(slug: str, state: RHELOSState) -> None:
 
     preset = _PRESETS.get(slug)
     if preset:
+        # Audit G3: for the 9 worst off-topic academy families, a topic-aware
+        # fault must WIN over the generated nginx/crond/rsyslog break. Dropping
+        # the sentinel and then re-breaking nginx made Agents/NetApp/SOC labs
+        # still grade as "restart nginx".
+        if topic_applied and _topic_fault_wins_over_academy_preset(low):
+            return
         # Drop topic-planted academy sentinels before the authoritative preset
         # runs (preset may re-plant if it IS a marker lab).
         if topic_applied:
@@ -4719,9 +4747,13 @@ except Exception:  # pragma: no cover
     pass
 
 # ── Academy real-state service presets (override COMPLETE_TECH markers) ──
+# Skip the 9 worst off-topic families so topic_faults (not nginx) owns them.
 try:
     from .academy_service_presets import ACADEMY_SERVICE_PRESETS as _ACADEMY_SERVICE_PRESETS
-    _PRESETS.update(_ACADEMY_SERVICE_PRESETS)
+    _PRESETS.update({
+        k: v for k, v in _ACADEMY_SERVICE_PRESETS.items()
+        if not _topic_fault_wins_over_academy_preset(k)
+    })
 except Exception:  # pragma: no cover
     pass
 

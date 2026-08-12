@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Terminal } from 'lucide-react'
+import { Terminal } from '../../ui/eagerIcons'
 
 /** Shared FixitLab logo — matches Claude design system (ac → ac2 gradient). */
 export default function FixitLogo({ to = '/', size = 'md', showText = true, className = '' }) {

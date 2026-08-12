@@ -1,3 +1,4 @@
+is_active: true
 title: Restore revoked database grants
 slug: mysql-grant-revoked
 technology: mysql
@@ -6,35 +7,28 @@ description: 'CONTEXT: A team operating MySQL has raised a ticket for `Restore r
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline MySQL instance. The architecture is a single lab-primary
   node exposing mysql client, InnoDB, grants, and slow query log; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: An app user lost SELECT on a required table after a migration.
-
 
   OBJECTIVE: Understand the current failure mode affecting Restore revoked database grants; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
   Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant mysql client, InnoDB, grants, and slow query log), changing one thing at a time.
   Check your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -97,23 +91,72 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: An app user lost SELECT on a required table after a migration.
+  instructions: 'An app user lost SELECT on a required table after a migration. Fix solution(conn) so
+    it returns the grants that must be re-applied, as a sorted list of ''PRIV ON table'' strings. Compare
+    the grants the user currently holds in `grants(user, table_name, priv)` against the required set in
+    `required(user, table_name, priv)` for the given user, and report only what is missing. Grants the
+    user holds beyond the required set are not revoked - ignore them.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn, user):\n    # BUG: reports the whole required set rather than the difference,\
+      \ so\n    # already-working grants get re-applied and nothing is really diagnosed.\n    return sorted('%s\
+      \ ON %s' % (p, t) for t, p in conn.execute(\n        \"SELECT table_name, priv FROM required WHERE\
+      \ user = ?\", (user,)))\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert callable(solution)
+  - name: missing grant is reported
+    code: "import sqlite3\ndef _seed(grants, required):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE grants (user TEXT, table_name TEXT, priv TEXT);\"\n        \"CREATE TABLE\
+      \ required (user TEXT, table_name TEXT, priv TEXT);\")\n    conn.executemany(\"INSERT INTO grants\
+      \ VALUES (?,?,?)\", grants)\n    conn.executemany(\"INSERT INTO required VALUES (?,?,?)\", required)\n\
+      \    return conn\nconn = _seed(grants=[('app','orders','INSERT')],\n             required=[('app','orders','INSERT'),('app','orders','SELECT')])\n\
+      assert solution(conn, 'app') == ['SELECT ON orders'], solution(conn, 'app')\n"
+  - name: fully granted user needs nothing
+    code: "import sqlite3\ndef _seed(grants, required):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE grants (user TEXT, table_name TEXT, priv TEXT);\"\n        \"CREATE TABLE\
+      \ required (user TEXT, table_name TEXT, priv TEXT);\")\n    conn.executemany(\"INSERT INTO grants\
+      \ VALUES (?,?,?)\", grants)\n    conn.executemany(\"INSERT INTO required VALUES (?,?,?)\", required)\n\
+      \    return conn\nconn = _seed(grants=[('app','orders','SELECT')],\n             required=[('app','orders','SELECT')])\n\
+      assert solution(conn, 'app') == [], solution(conn, 'app')\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert callable(solution)
+  - name: extra grants are not revoked
+    code: "import sqlite3\ndef _seed(grants, required):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE grants (user TEXT, table_name TEXT, priv TEXT);\"\n        \"CREATE TABLE\
+      \ required (user TEXT, table_name TEXT, priv TEXT);\")\n    conn.executemany(\"INSERT INTO grants\
+      \ VALUES (?,?,?)\", grants)\n    conn.executemany(\"INSERT INTO required VALUES (?,?,?)\", required)\n\
+      \    return conn\nconn = _seed(grants=[('app','orders','SELECT'),('app','logs','DROP')],\n     \
+      \        required=[('app','orders','SELECT')])\nassert solution(conn, 'app') == [], solution(conn,\
+      \ 'app')\n"
+  - name: another user's grants do not count
+    code: "import sqlite3\ndef _seed(grants, required):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE grants (user TEXT, table_name TEXT, priv TEXT);\"\n        \"CREATE TABLE\
+      \ required (user TEXT, table_name TEXT, priv TEXT);\")\n    conn.executemany(\"INSERT INTO grants\
+      \ VALUES (?,?,?)\", grants)\n    conn.executemany(\"INSERT INTO required VALUES (?,?,?)\", required)\n\
+      \    return conn\nconn = _seed(grants=[('other','orders','SELECT')],\n             required=[('app','orders','SELECT')])\n\
+      assert solution(conn, 'app') == ['SELECT ON orders'], solution(conn, 'app')\n"
+  - name: no requirements means nothing to do
+    code: "import sqlite3\ndef _seed(grants, required):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE grants (user TEXT, table_name TEXT, priv TEXT);\"\n        \"CREATE TABLE\
+      \ required (user TEXT, table_name TEXT, priv TEXT);\")\n    conn.executemany(\"INSERT INTO grants\
+      \ VALUES (?,?,?)\", grants)\n    conn.executemany(\"INSERT INTO required VALUES (?,?,?)\", required)\n\
+      \    return conn\nconn = _seed(grants=[], required=[])\nassert solution(conn, 'app') == [], solution(conn,\
+      \ 'app')\n"
+  - name: multiple missing grants come back sorted
+    code: "import sqlite3\ndef _seed(grants, required):\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE grants (user TEXT, table_name TEXT, priv TEXT);\"\n        \"CREATE TABLE\
+      \ required (user TEXT, table_name TEXT, priv TEXT);\")\n    conn.executemany(\"INSERT INTO grants\
+      \ VALUES (?,?,?)\", grants)\n    conn.executemany(\"INSERT INTO required VALUES (?,?,?)\", required)\n\
+      \    return conn\nconn = _seed(grants=[],\n             required=[('app','zeta','SELECT'),('app','alpha','SELECT')])\n\
+      assert solution(conn, 'app') == ['SELECT ON alpha','SELECT ON zeta'], solution(conn, 'app')\n"
   timeout: 8
 summary: Complete the restore revoked database grants mysql lab and verify success with the checker
 estimated_minutes: 20
@@ -124,7 +167,7 @@ tags:
 - fix
 - hands-on
 - mysql
-linked_tutorial: mysql-fundamentals
+linked_tutorial: mysql-dba-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Restore revoked database grants
 - Restore expected service behavior with a minimal, documented change

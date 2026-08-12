@@ -120,12 +120,21 @@ def _user(name: str, *, display: str = "", enabled: bool = True,
     }
 
 
-def _service(name: str, display: str, status: str, startup: str) -> dict:
+def _service(name: str, display: str, status: str, startup: str,
+             *, depends_on: list[str] | None = None) -> dict:
+    """One SCM service row.
+
+    depends_on names the services this one requires (the `DependOnService`
+    registry value). Real SCM refuses to start a service whose dependencies are
+    stopped, and cascades a stop to everything that depends on it — see
+    _service_dependents / _cascade_stop.
+    """
     return {
         "name": name,
         "display": display,
         "status": status if status in _SERVICE_STATUSES else "stopped",
         "startup": startup if startup in _STARTUP_TYPES else "manual",
+        "depends_on": list(depends_on or []),
     }
 
 
@@ -162,7 +171,14 @@ def _gpo_setting(key: str, value: str, *, enabled: bool = True, category: str = 
 
 
 def _gpo(gid: str, name: str, *, settings: list[dict] | None = None,
-         links: list[str] | None = None, status: str = "Enabled") -> dict:
+         links: list[str] | None = None, status: str = "Enabled",
+         enforced: bool = False, link_order: int = 1) -> dict:
+    """One Group Policy Object.
+
+    `enforced` is the link-level "Enforced" (formerly No Override) flag, and
+    `link_order` is its position in the container's link list — both feed the
+    LSDOU resolution in _resolve_rsop.
+    """
     return {
         "id": gid,
         "name": name,
@@ -174,6 +190,8 @@ def _gpo(gid: str, name: str, *, settings: list[dict] | None = None,
             _gpo_setting("Password must meet complexity requirements", "Enabled"),
         ],
         "links": list(links) if links is not None else [],
+        "enforced": bool(enforced),
+        "link_order": int(link_order),
     }
 
 
@@ -183,6 +201,146 @@ def _find_gpo(world: dict, gpo_id: str) -> dict | None:
         if g["id"].lower() == target or g["name"].lower() == target:
             return g
     return None
+
+
+# ---------------------------------------------------------------------------
+# Group Policy precedence (LSDOU + Enforced + Block Inheritance)
+#
+# GPOs existed here only as inert data — nothing computed which policy actually
+# wins, so "why is this setting not applying?" had no modelled answer. The
+# resolver below implements the real precedence rules:
+#   * Apply order is Local -> Site -> Domain -> OU, deepest OU last, so the
+#     closest container normally wins.
+#   * A container may Block Inheritance, dropping policy from its parents.
+#   * An Enforced link beats everything below it AND survives Block
+#     Inheritance — enforced links are applied last, parent-most first.
+#   * Disabled GPOs and unlinked GPOs never apply.
+# ---------------------------------------------------------------------------
+
+_SCOPE_RANK = {"local": 0, "site": 1, "domain": 2, "ou": 3}
+
+
+def _scope_of(path: str) -> str:
+    """Classify a link path into its LSDOU tier."""
+    text = (path or "").strip()
+    if not text:
+        return "local"
+    lowered = text.lower()
+    if lowered in ("local", "local computer policy"):
+        return "local"
+    if lowered.startswith("site:") or lowered.startswith("sites/"):
+        return "site"
+    # Anything nested under the domain root is an OU; the bare root is the domain.
+    if "/" in text.strip("/"):
+        return "ou"
+    return "domain"
+
+
+def _container_chain(world: dict, path: str) -> list[str]:
+    """Containers from the domain root down to `path`, parent-first."""
+    text = (path or DEFAULT_DOMAIN).strip().strip("/")
+    parts = [p for p in text.split("/") if p]
+    chain: list[str] = []
+    for idx in range(len(parts)):
+        chain.append("/".join(parts[: idx + 1]))
+    return chain
+
+
+def _blocks_inheritance(world: dict, path: str) -> bool:
+    for container in world.get("group_policy", {}).get("containers", []) or []:
+        if (container.get("path") or "").strip("/").lower() == (path or "").strip("/").lower():
+            return bool(container.get("block_inheritance"))
+    return False
+
+
+def _resolve_rsop(world: dict, target_path: str = "") -> dict:
+    """Resultant Set of Policy for a container.
+
+    Returns the applied GPO list in precedence order (lowest precedence first,
+    i.e. later entries overwrite earlier ones), the winning value for each
+    setting key, and the GPOs filtered out with the reason why.
+    """
+    gp = world.get("group_policy", {}) or {}
+    target = (target_path or gp.get("forest") or DEFAULT_DOMAIN).strip()
+    chain = _container_chain(world, target)
+    chain_lower = [c.lower() for c in chain]
+
+    normal: list[tuple[int, int, int, dict, str]] = []
+    enforced: list[tuple[int, int, int, dict, str]] = []
+    filtered: list[dict] = []
+
+    # The deepest container that blocks inheritance drops every non-enforced
+    # policy linked above it.
+    block_from_depth = 0
+    for depth, container in enumerate(chain):
+        if _blocks_inheritance(world, container):
+            block_from_depth = max(block_from_depth, depth)
+
+    for gpo in gp.get("gpos", []) or []:
+        links = [l for l in (gpo.get("links") or []) if l]
+        if not links:
+            filtered.append({"id": gpo.get("id"), "name": gpo.get("name"),
+                             "reason": "not linked to any container"})
+            continue
+        applicable = [l for l in links if (l or "").strip().strip("/").lower() in chain_lower]
+        if not applicable:
+            filtered.append({"id": gpo.get("id"), "name": gpo.get("name"),
+                             "reason": f"not linked in the scope of {target}"})
+            continue
+        if gpo.get("status") != "Enabled":
+            filtered.append({"id": gpo.get("id"), "name": gpo.get("name"),
+                             "reason": "GPO status is Disabled"})
+            continue
+
+        link = applicable[0]
+        depth = chain_lower.index((link or "").strip().strip("/").lower())
+        rank = _SCOPE_RANK.get(_scope_of(link), 2)
+        order = int(gpo.get("link_order", 1))
+        entry = (rank, depth, -order, gpo, link)
+
+        if gpo.get("enforced"):
+            enforced.append(entry)
+        elif depth < block_from_depth:
+            filtered.append({
+                "id": gpo.get("id"), "name": gpo.get("name"),
+                "reason": f"inheritance blocked at {chain[block_from_depth]}",
+            })
+        else:
+            normal.append(entry)
+
+    # Non-enforced: parent-most first so the closest OU overwrites. Within one
+    # container, link order 1 has the highest precedence, hence -order.
+    normal.sort(key=lambda e: (e[0], e[1], e[2]))
+    # Enforced links are applied afterwards, parent-most LAST, so a domain-level
+    # Enforced policy beats an Enforced OU policy.
+    enforced.sort(key=lambda e: (e[0], e[1], e[2]), reverse=True)
+
+    applied = normal + enforced
+    winning: dict[str, dict] = {}
+    for _, _, _, gpo, link in applied:
+        for setting in gpo.get("settings") or []:
+            if not setting.get("enabled", True):
+                continue
+            winning[setting["key"]] = {
+                "value": setting.get("value"),
+                "winning_gpo": gpo.get("name"),
+                "gpo_id": gpo.get("id"),
+                "enforced": bool(gpo.get("enforced")),
+                "link": link,
+            }
+
+    return {
+        "target": target,
+        "applied": [
+            {"id": g.get("id"), "name": g.get("name"), "link": link,
+             "enforced": bool(g.get("enforced")), "scope": _scope_of(link),
+             "precedence": idx + 1}
+            # Precedence 1 = highest, so present the winning policy first.
+            for idx, (_, _, _, g, link) in enumerate(reversed(applied))
+        ],
+        "settings": winning,
+        "filtered": filtered,
+    }
 
 
 def _base_world() -> dict:
@@ -247,13 +405,24 @@ def _base_world() -> dict:
             _update("KB5030216", "Servicing Stack Update for Windows Server 2022",
                     "installed", severity="Important"),
         ],
+        # Dependency edges mirror the real DependOnService values on Server 2022:
+        # Netlogon and the Server service both sit on the RPC/workstation stack,
+        # the Print Spooler needs RPC, and DNS on a DC needs Netlogon.
         "services": [
-            _service("Netlogon", "Netlogon", "running", "automatic"),
-            _service("DNS", "DNS Server", "running", "automatic"),
-            _service("LanmanServer", "Server", "running", "automatic"),
+            _service("RpcSs", "Remote Procedure Call (RPC)", "running", "automatic"),
+            _service("LanmanWorkstation", "Workstation", "running", "automatic",
+                     depends_on=["RpcSs"]),
+            _service("Netlogon", "Netlogon", "running", "automatic",
+                     depends_on=["LanmanWorkstation"]),
+            _service("DNS", "DNS Server", "running", "automatic",
+                     depends_on=["RpcSs", "Netlogon"]),
+            _service("LanmanServer", "Server", "running", "automatic",
+                     depends_on=["RpcSs"]),
             _service("W32Time", "Windows Time", "running", "automatic"),
-            _service("Spooler", "Print Spooler", "running", "automatic"),
-            _service("wuauserv", "Windows Update", "running", "manual"),
+            _service("Spooler", "Print Spooler", "running", "automatic",
+                     depends_on=["RpcSs"]),
+            _service("wuauserv", "Windows Update", "running", "manual",
+                     depends_on=["RpcSs"]),
         ],
         # Interactive session state for the UI. NOT graded — the validators only
         # inspect roles/users/services/updates/domain — but modelled with a real
@@ -606,6 +775,71 @@ def _find_service(world: dict, name: str) -> dict | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Service dependency chains (SCM semantics)
+#
+# The SCM will not start a service whose dependencies are stopped, and stopping
+# a service takes down everything that depends on it — transitively. Modelling
+# only the flat status list made "stop Netlogon" a no-consequence click.
+# ---------------------------------------------------------------------------
+
+def _service_deps(world: dict, svc: dict) -> list[dict]:
+    """Direct dependencies of svc that exist in this world."""
+    return [d for d in (_find_service(world, n) for n in svc.get("depends_on") or []) if d]
+
+
+def _stopped_dependencies(world: dict, svc: dict) -> list[dict]:
+    return [d for d in _service_deps(world, svc) if d.get("status") != "running"]
+
+
+def _service_dependents(world: dict, svc: dict) -> list[dict]:
+    """Services that directly depend on svc."""
+    name = (svc.get("name") or "").lower()
+    return [
+        s for s in world.get("services", [])
+        if any((d or "").lower() == name for d in s.get("depends_on") or [])
+    ]
+
+
+def _cascade_stop(world: dict, svc: dict) -> list[dict]:
+    """Stop svc's running dependents transitively; return those actually stopped.
+
+    Breadth-first over the dependent graph. Services already stopped are left
+    alone so a repeated stop does not report phantom cascades.
+    """
+    stopped: list[dict] = []
+    seen = {id(svc)}
+    queue = list(_service_dependents(world, svc))
+    while queue:
+        dependent = queue.pop(0)
+        if id(dependent) in seen:
+            continue
+        seen.add(id(dependent))
+        queue.extend(_service_dependents(world, dependent))
+        if dependent.get("status") == "running":
+            dependent["status"] = "stopped"
+            stopped.append(dependent)
+    return stopped
+
+
+def _cascade_start(world: dict, svc: dict) -> list[dict]:
+    """Start svc's stopped dependencies transitively; return those started.
+
+    Mirrors the SCM behaviour of bringing required services up first. A
+    dependency whose startup type is Disabled cannot be auto-started, so it is
+    left stopped and surfaces through _stopped_dependencies as a hard error.
+    """
+    started: list[dict] = []
+    for dep in _service_deps(world, svc):
+        if dep.get("status") == "running":
+            continue
+        started.extend(_cascade_start(world, dep))
+        if dep.get("startup") != "disabled" and not _stopped_dependencies(world, dep):
+            dep["status"] = "running"
+            started.append(dep)
+    return started
+
+
 def _find_update(world: dict, kb: str) -> dict | None:
     target = (kb or "").lower()
     for u in world["updates"]:
@@ -789,6 +1023,9 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "session": world["session"],
         "rdp_sessions": world.get("rdp_sessions", []),
         "group_policy": world.get("group_policy", {}),
+        # Computed precedence, so the console shows the same winning policy the
+        # engine resolves rather than re-deriving LSDOU client-side.
+        "rsop": _resolve_rsop(world),
         "storage": world.get("storage", {}),
         "network": world.get("network", {}),
         "devices": world.get("devices", []),
@@ -1278,7 +1515,19 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
             return {"ok": False,
                     "error": (f"Cannot start {svc['display']}: its startup type is "
                               "Disabled. Set startup to Automatic or Manual first.")}
+        # SCM starts required services first; a Disabled dependency is fatal.
+        started_deps = _cascade_start(world, svc)
+        blocked = _stopped_dependencies(world, svc)
+        if blocked:
+            names = ", ".join(d["display"] for d in blocked)
+            return {"ok": False,
+                    "error": (f"Cannot start {svc['display']}: the dependency service "
+                              f"{names} is not running and could not be started "
+                              "(its startup type is Disabled).")}
         svc["status"] = "running"
+        if started_deps:
+            _event(state, "Started dependency services: "
+                          + ", ".join(d["display"] for d in started_deps))
         _event(state, f"Started service: {svc['display']}")
         try:
             from apps.labs.provisioner.simulation.chaos_engine import clear_faults as _chaos_clear
@@ -1288,13 +1537,23 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
             )
         except Exception:  # pragma: no cover
             pass
-        return {"ok": True, "message": f"Started {svc['display']}"}
+        message = f"Started {svc['display']}"
+        if started_deps:
+            message += (" (also started "
+                        + ", ".join(d["display"] for d in started_deps) + ")")
+        return {"ok": True, "message": message, "started_dependencies":
+                [d["name"] for d in started_deps]}
 
     if act in ("stop_service",):
         svc = _find_service(world, payload.get("service") or payload.get("name"))
         if not svc:
             return {"ok": False, "error": "Service not found"}
+        # Stopping a service takes its dependents down with it, transitively.
+        cascaded = _cascade_stop(world, svc)
         svc["status"] = "stopped"
+        if cascaded:
+            _event(state, "Stopped dependent services: "
+                          + ", ".join(d["display"] for d in cascaded))
         _event(state, f"Stopped service: {svc['display']}")
         try:
             from apps.labs.provisioner.simulation.chaos_engine import inject as _chaos_inject
@@ -1304,7 +1563,12 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
             )
         except Exception:  # pragma: no cover
             pass
-        return {"ok": True, "message": f"Stopped {svc['display']}"}
+        message = f"Stopped {svc['display']}"
+        if cascaded:
+            message += (" and its dependent services: "
+                        + ", ".join(d["display"] for d in cascaded))
+        return {"ok": True, "message": message,
+                "stopped_dependents": [d["name"] for d in cascaded]}
 
     if act in ("restart_service",):
         svc = _find_service(world, payload.get("service") or payload.get("name"))
@@ -1313,7 +1577,20 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
         if svc["startup"] == "disabled":
             return {"ok": False,
                     "error": f"Cannot start {svc['display']}: startup type is Disabled."}
+        started_deps = _cascade_start(world, svc)
+        blocked = _stopped_dependencies(world, svc)
+        if blocked:
+            names = ", ".join(d["display"] for d in blocked)
+            return {"ok": False,
+                    "error": (f"Cannot start {svc['display']}: the dependency service "
+                              f"{names} is not running and could not be started "
+                              "(its startup type is Disabled).")}
+        # A real restart bounces dependents down and back up with the parent.
+        bounced = _cascade_stop(world, svc)
         svc["status"] = "running"
+        for dependent in bounced:
+            if dependent.get("startup") != "disabled":
+                dependent["status"] = "running"
         _event(state, f"Restarted service: {svc['display']}")
         try:
             from apps.labs.provisioner.simulation.chaos_engine import clear_faults as _chaos_clear
@@ -1446,6 +1723,59 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
             gpo["status"] = "Disabled" if gpo.get("status") == "Enabled" else "Enabled"
         _event(state, f"Set GPO {gpo['name']} to {gpo['status']}")
         return {"ok": True, "message": f"GPO {gpo['name']} is now {gpo['status']}"}
+
+    if act in ("set_gpo_enforced", "enforce_gpo"):
+        gpo = _find_gpo(world, payload.get("gpo") or payload.get("id"))
+        if not gpo:
+            return {"ok": False, "error": "GPO not found"}
+        enforced = payload.get("enforced")
+        gpo["enforced"] = (not gpo.get("enforced")) if enforced is None else bool(enforced)
+        label = "Enforced" if gpo["enforced"] else "not enforced"
+        _event(state, f"Set GPO {gpo['name']} link to {label}")
+        return {"ok": True, "message": f"GPO {gpo['name']} is now {label}",
+                "enforced": gpo["enforced"]}
+
+    if act in ("set_gpo_link_order", "set_link_order"):
+        gpo = _find_gpo(world, payload.get("gpo") or payload.get("id"))
+        if not gpo:
+            return {"ok": False, "error": "GPO not found"}
+        try:
+            order = int(payload.get("link_order") or payload.get("order"))
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "Link order must be a positive integer"}
+        if order < 1:
+            return {"ok": False, "error": "Link order must be a positive integer"}
+        gpo["link_order"] = order
+        _event(state, f"Set link order of {gpo['name']} to {order}")
+        return {"ok": True, "message": f"{gpo['name']} link order is now {order}"}
+
+    if act in ("set_block_inheritance", "block_inheritance"):
+        gp = world.setdefault("group_policy", {"forest": DEFAULT_DOMAIN, "gpos": [], "containers": []})
+        path = (payload.get("ou") or payload.get("path") or "").strip()
+        if not path:
+            return {"ok": False, "error": "A container path is required"}
+        blocked = payload.get("blocked")
+        container = next(
+            (c for c in gp.setdefault("containers", [])
+             if (c.get("path") or "").strip("/").lower() == path.strip("/").lower()),
+            None,
+        )
+        if container is None:
+            container = {"path": path, "type": "ou"}
+            gp["containers"].append(container)
+        container["block_inheritance"] = (
+            (not container.get("block_inheritance")) if blocked is None else bool(blocked)
+        )
+        label = "blocked" if container["block_inheritance"] else "not blocked"
+        _event(state, f"Inheritance on {path} is now {label}")
+        return {"ok": True, "message": f"Inheritance on {path} is now {label}",
+                "block_inheritance": container["block_inheritance"]}
+
+    if act in ("rsop", "get_rsop", "gpresult"):
+        target = payload.get("ou") or payload.get("path") or payload.get("target") or ""
+        rsop = _resolve_rsop(world, target)
+        _event(state, f"Generated Resultant Set of Policy for {rsop['target']}")
+        return {"ok": True, "message": f"RSoP computed for {rsop['target']}", "rsop": rsop}
 
     if act in ("rescan_disks", "rescan_storage"):
         try:
@@ -1708,3 +2038,480 @@ def validate_windows_lab(session_id: str, scenario_slug: str = "") -> tuple[bool
         return True, (f"The server is joined to {dom.get('name')} — validation passed.")
 
     return False, "No validation goal configured for this scenario"
+
+
+# ---------------------------------------------------------------------------
+# PowerShell cmdlet surface
+#
+# Roughly thirty cmdlets over the same _base_world state the GUI consoles read.
+# Every state-changing cmdlet routes through apply_action so the goal `require`
+# checks, chaos-fault clearing and dependency cascades behave identically
+# whether the learner clicked the console or typed the cmdlet. Unknown cmdlets
+# return a CommandNotFoundException with rc!=0 — silently accepting one would
+# leave a learner believing a lab was solved when nothing moved.
+# ---------------------------------------------------------------------------
+
+_PS_HINT = "Run 'Get-Command' to list the available cmdlets."
+
+
+def _ps_error(message: str, *, rc: int = 1) -> dict:
+    return {"ok": False, "rc": rc, "error": message, "stdout": "", "stderr": message}
+
+
+def _ps_ok(stdout: str, *, message: str = "") -> dict:
+    return {"ok": True, "rc": 0, "stdout": stdout, "stderr": "", "message": message or stdout}
+
+
+def _ps_parse(tokens: list[str]) -> tuple[list[str], dict[str, str]]:
+    """Split PowerShell `-Parameter Value` pairs from positional arguments.
+
+    Parameter names are lower-cased so `-Name`, `-name` and `-NAME` all land on
+    the same key; switch parameters with no value become "true".
+    """
+    positionals: list[str] = []
+    opts: dict[str, str] = {}
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok.startswith("-") and len(tok) > 1 and not tok[1].isdigit():
+            key = tok.lstrip("-").lower()
+            if i + 1 < len(tokens) and not tokens[i + 1].startswith("-"):
+                opts[key] = tokens[i + 1]
+                i += 1
+            else:
+                opts[key] = "true"
+        else:
+            positionals.append(tok)
+        i += 1
+    return positionals, opts
+
+
+def _ps_table(headers: list[str], rows: list[list[str]]) -> str:
+    """PowerShell Format-Table output: header, dashed rule, padded columns."""
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for idx, cell in enumerate(row):
+            widths[idx] = max(widths[idx], len(str(cell)))
+    lines = [
+        " ".join(h.ljust(widths[i]) for i, h in enumerate(headers)).rstrip(),
+        " ".join("-" * widths[i] for i in range(len(headers))).rstrip(),
+    ]
+    for row in rows:
+        lines.append(" ".join(str(c).ljust(widths[i]) for i, c in enumerate(row)).rstrip())
+    return "\n".join(lines)
+
+
+def _ps_list(pairs: list[tuple[str, str]]) -> str:
+    """Format-List output (`Name : Value`)."""
+    width = max((len(k) for k, _ in pairs), default=0)
+    return "\n".join(f"{k.ljust(width)} : {v}" for k, v in pairs)
+
+
+def _ps_bool(raw: str | None, default: bool = True) -> bool:
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in ("true", "1", "yes", "$true")
+
+
+def _ps_status(svc: dict) -> str:
+    return "Running" if svc.get("status") == "running" else "Stopped"
+
+
+def _ps_startup(svc: dict) -> str:
+    return (svc.get("startup") or "manual").title()
+
+
+# Cmdlet -> (engine action, payload builder). Keeping the write cmdlets in a
+# table makes it obvious that none of them mutate state directly.
+def _ps_service_target(opts: dict, positionals: list[str]) -> str:
+    return opts.get("name") or (positionals[0] if positionals else "")
+
+
+def _cmdlet_get_service(world: dict, session_id: str, pos: list[str], opts: dict) -> dict:
+    name = _ps_service_target(opts, pos)
+    services = world.get("services", [])
+    if name:
+        svc = _find_service(world, name)
+        if not svc:
+            return _ps_error(
+                f"Get-Service : Cannot find any service with service name '{name}'.")
+        services = [svc]
+    rows = [[_ps_status(s), s.get("name", ""), s.get("display", "")] for s in services]
+    return _ps_ok(_ps_table(["Status", "Name", "DisplayName"], rows))
+
+
+def _cmdlet_get_process(world: dict, session_id: str, pos: list[str], opts: dict) -> dict:
+    processes = world.get("processes") or (world.get("v2") or {}).get("processes") or []
+    if not processes:
+        # No process table is modelled; say so rather than inventing rows that
+        # would contradict Task Manager.
+        return _ps_ok("Get-Process : no process table is modelled for this lab host.")
+    rows = [[str(p.get("id", "")), p.get("name", ""), str(p.get("cpu", ""))] for p in processes]
+    return _ps_ok(_ps_table(["Id", "ProcessName", "CPU"], rows))
+
+
+def _cmdlet_get_aduser(world: dict, session_id: str, pos: list[str], opts: dict) -> dict:
+    identity = opts.get("identity") or opts.get("filter") or (pos[0] if pos else "")
+    users = world.get("ad", {}).get("users", [])
+    if identity and identity not in ("*", "Filter", "true"):
+        user = _find_user(world, identity)
+        if not user:
+            return _ps_error(
+                f"Get-ADUser : Cannot find an object with identity: '{identity}'.")
+        return _ps_ok(_ps_list([
+            ("Name", user.get("display") or user.get("name", "")),
+            ("SamAccountName", user.get("name", "")),
+            ("Enabled", str(bool(user.get("enabled")))),
+            ("LockedOut", str(bool(user.get("locked")))),
+            ("MemberOf", ", ".join(user.get("groups") or [])),
+            ("DistinguishedName", f"CN={user.get('name')},OU={user.get('ou')},{DEFAULT_DOMAIN}"),
+        ]))
+    rows = [[u.get("name", ""), u.get("display", ""), str(bool(u.get("enabled"))),
+             str(bool(u.get("locked")))] for u in users]
+    return _ps_ok(_ps_table(["SamAccountName", "Name", "Enabled", "LockedOut"], rows))
+
+
+def _cmdlet_get_adgroup(world: dict, session_id: str, pos: list[str], opts: dict) -> dict:
+    rows = [[g.get("name", ""), g.get("scope", ""), g.get("description", "")]
+            for g in world.get("ad", {}).get("groups", [])]
+    return _ps_ok(_ps_table(["Name", "GroupScope", "Description"], rows))
+
+
+def _cmdlet_get_adgroupmember(world: dict, session_id: str, pos: list[str], opts: dict) -> dict:
+    identity = opts.get("identity") or (pos[0] if pos else "")
+    if not identity:
+        return _ps_error('Get-ADGroupMember : Missing required parameter "-Identity".')
+    if not _group_exists(world, identity):
+        return _ps_error(f"Get-ADGroupMember : Cannot find group '{identity}'.")
+    target = identity.lower()
+    rows = [[u.get("name", ""), u.get("display", "")]
+            for u in world.get("ad", {}).get("users", [])
+            if any((g or "").lower() == target for g in u.get("groups") or [])]
+    return _ps_ok(_ps_table(["SamAccountName", "Name"], rows))
+
+
+def _cmdlet_get_windowsfeature(world: dict, session_id: str, pos: list[str], opts: dict) -> dict:
+    name = opts.get("name") or (pos[0] if pos else "")
+    roles = world.get("roles", [])
+    if name:
+        roles = [r for r in roles if r.get("name", "").lower() == name.lower()
+                 or r.get("display", "").lower() == name.lower()]
+        if not roles:
+            return _ps_error(f"Get-WindowsFeature : No feature matches '{name}'.")
+    rows = [["[X]" if r.get("installed") else "[ ]", r.get("display", ""), r.get("name", "")]
+            for r in roles]
+    return _ps_ok(_ps_table(["Install State", "Display Name", "Name"], rows))
+
+
+def _cmdlet_get_hotfix(world: dict, session_id: str, pos: list[str], opts: dict) -> dict:
+    rows = [[u.get("kb", ""), u.get("status", ""), u.get("severity", ""), u.get("title", "")]
+            for u in world.get("updates", [])]
+    return _ps_ok(_ps_table(["HotFixID", "Status", "Severity", "Description"], rows))
+
+
+def _cmdlet_get_gpo(world: dict, session_id: str, pos: list[str], opts: dict) -> dict:
+    name = opts.get("name") or (pos[0] if pos else "")
+    gpos = world.get("group_policy", {}).get("gpos", [])
+    if name:
+        gpo = _find_gpo(world, name)
+        if not gpo:
+            return _ps_error(f"Get-GPO : GPO '{name}' was not found in this domain.")
+        gpos = [gpo]
+    rows = [[g.get("name", ""), g.get("status", ""), "Yes" if g.get("enforced") else "No",
+             str(g.get("link_order", 1)), ", ".join(g.get("links") or []) or "(unlinked)"]
+            for g in gpos]
+    return _ps_ok(_ps_table(["DisplayName", "GpoStatus", "Enforced", "LinkOrder", "Links"], rows))
+
+
+def _cmdlet_get_gpresult(world: dict, session_id: str, pos: list[str], opts: dict) -> dict:
+    target = opts.get("target") or opts.get("scope") or opts.get("path") or ""
+    rsop = _resolve_rsop(world, target)
+    applied = _ps_table(
+        ["Precedence", "GPO", "Scope", "Enforced", "Link"],
+        [[str(g["precedence"]), g["name"], g["scope"], "Yes" if g["enforced"] else "No", g["link"]]
+         for g in rsop["applied"]],
+    )
+    winning = _ps_table(
+        ["Setting", "Value", "Winning GPO"],
+        [[k, v["value"], v["winning_gpo"]] for k, v in sorted(rsop["settings"].items())],
+    )
+    denied = _ps_table(
+        ["GPO", "Reason Denied"],
+        [[g["name"], g["reason"]] for g in rsop["filtered"]],
+    )
+    body = (f"Resultant Set of Policy for {rsop['target']}\n\nApplied GPOs\n{applied}"
+            f"\n\nWinning settings\n{winning}\n\nDenied GPOs\n{denied}")
+    return _ps_ok(body)
+
+
+def _cmdlet_get_computerinfo(world: dict, session_id: str, pos: list[str], opts: dict) -> dict:
+    dom = world.get("domain", {})
+    return _ps_ok(_ps_list([
+        ("CsName", world.get("computer_name", "")),
+        ("OsName", world.get("os", "")),
+        ("CsDomain", dom.get("name") if dom.get("joined") else "WORKGROUP"),
+        ("CsPartOfDomain", str(bool(dom.get("joined")))),
+    ]))
+
+
+def _cmdlet_get_disk(world: dict, session_id: str, pos: list[str], opts: dict) -> dict:
+    rows = [[str(d.get("number", "")), d.get("model", ""), f"{d.get('size_gb', 0)}GB",
+             d.get("partition_style", ""), d.get("status", "")]
+            for d in world.get("storage", {}).get("disks", [])]
+    return _ps_ok(_ps_table(["Number", "FriendlyName", "Size", "PartitionStyle", "OperationalStatus"], rows))
+
+
+def _cmdlet_get_volume(world: dict, session_id: str, pos: list[str], opts: dict) -> dict:
+    rows = [[v.get("letter", ""), v.get("label", ""), v.get("fs", ""),
+             f"{v.get('size_gb', 0)}GB", f"{v.get('free_gb', 0)}GB"]
+            for v in world.get("storage", {}).get("volumes", [])]
+    return _ps_ok(_ps_table(["DriveLetter", "FileSystemLabel", "FileSystem", "Size", "SizeRemaining"], rows))
+
+
+def _cmdlet_get_netadapter(world: dict, session_id: str, pos: list[str], opts: dict) -> dict:
+    rows = [[a.get("name", ""), a.get("status", ""), a.get("mac", ""), a.get("speed", "")]
+            for a in world.get("network", {}).get("adapters", [])]
+    return _ps_ok(_ps_table(["Name", "Status", "MacAddress", "LinkSpeed"], rows))
+
+
+def _cmdlet_get_netipaddress(world: dict, session_id: str, pos: list[str], opts: dict) -> dict:
+    rows = [[a.get("name", ""), a.get("ip", ""), str(a.get("prefix", "")), a.get("gateway", "")]
+            for a in world.get("network", {}).get("adapters", [])]
+    return _ps_ok(_ps_table(["InterfaceAlias", "IPAddress", "PrefixLength", "DefaultGateway"], rows))
+
+
+# Read-only cmdlets, dispatched by lower-cased name.
+_PS_READ_CMDLETS = {
+    "get-service": _cmdlet_get_service,
+    "get-process": _cmdlet_get_process,
+    "get-aduser": _cmdlet_get_aduser,
+    "get-adgroup": _cmdlet_get_adgroup,
+    "get-adgroupmember": _cmdlet_get_adgroupmember,
+    "get-windowsfeature": _cmdlet_get_windowsfeature,
+    "get-hotfix": _cmdlet_get_hotfix,
+    "get-gpo": _cmdlet_get_gpo,
+    "get-gpresultantsetofpolicy": _cmdlet_get_gpresult,
+    "gpresult": _cmdlet_get_gpresult,
+    "get-computerinfo": _cmdlet_get_computerinfo,
+    "get-disk": _cmdlet_get_disk,
+    "get-volume": _cmdlet_get_volume,
+    "get-netadapter": _cmdlet_get_netadapter,
+    "get-netipaddress": _cmdlet_get_netipaddress,
+}
+
+
+def _ps_write_payload(cmdlet: str, pos: list[str], opts: dict) -> tuple[str, dict] | dict:
+    """Map a state-changing cmdlet to an (action, payload) pair.
+
+    Returns an error dict when a required parameter is missing so the caller can
+    surface it verbatim.
+    """
+    ident = opts.get("identity") or opts.get("name") or (pos[0] if pos else "")
+
+    if cmdlet in ("start-service", "stop-service", "restart-service"):
+        if not ident:
+            return _ps_error(f'{cmdlet} : Missing required parameter "-Name".')
+        return {"start-service": "start_service", "stop-service": "stop_service",
+                "restart-service": "restart_service"}[cmdlet], {"service": ident}
+
+    if cmdlet == "set-service":
+        if not ident:
+            return _ps_error('Set-Service : Missing required parameter "-Name".')
+        startup = (opts.get("startuptype") or "").lower()
+        if startup:
+            return "set_startup", {"service": ident, "startup": startup}
+        status = (opts.get("status") or "").lower()
+        if status in ("running", "stopped"):
+            action = "start_service" if status == "running" else "stop_service"
+            return action, {"service": ident}
+        return _ps_error('Set-Service : Specify -StartupType or -Status.')
+
+    if cmdlet in ("install-windowsfeature", "add-windowsfeature"):
+        if not ident:
+            return _ps_error(f'{cmdlet} : Missing required parameter "-Name".')
+        return "install_role", {"role": ident, "name": ident}
+
+    if cmdlet in ("uninstall-windowsfeature", "remove-windowsfeature"):
+        if not ident:
+            return _ps_error(f'{cmdlet} : Missing required parameter "-Name".')
+        return "uninstall_role", {"role": ident, "name": ident}
+
+    if cmdlet == "new-aduser":
+        if not ident:
+            return _ps_error('New-ADUser : Missing required parameter "-Name".')
+        payload = {"name": ident, "username": ident}
+        if opts.get("displayname"):
+            payload["display"] = opts["displayname"]
+        if opts.get("path") or opts.get("ou"):
+            payload["ou"] = opts.get("path") or opts["ou"]
+        return "create_ad_user", payload
+
+    if cmdlet == "new-adgroup":
+        if not ident:
+            return _ps_error('New-ADGroup : Missing required parameter "-Name".')
+        payload = {"name": ident}
+        if opts.get("groupscope"):
+            payload["scope"] = opts["groupscope"]
+        return "create_ad_group", payload
+
+    if cmdlet == "remove-aduser":
+        if not ident:
+            return _ps_error('Remove-ADUser : Missing required parameter "-Identity".')
+        return "delete_ad_user", {"user": ident}
+
+    if cmdlet == "enable-adaccount":
+        if not ident:
+            return _ps_error('Enable-ADAccount : Missing required parameter "-Identity".')
+        return "enable_ad_user", {"user": ident}
+
+    if cmdlet == "disable-adaccount":
+        if not ident:
+            return _ps_error('Disable-ADAccount : Missing required parameter "-Identity".')
+        return "disable_ad_user", {"user": ident}
+
+    if cmdlet == "unlock-adaccount":
+        if not ident:
+            return _ps_error('Unlock-ADAccount : Missing required parameter "-Identity".')
+        return "unlock_ad_user", {"user": ident}
+
+    if cmdlet == "set-adaccountpassword":
+        if not ident:
+            return _ps_error('Set-ADAccountPassword : Missing required parameter "-Identity".')
+        payload = {"user": ident}
+        if opts.get("newpassword"):
+            payload["password"] = opts["newpassword"]
+        return "reset_password", payload
+
+    if cmdlet == "add-adgroupmember":
+        group = opts.get("identity") or (pos[0] if pos else "")
+        member = opts.get("members") or opts.get("member") or (pos[1] if len(pos) > 1 else "")
+        if not group or not member:
+            return _ps_error('Add-ADGroupMember : Parameters "-Identity" and "-Members" are required.')
+        return "add_user_to_group", {"group": group, "user": member}
+
+    if cmdlet == "remove-adgroupmember":
+        group = opts.get("identity") or (pos[0] if pos else "")
+        member = opts.get("members") or opts.get("member") or (pos[1] if len(pos) > 1 else "")
+        if not group or not member:
+            return _ps_error('Remove-ADGroupMember : Parameters "-Identity" and "-Members" are required.')
+        return "remove_user_from_group", {"group": group, "user": member}
+
+    if cmdlet == "new-gpo":
+        if not ident:
+            return _ps_error('New-GPO : Missing required parameter "-Name".')
+        return "create_gpo", {"name": ident}
+
+    if cmdlet == "remove-gpo":
+        if not ident:
+            return _ps_error('Remove-GPO : Missing required parameter "-Name".')
+        return "delete_gpo", {"gpo": ident}
+
+    if cmdlet == "new-gplink":
+        if not ident:
+            return _ps_error('New-GPLink : Missing required parameter "-Name".')
+        target = opts.get("target") or opts.get("ou") or DEFAULT_DOMAIN
+        return "link_gpo", {"gpo": ident, "ou": target}
+
+    if cmdlet == "remove-gplink":
+        if not ident:
+            return _ps_error('Remove-GPLink : Missing required parameter "-Name".')
+        return "unlink_gpo", {"gpo": ident, "ou": opts.get("target") or opts.get("ou") or ""}
+
+    if cmdlet == "set-gplink":
+        if not ident:
+            return _ps_error('Set-GPLink : Missing required parameter "-Name".')
+        if opts.get("enforced") is not None:
+            return "set_gpo_enforced", {
+                "gpo": ident,
+                "enforced": _ps_bool(opts.get("enforced")) or opts.get("enforced") == "Yes",
+            }
+        if opts.get("order"):
+            return "set_gpo_link_order", {"gpo": ident, "link_order": opts["order"]}
+        return _ps_error('Set-GPLink : Specify -Enforced or -Order.')
+
+    if cmdlet == "install-windowsupdate":
+        kb = opts.get("kbarticleid") or opts.get("kb") or ident
+        if not kb:
+            return _ps_error('Install-WindowsUpdate : Missing required parameter "-KBArticleID".')
+        return "install_update", {"kb": kb}
+
+    if cmdlet == "add-computer":
+        domain = opts.get("domainname") or opts.get("domain") or ident
+        if not domain:
+            return _ps_error('Add-Computer : Missing required parameter "-DomainName".')
+        return "join_domain", {"domain": domain, "user": opts.get("credential") or "admin",
+                               "password": opts.get("password") or "pw"}
+
+    if cmdlet == "rename-computer":
+        if not ident:
+            return _ps_error('Rename-Computer : Missing required parameter "-NewName".')
+        return "rename_computer", {"name": opts.get("newname") or ident}
+
+    return _ps_error(
+        f"The term '{cmdlet}' is not recognized as the name of a cmdlet. {_PS_HINT}")
+
+
+_PS_WRITE_CMDLETS = {
+    "start-service", "stop-service", "restart-service", "set-service",
+    "install-windowsfeature", "add-windowsfeature",
+    "uninstall-windowsfeature", "remove-windowsfeature",
+    "new-aduser", "new-adgroup", "remove-aduser",
+    "enable-adaccount", "disable-adaccount", "unlock-adaccount",
+    "set-adaccountpassword", "add-adgroupmember", "remove-adgroupmember",
+    "new-gpo", "remove-gpo", "new-gplink", "remove-gplink", "set-gplink",
+    "install-windowsupdate", "add-computer", "rename-computer",
+}
+
+
+def _cmdlet_names() -> list[str]:
+    return sorted(set(_PS_READ_CMDLETS) | _PS_WRITE_CMDLETS)
+
+
+def run_command(session_id: str, command: str) -> dict:
+    """Execute one PowerShell cmdlet against the session world.
+
+    Returns a shell-shaped dict ({ok, rc, stdout, stderr}). Unknown cmdlets
+    always come back rc!=0 with a CommandNotFoundException-style message.
+    """
+    import shlex
+
+    raw = (command or "").strip()
+    if not raw:
+        return _ps_error("No command entered. " + _PS_HINT)
+
+    try:
+        tokens = shlex.split(raw)
+    except ValueError as exc:
+        return _ps_error(f"ParserError: could not parse command ({exc})")
+
+    if not tokens:
+        return _ps_error("No command entered. " + _PS_HINT)
+
+    cmdlet = tokens[0].lower()
+    positionals, opts = _ps_parse(tokens[1:])
+
+    if cmdlet in ("get-command", "help", "get-help"):
+        return _ps_ok("\n".join(_cmdlet_names()))
+
+    entry = _ensure_session(session_id)
+    world = entry["state"]["world"]
+
+    reader = _PS_READ_CMDLETS.get(cmdlet)
+    if reader:
+        return reader(world, session_id, positionals, opts)
+
+    if cmdlet in _PS_WRITE_CMDLETS:
+        mapped = _ps_write_payload(cmdlet, positionals, opts)
+        if isinstance(mapped, dict):  # already an error payload
+            return mapped
+        action, payload = mapped
+        result = apply_action(session_id, action, {**payload, "session_id": str(session_id)})
+        if result.get("ok"):
+            message = result.get("message") or ""
+            return {**result, "rc": 0, "stdout": message, "stderr": ""}
+        error = result.get("error") or "command failed"
+        return {**result, "rc": 1, "stdout": "", "stderr": f"{tokens[0]} : {error}"}
+
+    return _ps_error(
+        f"The term '{tokens[0]}' is not recognized as the name of a cmdlet, function, "
+        f"script file, or operable program. {_PS_HINT}")

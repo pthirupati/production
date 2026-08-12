@@ -13,17 +13,13 @@ infrastructure_type: docker
 jira_priority: Low
 description: 'CONTEXT: Complete the arrays coding exercise in the browser IDE.
 
-
   ENVIRONMENT: FixitLab JavaScript/React practice IDE — edit solution.js, Run visible
   tests, then Check Solution.
-
 
   SYMPTOM / STARTING STATE: Coding challenge: arrays. The stub in solution.js is incomplete
   so tests fail until you implement it.
 
-
   OBJECTIVE: Implement the required function so all visible and hidden tests pass.
-
 
   VERIFY: Check Solution passes all hidden tests.
 
@@ -74,7 +70,7 @@ tags:
 - do
 - hands-on
 - javascript
-linked_tutorial: javascript-fundamentals
+linked_tutorial: javascript-language-zero-hero
 what_you_will_learn:
 - Understand how arrays work in this lab environment
 - Identify the main status and configuration signals for arrays
@@ -160,4 +156,8 @@ coding_spec:
     code: assert(arraySum([]) === 0);
   - name: neg
     code: assert(arraySum([-1, 5, 1]) === 5);
+  - name: s87_fn_defined
+    code: assert(typeof arraySum === "function");
+  - name: s87_idempotent
+    code: const a=arraySum([]); const b=arraySum([]); assert(String(a)===String(b));
   timeout: 8

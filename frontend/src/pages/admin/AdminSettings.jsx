@@ -226,6 +226,8 @@ export default function AdminSettings() {
           <button
             onClick={handleToggleMaintenance}
             disabled={saving}
+            aria-label="Toggle maintenance mode"
+            aria-pressed={!!maintenance.maintenance_mode}
             className="flex items-center gap-2"
           >
             {maintenance.maintenance_mode ? (
@@ -237,9 +239,10 @@ export default function AdminSettings() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Banner Message</label>
+          <label htmlFor="maint-banner-message" className="block text-sm font-medium mb-1">Banner Message</label>
           <div className="flex gap-2">
             <input
+              id="maint-banner-message"
               type="text"
               className="input-field flex-1"
               value={maintenance.maintenance_message}
@@ -279,7 +282,7 @@ export default function AdminSettings() {
           Show maintenance banner on site
         </label>
         <div className="flex flex-wrap gap-2 items-center">
-          <input type="file" accept="image/png,image/jpeg,image/webp" className="text-xs text-surface-400"
+          <input type="file" aria-label="Upload maintenance banner image" accept="image/png,image/jpeg,image/webp" className="text-xs text-surface-400"
             onChange={async e => {
               const file = e.target.files?.[0]
               if (!file) return
@@ -295,7 +298,7 @@ export default function AdminSettings() {
             }} />
           <span className="text-xs text-surface-500">Required size: {IMAGE_UPLOAD_HINTS.maintenance_banner}</span>
         </div>
-        <input type="url" className="input-field w-full" placeholder="Banner image URL (optional)"
+        <input type="url" aria-label="Maintenance banner image URL" className="input-field w-full" placeholder="Banner image URL (optional)"
           value={maintenance.maintenance_banner_image || ''}
           onChange={e => setMaintenance({ ...maintenance, maintenance_banner_image: e.target.value })} />
 
@@ -498,8 +501,8 @@ export default function AdminSettings() {
             <label key={key} className="text-sm capitalize">
               {key}
               <div className="flex gap-2 mt-1 items-center">
-                <input type="color" value={value} onChange={e => setThemeColors(c => ({ ...c, [key]: e.target.value }))} className="h-9 w-12 rounded cursor-pointer" />
-                <input type="text" className="input-field flex-1 font-mono text-xs" value={value} onChange={e => setThemeColors(c => ({ ...c, [key]: e.target.value }))} />
+                <input type="color" aria-label={`${key} colour picker`} value={value} onChange={e => setThemeColors(c => ({ ...c, [key]: e.target.value }))} className="h-9 w-12 rounded cursor-pointer" />
+                <input type="text" aria-label={`${key} hex value`} className="input-field flex-1 font-mono text-xs" value={value} onChange={e => setThemeColors(c => ({ ...c, [key]: e.target.value }))} />
               </div>
             </label>
           ))}
@@ -542,11 +545,11 @@ export default function AdminSettings() {
         </div>
         <p className="text-sm text-surface-400">Shown on home, pricing, and subscription pages only.</p>
         <div className="grid sm:grid-cols-2 gap-3">
-          <input className="input-field" placeholder="Title" value={promoDraft.title} onChange={e => setPromoDraft({ ...promoDraft, title: e.target.value })} />
-          <input className="input-field" placeholder="Link (/pricing)" value={promoDraft.link} onChange={e => setPromoDraft({ ...promoDraft, link: e.target.value })} />
-          <input className="input-field sm:col-span-2" placeholder="Offer text" value={promoDraft.text} onChange={e => setPromoDraft({ ...promoDraft, text: e.target.value })} />
-          <input className="input-field sm:col-span-2" placeholder="Image URL (optional)" value={promoDraft.image_url || ''} onChange={e => setPromoDraft({ ...promoDraft, image_url: e.target.value })} />
-          <input type="file" accept="image/png,image/jpeg,image/webp" className="text-xs text-surface-400 sm:col-span-2"
+          <input className="input-field" aria-label="Promo banner title" placeholder="Title" value={promoDraft.title} onChange={e => setPromoDraft({ ...promoDraft, title: e.target.value })} />
+          <input className="input-field" aria-label="Promo banner link" placeholder="Link (/pricing)" value={promoDraft.link} onChange={e => setPromoDraft({ ...promoDraft, link: e.target.value })} />
+          <input className="input-field sm:col-span-2" aria-label="Promo banner offer text" placeholder="Offer text" value={promoDraft.text} onChange={e => setPromoDraft({ ...promoDraft, text: e.target.value })} />
+          <input className="input-field sm:col-span-2" aria-label="Promo banner image URL" placeholder="Image URL (optional)" value={promoDraft.image_url || ''} onChange={e => setPromoDraft({ ...promoDraft, image_url: e.target.value })} />
+          <input type="file" aria-label="Upload promo banner image" accept="image/png,image/jpeg,image/webp" className="text-xs text-surface-400 sm:col-span-2"
             onChange={async e => {
               const file = e.target.files?.[0]
               if (!file) return
@@ -610,16 +613,18 @@ export default function AdminSettings() {
 
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium mb-1">Bot name</label>
+            <label htmlFor="bot-name" className="block text-sm font-medium mb-1">Bot name</label>
             <input
+              id="bot-name"
               className="input-field w-full"
               value={supportBot.support_bot_name}
               onChange={e => setSupportBot(s => ({ ...s, support_bot_name: e.target.value }))}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Typing delay (ms)</label>
+            <label htmlFor="bot-typing-delay" className="block text-sm font-medium mb-1">Typing delay (ms)</label>
             <input
+              id="bot-typing-delay"
               type="number"
               min={300}
               max={5000}
@@ -629,8 +634,9 @@ export default function AdminSettings() {
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium mb-1">Welcome message</label>
+            <label htmlFor="bot-welcome" className="block text-sm font-medium mb-1">Welcome message</label>
             <textarea
+              id="bot-welcome"
               className="input-field w-full min-h-[80px]"
               value={supportBot.support_bot_welcome_message}
               onChange={e => setSupportBot(s => ({ ...s, support_bot_welcome_message: e.target.value }))}
@@ -643,12 +649,14 @@ export default function AdminSettings() {
           <h3 className="text-sm font-medium text-surface-300 mb-2">Custom FAQ entries</h3>
           <div className="grid sm:grid-cols-2 gap-2 mb-2">
             <input
+              aria-label="FAQ keywords"
               className="input-field"
               placeholder="Keywords (comma-separated)"
               value={faqDraft.keywords}
               onChange={e => setFaqDraft(d => ({ ...d, keywords: e.target.value }))}
             />
             <input
+              aria-label="FAQ answer text"
               className="input-field"
               placeholder="Answer text"
               value={faqDraft.answer}
@@ -846,6 +854,7 @@ export default function AdminSettings() {
                       <div className="flex items-center gap-2 mt-1.5">
                         <div className="relative flex-1 max-w-xs">
                           <input
+                            aria-label={`Value for ${s.key}`}
                             type={envVisible[s.key] ? 'text' : 'password'}
                             placeholder={s.masked || (s.is_set ? '(set — enter new value to rotate)' : 'Not set')}
                             value={envEdits[s.key] || ''}

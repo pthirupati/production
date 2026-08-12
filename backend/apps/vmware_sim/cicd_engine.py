@@ -161,6 +161,17 @@ def _base_state() -> dict:
                 "_fault": None,
             },
         ],
+        # Workflow trigger model. `pull_request` runs untrusted fork code with a
+        # read-only token and NO secret access; `pull_request_target` runs in the
+        # BASE repo context, so it can reach secrets — safe only while it checks
+        # out the trusted base ref. Modelled as three independent fields because
+        # the vulnerability is the combination, not any one of them.
+        "workflow": {
+            "name": "ci.yml",
+            "trigger": "pull_request",
+            "checkout_ref": "github.base_ref",
+            "secrets_available": False,
+        },
         "goal": {
             "title": "Get the pipeline green",
             "objective": "Diagnose and fix the broken CI/CD pipeline so every stage passes.",
@@ -184,7 +195,34 @@ def _apply_preset(state: dict, slug: str) -> None:
     s = (slug or "").lower()
     fault = state["fault"]
 
-    if "image" in s or "bad-image" in s or "registry" in s or "tag" in s:
+    # Checked BEFORE the image/tag rule: these slugs contain "target", and the
+    # generic matcher below would otherwise grab "tag" out of "pull_request_target".
+    if "pull-request-target" in s or "pull_request_target" in s or "fork-pr" in s:
+        wf = state["workflow"]
+        wf["trigger"] = "pull_request_target"
+        wf["checkout_ref"] = "github.event.pull_request.head.sha"
+        wf["secrets_available"] = True
+        job = _job(state, "build")
+        if job:
+            job["_fault"] = "fork_pr_secret_exfil"
+            job["script"] = [
+                "actions/checkout@v4 with ref: ${{ github.event.pull_request.head.sha }}",
+                "npm ci   # runs attacker-controlled package scripts",
+                "npm run build  # $DEPLOY_TOKEN is in scope here",
+            ]
+        fault.update({
+            "kind": "fork_pr_secret_exfil", "job": "build",
+            "summary": "ci.yml runs on `pull_request_target` (base-repo context, secrets in "
+                       "scope) AND checks out the untrusted fork head. Any fork PR can run "
+                       "code with DEPLOY_TOKEN available and exfiltrate it.",
+        })
+        state["goal"] = {
+            "title": "Stop CI secret exfiltration from fork PRs",
+            "objective": "A fork PR can steal DEPLOY_TOKEN. Break the dangerous combination: "
+                         "either run untrusted code without secrets, or keep the privileged "
+                         "trigger but stop checking out the fork head.",
+        }
+    elif "image" in s or "bad-image" in s or "registry" in s or "tag" in s:
         # Bad container image / tag → the job can never pull its runner image.
         job = _job(state, "build")
         if job:
@@ -312,6 +350,37 @@ def _pipeline_outcome(state: dict) -> dict:
     }
 
 
+_UNTRUSTED_REFS = (
+    "pull_request.head",
+    "head.sha",
+    "head.ref",
+    "head_ref",
+)
+
+
+def _fork_pr_is_exploitable(wf: dict) -> bool:
+    """True while a fork PR can both run untrusted code AND reach secrets.
+
+    Deliberately NOT a `pull_request_target` string test. Three independent
+    conditions must hold together, so there are three legitimate fixes and no
+    cosmetic one:
+      * the trigger runs in the privileged base-repo context, AND
+      * the job checks out the untrusted fork head, AND
+      * secrets are in scope for that job.
+    Swapping the trigger to `pull_request` alone is a real fix (the token is
+    read-only and secrets are withheld), and so is keeping the trigger but
+    checking out the trusted base ref — the learner may do either.
+    """
+    if not wf:
+        return False
+    if (wf.get("trigger") or "").strip() != "pull_request_target":
+        return False
+    if not wf.get("secrets_available"):
+        return False
+    ref = (wf.get("checkout_ref") or "").lower()
+    return any(marker in ref for marker in _UNTRUSTED_REFS)
+
+
 def _dag_is_safe(state: dict) -> tuple[bool, str]:
     """A deploy job must transitively depend on the test job(s)."""
     deploy_jobs = [j for j in state.get("jobs", []) if (j.get("stage") == "deploy")]
@@ -378,6 +447,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "argo_apps": state.get("argo_apps", []),
         "flux": state.get("flux", {}),
         "github": state.get("github", {}),
+        "workflow": state.get("workflow", {}),
         "pipeline_secrets": state.get("pipeline_secrets", []),
         "pipeline_variables": state.get("pipeline_variables", []),
         "pipeline_environments": state.get("pipeline_environments", []),
@@ -492,6 +562,28 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": f"Job {job_id} repaired"}
 
+    if action == "set_workflow":
+        # Edit ci.yml's trigger / checkout ref / secret scope. Any of the three
+        # can be changed independently — grading looks at the resulting combo.
+        wf = state.setdefault("workflow", {})
+        for key in ("trigger", "checkout_ref"):
+            if key in payload and payload[key]:
+                wf[key] = str(payload[key]).strip()
+        if "secrets_available" in payload:
+            wf["secrets_available"] = bool(payload["secrets_available"])
+        if not _fork_pr_is_exploitable(wf):
+            job = _job(state, "build")
+            if job and job.get("_fault") == "fork_pr_secret_exfil":
+                job["_fault"] = None
+            _clear_fault_if("build", ("fork_pr_secret_exfil",))
+        state["events"].insert(0, {
+            "time": _now_iso(),
+            "message": f"Updated {wf.get('name', 'workflow')} ({wf.get('trigger')})",
+            "severity": "info",
+        })
+        _save(session_id, entry)
+        return {"ok": True, "message": "Workflow updated", "workflow": wf}
+
     if action == "run_pipeline" or action == "run":
         outcome = _pipeline_outcome(state)
         state["last_run"] = {
@@ -566,6 +658,16 @@ def validate_cicd_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, s
     for job in state.get("jobs", []):
         if job.get("_fault"):
             return False, f"Job {job.get('id')} still broken ({job.get('_fault')})"
+
+    # 2b) A green pipeline is not a safe one. Re-derive the fork-PR exposure from
+    # the live workflow so editing it back into the dangerous shape after the
+    # fault cleared still fails closed.
+    if _fork_pr_is_exploitable(state.get("workflow") or {}):
+        return False, (
+            "ci.yml still lets a fork PR run untrusted code with secrets in scope "
+            "(pull_request_target + fork-head checkout). Remove the secret access, "
+            "check out the base ref, or drop back to `pull_request`."
+        )
 
     # 3) The derived pipeline outcome must be green.
     outcome = _pipeline_outcome(state)

@@ -9,6 +9,13 @@ import { monitoringApi } from '../../api/monitoring'
 
 const ACCENT = '#f7913b'
 
+// Stable fallbacks for absent alerting state. The `: []` arm of the Array.isArray
+// guards below minted a new identity every render, so `firing`/`pending` — and
+// the `silences`/`alertGroups` memos that chain off them — never hit. Frozen so
+// an accidental in-place mutation throws rather than corrupting the fallback.
+const EMPTY_OBJ = Object.freeze({})
+const EMPTY_ARR = Object.freeze([])
+
 // Map a Grafana rule/alert state string to one of the shared badge classes.
 function stateBadgeClass(state) {
   const s = String(state || '').toLowerCase()
@@ -54,14 +61,14 @@ const SUB_TABS = [
  *   graf.contact_points:[{name,type,address,configured}]
  *   graf.notification_policies:{ root:{ receiver, ... } }
  */
-export default function GrafanaAlertingPanel({ graf = {}, sessionId, silences: liveSilences, onReload }) {
+export default function GrafanaAlertingPanel({ graf = EMPTY_OBJ, sessionId, silences: liveSilences, onReload }) {
   const [sub, setSub] = useState('rules')
   const [busy, setBusy] = useState(false)
 
-  const rules = Array.isArray(graf.alert_rules) ? graf.alert_rules : []
-  const contacts = Array.isArray(graf.contact_points) ? graf.contact_points : []
-  const policies = graf.notification_policies || {}
-  const root = policies.root || {}
+  const rules = Array.isArray(graf.alert_rules) ? graf.alert_rules : EMPTY_ARR
+  const contacts = Array.isArray(graf.contact_points) ? graf.contact_points : EMPTY_ARR
+  const policies = graf.notification_policies || EMPTY_OBJ
+  const root = policies.root || EMPTY_OBJ
 
   // firing rules drive the synthesized Silences + Alert groups views
   const firing = useMemo(
@@ -78,7 +85,7 @@ export default function GrafanaAlertingPanel({ graf = {}, sessionId, silences: l
     if (Array.isArray(liveSilences) && liveSilences.length) {
       return liveSilences.map((s) => ({
         id: s.id,
-        matchers: (s.matchers || []).map((m) => (
+        matchers: (s.matchers || EMPTY_ARR).map((m) => (
           typeof m === 'string' ? m : `${m.name}${m.isRegex ? '=~' : '='}"${m.value}"`
         )),
         comment: s.comment || '',

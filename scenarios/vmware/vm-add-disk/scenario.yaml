@@ -5,36 +5,29 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline vSphere lab. The architecture is a single lab-primary
   node exposing VMs, datastores, vCenter, and ESXi tasks; treat it as the production host for this incident.
   All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: vCenter VM web-prod-01 with a single 40 GB disk; the application requires
   at least 100 GB, so more capacity must be added (online).
-
 
   OBJECTIVE: Locate web-prod-01 in the vCenter inventory; Add at least 60 GB of additional disk capacity
   (hot-add); Verify the VM now meets the 100 GB requirement. Acceptance criteria: the change is minimal
   and reversible, and success means `check.sh` exits successfully.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant VMs, datastores, vCenter, and ESXi tasks), changing one thing at a time. Check your
   work continuously against the objective — success means `check.sh` exits successfully.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
   before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -92,7 +85,6 @@ hints:
 
     3. Retry the command that failed with ''No space left on device''.
 
-
     WHY: many services fail cryptically when disk is full.'
 technology: vmware
 summary: Complete the expand vm disk capacity vmware lab and verify success with the checker
@@ -104,7 +96,7 @@ tags:
 - fix
 - hands-on
 - vmware
-linked_tutorial: vmware-fundamentals
+linked_tutorial: vmware-vsphere-zero-hero
 what_you_will_learn:
 - Locate web-prod-01 in the vCenter inventory
 - Add at least 60 GB of additional disk capacity (hot-add)

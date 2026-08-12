@@ -30,6 +30,26 @@ class Profile(models.Model):
         max_length=100, blank=True, default="",
         help_text="User's country or location"
     )
+    # Which legal text this account agreed to, and when (audit Z4-8). Recorded from
+    # the server's current version at the moment of acceptance — never from a value
+    # the client supplies, since the client is not the authority on what it was
+    # shown. Blank means "predates this field", which is a truthful answer and a
+    # different one from "accepted an unknown version".
+    # When the user last dismissed the "turn on two-factor" nudge (audit Z2-3).
+    # A prompt that returns on every single login is one people learn to click
+    # past without reading, which is worse than not asking.
+    mfa_prompt_dismissed_at = models.DateTimeField(null=True, blank=True)
+    terms_accepted_at = models.DateTimeField(null=True, blank=True)
+    terms_version = models.CharField(max_length=32, blank=True, default="")
+    privacy_version = models.CharField(max_length=32, blank=True, default="")
+    billing_state = models.CharField(
+        max_length=100, blank=True, default="",
+        help_text=(
+            "Indian state/UT used as the GST place of supply. Blank means no "
+            "address on record, which under the CGST place-of-supply rules for "
+            "B2C services falls back to the seller's state (audit Z1-13)."
+        ),
+    )
     currency_preference = models.CharField(
         max_length=3, choices=CURRENCY_CHOICES, default="INR",
         help_text="Preferred currency for pricing display"
@@ -42,6 +62,13 @@ class Profile(models.Model):
         default=True,
         help_text="Show the floating FixitLab support assistant",
     )
+    # DPDP §6(4) — withdraw interview-processing consent without deleting the
+    # whole account. When False, new interview rounds are blocked; existing
+    # transcripts remain until the user deletes them or the account.
+    interview_processing_consent = models.BooleanField(
+        default=True,
+        help_text="Consent to process interview transcripts/scores for practice rounds",
+    )
     daily_streak = models.PositiveIntegerField(default=0)
     longest_streak = models.PositiveIntegerField(default=0)
     xp = models.PositiveIntegerField(default=0)
@@ -52,11 +79,39 @@ class Profile(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Ambiguous characters removed: these codes get read aloud, typed from a
+    # screenshot and dictated over a call. O/0 and I/1/L are where that goes wrong,
+    # and a mistyped code silently attributes the signup to nobody.
+    REFERRAL_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+    REFERRAL_CODE_LENGTH = 8
+
+    @classmethod
+    def generate_referral_code(cls) -> str:
+        """A code that is not already taken.
+
+        `referral_code` is `unique=True` and the previous version generated one
+        random string with no collision check, so a duplicate would surface as an
+        IntegrityError **during signup** (audit Z6-16). At 31^8 that is vanishingly
+        unlikely, but the failure mode is a user unable to create an account, and
+        the retry costs one indexed lookup.
+        """
+        for _ in range(5):
+            code = "".join(
+                secrets.choice(cls.REFERRAL_ALPHABET)
+                for _ in range(cls.REFERRAL_CODE_LENGTH)
+            )
+            if not cls.objects.filter(referral_code=code).exists():
+                return code
+        # Five collisions means something is badly wrong with the RNG; fall back to
+        # a longer code rather than failing the signup.
+        return "".join(
+            secrets.choice(cls.REFERRAL_ALPHABET)
+            for _ in range(cls.REFERRAL_CODE_LENGTH + 4)
+        )
+
     def save(self, *args, **kwargs):
         if not self.referral_code:
-            self.referral_code = ''.join(
-                secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8)
-            )
+            self.referral_code = self.generate_referral_code()
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -67,7 +122,12 @@ class EmailVerificationOTP(models.Model):
     """6-digit OTP for email verification during registration."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(db_index=True)
-    code = models.CharField(max_length=6)
+    # Hashed, not plaintext (audit Z4-11). The 6-digit code used to be stored as-is
+    # for its whole lifetime, so a database dump — or a staff member reading the
+    # Django admin, where it was a readonly_field — yielded a live credential good
+    # for immediate account takeover. It is only ever compared, never replayed, so
+    # there is no reason to keep it recoverable.
+    code_hash = models.CharField(max_length=128)
     session_token = models.CharField(max_length=128, unique=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
@@ -88,6 +148,19 @@ class EmailVerificationOTP(models.Model):
     def is_valid(self):
         return not self.verified and not self.is_expired and self.attempts < 5
 
+    def _code_matches(self, code, check_password) -> bool:
+        """Compare a submitted code against the stored hash.
+
+        No plaintext fallback: migration 0013 drops the old column rather than
+        renaming it, so a plaintext code cannot survive into `code_hash`. An empty
+        hash therefore means a malformed row and must not match anything — returning
+        True on empty is the classic fail-open here.
+        """
+        stored = self.code_hash or ""
+        if not stored:
+            return False
+        return check_password(str(code), stored)
+
     @classmethod
     def generate(cls, email, minutes=10):
         """Create a new OTP for email verification."""
@@ -96,24 +169,29 @@ class EmailVerificationOTP(models.Model):
         session_token = uuid.uuid4().hex + uuid.uuid4().hex
         # Invalidate any previous OTPs for this email
         cls.objects.filter(email=email, verified=False).update(verified=True)
+        from django.contrib.auth.hashers import make_password
+
         instance = cls.objects.create(
             email=email,
-            code=code,
+            code_hash=make_password(code),
             session_token=session_token,
             expires_at=timezone.now() + timezone.timedelta(minutes=minutes),
         )
+        # The plaintext code is RETURNED (to email it) and never persisted.
         return instance, code, session_token
 
     @classmethod
     def verify(cls, session_token, code):
         """Verify an OTP code. Returns the instance if valid."""
+        from django.contrib.auth.hashers import check_password
+
         try:
             instance = cls.objects.get(session_token=session_token)
             if not instance.is_valid:
                 return None, "OTP has expired or already been used. Please request a new one."
             instance.attempts += 1
             instance.save(update_fields=["attempts"])
-            if instance.code != code:
+            if not instance._code_matches(code, check_password):
                 remaining = 5 - instance.attempts
                 if remaining <= 0:
                     return None, "Too many failed attempts. Please request a new OTP."
@@ -309,7 +387,13 @@ class PendingOrgInvite(models.Model):
 
 
 class AccountLifecycleEvent(models.Model):
-    """Tracks inactive-account warnings and deletions (audit survives user delete)."""
+    """Tracks inactive-account warnings and deletions (audit survives user delete).
+
+    `email` is retained after the user row is gone as a short anti-abuse signal
+    (prevent immediate re-registration of the same address after inactive cleanup).
+    Retention is bounded by `RETENTION_ACCOUNT_LIFECYCLE_DAYS` (0 = report-only
+    until the operator chooses a period); see `purge_expired_personal_data`.
+    """
 
     EVENT_CHOICES = [
         ("inactive_warning", "Inactive account warning sent"),
@@ -338,3 +422,7 @@ class AccountLifecycleEvent(models.Model):
     def __str__(self):
         return f"{self.event_type} — {self.email}"
 
+
+# TOTP multi-factor authentication (audit Z2-3). Defined in their own module for
+# readability; re-exported here so Django's app loader registers them.
+from .mfa_models import MfaDevice, MfaRecoveryCode, mfa_required_for  # noqa: E402,F401

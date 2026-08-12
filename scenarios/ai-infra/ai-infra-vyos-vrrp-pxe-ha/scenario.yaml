@@ -16,14 +16,11 @@ description: 'CONTEXT: Networking / Bare Metal ticket — the PXE helper pair sh
   router never took over during the last primary reboot, leaving a single point of failure for
   fleet bring-up. AI Infra Engineering owns the VyOS underlay that MAAS PXE depends on.
 
-
   ENVIRONMENT: Lab Terminal VyOS CLI (configure/commit/compare/rollback, show vrrp) on both
   routers + Bare Metal for enlist verification.
 
-
   SYMPTOM / STARTING STATE: VRRP group for the PXE helper VLAN is misconfigured or absent on
   one peer; only one router answers the virtual IP, with no automatic failover.
-
 
   OBJECTIVE: Configure a matching VRRP group on both PXE helper routers; commit; verify one is
   MASTER and the other BACKUP with show vrrp; fail the primary over and confirm the backup

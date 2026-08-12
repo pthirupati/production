@@ -4995,28 +4995,9 @@ EXTRA_PROJECTS = [{'technology_slug': 'aws',
             {'jira_key': 'AII8-4', 'title': 'Hand off inference endpoint', 'description': 'Document host:8000, model, and TP size for the platform team.', 'acceptance_criteria': 'Handoff note includes endpoint URL + model + tensor parallel.', 'hint': 'Capture vllm READY line and nvidia-smi GPU count.', 'order': 4, 'depends_on': 'AII8-3'},
         ],
     },
-    {
-        'technology_slug': 'ai-infra',
-        'title': 'E2E Image Factory to Inference',
-        'slug': 'ai-infra-e2e-image-to-inference',
-        'architecture_type': 'custom',
-        'description': (
-            'Full Bare Metal + ImageDev handoff: Packer build → MAAS publish/deploy → '
-            'cloud-init + GPU sanity → vLLM serve. End-to-end AI Infra Engineering project.'
-        ),
-        'objectives': [
-            'Publish Packer GPU image to MAAS',
-            'Deploy and pass ImageDev gates',
-            'Serve inference with vLLM',
-        ],
-        'difficulty': 'advanced',
-        'estimated_hours': 8,
-        'order': 9,
-        'tasks': [
-            {'jira_key': 'AII9-1', 'title': 'Packer build + publish', 'description': 'Build GPU image and publish boot resource.', 'acceptance_criteria': 'MAAS Images lists custom GPU series.', 'hint': 'Packer IDE → Publish to MAAS.', 'order': 1},
-            {'jira_key': 'AII9-2', 'title': 'MAAS deploy', 'description': 'Deploy Ready node with custom image.', 'acceptance_criteria': 'Machine Deployed; cloud-init done.', 'hint': 'Deploy with boot_resource picker; cloud-init status.', 'order': 2, 'depends_on': 'AII9-1'},
-            {'jira_key': 'AII9-3', 'title': 'Sanity gate', 'description': 'gpu-sanity + dcgmi diag -r 1 PASS.', 'acceptance_criteria': 'ALL PASS report.', 'hint': 'gpu-sanity; dcgmi diag -r 1.', 'order': 3, 'depends_on': 'AII9-2'},
-            {'jira_key': 'AII9-4', 'title': 'vLLM ready', 'description': 'Start vLLM and confirm :8000 READY.', 'acceptance_criteria': 'OpenAI-compatible server ready.', 'hint': 'vllm serve … --tensor-parallel-size N', 'order': 4, 'depends_on': 'AII9-3'},
-        ],
-    },
 ]
+
+# Z6-14: YAML fixtures under data/projects/ override same-slug Python entries.
+from apps.question_bank.management.commands.project_yaml_loader import merge_extra_projects  # noqa: E402
+
+EXTRA_PROJECTS = merge_extra_projects(EXTRA_PROJECTS)

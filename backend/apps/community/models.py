@@ -6,9 +6,19 @@ from django.conf import settings
 class Thread(models.Model):
     """A community discussion thread."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # SET_NULL, not CASCADE (audit Z3-8). Deleting a user used to hard-delete their
+    # threads, and `Reply.thread` cascades from there — so **other people's replies**
+    # vanished mid-conversation. One person leaving should not erase everyone else's
+    # contributions to a discussion they happened to start.
+    #
+    # This still satisfies erasure: severing the link is what removes the personal
+    # data. The content stays and renders as "[deleted]", which is what Reddit,
+    # Stack Overflow and Discourse all do for the same reason.
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="threads",
     )
     title = models.CharField(max_length=300)
@@ -49,9 +59,13 @@ class Reply(models.Model):
         on_delete=models.CASCADE,
         related_name="replies",
     )
+    # SET_NULL for the same reason as Thread.author (audit Z3-8): a reply is part of
+    # someone else's conversation, and removing it rewrites the thread for everyone.
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="thread_replies",
     )
     parent = models.ForeignKey(

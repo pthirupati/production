@@ -26,6 +26,15 @@ frontend/dist/
 *.pem
 *.key
 
+# --- Self-hosted runtime assets (build output, NEVER commit) ---
+# Pyodide and MediaPipe selfie-segmentation are served same-origin because the
+# production CSP does not allow a public CDN. frontend/scripts/vendor-assets.mjs
+# copies them out of node_modules during `npm run build` / `npm run dev`, so the
+# ~25MB of binaries stay reproducible from package-lock.json instead of being
+# committed to every clone forever.
+frontend/public/pyodide/
+frontend/public/vendor/
+
 # --- User uploads & runtime-generated media (NEVER commit) ---
 # MEDIA_ROOT = backend/media. Holds community thread attachments and the
 # auto-generated Open Badge Ed25519 signing key (openbadge_signing_key.json) —

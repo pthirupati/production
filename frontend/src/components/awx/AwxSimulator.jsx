@@ -1,20 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { awxApi } from '../../api/awx'
-import toast from 'react-hot-toast'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Play, RefreshCw, Layers, FolderGit2, Key, ListChecks, Server, AlertTriangle,
-  Calendar, Activity, CheckSquare, Users, Bell, Settings, Cpu, Package, Plus, Terminal,
+  Calendar, Activity, CheckSquare, Users, Bell, Settings, Package, Plus, Terminal,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import {
-  SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, SimTerminalLog, useSimSession,
-} from '../sim/shared'
+  SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, SimTerminalLog, useSimSession, SimLoginGateCard } from '../sim/shared'
 import {
-  AWX_SIDEBAR, AWX_DASHBOARD_STATS, AWX_JOB_LOG, AWX_HOSTS, AWX_SCHEDULES, AWX_USERS, AWX_CREDENTIAL_TYPES,
+  AWX_SIDEBAR, AWX_JOB_LOG, AWX_HOSTS, AWX_SCHEDULES, AWX_USERS, AWX_CREDENTIAL_TYPES,
   AWX_ACTIVITY, AWX_APPROVALS, AWX_ORGANIZATIONS, AWX_TEAMS, AWX_INSTANCE_GROUPS, AWX_EXEC_ENVS,
   AWX_NOTIFICATIONS, AWX_MGMT_JOBS, AWX_APPLICATIONS, AWX_SETTINGS_SECTIONS,
-} from '../../mockData/awx'
+} from '../../simFixtures/awx'
 import '../../styles/sim-products.css'
 
 // Lab sign-in credentials, consistent with the other simulators
@@ -95,8 +93,22 @@ export default function AwxSimulator({
   refreshRef.current = refresh
   useEffect(() => {
     if (!loggedIn || !hasLiveJob) return undefined
-    const t = setInterval(() => { refreshRef.current?.() }, 1200)
-    return () => clearInterval(t)
+    // A 1.2s poll is a network round-trip + full re-render each tick, so stop it
+    // entirely while the tab is hidden instead of burning it in the background.
+    // On becoming visible we refresh IMMEDIATELY before restarting the timer —
+    // a job can reach a terminal status while hidden, and waiting a further
+    // 1.2s would show a stale "running" badge on refocus.
+    let t = null
+    const stop = () => { if (t) { clearInterval(t); t = null } }
+    const start = () => { if (!t) t = setInterval(() => { refreshRef.current?.() }, 1200) }
+    const onVis = () => {
+      if (document.visibilityState === 'visible') { refreshRef.current?.(); start() } else stop()
+    }
+    // refreshRef (not refresh) is deliberate: the effect must not re-run — and
+    // therefore must not drop the listener — every time refresh is re-created.
+    if (document.visibilityState === 'visible') start()
+    document.addEventListener('visibilitychange', onVis)
+    return () => { stop(); document.removeEventListener('visibilitychange', onVis) }
   }, [loggedIn, hasLiveJob])
   // Companions pass onExit; primary embeds pass onToggleTerminal. Never drop
   // Back just because embedded=true — that was hiding Close on Open AWX overlays.
@@ -129,7 +141,7 @@ export default function AwxSimulator({
       <div className={simPanelRoot(embedded, 'bg-[#1a1a2e]')}>
         <LabChromeBar title="Ansible AWX" subtitle={scenario?.title || slug} accent="#EE0000" {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <SimLoginGateCard title="Sign in to Ansible AWX" onClose={onExit} className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold bg-[#EE0000] flex items-center gap-2">
               <Layers size={18} /> Ansible AWX
             </div>
@@ -162,7 +174,7 @@ export default function AwxSimulator({
                 Training credentials: <span className="font-mono text-slate-700">{AWX_LAB_USER}</span> / <span className="font-mono text-slate-700">{AWX_LAB_PASS}</span>
               </p>
             </form>
-          </div>
+          </SimLoginGateCard>
         </div>
       </div>
     )
@@ -246,7 +258,7 @@ export default function AwxSimulator({
             { key: 'inventory', label: 'Inventory', sortable: true },
             { key: 'actions', label: 'Actions', render: (jt) => (
               <div className="flex gap-1">
-                <button type="button" className="awx-btn-launch text-[10px] py-1 px-2" onClick={(e) => { e.stopPropagation(); setLaunchModal(jt) }}><Play size={12} /></button>
+                <button type="button" className="awx-btn-launch text-[10px] py-1 px-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center" onClick={(e) => { e.stopPropagation(); setLaunchModal(jt) }} aria-label={`Launch ${jt.name || 'job template'}`}><Play size={12} /></button>
               </div>
             )},
           ]} rows={inv.job_templates || []} searchKeys={['name']} />

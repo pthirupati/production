@@ -39,9 +39,10 @@ export function LinuxTerminalTabs({ tabs, activeId, onSelect, onClose, onNew, ma
       {tabs.length < maxTabs && (
         <button
           type="button"
-          className="flex items-center justify-center w-7 h-7 rounded text-[#8FA5B8] hover:text-white hover:bg-[#2D3A4A] shrink-0"
+          className="flex items-center justify-center min-h-[44px] min-w-[44px] w-11 h-11 rounded text-[#8FA5B8] hover:text-white hover:bg-[#2D3A4A] shrink-0"
           onClick={onNew}
           title="New terminal tab"
+          aria-label="New terminal tab"
         >
           <Plus size={14} />
         </button>

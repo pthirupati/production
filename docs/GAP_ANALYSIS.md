@@ -1,5 +1,12 @@
 # FixitLab — Competitive Gap Analysis
 
+> **Not to be confused with `docs/gap-analysis.md`.** The two filenames differ only by letter case
+> and an underscore-vs-hyphen, but the documents are unrelated. **This** file is the outward-facing *market* study:
+> how FixitLab compares to competing lab/interview platforms, and which features to build next.
+> `docs/gap-analysis.md` is the inward-facing *infrastructure* ledger: which simulator engines are
+> real vs facade, and what still needs hardening. Renaming is tracked in `docs/AUDIT_2026_08_TODO.md`
+> (O1) — it is deferred because five files across the backend, docs, and CI link to these paths.
+
 _Last updated: 2026-06-20 · Research + analysis deliverable (no application code changed)_
 
 This document benchmarks FixitLab against the leading hands-on lab, coding-practice, and

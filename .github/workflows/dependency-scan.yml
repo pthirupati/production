@@ -1,9 +1,26 @@
 # FixitLab — Dependency vulnerability scanning (FREE, advisory).
 #
 # Quick-win #14 from docs/GAP_ANALYSIS.md. Runs pip-audit on the Python deps and
-# `npm audit` on the frontend lockfile. Both steps are advisory only
-# (continue-on-error) so a freshly-disclosed CVE surfaces in the Actions log
-# without ever blocking a deploy or PR. Tighten to fail-on-high later if desired.
+# `npm audit` on the frontend lockfile.
+#
+# These used to be blanket `continue-on-error: true`, which meant the job was
+# green whether it found nothing or found a remote-code-execution CVE — nobody
+# reads a green check, so the scan was decorative. It is now two-tier:
+#
+#   * CRITICAL and HIGH findings FAIL the job.
+#   * MODERATE and LOW are reported and left advisory.
+#
+# The npm threshold sat at critical-only until 2026-08-09 because the frontend
+# lockfile carried a backlog (2 high + 4 moderate — esbuild, js-yaml, mermaid,
+# react-router, react-router-dom, vite) that would have red-X'd every run. That
+# backlog is now cleared — `npm audit --audit-level=moderate` reports zero — so
+# the gate is tightened to high. It was cleared by bumping vite 5→7 (which moves
+# esbuild past the vulnerable 0.24.2), @vitejs/plugin-react 4→5, and
+# react-router-dom 6→7, plus in-range lockfile bumps for mermaid and js-yaml.
+#
+# Note vite 7, not the vite 8 that `npm audit fix --force` suggests: 7 already
+# clears the esbuild advisory, while 8 would force vitest 3→4 and a rewrite of
+# the `environmentMatchGlobs` test config for no additional security benefit.
 #
 # Triggers: manual, weekly, and on changes to dependency manifests.
 
@@ -34,6 +51,7 @@ jobs:
   python-audit:
     name: pip-audit (Python deps)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -42,13 +60,89 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit
       - name: Audit backend requirements
-        # Advisory: report findings but never fail the workflow.
+        # Full human-readable report; never fails on its own (the gate is next).
         continue-on-error: true
         run: pip-audit -r backend/requirements.txt --desc
+
+      - name: Fail on CRITICAL Python CVEs
+        run: |
+          # `|| true` here is deliberate and narrow: pip-audit exits non-zero
+          # merely because findings exist, which is the normal case we classify
+          # below. A genuinely broken run writes no file and is caught as such.
+          pip-audit -r backend/requirements.txt -f json -o /tmp/pip-audit.json || true
+          python3 - <<'PY'
+          import json, sys, urllib.error, urllib.request
+
+          try:
+              with open("/tmp/pip-audit.json") as fh:
+                  report = json.load(fh)
+          except (OSError, json.JSONDecodeError) as exc:
+              # A scanner that cannot produce a report is a failure, not a pass.
+              # This is the fail-open hole the audit flagged. Verified locally:
+              # when pip-audit aborts (e.g. resolver error) it writes no file at
+              # all, so without this the whole gate would silently pass.
+              print(f"::error::pip-audit produced no readable report: {exc}")
+              sys.exit(1)
+
+          deps = report.get("dependencies", report) if isinstance(report, dict) else report
+
+          # pip-audit's JSON carries NO severity field -- measured 2026-08-09,
+          # the only per-vuln keys are id/aliases/fix_versions/description. So
+          # severity has to come from OSV. Do NOT grep the description for
+          # "critical": a real finding (filelock PYSEC-2026-1374) contains the
+          # phrase "for critical deployments" in its remediation prose and would
+          # fail the build on nothing at all.
+          def severity_of(vuln_id):
+              """Return the OSV CVSS severity string, or None if unavailable."""
+              req = urllib.request.Request(
+                  f"https://api.osv.dev/v1/vulns/{vuln_id}",
+                  headers={"User-Agent": "fixitlab-dependency-scan"},
+              )
+              with urllib.request.urlopen(req, timeout=20) as resp:
+                  osv = json.load(resp)
+              # Prefer the explicit database_specific severity, fall back to the
+              # CVSS v3 base score band.
+              sev = (osv.get("database_specific") or {}).get("severity")
+              if sev:
+                  return sev.upper()
+              for entry in osv.get("severity") or []:
+                  score = entry.get("score", "")
+                  if entry.get("type", "").startswith("CVSS") and "/" in score:
+                      return score  # vector string; classified by score below
+              return None
+
+          critical, unknown = [], []
+          for dep in deps:
+              for vuln in dep.get("vulns", []) or []:
+                  vuln_id = vuln.get("id")
+                  label = f"{dep.get('name')} {vuln_id}"
+                  try:
+                      sev = severity_of(vuln_id)
+                  except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+                      unknown.append(f"{label} (OSV lookup failed: {exc})")
+                      continue
+                  if sev and "CRITICAL" in sev:
+                      critical.append(f"{label} [{sev}]")
+
+          for item in unknown:
+              # Advisory, not fatal: OSV being down must not wedge the pipeline,
+              # but it must be visible rather than silently treated as clean.
+              print(f"::warning::Could not determine severity for {item}")
+          for item in critical:
+              print(f"::error::CRITICAL Python CVE: {item}")
+
+          total = sum(len(d.get("vulns") or []) for d in deps)
+          print(
+              f"Scanned {len(deps)} packages: {total} advisories, "
+              f"{len(critical)} critical, {len(unknown)} unclassified."
+          )
+          sys.exit(1 if critical else 0)
+          PY
 
   npm-audit:
     name: npm audit (frontend deps)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -56,6 +150,45 @@ jobs:
           node-version: "24"
       - name: Audit frontend dependencies
         working-directory: frontend
-        # Advisory: surface moderate+ findings without blocking.
+        # Full human-readable report; never fails on its own (the gate is next).
         continue-on-error: true
         run: npm audit --audit-level=moderate
+
+      - name: Fail on CRITICAL or HIGH npm CVEs
+        working-directory: frontend
+        run: |
+          # npm audit exits non-zero merely because findings exist, so capture
+          # the JSON and decide on severity ourselves.
+          npm audit --json > /tmp/npm-audit.json || true
+          python3 - <<'PY'
+          import json, sys
+
+          try:
+              with open("/tmp/npm-audit.json") as fh:
+                  report = json.load(fh)
+          except (OSError, json.JSONDecodeError) as exc:
+              print(f"::error::npm audit produced no readable report: {exc}")
+              sys.exit(1)
+
+          counts = report.get("metadata", {}).get("vulnerabilities", {})
+          critical = counts.get("critical", 0)
+          high = counts.get("high", 0)
+
+          for name, meta in sorted(report.get("vulnerabilities", {}).items()):
+              sev = meta.get("severity")
+              if sev in ("critical", "high"):
+                  print(f"::error::{sev.upper()} npm CVE: {name}")
+
+          # Keep the still-tolerated tiers visible in the log so the backlog
+          # cannot quietly grow back behind a green check.
+          print(
+              "npm severity counts — critical={critical} high={high} "
+              "moderate={moderate} low={low}".format(
+                  critical=critical,
+                  high=high,
+                  moderate=counts.get("moderate", 0),
+                  low=counts.get("low", 0),
+              )
+          )
+          sys.exit(1 if (critical or high) else 0)
+          PY

@@ -15,14 +15,11 @@ description: 'CONTEXT: Bare Metal / AI Infra — before any GPU node can run a w
   it: boot it over the network, probe its hardware, and record what it found. This lab walks through that
   first commission end to end on a single New node.
 
-
   ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin (rack view mirrors power/link state as
   the node boots).
 
-
   SYMPTOM / STARTING STATE: gpu-node-01 has just been added to MAAS and shows status New; it has never
   been commissioned, so MAAS has no hardware inventory — CPU, RAM, disks, NICs, GPUs — for it yet.
-
 
   OBJECTIVE: Open Bare Metal → Machines; select gpu-node-01; Commission it and watch the PXE/hardware-discovery
   steps run; once status reaches Ready, open the machine detail page and confirm the discovered CPU/RAM/disk/NIC

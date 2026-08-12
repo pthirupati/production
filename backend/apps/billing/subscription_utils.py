@@ -13,6 +13,31 @@ GRACE_PERIOD_DAYS = 3  # Read-only window after expiry before full lockout
 TEST_CERTIFICATE_ID = "FIXIT-TEST-ADMIN-CERT-2026"
 
 
+def apply_dunning_status(subscription, sub_status: str) -> dict:
+    """Apply Stripe-like subscription status with a past_due dunning grace.
+
+    ``past_due`` keeps ``is_active`` True so plan limits continue while retries
+    run (same GRACE_PERIOD_DAYS spirit as expiry grace). ``unpaid`` /
+    ``cancelled`` deactivate. Returns a small audit dict for tests/logs.
+    """
+    status = (sub_status or "").strip().lower()
+    if status == "past_due":
+        # Do not hard-kill — dunning / retry window.
+        if not subscription.is_active:
+            subscription.is_active = True
+            subscription.save(update_fields=["is_active"])
+        return {"action": "dunning_grace", "is_active": True, "status": status}
+    if status in ("unpaid", "cancelled", "canceled"):
+        subscription.is_active = False
+        subscription.save(update_fields=["is_active"])
+        return {"action": "deactivate", "is_active": False, "status": status}
+    if status == "active":
+        subscription.is_active = True
+        subscription.save(update_fields=["is_active"])
+        return {"action": "activate", "is_active": True, "status": status}
+    return {"action": "noop", "is_active": bool(subscription.is_active), "status": status}
+
+
 def subscription_expires_at(from_dt=None):
     base = from_dt or timezone.now()
     return base + timedelta(days=SUBSCRIPTION_TERM_DAYS)
@@ -248,17 +273,23 @@ def subscription_status_payload(sub) -> dict:
     in_grace = is_tech_subscription_in_grace(sub)
     days_left = None
     needs_renewal = False
+    # A cancelled subscription keeps access to the end of its paid term
+    # (audit Z1-11), so it is still `active` — but prompting the customer to renew
+    # something they just cancelled would be the wrong message.
+    cancelled = bool(getattr(sub, "cancelled_at", None))
     if sub.expires_at:
         delta = (sub.expires_at - now).days
         days_left = max(0, delta)
-        needs_renewal = active and delta <= RENEWAL_WARNING_DAYS
+        needs_renewal = active and not cancelled and delta <= RENEWAL_WARNING_DAYS
     return {
         "is_active": active,
         "in_grace_period": in_grace,
         "has_access": active or in_grace,
+        "cancelled": cancelled,
+        "cancelled_at": sub.cancelled_at.isoformat() if cancelled else None,
         "created_at": sub.created_at.isoformat() if sub.created_at else None,
         "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
         "days_until_expiry": days_left,
-        "needs_renewal": needs_renewal or in_grace,
+        "needs_renewal": (needs_renewal or in_grace) and not cancelled,
         "is_expired": bool(sub.expires_at and sub.expires_at <= now and not in_grace),
     }

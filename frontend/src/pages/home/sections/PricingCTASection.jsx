@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, CheckCircle2 } from 'lucide-react'
+import { ArrowRight, CheckCircle2 } from '../../../ui/eagerIcons'
 import { blurIn, viewportOnce } from '../../../ui/motion'
 
 export default function PricingCTASection() {

@@ -27,12 +27,59 @@ server {
     gzip_vary on;
     gzip_proxied any;
     gzip_comp_level 6;
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript image/svg+xml;
+    # application/wasm is included because Pyodide's runtime WASM is ~9MB raw and
+    # compresses ~3x. python_stdlib.zip is deliberately NOT listed — it is already
+    # compressed, so gzipping it burns CPU for no gain.
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript image/svg+xml application/wasm;
 
     # Hashed, fingerprinted build assets (Vite) — safe to cache forever.
     location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff2?)$ {
         expires 1y;
         add_header Cache-Control "public, immutable";
+    }
+
+    # ── Self-hosted runtimes: Pyodide (~15MB) and MediaPipe (~13MB) ──
+    # Served same-origin because the production CSP allows scripts only from
+    # 'self' + checkout.razorpay.com. These are version-pinned, immutable
+    # release artifacts, so they cache forever.
+    #
+    # `^~` is required, not cosmetic: a plain prefix location loses to the regex
+    # location above, which would match pyodide.js but NOT .wasm/.zip/.json —
+    # those would fall through to `location /` and its no-store header, forcing
+    # a ~28MB re-download on every single page load.
+    #
+    # The explicit `types` block matters too. This server sends
+    # X-Content-Type-Options: nosniff, and a script or WASM module delivered as
+    # application/octet-stream is rejected outright under strict MIME checking.
+    # A `types` block REPLACES the inherited map for the location, so the text
+    # types have to be restated here — omitting them is what breaks the loader.
+    location ^~ /pyodide/ {
+        types {
+            application/javascript  js mjs;
+            application/json        json;
+            application/wasm        wasm;
+            application/zip         zip;
+        }
+        default_type application/octet-stream;
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        access_log off;
+    }
+
+    location ^~ /vendor/ {
+        types {
+            application/javascript  js;
+            application/json        json;
+            application/wasm        wasm;
+        }
+        # .tflite / .binarypb / .data have no registered type and are fetched via
+        # XHR (not <script>), so the octet-stream default is correct for them.
+        default_type application/octet-stream;
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        access_log off;
     }
 
     # index.html + SPA fallback — NEVER cache. A cached index.html keeps

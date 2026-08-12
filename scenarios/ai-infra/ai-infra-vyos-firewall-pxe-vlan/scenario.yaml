@@ -15,12 +15,9 @@ description: 'CONTEXT: Networking / Bare Metal / DCOps — MAAS PXE enlist stall
   VyOS firewall on the PXE helper VLAN drops TFTP/DHCP/HTTP. AI Infra Engineering owns the
   underlay firewall that Bare Metal enlist depends on.
 
-
   ENVIRONMENT: Lab Terminal VyOS CLI (configure / set / compare / commit / rollback) + Bare Metal.
 
-
   SYMPTOM: New machines never appear; packet captures show drops on the helper VLAN.
-
 
   OBJECTIVE: Enter configure; add firewall name rules allowing PXE helper traffic; compare;
   commit; verify enlist path; FIXED-OK.'

@@ -254,7 +254,7 @@ export default function VmCreateWizard({ hosts, datastores, networks, resourcePo
       <div className="vm-modal w-[560px] max-w-[95vw]">
         <div className="vm-modal-header">
           <span>New Virtual Machine Wizard — Step {step + 1} of 14: {STEPS[step]}</span>
-          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8fa5b8] hover:text-white">✕</button>
         </div>
         <div className="px-4 pt-2">
           <div className="h-1 bg-[#2d3a4a] rounded overflow-hidden">

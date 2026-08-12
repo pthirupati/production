@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell, Gauge, Search, Server, GitBranch,
-  AlertTriangle, XCircle, RefreshCw, Play, Layers,
+  AlertTriangle, XCircle, RefreshCw, Play,
   Compass, Settings, Plug, Plus, Trash2, ChevronUp, ChevronDown, Pencil, ChevronRight, Home, GripVertical,
   ArrowLeft, Terminal, Clock, Share2, Save, X, Copy, SlidersHorizontal,
 } from 'lucide-react'
@@ -13,15 +13,16 @@ import GrafanaExplorePanel from './GrafanaExplorePanel'
 import GrafanaAlertingPanel from './GrafanaAlertingPanel'
 import GrafanaConnectionsPanel from './GrafanaConnectionsPanel'
 import GrafanaAdministrationPanel from './GrafanaAdministrationPanel'
+import { useModalA11y } from '../ConfirmModal'
 import GrafanaIconSidebar from './GrafanaIconSidebar'
 import PrometheusTopNav from './PrometheusTopNav'
 import {
   PROMETHEUS_ALERT_GROUPS, PROMETHEUS_CONFIG_YAML, PROMETHEUS_SERVICE_DISCOVERY,
   PROM_TSDB_TOP_METRICS, PROM_TSDB_TOP_LABELS, PROMETHEUS_FLAGS,
-} from '../../mockData/prometheus'
+} from '../../simFixtures/prometheus'
 import {
   GRAFANA_FOLDERS, GRAFANA_DASHBOARD_BROWSE, GRAFANA_PLAYLISTS, GRAFANA_SNAPSHOTS, GRAFANA_LIBRARY_PANELS,
-} from '../../mockData/grafana'
+} from '../../simFixtures/grafana'
 import '../../styles/monitoring-sim.css'
 import { simShellClass } from '../../utils/simLayout'
 
@@ -117,7 +118,7 @@ function DashPanel({ panel, sessionId, scenario, dashboardUid, noData, editLayou
     >
       <div className="flex items-center justify-between mb-1 gap-2">
         {metaEditing ? (
-          <input className="mon-input flex-1 !text-xs font-semibold" value={titleDraft}
+          <input aria-label="Panel title" className="mon-input flex-1 !text-xs font-semibold" value={titleDraft}
             onChange={(e) => setTitleDraft(e.target.value)} />
         ) : (
           <span className="mon-panel-title flex items-center gap-1.5 min-w-0">
@@ -126,26 +127,26 @@ function DashPanel({ panel, sessionId, scenario, dashboardUid, noData, editLayou
           </span>
         )}
         <div className="flex items-center gap-1 shrink-0">
-          <button type="button" className="mon-btn !p-1" title="Edit panel"
+          <button type="button" className="mon-btn !p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center" aria-label="Edit panel"
             onClick={() => onMutate?.('edit-panel')}><Pencil size={12} /></button>
-          <button type="button" className="mon-btn !p-1" title="Inspect panel data"
+          <button type="button" className="mon-btn !p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center" aria-label="Inspect panel data"
             onClick={() => onMutate?.('inspect-panel')}><Search size={12} /></button>
-          <button type="button" className="mon-btn !p-1" title="More panel actions"
+          <button type="button" className="mon-btn !p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center" aria-label="More panel actions"
             onClick={() => onMutate?.('duplicate-panel')}><Copy size={12} /></button>
           {editLayout && (
             <>
-              <button type="button" className="mon-btn !p-1" title="Move up" disabled={panelIndex === 0}
+              <button type="button" className="mon-btn !p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center" aria-label="Move panel up" disabled={panelIndex === 0}
                 onClick={() => onMutate?.('reorder', { direction: 'up' })}><ChevronUp size={12} /></button>
-              <button type="button" className="mon-btn !p-1" title="Move down" disabled={panelIndex >= panelCount - 1}
+              <button type="button" className="mon-btn !p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center" aria-label="Move panel down" disabled={panelIndex >= panelCount - 1}
                 onClick={() => onMutate?.('reorder', { direction: 'down' })}><ChevronDown size={12} /></button>
-              <button type="button" className="mon-btn !p-1 text-[#ffb4b4]" title="Delete panel"
+              <button type="button" className="mon-btn !p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#ffb4b4]" aria-label="Delete panel"
                 onClick={() => onMutate?.('remove')}><Trash2 size={12} /></button>
-              <button type="button" className="mon-btn !p-1" title="Edit title/type"
+              <button type="button" className="mon-btn !p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center" aria-label="Edit title/type"
                 onClick={() => setMetaEditing((m) => !m)}><Pencil size={12} /></button>
             </>
           )}
           {metaEditing ? (
-            <select className="mon-input !text-[10px] !py-0.5" value={typeDraft} onChange={(e) => setTypeDraft(e.target.value)}>
+            <select aria-label="Panel visualization type" className="mon-input !text-[10px] !py-0.5" value={typeDraft} onChange={(e) => setTypeDraft(e.target.value)}>
               {['timeseries', 'stat', 'gauge', 'table'].map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           ) : (
@@ -183,7 +184,7 @@ function DashPanel({ panel, sessionId, scenario, dashboardUid, noData, editLayou
       <div className="mon-code mt-2 !text-[10px] !py-1.5 opacity-80">
         {editing ? (
           <div className="space-y-1">
-            <input className="mon-input w-full font-mono !text-[10px]" value={exprDraft}
+            <input aria-label="PromQL query" className="mon-input w-full font-mono !text-[10px]" value={exprDraft}
               onChange={(e) => setExprDraft(e.target.value)} />
             <div className="flex gap-1">
               <button type="button" className="mon-btn !text-[10px] !py-0.5" disabled={saving}
@@ -252,10 +253,10 @@ function GrafanaTimePicker({ range, refresh, open, onToggle, onRange, onRefresh,
             <div className="p-3 space-y-3">
               <div>
                 <div className="mon-panel-title text-sm mb-2">Absolute time range</div>
-                <label className="block text-[10px] text-[#8a93b2] mb-1">From</label>
-                <input className="mon-input w-full !text-xs mb-2" value="2026-06-28 03:00:00" readOnly />
-                <label className="block text-[10px] text-[#8a93b2] mb-1">To</label>
-                <input className="mon-input w-full !text-xs" value="now" readOnly />
+                <label htmlFor="mon-abs-from" className="block text-[10px] text-[#8a93b2] mb-1">From</label>
+                <input id="mon-abs-from" className="mon-input w-full !text-xs mb-2" value="2026-06-28 03:00:00" readOnly />
+                <label htmlFor="mon-abs-to" className="block text-[10px] text-[#8a93b2] mb-1">To</label>
+                <input id="mon-abs-to" className="mon-input w-full !text-xs" value="now" readOnly />
               </div>
               <div>
                 <div className="mon-panel-title text-sm mb-2">Refresh interval</div>
@@ -294,6 +295,7 @@ function GrafanaPanelEditor({ panel, dashboardUid, sessionId, onClose, onReload 
     alertName: `${panel?.title || 'Panel'} threshold`,
   }))
   const [saving, setSaving] = useState(false)
+  const editorRef = useModalA11y(!!panel, onClose)
 
   if (!panel) return null
 
@@ -317,7 +319,14 @@ function GrafanaPanelEditor({ panel, dashboardUid, sessionId, onClose, onReload 
 
   return (
     <div className="fixed inset-0 z-[1000] bg-black/70 flex items-stretch justify-center p-4">
-      <div className="w-full max-w-6xl bg-[#111217] border border-[#30324a] rounded-lg shadow-2xl overflow-hidden flex flex-col">
+      <div
+        ref={editorRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit panel"
+        className="w-full max-w-6xl bg-[#111217] border border-[#30324a] rounded-lg shadow-2xl overflow-hidden flex flex-col outline-none"
+      >
         <div className="px-4 py-3 border-b border-[#30324a] flex items-center gap-3">
           <div>
             <div className="text-white font-semibold">Edit panel</div>
@@ -327,7 +336,7 @@ function GrafanaPanelEditor({ panel, dashboardUid, sessionId, onClose, onReload 
           <button type="button" className="mon-btn !text-xs flex items-center gap-1" disabled={saving} onClick={save}>
             <Save size={13} /> Save
           </button>
-          <button type="button" className="mon-btn !p-1.5" onClick={onClose}><X size={14} /></button>
+          <button type="button" aria-label="Close panel editor" className="mon-btn !p-1.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center" onClick={onClose}><X size={14} /></button>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_330px] min-h-0 flex-1">
           <div className="p-4 overflow-auto">
@@ -356,10 +365,10 @@ function GrafanaPanelEditor({ panel, dashboardUid, sessionId, onClose, onReload 
                     <div className="mon-panel-title text-sm">Query A</div>
                     <span className="text-[10px] text-[#8a93b2]">Data source: Prometheus</span>
                   </div>
-                  <label className="block text-[10px] text-[#8a93b2] mb-1">Legend</label>
-                  <input className="mon-input w-full mb-2" value="{{instance}}" readOnly />
-                  <label className="block text-[10px] text-[#8a93b2] mb-1">PromQL</label>
-                  <textarea className="mon-input w-full font-mono min-h-[90px]" value={draft.expr}
+                  <label htmlFor="mon-legend" className="block text-[10px] text-[#8a93b2] mb-1">Legend</label>
+                  <input id="mon-legend" className="mon-input w-full mb-2" value="{{instance}}" readOnly />
+                  <label htmlFor="mon-promql" className="block text-[10px] text-[#8a93b2] mb-1">PromQL</label>
+                  <textarea id="mon-promql" className="mon-input w-full font-mono min-h-[90px]" value={draft.expr}
                     onChange={(e) => setDraft((d) => ({ ...d, expr: e.target.value }))} />
                   <div className="grid sm:grid-cols-4 gap-2 mt-3">
                     {['rate', 'sum', 'avg', 'by label'].map((op) => <button key={op} type="button" className="mon-tab !text-[11px]">{op}</button>)}
@@ -375,7 +384,7 @@ function GrafanaPanelEditor({ panel, dashboardUid, sessionId, onClose, onReload 
             {tab === 'transform' && (
               <div className="mon-card">
                 <div className="mon-panel-title text-sm mb-3">Transformations</div>
-                <select className="mon-input w-full mb-3" value={draft.transform}
+                <select aria-label="Transformation" className="mon-input w-full mb-3" value={draft.transform}
                   onChange={(e) => setDraft((d) => ({ ...d, transform: e.target.value }))}>
                   {GRAFANA_TRANSFORMS.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -389,15 +398,15 @@ function GrafanaPanelEditor({ panel, dashboardUid, sessionId, onClose, onReload 
             {tab === 'alert' && (
               <div className="mon-card space-y-3">
                 <div className="mon-panel-title text-sm">Alert rule</div>
-                <input className="mon-input w-full" value={draft.alertName}
+                <input aria-label="Alert rule name" className="mon-input w-full" value={draft.alertName}
                   onChange={(e) => setDraft((d) => ({ ...d, alertName: e.target.value }))} />
                 <div className="grid sm:grid-cols-3 gap-2">
-                  <select className="mon-input"><option>IS ABOVE</option><option>IS BELOW</option><option>OUTSIDE RANGE</option></select>
-                  <input className="mon-input" value={draft.threshold}
+                  <select aria-label="Alert condition" className="mon-input"><option>IS ABOVE</option><option>IS BELOW</option><option>OUTSIDE RANGE</option></select>
+                  <input aria-label="Alert threshold" className="mon-input" value={draft.threshold}
                     onChange={(e) => setDraft((d) => ({ ...d, threshold: e.target.value }))} />
-                  <select className="mon-input"><option>for 5m</option><option>for 10m</option><option>for 1h</option></select>
+                  <select aria-label="Alert pending period" className="mon-input"><option>for 5m</option><option>for 10m</option><option>for 1h</option></select>
                 </div>
-                <textarea className="mon-input w-full min-h-[70px]" value="Summary: panel threshold exceeded\nRunbook URL: https://runbooks.fixitlab.io/monitoring" readOnly />
+                <textarea aria-label="Alert annotations" className="mon-input w-full min-h-[70px]" value="Summary: panel threshold exceeded\nRunbook URL: https://runbooks.fixitlab.io/monitoring" readOnly />
               </div>
             )}
           </div>
@@ -434,11 +443,11 @@ function GrafanaPanelEditor({ panel, dashboardUid, sessionId, onClose, onReload 
                 <div className="text-xs font-semibold mb-2 text-[#d8def0]">Thresholds</div>
                 <div className="flex items-center gap-2">
                   <span className="w-4 h-4 rounded bg-green-500" />
-                  <input className="mon-input flex-1 !py-1" value="Base" readOnly />
+                  <input aria-label="Base threshold" className="mon-input flex-1 !py-1" value="Base" readOnly />
                 </div>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="w-4 h-4 rounded bg-red-500" />
-                  <input className="mon-input flex-1 !py-1" value={draft.threshold}
+                  <input aria-label="Threshold value" className="mon-input flex-1 !py-1" value={draft.threshold}
                     onChange={(e) => setDraft((d) => ({ ...d, threshold: e.target.value }))} />
                 </div>
               </div>
@@ -765,7 +774,7 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
                 <div className="min-w-0">
                   <div className="text-lg font-semibold text-[#d8def0] flex items-center gap-2">
                     {dash.title}
-                    <button type="button" className="text-[#8a93b2] hover:text-[#f7913b]" title="Star dashboard">★</button>
+                    <button type="button" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[#8a93b2] hover:text-[#f7913b]" title="Star dashboard" aria-label="Star dashboard">★</button>
                   </div>
                   <div className="text-[11px] text-[#8a93b2]">Folder: {dash.folder || 'General'} · UID: {dash.uid}</div>
                 </div>
@@ -791,7 +800,7 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
                   onRefresh={(r) => setRefreshInterval(r)}
                   onReload={() => { setTimePickerOpen(false); onReload?.() }}
                 />
-                <button type="button" className="mon-tab !p-2" title="Refresh dashboard" onClick={onReload}>
+                <button type="button" aria-label="Refresh dashboard" className="mon-tab !p-2" title="Refresh dashboard" onClick={onReload}>
                   <RefreshCw size={13} />
                 </button>
                 <button type="button" className={`mon-tab ${editLayout ? 'mon-tab-active' : ''}`}
@@ -816,11 +825,11 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
             {adding && (
               <div className="mon-card mb-3 space-y-2">
                 <p className="mon-panel-title text-sm">New panel</p>
-                <input className="mon-input w-full" placeholder="Title" value={newPanel.title}
+                <input aria-label="New panel title" className="mon-input w-full" placeholder="Title" value={newPanel.title}
                   onChange={(e) => setNewPanel((p) => ({ ...p, title: e.target.value }))} />
-                <input className="mon-input w-full font-mono text-xs" placeholder="PromQL expr" value={newPanel.expr}
+                <input aria-label="New panel PromQL expression" className="mon-input w-full font-mono text-xs" placeholder="PromQL expr" value={newPanel.expr}
                   onChange={(e) => setNewPanel((p) => ({ ...p, expr: e.target.value }))} />
-                <select className="mon-input w-full" value={newPanel.type}
+                <select aria-label="New panel visualization type" className="mon-input w-full" value={newPanel.type}
                   onChange={(e) => setNewPanel((p) => ({ ...p, type: e.target.value }))}>
                   {['timeseries', 'stat', 'gauge', 'table'].map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -836,7 +845,7 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
                 {dash.templating.map(v => (
                   <label key={v.name} className="flex items-center gap-1.5 text-xs text-[#8a93b2]">
                     {v.label || v.name}:
-                    <select className="mon-input !py-1 !text-xs" defaultValue={v.current}>
+                    <select aria-label={`Variable ${v.label || v.name}`} className="mon-input !py-1 !text-xs" defaultValue={v.current}>
                       {(v.options || []).map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                   </label>
@@ -1222,7 +1231,7 @@ function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload, state }) 
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="text-sm font-semibold text-gray-800">Command-Line Flags</div>
-          <input className="mon-input bg-white !text-gray-800 !w-64" placeholder="Filter by flag name…" value={flagFilter}
+          <input aria-label="Filter by flag name" className="mon-input bg-white !text-gray-800 !w-64" placeholder="Filter by flag name…" value={flagFilter}
             onChange={(e) => setFlagFilter(e.target.value)} />
         </div>
         <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
@@ -1347,11 +1356,11 @@ function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload, state }) 
           </button>
         </div>
         <div className="mon-card bg-white !border-gray-200 p-3 grid sm:grid-cols-4 gap-2">
-          <input className="mon-input bg-white !text-gray-800" placeholder="Group" value={newRule.group}
+          <input aria-label="Rule group" className="mon-input bg-white !text-gray-800" placeholder="Group" value={newRule.group}
             onChange={(e) => setNewRule((p) => ({ ...p, group: e.target.value }))} />
-          <input className="mon-input bg-white !text-gray-800" placeholder="Alert name" value={newRule.name}
+          <input aria-label="Alert name" className="mon-input bg-white !text-gray-800" placeholder="Alert name" value={newRule.name}
             onChange={(e) => setNewRule((p) => ({ ...p, name: e.target.value }))} />
-          <input className="mon-input bg-white !text-gray-800 font-mono text-xs sm:col-span-2" placeholder="PromQL expr" value={newRule.expr}
+          <input aria-label="Rule PromQL expression" className="mon-input bg-white !text-gray-800 font-mono text-xs sm:col-span-2" placeholder="PromQL expr" value={newRule.expr}
             onChange={(e) => setNewRule((p) => ({ ...p, expr: e.target.value }))} />
         </div>
         <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
@@ -1391,9 +1400,9 @@ function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload, state }) 
         </button>
       </div>
       <div className="mon-card bg-white !border-gray-200 p-3 grid sm:grid-cols-3 gap-2">
-        <input className="mon-input bg-white !text-gray-800" placeholder="Job" value={newTarget.job}
+        <input aria-label="Scrape target job" className="mon-input bg-white !text-gray-800" placeholder="Job" value={newTarget.job}
           onChange={(e) => setNewTarget((p) => ({ ...p, job: e.target.value }))} />
-        <input className="mon-input bg-white !text-gray-800 font-mono text-xs sm:col-span-2" placeholder="http://host:port/metrics"
+        <input aria-label="Scrape target metrics URL" className="mon-input bg-white !text-gray-800 font-mono text-xs sm:col-span-2" placeholder="http://host:port/metrics"
           value={newTarget.url} onChange={(e) => setNewTarget((p) => ({ ...p, url: e.target.value }))} />
       </div>
       <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
@@ -1454,7 +1463,7 @@ function PromQueryGraph({ result }) {
 }
 
 /* ── Prometheus view ── */
-function PrometheusView({ state, sessionId, scenario, defaultExpr, activeNav, statusSub = 'targets', onReload }) {
+function PrometheusView({ state, sessionId, scenario: _scenario, defaultExpr, activeNav, statusSub = 'targets', onReload }) {
   const prom = state.prometheus || {}
   const externalNav = activeNav != null
   const [sub, setSub] = useState('query')
@@ -1517,7 +1526,7 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr, activeNav, st
       {(showGraph || (!externalNav && sub === 'query')) && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <input className="mon-input flex-1 font-mono bg-white !text-gray-800 !border-gray-300" value={expr} spellCheck={false}
+            <input aria-label="PromQL expression" className="mon-input flex-1 font-mono bg-white !text-gray-800 !border-gray-300" value={expr} spellCheck={false}
                    onChange={e => setExpr(e.target.value)}
                    onKeyDown={e => { if (e.key === 'Enter') runQuery() }}
                    placeholder="Enter a PromQL expression…" />
@@ -1679,7 +1688,7 @@ export default function MonitoringSimulator({
       const data = await monitoringApi.getState(sessionId, slug)
       setState(data)
       setError('')
-    } catch (e) {
+    } catch {
       setError('Could not load the monitoring console')
     }
   }, [sessionId, slug])

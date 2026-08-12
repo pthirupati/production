@@ -7,14 +7,20 @@
 export const PUBLIC_NAV_PRIMARY = [
   { to: '/pricing', label: 'Pricing' },
   { to: '/tutorials', label: 'Tutorials' },
+  { to: '/journeys', label: 'Journeys' },
+  { to: '/projects', label: 'Projects' },
   { to: '/certifications', label: 'Certifications' },
   { to: '/mock-interviews', label: 'AI Interviews' },
   { to: '/verify-certificate', label: 'Verify Certificate' },
   { to: '/#tech', label: 'Technologies' },
 ]
 
+// NOTE: '/simulators' ("Lab Consoles") deliberately does NOT belong here. The
+// route lives inside the authenticated MainLayout and every card on that page
+// links to an authenticated /technologies/:slug, so advertising it to anonymous
+// visitors only bounced them to /login. It is reachable from the authenticated
+// sidebar instead — see navItems in components/layout/MainLayout.jsx.
 export const PUBLIC_NAV_SECONDARY = [
-  { to: '/simulators', label: 'Lab Consoles' },
   { to: '/about', label: 'About' },
   { to: '/blog', label: 'Blog' },
   { to: '/changelog', label: 'Changelog' },

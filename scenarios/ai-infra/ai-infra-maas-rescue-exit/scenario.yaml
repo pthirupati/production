@@ -15,13 +15,10 @@ description: 'CONTEXT: Bare Metal / AI Infra — gpu-node-01 was put into Rescue
   the engineer who ran the diagnostic forgot to exit; the node has been stuck in Rescue mode since and
   cannot serve workloads while in that state.
 
-
   ENVIRONMENT: Bare Metal (MAAS) + Lab Terminal + Datacenter twin.
-
 
   SYMPTOM: Node status is Rescue mode; the previously Deployed OS is not receiving traffic; nothing else
   in MAAS is broken — the node just needs to leave Rescue and come back to its prior Deployed state.
-
 
   OBJECTIVE: From Bare Metal, exit Rescue mode on gpu-node-01; confirm on Lab Terminal that the node has
   rebooted back into the deployed OS rather than the rescue shell; confirm MAAS status is Deployed again;

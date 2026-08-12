@@ -15,13 +15,10 @@ description: 'CONTEXT: ImageDev — before publishing to MAAS, inspect the Packe
   qcow2 with libguestfs (guestfish / virt-inspect / virt-customize). Catch missing NVIDIA
   modules or wrong kernel before fleet deploy.
 
-
   ENVIRONMENT: Lab Terminal with Packer + libguestfs tools. Bare Metal Images for publish.
-
 
   SYMPTOM: Artifact built; not yet published. Must inspect and virt-customize a marker,
   then publish custom/h100-jammy.
-
 
   OBJECTIVE: Run virt-inspect/guestfish on the artifact; virt-customize as needed; Publish
   to MAAS; FIXED-OK.'

@@ -151,7 +151,7 @@ function AddRolesWizard({ onClose }) {
   const [page, setPage] = useState(1)
   const [checked, setChecked] = useState(() => new Set(os.roles.filter((r) => r.installed).map((r) => r.name)))
   const [installing, setInstalling] = useState(false)
-  const [done, setDone] = useState(false)
+  const [, setDone] = useState(false)
   const pages = ['Before You Begin', 'Installation Type', 'Server Selection', 'Server Roles', 'Features', 'Confirmation', 'Results']
   const FEATURES = ['.NET Framework 3.5 Features', '.NET Framework 4.8 Features', 'BitLocker Drive Encryption', 'Data Center Bridging', 'Failover Clustering', 'Group Policy Management', 'Network Load Balancing', 'Remote Server Administration Tools', 'SMB 1.0/CIFS File Sharing Support', 'SNMP Service', 'Telnet Client', 'Windows PowerShell', 'Windows Server Backup', 'WoW64 Support']
   const DEFAULT_FEATURES = new Set(['Group Policy Management', '.NET Framework 4.8 Features', 'Windows PowerShell', 'WoW64 Support', 'Remote Server Administration Tools'])

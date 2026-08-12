@@ -286,6 +286,15 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
         out = self.shell.run(line)
         if out == "__REBOOT__":
             return self._reboot_from_shell()
+        # Z5-1 write-through: keep Redis/cache hot after every mutating command
+        # so another uvicorn worker can rehydrate without waiting on DB debounce.
+        try:
+            sid = getattr(self.shell.state, "session_id", "") or ""
+            if sid:
+                from .sim_persistence import cache_touch_engine
+                cache_touch_engine(sid, engine=self)
+        except Exception:
+            pass
         if self.boot:
             patch = self.boot.run_patch_command(line)
             if patch:

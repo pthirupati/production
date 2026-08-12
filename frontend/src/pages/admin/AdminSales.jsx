@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
+import { useModalA11y } from '../../components/ConfirmModal'
 import { X, Save, Building2, Mail, Phone, Users, Tag, ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -25,6 +26,9 @@ export default function AdminSales() {
     custom_quote_notes: '', custom_quote_valid_until: '',
   })
   const [saving, setSaving] = useState(false)
+
+  const closeEdit = () => setEditing(null)
+  const editDialogRef = useModalA11y(!!editing, closeEdit)
 
   useEffect(() => { loadData() }, [filter])
 
@@ -192,14 +196,21 @@ export default function AdminSales() {
       {/* Quote / status editor modal */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditing(null)} />
-          <div className="relative w-full max-w-lg glass-card p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeEdit} />
+          <div
+            ref={editDialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Edit inquiry ${editing.organization}`}
+            className="relative w-full max-w-lg glass-card p-6 space-y-4 max-h-[90vh] overflow-y-auto outline-none"
+          >
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-white">{editing.organization}</h2>
                 <p className="text-xs text-surface-500">{editing.full_name} &middot; {editing.work_email}</p>
               </div>
-              <button onClick={() => setEditing(null)} className="text-surface-400 hover:text-white"><X size={18} /></button>
+              <button type="button" onClick={closeEdit} aria-label="Close inquiry editor" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400 hover:text-white"><X size={18} /></button>
             </div>
 
             {editing.message && (

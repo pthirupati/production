@@ -1,9 +1,12 @@
 import PublicLayout from '../components/layout/PublicLayout'
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
-import { ScrollText, AlertCircle, CreditCard, UserX, Scale, Shield, ExternalLink } from 'lucide-react'
+import { AlertCircle, CreditCard, UserX, Scale, Shield, ExternalLink } from 'lucide-react'
+import { usePageTitle } from '../hooks/usePageTitle'
+import { PRIMARY_EMAIL } from '../constants/contact'
 
 export default function Terms() {
+  usePageTitle('Terms of Service', 'The terms governing use of FixitLab labs, subscriptions and AI interviews.')
   const sections = [
     {
       icon: Scale,
@@ -32,6 +35,7 @@ export default function Terms() {
               'Not attempt to circumvent security measures or access controls',
               'Not share your account credentials with others',
               'Comply with all applicable laws and regulations',
+              'Follow the Acceptable Use Policy (/acceptable-use)',
             ].map((item, i) => (
               <li key={i} className="flex items-start gap-3 text-surface-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-accent-cyan mt-2 shrink-0" />
@@ -55,6 +59,7 @@ export default function Terms() {
             'Bank OTP, 3D Secure, and UPI authentication are handled entirely by the payment gateway',
             'FixitLab never stores your card number, CVV, or UPI PIN — only payment confirmation IDs',
             'Refund requests must be made within 7 days of purchase',
+            'See the Refunds & Cancellation policy (/refunds) for the full refund and cancellation rules',
             'We reserve the right to modify pricing with 30 days notice',
           ].map((item, i) => (
             <li key={i} className="flex items-start gap-3 text-surface-300">
@@ -167,9 +172,18 @@ export default function Terms() {
             <h2 className="text-xl font-bold text-white mb-4">7. Contact</h2>
             <p className="text-surface-300 leading-relaxed">
               Questions about these terms? Contact us at{' '}
-              <a href="mailto:fixitlab.admin@gmail.com" className="inline-flex items-center gap-1 text-accent-cyan hover:underline font-medium">
-                fixitlab.admin@gmail.com <ExternalLink size={12} />
+              <a href={`mailto:${PRIMARY_EMAIL}`} className="inline-flex items-center gap-1 text-accent-cyan hover:underline font-medium">
+                {PRIMARY_EMAIL} <ExternalLink size={12} />
               </a>
+              . Refund and cancellation rules are published at{' '}
+              <a href="/refunds" className="text-accent-cyan hover:underline font-medium">
+                /refunds
+              </a>
+              . Acceptable use is at{' '}
+              <a href="/acceptable-use" className="text-accent-cyan hover:underline font-medium">
+                /acceptable-use
+              </a>
+              .
             </p>
           </FixitPanel>
         </div>

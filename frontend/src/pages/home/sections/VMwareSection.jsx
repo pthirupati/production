@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Server, Layers, Zap, Wrench, LineChart } from 'lucide-react'
+import { ArrowRight, Server, Layers, Zap, Wrench, LineChart } from '../../../ui/eagerIcons'
 import VMwareShowcase from '../components/VMwareShowcase'
 import { fadeLeft, fadeRight, viewportOnce } from '../../../ui/motion'
 

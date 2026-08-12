@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bot, Zap, Sparkles, Wrench, Plug, Shuffle, GitBranch, Flag,
-  Play, RefreshCw, ArrowLeft, StopCircle, Lightbulb, XCircle, AlertTriangle,
+  Play, RefreshCw, XCircle, AlertTriangle,
   CheckCircle2, Target, Trash2, Plus, Link2, Settings2, Activity, X, ChevronRight,
 } from 'lucide-react'
 import { aimlApi } from '../../api/aiml'
 import LabChromeBar from '../lab/LabChromeBar'
 import { renderAimlV2Page } from '../sim/V3PlatformPanels'
 import '../../styles/sim-products.css'
+
+// Stable fallbacks for absent server state. A bare `|| []` mints a new identity
+// every render, so the `byId` node-index memo below never hit while this sim
+// polls. Frozen so an accidental in-place mutation throws rather than silently
+// corrupting the fallback for every other consumer.
+const EMPTY_OBJ = Object.freeze({})
+const EMPTY_ARR = Object.freeze([])
+// `graph` is consumed as a shaped object, so its fallback needs the shape.
+const EMPTY_GRAPH = Object.freeze({ nodes: EMPTY_ARR, edges: EMPTY_ARR })
 
 /* ── scoped, self-contained n8n-style automation chrome (no shared CSS) ── */
 const SCOPED_CSS = `
@@ -270,8 +279,10 @@ function NodeCard({ node, selected, connectSrc, runStatus, onSelect, onDragStart
         </div>
         {node.type !== 'trigger' && (
           <button
-            className="text-[var(--ag-muted)] hover:text-[var(--ag-red)]"
+            type="button"
+            className="text-[var(--ag-muted)] hover:text-[var(--ag-red)] min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
             title="Delete node"
+            aria-label="Delete node"
             onClick={(e) => { e.stopPropagation(); onDelete(node.id) }}
           ><Trash2 size={13} /></button>
         )}
@@ -325,13 +336,13 @@ export default function AgentWorkflowSimulator({
     return () => clearInterval(pollRef.current)
   }, [load])
 
-  const graph = state?.graph || { nodes: [], edges: [] }
-  const nodes = graph.nodes || []
-  const edges = graph.edges || []
-  const palette = state?.palette || []
-  const catalog = state?.catalog || {}
-  const goal = state?.goal || {}
-  const summary = state?.summary || {}
+  const graph = state?.graph || EMPTY_GRAPH
+  const nodes = graph.nodes || EMPTY_ARR
+  const edges = graph.edges || EMPTY_ARR
+  const palette = state?.palette || EMPTY_ARR
+  const catalog = state?.catalog || EMPTY_OBJ
+  const goal = state?.goal || EMPTY_OBJ
+  const summary = state?.summary || EMPTY_OBJ
   const lastRun = state?.last_run || null
   const selected = nodes.find(n => n.id === selectedId) || null
   const validationPassed = !!summary.validation_passed
@@ -339,10 +350,10 @@ export default function AgentWorkflowSimulator({
   // map node_id -> run status for the canvas glow
   const runStatusById = useMemo(() => {
     const m = {}
-    for (const t of (lastRun?.trace || [])) m[t.node_id] = t.status
+    for (const t of (lastRun?.trace || EMPTY_ARR)) m[t.node_id] = t.status
     return m
   }, [lastRun])
-  const traceVisited = useMemo(() => new Set((lastRun?.visited) || []), [lastRun])
+  const traceVisited = useMemo(() => new Set((lastRun?.visited) || EMPTY_ARR), [lastRun])
 
   /* ── action helpers (optimistic refresh from the action response state) ── */
   const applyResult = useCallback((res) => {
@@ -508,7 +519,7 @@ export default function AgentWorkflowSimulator({
             <button type="button" className="lab-chrome-btn" disabled={running} onClick={runWorkflow}>
               {running ? <RefreshCw size={13} className="animate-spin" /> : <Play size={13} />} Run
             </button>
-            <button type="button" className="lab-chrome-btn" onClick={load}><RefreshCw size={13} /></button>
+            <button type="button" className="lab-chrome-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" onClick={load} title="Refresh" aria-label="Refresh workflow"><RefreshCw size={13} /></button>
             <button type="button" className="lab-chrome-btn" onClick={resetGraph} disabled={busy}>Reset</button>
           </>
         )}
@@ -740,7 +751,7 @@ function ConfigPanel({ node, edges, nodes, catalog, onConfigure, onDisconnect, o
           </span>
           {meta.label} · {node.id}
         </div>
-        <button className="text-[var(--ag-muted)] hover:text-white" onClick={onClose}><X size={14} /></button>
+        <button type="button" className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[var(--ag-muted)] hover:text-white" onClick={onClose} aria-label="Close node editor"><X size={14} /></button>
       </div>
 
       <div className="space-y-2.5">
@@ -865,8 +876,10 @@ function ConfigPanel({ node, edges, nodes, catalog, onConfigure, onDisconnect, o
                 <span className="flex-1 min-w-0 truncate">{byId[e.to]?.label || e.to}</span>
                 {node.type === 'condition' && (
                   <button
+                    type="button"
                     className="ag-badge ag-b-branch"
                     title="Flip the branch this edge fires on"
+                    aria-label={`Flip branch (currently ${e.branch || 'any'})`}
                     onClick={() => {
                       const next = e.branch === 'true' ? 'false' : 'true'
                       onDisconnect(node.id, e.to, e.branch)
@@ -874,8 +887,9 @@ function ConfigPanel({ node, edges, nodes, catalog, onConfigure, onDisconnect, o
                     }}
                   ><GitBranch size={10} /> {e.branch || 'any'}</button>
                 )}
-                <button className="text-[var(--ag-muted)] hover:text-[var(--ag-red)]"
+                <button type="button" className="text-[var(--ag-muted)] hover:text-[var(--ag-red)] min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
                         title="Remove this connection"
+                        aria-label="Remove connection"
                         onClick={() => onDisconnect(node.id, e.to, e.branch)}>
                   <Trash2 size={12} />
                 </button>

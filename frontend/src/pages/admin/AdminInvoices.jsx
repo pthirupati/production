@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/admin'
 import { AdminPageHeader } from '../../components/design'
-import { FileText, Download, Search, IndianRupee } from 'lucide-react'
+import { Download, Search, IndianRupee } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function AdminInvoices() {

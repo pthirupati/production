@@ -154,15 +154,26 @@ _TECH_GROUPS = {
 }
 
 
-def resolve_lab_context(page_path: str) -> dict:
+def resolve_lab_context(page_path: str, user=None) -> dict:
     """Best-effort lookup of the scenario/technology behind a ``/lab/<id>`` path.
 
     Returns a dict with ``scenario_slug``, ``technology_slug``, ``scenario_title``
     and a derived ``group`` (vmware/linux/kubernetes/docker/network/...). All keys
     are empty strings when no context is available. Never raises.
+
+    SECURITY (audit Z3-9): ``page_path`` is supplied by the caller on an
+    ``AllowAny`` endpoint, and this used to look the session up by id ALONE. Anyone
+    holding a session UUID — including an anonymous caller — got back that session's
+    scenario slug, title and technology. UUID4 makes it unguessable, so the impact is
+    small, but "unguessable" is not an access control: the id leaks through logs,
+    screenshots, shared URLs and referrers. The lookup is now scoped to the
+    requesting user, and an unauthenticated caller gets no context at all rather
+    than someone else's.
     """
     ctx = {"scenario_slug": "", "technology_slug": "", "scenario_title": "", "group": ""}
     if not page_path:
+        return ctx
+    if user is None or not getattr(user, "is_authenticated", False):
         return ctx
     match = _SESSION_PATH_RE.search(page_path)
     if not match:
@@ -172,7 +183,7 @@ def resolve_lab_context(page_path: str) -> dict:
         from apps.labs.models import LabSession
 
         session = (
-            LabSession.objects.filter(id=session_id)
+            LabSession.objects.filter(id=session_id, user=user)
             .select_related("scenario", "scenario__technology")
             .first()
         )
@@ -1037,6 +1048,7 @@ def generate_support_reply(
     *,
     is_authenticated: bool = False,
     page_path: str = "",
+    user=None,
 ) -> dict:
     """Return assistant reply with optional follow-up suggestions.
 
@@ -1056,7 +1068,7 @@ def generate_support_reply(
 
     # Context: scenario/technology behind the current lab session, plus any
     # technology group implied by the user's own wording.
-    ctx = resolve_lab_context(page_path)
+    ctx = resolve_lab_context(page_path, user=user)
     group = ctx.get("group") or _detect_group(text)
 
     # 1. Lab ticket *actions* still belong to the Jira team bots.

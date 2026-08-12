@@ -295,6 +295,106 @@ class DatacenterFacilityTests(SimpleTestCase):
         self.assertEqual(r2["bmc"]["virtual_media"]["image"], "ubuntu-22.04.iso")
 
 
+class ThermalLoadCouplingTests(SimpleTestCase):
+    """Load must actually drive power and temperature (audit L2263).
+
+    Before this coupling every rack PDU was a hardcoded 4.2 kW and sensor
+    drift was a sine wave around a constant, so a cooling failure could not
+    make the hall hot and PUE never moved.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.session_id = str(uuid.uuid4())
+        self.addCleanup(cache.clear)
+
+    def test_rack_load_varies_by_what_is_racked(self):
+        state = dc.get_state(self.session_id)["state"]
+        # Dual-feed PDUs: take the busiest feed per rack (B is often idle at 0).
+        pdus = {}
+        for p in state["power_chain"]["rack_pdus"]:
+            rack = p["rack"]
+            kw = float(p.get("load_kw") or 0)
+            if kw >= float(pdus.get(rack) or 0):
+                pdus[rack] = kw
+        # R03 holds the GPU node; R06 holds a single cache node.
+        self.assertGreater(pdus["R03"], pdus["R06"])
+        # Empty data-hall racks draw nothing at all.
+        self.assertEqual(pdus["R07"], 0.0)
+        self.assertGreater(len({round(v, 2) for v in pdus.values()}), 1)
+
+    def test_powering_off_a_server_lowers_it_load(self):
+        state = dc.get_state(self.session_id)["state"]
+        before = state["facility"]["it_kw"]
+        r = dc.apply_action(self.session_id, "bmc_power", {"asset_id": "srv-r03-u08", "mode": "off"})
+        self.assertTrue(r["ok"], r)
+        after = dc.get_state(self.session_id)["state"]["facility"]["it_kw"]
+        self.assertLess(after, before)
+
+    def test_pue_stays_in_band_and_cooling_tracks_load(self):
+        state = dc.get_state(self.session_id)["state"]
+        facility = state["facility"]
+        self.assertGreaterEqual(facility["pue"], 1.0)
+        self.assertLessEqual(facility["pue"], 2.0)
+        self.assertGreater(facility["cooling_kw"], 0)
+
+    def test_cooling_loss_raises_hall_temperature(self):
+        from apps.vmware_sim.datacenter_facility_ops import thermal_baseline, tick_live
+
+        state = dc.get_state(self.session_id)["state"]
+        baseline = thermal_baseline(state)
+        self.assertEqual(baseline["deficit_kw"], 0.0)
+
+        # Kill all cooling: every IT kW is now unrejected heat.
+        for c in state["cooling"]:
+            c["status"] = "off"
+        hot = thermal_baseline(state)
+        self.assertGreater(hot["deficit_kw"], 0.0)
+        self.assertGreater(hot["cold_aisle_c"], baseline["cold_aisle_c"] + 5)
+
+        # The sensors must follow, and an inlet over ASHRAE A1 must alarm.
+        env = tick_live(state)
+        cold = next(s for s in env["sensors"] if s["location"] == "Cold aisle A")
+        self.assertGreater(cold["temp_c"], 32.0)
+        self.assertEqual(cold["status"], "alarm")
+
+    def test_alarmed_sensor_keeps_escalating(self):
+        """A hotspot in alarm must not freeze at the value that tripped it."""
+        from apps.vmware_sim.datacenter_facility_ops import tick_live
+
+        state = dc.get_state(self.session_id)["state"]
+        for c in state["cooling"]:
+            c["status"] = "off"
+        env = tick_live(state)
+        cold = next(s for s in env["sensors"] if s["location"] == "Cold aisle A")
+        self.assertEqual(cold["status"], "alarm")
+        first = cold["temp_c"]
+
+        # Rack more load while the sensor is already alarming.
+        for srv in state["servers"]:
+            srv["power_state"] = "on"
+        dc._recompute_facility(state)
+        env = tick_live(state)
+        cold = next(s for s in env["sensors"] if s["location"] == "Cold aisle A")
+        self.assertGreater(cold["temp_c"], first)
+
+    def test_bmc_inlet_follows_the_hall_not_its_own_last_value(self):
+        from apps.vmware_sim.datacenter_facility_ops import tick_live
+
+        state = dc.get_state(self.session_id)["state"]
+        tick_live(state)
+        srv = next(s for s in state["servers"] if s["power_state"] == "on")
+        cool_inlet = srv["bmc"]["sensors"]["inlet_c"]
+
+        for c in state["cooling"]:
+            c["status"] = "off"
+        tick_live(state)
+        srv = next(s for s in state["servers"] if s["id"] == srv["id"])
+        self.assertGreater(srv["bmc"]["sensors"]["inlet_c"], cool_inlet + 5)
+        # Fans ramp against the hot inlet.
+        self.assertGreater(srv["bmc"]["sensors"]["fans_rpm"], 7300)
+
+
 class CampusPlantOpsTests(SimpleTestCase):
     def setUp(self):
         cache.clear()
@@ -359,6 +459,113 @@ class CampusPlantOpsTests(SimpleTestCase):
         )
         self.assertEqual(qty_after, qty_before + 1)
 
+    def test_rma_part_is_unavailable_until_lead_time_elapses(self):
+        """An RMA part must not be receivable the instant it is ordered (L2269)."""
+        dc.get_state(self.session_id)
+        opened = dc.apply_action(self.session_id, "ops_ticket", {
+            "asset_id": "srv-r01-u14", "component": "power", "summary": "PSU dead",
+        })
+        self.assertTrue(opened["ok"], opened)
+        tid = opened["ticket"]["id"]
+        shipped = dc.apply_action(self.session_id, "ops_ticket", {
+            "op": "advance", "ticket_id": tid, "advance": "ship_rma",
+            "part": "PSU-R760", "eta_days": 2,
+        })
+        self.assertTrue(shipped["ok"], shipped)
+
+        state = dc.get_state(self.session_id)["state"]
+        asn = next(q for q in state["campus"]["loading_dock"]["queue"] if q["id"].startswith("ASN-RMA-"))
+        self.assertEqual(asn["status"], "inbound")
+        self.assertGreater(asn["ticks_remaining"], 0)
+
+        # The part is genuinely not here yet.
+        early = dc.apply_action(self.session_id, "campus_plant_ops", {
+            "op": "receive_dock", "asn_id": asn["id"],
+        })
+        self.assertFalse(early["ok"])
+        self.assertIn("transit", early["error"])
+
+        # Ticking the sim clock brings it in.
+        for _ in range(asn["ticks_remaining"]):
+            dc.apply_action(self.session_id, "live_tick", {})
+        state = dc.get_state(self.session_id)["state"]
+        asn = next(q for q in state["campus"]["loading_dock"]["queue"] if q["id"] == asn["id"])
+        self.assertEqual(asn["status"], "at_bay")
+        late = dc.apply_action(self.session_id, "campus_plant_ops", {
+            "op": "receive_dock", "asn_id": asn["id"],
+        })
+        self.assertTrue(late["ok"], late)
+
+    def test_expedite_shortens_lead_time(self):
+        dc.get_state(self.session_id)
+        opened = dc.apply_action(self.session_id, "ops_ticket", {
+            "asset_id": "srv-r01-u14", "component": "power", "summary": "PSU dead",
+        })
+        dc.apply_action(self.session_id, "ops_ticket", {
+            "op": "advance", "ticket_id": opened["ticket"]["id"],
+            "advance": "ship_rma", "eta_days": 3,
+        })
+        state = dc.get_state(self.session_id)["state"]
+        asn = next(q for q in state["campus"]["loading_dock"]["queue"] if q["id"].startswith("ASN-RMA-"))
+        before = asn["ticks_remaining"]
+
+        r = dc.apply_action(self.session_id, "campus_plant_ops", {
+            "op": "expedite_asn", "asn_id": asn["id"],
+        })
+        self.assertTrue(r["ok"], r)
+        state = dc.get_state(self.session_id)["state"]
+        asn = next(q for q in state["campus"]["loading_dock"]["queue"] if q["id"] == asn["id"])
+        self.assertLess(asn["ticks_remaining"], before)
+
+    def test_maintenance_window_flags_a_hot_rack(self):
+        """Scheduling onto a near-breaker rack must say so (audit L2267)."""
+        dc.get_state(self.session_id)
+        # srv-r03-u08 is the GPU node — its rack runs closest to the breaker.
+        opened = dc.apply_action(self.session_id, "ops_ticket", {
+            "asset_id": "srv-r03-u08", "component": "gpu", "summary": "GPU fault",
+        })
+        r = dc.apply_action(self.session_id, "ops_ticket", {
+            "op": "advance", "ticket_id": opened["ticket"]["id"],
+            "advance": "schedule_visit", "duration_min": 90,
+        })
+        self.assertTrue(r["ok"], r)
+        window = r["ticket"]["maintenance_window"]
+        self.assertEqual(window["rack"], "R03")
+        self.assertGreater(window["rack_load_pct"], 70)
+        self.assertIn(window["load_verdict"], ("caution", "conflict"))
+        self.assertTrue(window["load_reason"])
+
+    def test_maintenance_window_clear_on_quiet_rack(self):
+        dc.get_state(self.session_id)
+        opened = dc.apply_action(self.session_id, "ops_ticket", {
+            "asset_id": "srv-r06-u08", "component": "nic", "summary": "NIC flap",
+        })
+        r = dc.apply_action(self.session_id, "ops_ticket", {
+            "op": "advance", "ticket_id": opened["ticket"]["id"], "advance": "schedule_visit",
+        })
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(r["ticket"]["maintenance_window"]["load_verdict"], "clear")
+
+    def test_window_load_advice_is_advisory_not_blocking(self):
+        """Load conflicts must never silently make ops actions unavailable."""
+        from apps.vmware_sim.datacenter_phase12 import change_freeze_blocks, window_load_advice
+
+        state = dc.get_state(self.session_id)["state"]
+        advice = {a["rack"]: a for a in window_load_advice(state)}
+        self.assertIn(advice["R03"]["verdict"], ("caution", "conflict"))
+        # No freeze is active, so nothing is blocked regardless of load.
+        self.assertIsNone(change_freeze_blocks(state, "replace_power"))
+        r = dc.apply_action(self.session_id, "bmc_power", {"asset_id": "srv-r03-u08", "mode": "off"})
+        self.assertTrue(r["ok"], r)
+
+    def test_legacy_asn_without_lead_time_still_receivable(self):
+        """Seeded ASNs predate lead times; existing FRU labs must not break."""
+        dc.get_state(self.session_id)
+        r = dc.apply_action(self.session_id, "campus_plant_ops", {
+            "op": "receive_dock", "asn_id": "ASN-1048",
+        })
+        self.assertTrue(r["ok"], r)
+
     def test_idf_patch_and_uplink(self):
         state = dc.get_state(self.session_id)["state"]
         self.assertTrue(state.get("optical", {}).get("idf"))
@@ -371,6 +578,99 @@ class CampusPlantOpsTests(SimpleTestCase):
         self.assertTrue(r2["ok"], r2)
         ul = dc.get_state(self.session_id)["state"]["optical"]["idf"]["uplinks"][0]
         self.assertEqual(ul["status"], "down")
+
+
+class PhysicalSecurityTests(SimpleTestCase):
+    """Tailgating, propped doors, and unescorted visitors (audit L2272)."""
+
+    def setUp(self):
+        cache.clear()
+        self.session_id = str(uuid.uuid4())
+        self.addCleanup(cache.clear)
+
+    def test_tailgate_alarm_does_not_evict_an_open_hardware_fault(self):
+        """`broken` is a single-fault slot shared with hardware chaos."""
+        state = dc.get_state(self.session_id)["state"]
+        # The base scenario ships with a failed PSU a lab may be grading on.
+        self.assertEqual(state["broken"]["component"], "power")
+
+        r = dc.apply_action(self.session_id, "access_ops", {"op": "tailgate_alarm"})
+        self.assertTrue(r["ok"], r)
+        state = dc.get_state(self.session_id)["state"]
+        self.assertEqual(state["broken"]["component"], "power")
+        self.assertEqual(state["broken"]["server"], "srv-r01-u14")
+        # The alarm is still raised, just not in the fault slot.
+        self.assertTrue(state["access_control"]["gate"]["tailgate_alarm"])
+
+    def test_tailgate_claims_the_fault_slot_when_it_is_free(self):
+        dc.get_state(self.session_id)
+        dc.apply_action(self.session_id, "clear_failure", {})
+        dc.apply_action(self.session_id, "access_ops", {"op": "tailgate_alarm"})
+        state = dc.get_state(self.session_id)["state"]
+        self.assertEqual(state["broken"]["component"], "security")
+
+    def test_propped_door_escalates_on_tick_and_clears_on_close(self):
+        from apps.vmware_sim.datacenter_facility_ops import PROPPED_DOOR_TICKS
+
+        dc.get_state(self.session_id)
+        dc.apply_action(self.session_id, "environmental_ops", {"op": "open_door", "sensor_id": "DOOR-DH"})
+
+        def door():
+            state = dc.get_state(self.session_id)["state"]
+            return next(s for s in state["environmental"]["sensors"] if s["id"] == "DOOR-DH")
+
+        # Briefly open is not yet a violation.
+        dc.apply_action(self.session_id, "live_tick", {})
+        self.assertFalse(door().get("propped"))
+
+        for _ in range(PROPPED_DOOR_TICKS):
+            dc.apply_action(self.session_id, "live_tick", {})
+        d = door()
+        self.assertTrue(d["propped"])
+        self.assertEqual(d["status"], "alarm")
+        alarms = dc.get_state(self.session_id)["state"]["access_control"]["active_alarms"]
+        self.assertTrue(any("propped" in a["message"] for a in alarms))
+
+        dc.apply_action(self.session_id, "environmental_ops", {"op": "close_door", "sensor_id": "DOOR-DH"})
+        d = door()
+        self.assertFalse(d["open"])
+        self.assertIsNone(d.get("propped"))
+
+    def test_unescorted_visitor_is_flagged_then_resolved_by_escort(self):
+        from apps.vmware_sim.datacenter_facility_ops import UNESCORTED_VISITOR_TICKS
+
+        dc.get_state(self.session_id)
+        r = dc.apply_action(self.session_id, "access_ops", {
+            "op": "sign_in_visitor", "name": "visitor.acme", "zone": "data-hall-a",
+        })
+        self.assertTrue(r["ok"], r)
+        for _ in range(UNESCORTED_VISITOR_TICKS):
+            dc.apply_action(self.session_id, "live_tick", {})
+
+        state = dc.get_state(self.session_id)["state"]
+        vis = state["access_control"]["visitors"][0]
+        self.assertTrue(vis["flagged"])
+        self.assertTrue(any("unescorted" in a["message"] for a in state["access_control"]["active_alarms"]))
+
+        esc = dc.apply_action(self.session_id, "access_ops", {
+            "op": "assign_escort", "visitor_id": vis["id"], "escort": "tech.oncall",
+        })
+        self.assertTrue(esc["ok"], esc)
+        state = dc.get_state(self.session_id)["state"]
+        vis = next(v for v in state["access_control"]["visitors"] if v["id"] == vis["id"])
+        self.assertEqual(vis["escort"], "tech.oncall")
+        self.assertFalse(vis.get("flagged"))
+        self.assertFalse(any("unescorted" in a["message"] for a in state["access_control"]["active_alarms"]))
+
+    def test_escorted_visitor_never_trips(self):
+        dc.get_state(self.session_id)
+        dc.apply_action(self.session_id, "access_ops", {
+            "op": "sign_in_visitor", "name": "visitor.bob", "escort": "tech.oncall",
+        })
+        for _ in range(6):
+            dc.apply_action(self.session_id, "live_tick", {})
+        state = dc.get_state(self.session_id)["state"]
+        self.assertFalse(state["access_control"]["visitors"][0].get("flagged"))
 
 
 class FailureTrainingTests(SimpleTestCase):

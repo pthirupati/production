@@ -3,10 +3,10 @@ import {
   Play, CheckCircle2, XCircle, FileCode, Loader2, Terminal as TerminalIcon,
   ListChecks, FileText, Lightbulb, Lock, EyeOff, AlertTriangle, Trophy,
   Sparkles, Search, Sun, Moon, ZoomIn, ZoomOut, Bug, ScrollText, Save, Eye,
-  Plus, Folder, RefreshCw, X, Files, Settings2,
+  Plus, Folder, RefreshCw, X, Files, Settings2, Send,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import CodeEditor from './CodeEditor'
+import CodeEditor, { computeDiagnostics } from './CodeEditor'
 import MentorPanel from './MentorPanel'
 import HtmlPreviewPane from './HtmlPreviewPane'
 import IdeExplorer from './IdeExplorer'
@@ -14,12 +14,17 @@ import VsCodeWorkbench, { VscEditorTab, VscPanelTab, VscActivityButton } from '.
 import '../../styles/vscode-workbench.css'
 import { runPython, runPythonTests } from '../../utils/ide/pyodideRunner'
 import { runJavaScript, runJavaScriptTests } from '../../utils/ide/jsRunner'
-import { hasHtmlPreview, editorLanguageForPath, listHtmlPaths } from '../../utils/ide/composeHtmlPreview'
+import { hasHtmlPreview, editorLanguageForPath, listHtmlPaths, preferredHtmlPath, resolvePreviewRef } from '../../utils/ide/composeHtmlPreview'
 import {
   parentDirs, fileBasename, stubContentForPath, newFileHint,
+  searchAcrossFiles, findDefinitions, wordAtOffset,
 } from '../../utils/ide/fileTree'
+import CommandPalette from './CommandPalette'
+import IdeLocalTerminal from './IdeLocalTerminal'
+import IdeApiClientPanel from './IdeApiClientPanel'
 import { labApi } from '../../api/labs'
 import { useThemeStore } from '../../store/themeStore'
+import { currentUserScopedKey } from '../../utils/userScopedStorage'
 
 const LANG_LABEL = {
   python: 'Python', javascript: 'JavaScript', js: 'JavaScript', node: 'Node.js', nodejs: 'Node.js',
@@ -37,31 +42,36 @@ function tsLine(text) {
 }
 
 // localStorage key for per-session autosaved drafts. Keyed by lab session so a
-// reload (or accidental navigation) restores the exact in-progress files.
-const draftKey = (sessionId) => `fixitlab:ide-draft:${sessionId}`
-/* SIMULATED-CREDENTIAL: lab-console flavour, not a real secret. Shown to the
-   learner on screen (with an autofill button) so the fake console feels real, and
-   the gate is bypassed entirely once a provisioned lab session exists. Grants no
-   access to anything. Secret scanners should allowlist this marker rather than
-   flagging these lines. See docs/AUDIT_2026_08_TODO.md §Y2e. */
-const IDE_LAB_USER = 'lab_ide'
-const IDE_LAB_PASS = 'lab_ide@123'
-const IDE_AUTH_KEY = 'fixitlab_ide_auth'
+// reload (or accidental navigation) restores the exact in-progress files, and
+// user-scoped so a second account on a shared browser cannot read back the
+// previous learner's code.
+const DRAFT_KEY_BASE = 'fixitlab:ide-draft'
+export const draftKey = (sessionId) => currentUserScopedKey(`${DRAFT_KEY_BASE}:${sessionId}`)
 
-function isIdeAuthenticated() {
-  try {
-    return sessionStorage.getItem(IDE_AUTH_KEY) === '1'
-  } catch {
-    return false
-  }
-}
+/**
+ * Drafts older than this are treated as abandoned and dropped on read.
+ *
+ * Deliberately generous: this is the learner's own unsaved code, so the cost of
+ * expiring too eagerly (losing work someone left open over a long weekend) is far
+ * worse than the cost of keeping a stale draft around. 90 days only reclaims
+ * quota from sessions that are long finished.
+ */
+export const DRAFT_TTL_MS = 90 * 24 * 60 * 60 * 1000
 
 function loadDraft(sessionId) {
   try {
-    const raw = localStorage.getItem(draftKey(sessionId))
+    const key = draftKey(sessionId)
+    const raw = localStorage.getItem(key)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    return parsed && typeof parsed.files === 'object' ? parsed : null
+    if (!parsed || typeof parsed.files !== 'object') return null
+    // `ts` was recorded but never read before, so drafts accumulated forever.
+    // Missing/!finite ts means a pre-TTL draft — keep it rather than guess.
+    if (Number.isFinite(parsed.ts) && Date.now() - parsed.ts > DRAFT_TTL_MS) {
+      try { localStorage.removeItem(key) } catch { /* noop */ }
+      return null
+    }
+    return parsed
   } catch {
     return null
   }
@@ -141,11 +151,11 @@ function TestRow({ name, passed, message, hidden }) {
  *   solved      boolean — externally controlled solved state (locks the editor)
  */
 export default function CodingIDE({ sessionId, scenario, onSolved, solved: solvedProp = false }) {
-  // Lab session already authenticates the learner — skip the fake IDE login gate.
-  const [authenticated, setAuthenticated] = useState(() => Boolean(sessionId) || isIdeAuthenticated())
-  const [loginUser, setLoginUser] = useState('')
-  const [loginPass, setLoginPass] = useState('')
-  const [loginError, setLoginError] = useState('')
+  // No IDE-local login gate: the lab session already authenticates the learner.
+  // The previous gate compared hardcoded credentials client-side and printed
+  // them on screen next to an autofill button, so it gated nothing and only
+  // shipped a fake secret in the public bundle. See docs/AUDIT_2026_08_TODO.md
+  // §Y2e (L2720).
   const [spec, setSpec] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -170,6 +180,10 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   const [running, setRunning] = useState(false)
   const [checking, setChecking] = useState(false)
   const [pyLoading, setPyLoading] = useState(false)
+  // Set when the in-browser runtime (Pyodide CDN) could not be reached, so we
+  // can say so explicitly instead of leaving the learner with a bare stderr
+  // line. Server grading is unaffected — Check Solution still works offline.
+  const [runtimeMissing, setRuntimeMissing] = useState(false)
   const [solved, setSolved] = useState(solvedProp)
   const [savedAt, setSavedAt] = useState(null)   // last autosave timestamp (ms)
   // Guards so we only persist AFTER the spec has loaded + any draft restored,
@@ -178,6 +192,8 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   // user has typed anything.
   const hydratedRef = useRef(false)
   const dirtyRef = useRef(false)
+  const serverDraftRef = useRef(null)
+  const ideTermRef = useRef(null)
 
   // Right panel: 'instructions' | 'mentor' | 'preview'
   const [rightTab, setRightTab] = useState('instructions')
@@ -186,6 +202,11 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   const [mentorLoading, setMentorLoading] = useState(false)
   // Latest run/grade context the mentor analyzes.
   const lastCtx = useRef({ output: '', error: '', tests: [] })
+
+  // Command palette + workspace search (find-across-files / go-to-definition).
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchHits, setSearchHits] = useState(null)  // null = never searched
 
   const [fontSize, setFontSize] = useState(13)
   const [vimMode, setVimMode] = useState(false)
@@ -199,13 +220,6 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   useEffect(() => () => { mountedRef.current = false }, [])
   useEffect(() => { if (solvedProp) setSolved(true) }, [solvedProp])
 
-  useEffect(() => {
-    if (sessionId && !authenticated) {
-      try { sessionStorage.setItem(IDE_AUTH_KEY, '1') } catch { /* ignore */ }
-      setAuthenticated(true)
-    }
-  }, [sessionId, authenticated])
-
   const language = spec?.language || 'python'
   const showHtmlPreview = hasHtmlPreview(files, language)
   const editorLanguage = editorLanguageForPath(activePath, language)
@@ -215,7 +229,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   useEffect(() => {
     if (!showHtmlPreview || !htmlPaths.length) return
     if (activePath && /\.html?$/i.test(activePath)) return
-    const preferred = htmlPaths.find((p) => /index\.html?$/i.test(p)) || htmlPaths[0]
+    const preferred = preferredHtmlPath(files)
     if (preferred) {
       setActivePath(preferred)
       setOpenTabs((tabs) => (tabs.includes(preferred) ? tabs : [...tabs, preferred]))
@@ -225,7 +239,20 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   }, [showHtmlPreview, htmlPaths.join('|')])
 
   const appendTerminal = useCallback((line) => {
-    setTerminalText((prev) => (prev ? prev + '\n' : '') + tsLine(line))
+    const stamped = tsLine(line)
+    setTerminalText((prev) => (prev ? prev + '\n' : '') + stamped)
+    try { ideTermRef.current?.writeln(stamped) } catch { /* ignore */ }
+  }, [])
+
+  // console.* and uncaught errors forwarded from the sandboxed preview iframe.
+  // The iframe shim already caps what it sends; we bound the retained text too so
+  // a chatty page cannot grow React state without limit.
+  const handlePreviewLog = useCallback(({ level, text }) => {
+    const prefix = level === 'error' ? 'error' : level === 'warn' ? 'warn' : level
+    setLogsText((prev) => {
+      const next = (prev ? prev + '\n' : '') + `[preview:${prefix}] ${text}`
+      return next.length > 20000 ? next.slice(-20000) : next
+    })
   }, [])
 
   // ── Load the coding spec (hidden tests stripped server-side) ──
@@ -241,7 +268,17 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     seedReadonlyRef.current = new Set(ro)
 
     if (mergeDraft) {
-      const draft = loadDraft(sessionId)
+      const local = loadDraft(sessionId)
+      // Prefer server draft when newer (survives cleared site data / other browser).
+      const server = serverDraftRef.current
+      let draft = local
+      if (server?.files) {
+        const serverTs = Number(server.ts) || 0
+        const localTs = Number(local?.ts) || 0
+        if (!local?.files || serverTs >= localTs) {
+          draft = server
+        }
+      }
       if (draft?.files) {
         let restored = false
         Object.entries(draft.files).forEach(([path, content]) => {
@@ -254,7 +291,13 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         })
         if (restored) {
           setSavedAt(draft.ts || Date.now())
-          if (announce) appendTerminal('restored your autosaved work from this browser')
+          if (announce) {
+            appendTerminal(
+              server && draft === server
+                ? 'restored your server-saved work'
+                : 'restored your autosaved work from this browser',
+            )
+          }
         }
       }
     }
@@ -294,6 +337,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         if (cancelled) return
         const s = data.spec || {}
         setSpec(s)
+        serverDraftRef.current = data.ide_draft || null
         const n = applySpecFiles(s, { mergeDraft: true, announce: true })
         if (n === 0) {
           appendTerminal('warning: this lab has no starter files — use New File to begin')
@@ -309,7 +353,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per session
   }, [sessionId])
 
-  // ── Autosave editable files to localStorage (debounced) ──
+  // ── Autosave editable files to localStorage + server (debounced) ──
   useEffect(() => {
     if (!hydratedRef.current || loading || !dirtyRef.current) return
     const editable = {}
@@ -322,21 +366,51 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         setSavedAt(Date.now())
         setDirtyPaths(new Set())
       }
+      labApi.saveIdeDraft(sessionId, editable).then((data) => {
+        if (data?.draft) serverDraftRef.current = data.draft
+      }).catch(() => {})
     }, 600)
     return () => clearTimeout(id)
   }, [files, readonlyPaths, sessionId, loading])
+
+  // Advisory diagnostics for the Problems panel — the same ones the editor
+  // gutter shows. These NEVER gate Check Solution; grading is server-side only.
+  const problems = useMemo(() => {
+    if (!activePath || files[activePath] === undefined) return []
+    const src = files[activePath]
+    const lineStarts = []
+    let acc = 0
+    src.split('\n').forEach((l) => { lineStarts.push(acc); acc += l.length + 1 })
+    const lineOf = (offset) => {
+      let lo = 0
+      let hi = lineStarts.length - 1
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2)
+        if (lineStarts[mid] <= offset) lo = mid
+        else hi = mid - 1
+      }
+      return lo
+    }
+    return computeDiagnostics(src, editorLanguage).map((d) => {
+      const line = lineOf(d.from)
+      return { ...d, line: line + 1, column: d.from - lineStarts[line] + 1 }
+    })
+  }, [files, activePath, editorLanguage])
 
   const entrypoint = useMemo(() => {
     if (spec?.entrypoint && files[spec.entrypoint] !== undefined) return spec.entrypoint
     return Object.keys(files)[0] || ''
   }, [spec, files])
 
-  // Build a single source string from all files for execution (non-entry files
-  // first so their definitions are in scope, entrypoint last).
+  // Build the browser-run source from the entrypoint only.
+  // Concatenating every file (audit §Y2e) invents a module system that does not
+  // exist — duplicate `const`/`function` across files became SyntaxErrors, and
+  // harness files polluted the learner's Run output. Server Check already sends
+  // structured `files` + `entrypoint` and is unaffected.
   const composedSource = useCallback(() => {
+    if (entrypoint && files[entrypoint] !== undefined) return files[entrypoint]
     const paths = Object.keys(files)
-    const ordered = [...paths.filter((p) => p !== entrypoint), entrypoint].filter(Boolean)
-    return ordered.map((p) => files[p]).join('\n\n')
+    return paths.length ? files[paths[0]] : ''
   }, [files, entrypoint])
 
   const handleEditorChange = useCallback((text) => {
@@ -370,6 +444,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         const res = await runPython(source)
         setPyLoading(false)
         if (!mountedRef.current) return
+        setRuntimeMissing(Boolean(res.runtimeMissing))
         stdout = res.stdout || (res.ok ? '(no output)' : '')
         stderr = [res.stderr, res.error].filter(Boolean).join('\n')
         setOutput(stdout)
@@ -410,6 +485,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       setPyLoading(true)
       const r = await runPythonTests(source, tests)
       setPyLoading(false)
+      setRuntimeMissing(Boolean(r?.runtimeMissing))
       return r
     }
     if (isJs) {
@@ -514,7 +590,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         return data
       })
       if (data?.summary) setDebugText((p) => (p ? p + '\n' : '') + tsLine(`Mentor: ${data.summary}`))
-    } catch (err) {
+    } catch {
       if (mountedRef.current) {
         setMentor({
           summary: 'The mentor is offline right now.',
@@ -540,8 +616,11 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       setSavedAt(Date.now())
       setDirtyPaths(new Set())
       dirtyRef.current = false
-      appendTerminal('saved to browser storage')
-      toast.success('Saved in this browser', { duration: 1400 })
+      appendTerminal('saved to browser + server')
+      toast.success('Saved', { duration: 1400 })
+      labApi.saveIdeDraft(sessionId, editable).then((data) => {
+        if (data?.draft) serverDraftRef.current = data.draft
+      }).catch(() => {})
     } else {
       toast.error('Could not save (storage unavailable)')
     }
@@ -561,6 +640,14 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     setActivePath(path)
     setOpenTabs((prev) => (prev.includes(path) ? prev : [...prev, path]))
   }, [])
+
+  const navigatePreviewHtml = useCallback((href) => {
+    const from = /\.html?$/i.test(activePath || '') ? activePath : ''
+    const resolved = resolvePreviewRef(files, href, from)
+    if (!resolved || files[resolved] === undefined) return
+    openFile(resolved)
+    setRightTab('preview')
+  }, [activePath, files, openFile])
 
   const closeTab = useCallback((path, e) => {
     e?.stopPropagation?.()
@@ -735,61 +822,94 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     }
   }, [solved, loading, sessionId, applySpecFiles, appendTerminal])
 
-  if (!authenticated) {
-    const submitLogin = (e) => {
-      e.preventDefault()
-      const ok = loginUser.trim().toLowerCase() === IDE_LAB_USER && loginPass === IDE_LAB_PASS
-      if (ok) {
-        try { sessionStorage.setItem(IDE_AUTH_KEY, '1') } catch { /* ignore */ }
-        setLoginError('')
-        setAuthenticated(true)
-      } else {
-        setLoginError(`Invalid credentials. Use ${IDE_LAB_USER} / ${IDE_LAB_PASS} for training labs.`)
+  // ── Find across files / go to definition (read-only navigation) ──
+  //
+  // Both recompute from the live `files` map on demand rather than caching an
+  // index: a stale index would jump the learner to a line that has since moved.
+  const runWorkspaceSearch = useCallback((q) => {
+    const query = String(q ?? '')
+    setSearchQuery(query)
+    if (!query.trim()) { setSearchHits(null); return }
+    setSearchHits(searchAcrossFiles(files, query))
+    setBottomTab('search')
+  }, [files])
+
+  /** Open a path and place the cursor at line/column. */
+  const gotoLocation = useCallback((path, line, column = 1) => {
+    if (files[path] === undefined) return
+    openFile(path)
+    // The editor may need a frame to swap documents before the position exists.
+    setTimeout(() => editorRef.current?.revealPosition?.(line, column), 0)
+  }, [files, openFile])
+
+  const goToDefinition = useCallback(() => {
+    const src = files[activePath]
+    if (typeof src !== 'string') return
+    const offset = editorRef.current?.getCursorOffset?.() ?? 0
+    const word = wordAtOffset(src, offset)
+    if (!word) { toast('Put the cursor on a symbol first', { icon: '🔎' }); return }
+    const defs = findDefinitions(files, word, { preferPath: activePath })
+    if (!defs.length) { toast(`No definition found for "${word}"`, { icon: '🔎' }); return }
+    if (defs.length > 1) {
+      // Ambiguous: show every site in the Search panel instead of guessing,
+      // which would silently send the learner to the wrong file.
+      setSearchQuery(word)
+      setSearchHits(defs.map((d) => ({ path: d.path, line: d.line, column: 1, preview: d.text })))
+      setBottomTab('search')
+      return
+    }
+    gotoLocation(defs[0].path, defs[0].line, 1)
+  }, [files, activePath, gotoLocation])
+
+  // ── Command palette (Ctrl/Cmd+Shift+P) ──
+  //
+  // Every entry mirrors a toolbar button INCLUDING its disabled guard, so the
+  // palette can never perform an action the toolbar forbids (e.g. editing files
+  // after the lab is solved).
+  const commands = useMemo(() => [
+    { id: 'run', group: 'Run', label: 'Run', hint: 'Ctrl+Enter', disabled: running || checking || solved || !activePath, run: handleRun },
+    { id: 'check', group: 'Run', label: 'Check Solution (grade on server)', disabled: checking || running || solved, run: handleCheck },
+    { id: 'save', group: 'File', label: 'Save draft to this browser', hint: 'Ctrl+S', disabled: solved, run: handleSave },
+    { id: 'refresh', group: 'File', label: 'Reload starter files (discards edits)', disabled: solved || loading, run: handleRefresh },
+    { id: 'newfile', group: 'File', label: 'New File', disabled: solved, run: () => createFileAt(newFileHint(language, Object.keys(files))) },
+    { id: 'newfolder', group: 'File', label: 'New Folder', disabled: solved, run: () => createFolderAt(`folder-${Date.now().toString(36).slice(-4)}`) },
+    { id: 'find', group: 'Go', label: 'Find in current file', hint: 'Ctrl+F', run: () => editorRef.current?.openSearch() },
+    { id: 'findall', group: 'Go', label: 'Find across all files', run: () => { setBottomTab('search'); setTimeout(() => document.getElementById('ide-workspace-search')?.focus(), 0) } },
+    { id: 'gotodef', group: 'Go', label: 'Go to Definition', hint: 'F12', disabled: !activePath, run: goToDefinition },
+    { id: 'format', group: 'Edit', label: 'Format Document', disabled: solved, run: () => editorRef.current?.formatDocument?.() },
+    { id: 'fos', group: 'Edit', label: `Format on Save: ${formatOnSave ? 'on' : 'off'}`, run: () => setFormatOnSave((v) => !v) },
+    { id: 'vim', group: 'Edit', label: `Vim keybindings: ${vimMode ? 'on' : 'off'}`, run: () => setVimMode((v) => !v) },
+    { id: 'zoomin', group: 'View', label: 'Zoom In (font size)', run: () => setFontSize((f) => Math.min(22, f + 1)) },
+    { id: 'zoomout', group: 'View', label: 'Zoom Out (font size)', run: () => setFontSize((f) => Math.max(10, f - 1)) },
+    { id: 'explorer', group: 'View', label: `${showExplorer ? 'Hide' : 'Show'} Explorer`, run: () => setShowExplorer((v) => !v) },
+    { id: 'theme', group: 'View', label: 'Toggle app theme', run: toggleTheme },
+    { id: 'closeothers', group: 'View', label: 'Close Other Tabs', disabled: !activePath || openTabs.length < 2, run: closeOtherTabs },
+    { id: 'closeall', group: 'View', label: 'Close All Tabs', disabled: !openTabs.length, run: closeAllTabs },
+    { id: 'mentor', group: 'Help', label: 'Ask the AI Mentor', run: () => { setRightTab('mentor'); if (!mentor) askMentor('all') } },
+    { id: 'problems', group: 'View', label: 'Show Problems panel', run: () => setBottomTab('problems') },
+    { id: 'tests', group: 'View', label: 'Show Test Results', run: () => setBottomTab('tests') },
+    { id: 'preview', group: 'View', label: 'Open HTML Preview', hidden: !showHtmlPreview, run: () => { setRightTab('preview'); setPreviewKey((k) => k + 1) } },
+  ], [
+    running, checking, solved, activePath, loading, language, files, formatOnSave, vimMode,
+    showExplorer, openTabs.length, mentor, showHtmlPreview, handleRun, handleCheck, handleSave,
+    handleRefresh, createFileAt, createFolderAt, goToDefinition, toggleTheme, closeOtherTabs,
+    closeAllTabs, askMentor,
+  ])
+
+  useEffect(() => {
+    const onKey = (e) => {
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+        e.preventDefault()
+        setPaletteOpen((v) => !v)
+      } else if (e.key === 'F12') {
+        e.preventDefault()
+        goToDefinition()
       }
     }
-
-    return (
-      <div className="flex-1 min-h-0 bg-[#1e1e1e] text-[#cccccc] flex flex-col">
-        <div className="h-9 bg-[#2d2d30] border-b border-[#3e3e42] flex items-center px-4 text-xs">
-          <span className="font-semibold text-white">FixitLab IDE</span>
-          <span className="ml-2 text-[#858585]">{scenario?.title || 'Coding Lab'}</span>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="w-full max-w-sm bg-[#252526] border border-[#3e3e42] shadow-2xl rounded overflow-hidden">
-            <div className="px-5 py-4 bg-[#007acc] text-white font-semibold flex items-center gap-2">
-              <FileCode size={18} /> VS Code Workbench
-            </div>
-            <form onSubmit={submitLogin} className="p-5 space-y-4">
-              <p className="text-sm text-[#cccccc]">Sign in to the multi-language IDE training environment.</p>
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#969696] mb-1">Username</label>
-                <input value={loginUser} onChange={(e) => setLoginUser(e.target.value)} autoFocus autoComplete="username"
-                  placeholder={IDE_LAB_USER}
-                  className="w-full bg-[#1e1e1e] border border-[#3e3e42] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#007acc]" />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#969696] mb-1">Password</label>
-                <input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} autoComplete="current-password"
-                  className="w-full bg-[#1e1e1e] border border-[#3e3e42] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#007acc]" />
-              </div>
-              {loginError && <p className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{loginError}</p>}
-              <button type="submit" className="w-full py-2 rounded bg-[#007acc] text-white font-semibold">
-                Sign In
-              </button>
-              <button type="button"
-                onClick={() => { setLoginUser(IDE_LAB_USER); setLoginPass(IDE_LAB_PASS); setLoginError('') }}
-                className="w-full py-1.5 text-xs text-[#cccccc] border border-[#3e3e42] rounded hover:bg-[#2d2d30]">
-                Use lab credentials (autofill)
-              </button>
-              <p className="text-[10px] text-[#969696] text-center pt-2 border-t border-[#3e3e42]">
-                Training credentials: <span className="font-mono text-white">{IDE_LAB_USER}</span> / <span className="font-mono text-white">{IDE_LAB_PASS}</span>
-              </p>
-            </form>
-          </div>
-        </div>
-      </div>
-    )
-  }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [goToDefinition])
 
   if (loading) {
     return (
@@ -823,7 +943,10 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   const protectedPaths = new Set(Object.keys(seedFilesRef.current).filter((p) => seedReadonlyRef.current.has(p)))
 
   const BOTTOM_TABS = [
+    { key: 'problems', label: 'Problems', icon: AlertTriangle },
+    { key: 'search', label: 'Search', icon: Search },
     { key: 'terminal', label: 'Terminal', icon: TerminalIcon },
+    { key: 'api', label: 'API', icon: Send },
     { key: 'output', label: 'Output', icon: ScrollText },
     { key: 'logs', label: 'Logs', icon: FileText },
     { key: 'tests', label: 'Test Results', icon: ListChecks },
@@ -858,7 +981,8 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           <button type="button" onClick={() => createFolderAt(`folder-${Date.now().toString(36).slice(-4)}`)} disabled={solved} className="vsc-btn" title="New folder">
             <Folder size={13} /> New Folder
           </button>
-          <button type="button" onClick={() => editorRef.current?.openSearch()} className="vsc-btn" title="Find (Ctrl/Cmd+F)"><Search size={13} /></button>
+          <button type="button" onClick={() => editorRef.current?.openSearch()} className="vsc-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" title="Find (Ctrl/Cmd+F)" aria-label="Find"><Search size={13} /></button>
+          <button type="button" onClick={() => setPaletteOpen(true)} className="vsc-btn" title="Command Palette (Ctrl/Cmd+Shift+P)">⌘P</button>
           <button type="button" onClick={() => setVimMode((v) => !v)} className={`vsc-btn ${vimMode ? 'vsc-btn-primary' : ''}`} title="Toggle Vim keybindings (jj = Esc, :w = Save)">
             Vim
           </button>
@@ -871,9 +995,9 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           >
             <Settings2 size={13} /> FoS
           </button>
-          <button type="button" onClick={() => setFontSize((f) => Math.max(10, f - 1))} className="vsc-btn" title="Zoom out"><ZoomOut size={13} /></button>
-          <button type="button" onClick={() => setFontSize((f) => Math.min(22, f + 1))} className="vsc-btn" title="Zoom in"><ZoomIn size={13} /></button>
-          <button type="button" onClick={toggleTheme} className="vsc-btn" title="Toggle theme">{isDark ? <Sun size={13} /> : <Moon size={13} />}</button>
+          <button type="button" onClick={() => setFontSize((f) => Math.max(10, f - 1))} className="vsc-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" title="Zoom out" aria-label="Zoom out"><ZoomOut size={13} /></button>
+          <button type="button" onClick={() => setFontSize((f) => Math.min(22, f + 1))} className="vsc-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" title="Zoom in" aria-label="Zoom in"><ZoomIn size={13} /></button>
+          <button type="button" onClick={toggleTheme} className="vsc-btn min-h-[44px] min-w-[44px] inline-flex items-center justify-center" title="Toggle theme" aria-label="Toggle theme">{isDark ? <Sun size={13} /> : <Moon size={13} />}</button>
           <button type="button" onClick={closeOtherTabs} disabled={!activePath || openTabs.length < 2} className="vsc-btn" title="Close other tabs">Close Others</button>
           <button type="button" onClick={closeAllTabs} disabled={!openTabs.length} className="vsc-btn" title="Close all tabs">Close All</button>
           <button type="button" onClick={() => { setRightTab('mentor'); if (!mentor) askMentor('all') }} className="vsc-btn"><Sparkles size={13} /> Mentor</button>
@@ -892,6 +1016,14 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
               <Save size={11} /> {dirtyPaths.size ? 'Unsaved' : 'Saved'}
             </span>
           )}
+          {runtimeMissing && (
+            <span
+              className="text-[10px] text-amber-400 flex items-center gap-1"
+              title="The in-browser runtime could not be downloaded. Check Solution still grades on the server."
+            >
+              <AlertTriangle size={11} /> Offline: Run unavailable
+            </span>
+          )}
           <span className="text-[10px] text-[var(--vsc-muted)] hidden lg:inline flex items-center gap-1"><EyeOff size={10} /> {hiddenCount} hidden</span>
         </>
       )}
@@ -906,6 +1038,9 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           <VscActivityButton active={bottomTab === 'tests'} onClick={() => setBottomTab('tests')} title="Test Results">
             <ListChecks size={22} />
           </VscActivityButton>
+          <VscActivityButton active={bottomTab === 'problems'} onClick={() => setBottomTab('problems')} title="Problems">
+            <AlertTriangle size={22} />
+          </VscActivityButton>
         </div>
       )}
       showSidebar={showExplorer}
@@ -913,9 +1048,9 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
         <div className="flex items-center justify-between gap-1 w-full">
           <span>EXPLORER</span>
           <div className="flex items-center gap-0.5">
-            <button type="button" onClick={createFolder} disabled={solved} className="p-0.5 text-[var(--vsc-accent)]" title="New folder"><Folder size={12} /></button>
-            <button type="button" onClick={createFile} disabled={solved} className="p-0.5 text-[var(--vsc-accent)]" title="New file"><Plus size={12} /></button>
-            <button type="button" onClick={handleRefresh} disabled={solved} className="p-0.5 text-[var(--vsc-muted)]" title="Refresh"><RefreshCw size={12} /></button>
+            <button type="button" onClick={createFolder} disabled={solved} className="p-0.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[var(--vsc-accent)]" title="New folder" aria-label="New folder"><Folder size={12} /></button>
+            <button type="button" onClick={createFile} disabled={solved} className="p-0.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[var(--vsc-accent)]" title="New file" aria-label="New file"><Plus size={12} /></button>
+            <button type="button" onClick={handleRefresh} disabled={solved} className="p-0.5 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-[var(--vsc-muted)]" title="Refresh" aria-label="Refresh explorer"><RefreshCw size={12} /></button>
           </div>
         </div>
       )}
@@ -964,7 +1099,10 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       editor={activePath && files[activePath] !== undefined ? (
         <CodeEditor
           ref={editorRef}
-          key={activePath}
+          // No key={activePath}: remounting on every tab switch destroyed the
+          // CodeMirror state and with it the undo history. CodeEditor swaps a
+          // per-path EditorState internally instead (L2741/L2859).
+          docPath={activePath}
           value={files[activePath] ?? ''}
           onChange={handleEditorChange}
           onSave={handleSave}
@@ -999,14 +1137,90 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
             {key === 'tests' && testResults && (
               <span className="ml-1 text-[9px] opacity-80">{testResults.passed_count}/{testResults.total_count}</span>
             )}
+            {key === 'problems' && problems.length > 0 && (
+              <span className="ml-1 text-[9px] px-1 rounded bg-amber-500/20 text-amber-300">{problems.length}</span>
+            )}
           </VscPanelTab>
         )),
         content: (
           <>
+            {bottomTab === 'problems' && (
+              <div className="space-y-1 font-sans">
+                {!problems.length ? (
+                  <p className="text-xs text-[var(--vsc-muted)]">
+                    No problems detected in {activePath ? fileName(activePath) : 'this file'}.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-[10px] text-[var(--vsc-muted)] mb-1">
+                      Advisory only — your grade comes from Check Solution on the server.
+                    </p>
+                    {problems.map((p, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs px-2 py-1 rounded border border-surface-800 bg-surface-900/60">
+                        <AlertTriangle
+                          size={12}
+                          className={`mt-0.5 shrink-0 ${p.severity === 'info' ? 'text-cyan-400' : 'text-amber-400'}`}
+                        />
+                        <span className="text-[var(--vsc-text)] flex-1">{p.message}</span>
+                        <span className="text-[var(--vsc-muted)] shrink-0 font-mono">
+                          {fileName(activePath)}:{p.line}:{p.column}
+                        </span>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+            {bottomTab === 'search' && (
+              <div className="space-y-1 font-sans">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Search size={12} className="text-[var(--vsc-muted)] shrink-0" />
+                  <input
+                    id="ide-workspace-search"
+                    value={searchQuery}
+                    onChange={(e) => runWorkspaceSearch(e.target.value)}
+                    placeholder="Search across all files…"
+                    aria-label="Search across all files"
+                    className="flex-1 bg-transparent border border-surface-800 rounded px-2 py-1 text-xs outline-none focus:border-cyan-500/50 text-[var(--vsc-text)]"
+                  />
+                  {searchHits && (
+                    <span className="text-[10px] text-[var(--vsc-muted)] shrink-0">
+                      {searchHits.length} result{searchHits.length === 1 ? '' : 's'}
+                    </span>
+                  )}
+                </div>
+                {searchHits === null ? (
+                  <p className="text-xs text-[var(--vsc-muted)]">
+                    Type to search every file. F12 jumps to a symbol&apos;s definition.
+                  </p>
+                ) : !searchHits.length ? (
+                  <p className="text-xs text-[var(--vsc-muted)]">No matches for “{searchQuery}”.</p>
+                ) : (
+                  searchHits.map((h, i) => (
+                    <button
+                      key={`${h.path}:${h.line}:${h.column}:${i}`}
+                      type="button"
+                      onClick={() => gotoLocation(h.path, h.line, h.column)}
+                      className="w-full flex items-baseline gap-2 text-left text-xs px-2 py-1 rounded border border-surface-800 bg-surface-900/60 hover:border-cyan-500/40"
+                    >
+                      <span className="font-mono text-[var(--vsc-muted)] shrink-0">
+                        {fileName(h.path)}:{h.line}
+                      </span>
+                      <span className="font-mono text-[var(--vsc-text)] truncate">{h.preview}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
             {bottomTab === 'terminal' && (
-              <pre className="text-[var(--vsc-text)] whitespace-pre-wrap break-words m-0">
-                {terminalText || 'Run or Check Solution to see a session transcript here.'}
-              </pre>
+              <IdeLocalTerminal
+                ref={ideTermRef}
+                initialText={terminalText}
+                className="h-full min-h-[140px]"
+              />
+            )}
+            {bottomTab === 'api' && (
+              <IdeApiClientPanel sessionId={sessionId} disabled={solved} />
             )}
             {bottomTab === 'output' && (
               <pre className="text-[var(--vsc-text)] whitespace-pre-wrap break-words m-0">
@@ -1055,6 +1269,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           </>
         ),
       }}
+      rightPanelLabel={rightTab === 'preview' ? 'Preview' : rightTab === 'mentor' ? 'Mentor' : 'Instructions'}
       rightPanel={{
         width: rightTab === 'preview' ? 420 : 320,
         header: (
@@ -1080,6 +1295,8 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
             files={files}
             htmlPath={/\.html?$/i.test(activePath || '') ? activePath : undefined}
             onRefresh={() => setPreviewKey((k) => k + 1)}
+            onLog={handlePreviewLog}
+            onNavigate={navigatePreviewHtml}
           />
         ) : (
           <div className="p-4 space-y-4 text-sm">
@@ -1109,6 +1326,16 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
             {!canRunInBrowser && (
               <p className="text-[11px] text-amber-400 flex gap-1.5"><Lightbulb size={12} className="shrink-0 mt-0.5" /> Use Check Solution for {langLabel} — server grades your code.</p>
             )}
+            {runtimeMissing && (
+              <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-300 flex gap-1.5">
+                <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+                <span>
+                  The in-browser {langLabel} runtime could not be downloaded, so Run is
+                  unavailable offline. <strong>Check Solution still works</strong> — the server
+                  runs and grades your code.
+                </span>
+              </div>
+            )}
           </div>
         ),
       }}
@@ -1123,6 +1350,8 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
           </>
         ),
       }}
-    />
+    >
+      <CommandPalette open={paletteOpen} commands={commands} onClose={() => setPaletteOpen(false)} />
+    </VsCodeWorkbench>
   )
 }

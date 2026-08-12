@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import json
 import random
+import re
 import time
 from typing import Any
 
@@ -245,12 +246,27 @@ def _configmap(name: str, namespace: str, data: dict) -> dict:
     }
 
 
-def _secret(name: str, namespace: str, secret_type: str = "Opaque", keys: list | None = None) -> dict:
+def _secret(name: str, namespace: str, secret_type: str = "Opaque", keys: list | None = None,
+            source: str = "manifest") -> dict:
+    """A Secret as the API server reports it.
+
+    `storageEncoding` models what an operator finds when they read the object
+    straight out of etcd. Kubernetes stores Secret values base64-*encoded* by
+    default, which is emphatically not encryption — `etcdctl get` returns
+    `k8s\x00v1\x00Secret...` with the cleartext value sitting right there. The
+    field only flips to "aescbc"/"kms" once an EncryptionConfiguration is wired
+    into the API server AND the object is rewritten, which is why re-applying a
+    manifest alone never changes it. `source` distinguishes a manifest-managed
+    Secret from one materialised by an external secrets operator, whose value
+    never lives in git or etcd in the first place.
+    """
     return {
         "name": name,
         "namespace": namespace,
         "type": secret_type,
         "dataKeys": keys or [],
+        "storageEncoding": "base64",
+        "source": source,
         "creationTimestamp": _ago_iso(random.randint(3600, 864000)),
     }
 
@@ -592,6 +608,11 @@ def _base_cluster() -> dict:
         "roles": roles,
         "role_bindings": role_bindings,
         "ingresses": ingresses,
+        # API server --encryption-provider-config. Default Kubernetes ships with
+        # NO EncryptionConfiguration at all: `resources` is empty and every
+        # Secret is written to etcd as the `identity` (plaintext) provider.
+        "encryption_config": {"present": False, "resources": []},
+        "external_secrets": [],
         "events": [],
         "validation": {"target_deployment": "worker", "require_available": 4},
     }
@@ -601,7 +622,33 @@ def _apply_scenario_preset(state: dict, scenario_slug: str) -> None:
     slug = (scenario_slug or "").lower()
     events = state["events"]
 
-    if "crashloop" in slug or "worker" in slug:
+    # Checked before the "worker" substring branch below: this slug contains
+    # neither, but keeping it first documents that preset matching is
+    # first-wins on substrings and a new slug must not collide.
+    if "secret-base64" in slug or "secret-encryption" in slug:
+        # The learner's misconception is that `data:` being base64 means the
+        # value is protected. Seed a Secret that a security review flagged and
+        # leave the cluster otherwise healthy, so "all pods Running" cannot be
+        # mistaken for a pass — the graded fact is at-rest encryption.
+        secret = _find_secret(state, "db-credentials", "production")
+        if secret:
+            secret["storageEncoding"] = "base64"
+            secret["source"] = "manifest"
+        events.append(_event(
+            "Audit finding SEC-4412: Secret production/db-credentials is stored unencrypted in etcd "
+            "(base64 is encoding, not encryption)",
+            reason="PolicyViolation", involved_object="db-credentials", namespace="production",
+        ))
+        events.append(_event(
+            "No --encryption-provider-config is set on kube-apiserver; the identity provider is in use",
+            reason="Warning", involved_object="kube-apiserver", namespace="kube-system",
+        ))
+        state["validation"] = {
+            "require_secret_encrypted_at_rest": "db-credentials",
+            "namespace": "production",
+        }
+
+    elif "crashloop" in slug or "worker" in slug:
         events.append(_event(
             "Back-off restarting failed container worker in pod worker-9a8b7c6d5e-fk2lm",
             reason="BackOff", involved_object="worker-9a8b7c6d5e-fk2lm", namespace="production",
@@ -1077,8 +1124,113 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         else:
             state["secrets"].append(_secret(name, namespace, secret_type=secret_type, keys=keys))
             events.append(_event(f"Created Secret {name}", involved_object=name, namespace=namespace))
+        # Deliberately does NOT touch storageEncoding. Re-applying a manifest —
+        # even with a freshly base64'd value — cannot change how the API server
+        # serialises the object into etcd. Only an EncryptionConfiguration (plus
+        # a rewrite) or moving the value out to an external store does that.
+        # Encoding the value harder is the exact misconception these labs
+        # correct, so it must not be rewarded here.
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"secret/{name} applied"}
+
+    if action == "apply_encryption_config":
+        # Models writing /etc/kubernetes/enc/enc.yaml and restarting kube-apiserver
+        # with --encryption-provider-config. `identity` is the no-op provider: a
+        # config that lists it first encrypts nothing, which is a real and common
+        # misconfiguration, so we accept the config but keep the cluster failing.
+        resources = payload.get("resources") or []
+        providers = [str(p).lower() for p in (payload.get("providers") or [])]
+        if not resources:
+            resources = ["secrets"] if providers else []
+        if not providers:
+            return {"ok": False, "error": "encryption config requires at least one provider (aescbc, aesgcm, secretbox, or kms)"}
+        state["encryption_config"] = {"present": True, "resources": list(resources), "providers": providers}
+        first = providers[0]
+        if first == "identity":
+            events.append(_event(
+                "EncryptionConfiguration applied but 'identity' is listed first — writes remain unencrypted",
+                reason="Warning", involved_object="kube-apiserver", namespace="kube-system",
+            ))
+            _save_session(str(session_id), entry)
+            return {"ok": True, "message": "encryption config applied (identity first — Secrets still stored in plaintext)"}
+        # Applying the config only affects objects written *after* the restart, so
+        # a real operator must follow with `kubectl get secrets -A -o json |
+        # kubectl replace -f -`. We model that as an explicit rewrite action.
+        events.append(_event(
+            f"kube-apiserver restarted with --encryption-provider-config (provider: {first})",
+            reason="Normal", involved_object="kube-apiserver", namespace="kube-system",
+        ))
+        events.append(_event(
+            "Existing Secrets are still stored with the old encoding until they are rewritten",
+            reason="Warning", involved_object="kube-apiserver", namespace="kube-system",
+        ))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"encryption config applied (provider: {first}); rewrite existing Secrets to re-encrypt them"}
+
+    if action == "rewrite_secrets":
+        # `kubectl get secrets --all-namespaces -o json | kubectl replace -f -`
+        enc = state.get("encryption_config") or {}
+        providers = [str(p).lower() for p in (enc.get("providers") or [])]
+        if not enc.get("present") or not providers or providers[0] == "identity":
+            return {"ok": False, "error": "no active encryption provider — rewriting Secrets would re-store them in plaintext"}
+        if "secrets" not in [str(r).lower() for r in (enc.get("resources") or [])]:
+            return {"ok": False, "error": "encryption config does not cover the 'secrets' resource"}
+        namespace = payload.get("namespace", "")
+        name = payload.get("name", "")
+        rewritten = 0
+        for sec in state["secrets"]:
+            if namespace and sec["namespace"] != namespace:
+                continue
+            if name and sec["name"] != name:
+                continue
+            if sec.get("source") == "external-secret":
+                continue
+            sec["storageEncoding"] = providers[0]
+            rewritten += 1
+        events.append(_event(
+            f"Rewrote {rewritten} Secret(s); now stored with the {providers[0]} provider",
+            reason="Normal", involved_object="kube-apiserver", namespace="kube-system",
+        ))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"{rewritten} secret(s) re-encrypted with {providers[0]}"}
+
+    if action == "apply_external_secret":
+        # The other legitimate remediation: External Secrets Operator syncs the
+        # value from a real vault, so the cleartext never lives in git or etcd.
+        name = payload.get("name")
+        namespace = payload.get("namespace", "production")
+        store = payload.get("secret_store") or payload.get("store") or ""
+        remote_key = payload.get("remote_key") or payload.get("remoteRef") or ""
+        if not name:
+            return {"ok": False, "error": "ExternalSecret name is required"}
+        if not store:
+            return {"ok": False, "error": "ExternalSecret requires a secretStoreRef (e.g. vault-backend)"}
+        if not remote_key:
+            return {"ok": False, "error": "ExternalSecret requires a remoteRef key in the external store"}
+        target = payload.get("target") or name
+        state.setdefault("external_secrets", []).append({
+            "name": name,
+            "namespace": namespace,
+            "secretStoreRef": store,
+            "remoteRef": remote_key,
+            "target": target,
+            "creationTimestamp": _now_iso(),
+        })
+        secret = _find_secret(state, target, namespace)
+        if secret:
+            secret["source"] = "external-secret"
+            secret["externalStore"] = store
+        else:
+            state["secrets"].append(_secret(
+                target, namespace, keys=[remote_key], source="external-secret",
+            ))
+            _find_secret(state, target, namespace)["externalStore"] = store
+        events.append(_event(
+            f"ExternalSecret {name} synced target Secret {target} from {store}",
+            reason="Normal", involved_object=name, namespace=namespace,
+        ))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"externalsecret/{name} applied; {target} now sourced from {store}"}
 
     # --- Namespace ---
 
@@ -1145,6 +1297,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{kind}/{name} patched"}
 
+    if action in ("kubernetes_http", "k8s_http", "http_api"):
+        url = payload.get("url") or payload.get("path") or ""
+        status, body = kubernetes_http_api(url, state)
+        return {"ok": status < 400, "status": status, "body": body}
+
     ensure_v2(state)
     v2 = apply_v2_action(state, action, payload)
     if v2 is not None:
@@ -1153,6 +1310,175 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return v2
 
     return {"ok": False, "error": f"Unknown action: {action}"}
+
+
+# ---------------------------------------------------------------------------
+# Kubernetes HTTP API (Y3 teaching surface — curl to apiserver)
+# ---------------------------------------------------------------------------
+
+def _pod_to_k8s_object(p: dict) -> dict:
+    ns = p.get("namespace") or "default"
+    name = p.get("name") or "pod"
+    containers = []
+    for c in p.get("containers") or []:
+        containers.append({
+            "name": c.get("name") or name,
+            "image": c.get("image") or "fixitlab/app:latest",
+            "ready": bool(c.get("ready")),
+            "restartCount": int(c.get("restartCount") or 0),
+            "state": {str(c.get("state") or "running"): {}},
+        })
+    return {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+            "name": name,
+            "namespace": ns,
+            "labels": dict(p.get("labels") or {}),
+            "creationTimestamp": p.get("startTime"),
+        },
+        "spec": {
+            "nodeName": p.get("node"),
+            "containers": [
+                {"name": c.get("name"), "image": c.get("image")}
+                for c in (p.get("containers") or [])
+            ],
+        },
+        "status": {
+            "phase": p.get("phase") or "Unknown",
+            "podIP": p.get("podIP"),
+            "containerStatuses": containers,
+            "conditions": list(p.get("conditions") or []),
+        },
+    }
+
+
+def _deployment_to_k8s_object(d: dict) -> dict:
+    ns = d.get("namespace") or "default"
+    name = d.get("name") or "deploy"
+    return {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+            "name": name,
+            "namespace": ns,
+            "labels": dict(d.get("labels") or {}),
+            "creationTimestamp": d.get("creationTimestamp"),
+        },
+        "spec": {
+            "replicas": int(d.get("replicas") or 0),
+            "selector": {"matchLabels": dict(d.get("selector") or d.get("labels") or {})},
+            "template": {
+                "metadata": {"labels": dict(d.get("labels") or {})},
+                "spec": {
+                    "containers": [{
+                        "name": name,
+                        "image": d.get("image") or f"fixitlab/{name}:latest",
+                    }],
+                },
+            },
+        },
+        "status": {
+            "replicas": int(d.get("replicas") or 0),
+            "availableReplicas": int(d.get("availableReplicas") or 0),
+            "readyReplicas": int(d.get("readyReplicas") or 0),
+            "updatedReplicas": int(d.get("updatedReplicas") or 0),
+        },
+    }
+
+
+def kubernetes_http_api(url_or_path: str, state: dict | None = None) -> tuple[int, dict]:
+    """Kubernetes apiserver HTTP surface for curl teaching labs (audit Y3).
+
+    Routes ``/api/v1/pods`` and ``/apis/apps/v1/deployments`` (namespaced and
+    cluster-scoped) against the in-session cluster. Returns ``(http_status, body)``.
+    """
+    from urllib.parse import parse_qs, urlparse
+
+    state = state or {}
+    raw = (url_or_path or "").strip()
+    if not raw:
+        return 400, {"kind": "Status", "apiVersion": "v1", "status": "Failure",
+                     "message": "empty URL", "code": 400}
+
+    if "://" in raw:
+        parsed = urlparse(raw)
+        path = parsed.path or "/"
+        qs = parse_qs(parsed.query)
+    elif "?" in raw:
+        path, q = raw.split("?", 1)
+        qs = parse_qs(q)
+    else:
+        path, qs = raw, {}
+
+    norm = path.rstrip("/") or "/"
+    label_selector = (qs.get("labelSelector") or [""])[0]
+
+    def _labels_match(labels: dict) -> bool:
+        if not label_selector:
+            return True
+        want = {}
+        for part in label_selector.split(","):
+            part = part.strip()
+            if "=" in part:
+                k, v = part.split("=", 1)
+                want[k.strip()] = v.strip()
+        return all(labels.get(k) == v for k, v in want.items())
+
+    # /api/v1/namespaces/{ns}/pods[/{name}]
+    m = re.match(r"^/api/v1/namespaces/([^/]+)/pods(?:/([^/]+))?$", norm)
+    if m:
+        ns, name = m.group(1), m.group(2)
+        pods = [p for p in state.get("pods") or [] if p.get("namespace") == ns]
+        if name:
+            pod = next((p for p in pods if p.get("name") == name), None)
+            if not pod:
+                return 404, {
+                    "kind": "Status", "apiVersion": "v1", "status": "Failure",
+                    "message": f'pods "{name}" not found', "reason": "NotFound", "code": 404,
+                }
+            return 200, _pod_to_k8s_object(pod)
+        items = [_pod_to_k8s_object(p) for p in pods if _labels_match(p.get("labels") or {})]
+        return 200, {"kind": "PodList", "apiVersion": "v1", "items": items}
+
+    # /api/v1/pods (all namespaces)
+    if norm == "/api/v1/pods":
+        items = [
+            _pod_to_k8s_object(p) for p in (state.get("pods") or [])
+            if _labels_match(p.get("labels") or {})
+        ]
+        return 200, {"kind": "PodList", "apiVersion": "v1", "items": items}
+
+    # /apis/apps/v1/namespaces/{ns}/deployments[/{name}]
+    m = re.match(r"^/apis/apps/v1/namespaces/([^/]+)/deployments(?:/([^/]+))?$", norm)
+    if m:
+        ns, name = m.group(1), m.group(2)
+        deps = [d for d in state.get("deployments") or [] if d.get("namespace") == ns]
+        if name:
+            dep = next((d for d in deps if d.get("name") == name), None)
+            if not dep:
+                return 404, {
+                    "kind": "Status", "apiVersion": "v1", "status": "Failure",
+                    "message": f'deployments.apps "{name}" not found', "reason": "NotFound", "code": 404,
+                }
+            return 200, _deployment_to_k8s_object(dep)
+        items = [_deployment_to_k8s_object(d) for d in deps if _labels_match(d.get("labels") or {})]
+        return 200, {"kind": "DeploymentList", "apiVersion": "apps/v1", "items": items}
+
+    if norm == "/apis/apps/v1/deployments":
+        items = [
+            _deployment_to_k8s_object(d) for d in (state.get("deployments") or [])
+            if _labels_match(d.get("labels") or {})
+        ]
+        return 200, {"kind": "DeploymentList", "apiVersion": "apps/v1", "items": items}
+
+    if norm in ("/api", "/apis", "/healthz", "/readyz", "/livez"):
+        return 200, {"kind": "Status", "apiVersion": "v1", "status": "Success", "code": 200}
+
+    return 404, {
+        "kind": "Status", "apiVersion": "v1", "status": "Failure",
+        "message": f"Kubernetes API: unknown path {path}", "reason": "NotFound", "code": 404,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1185,6 +1511,50 @@ def validate_k8s_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, st
         if any(c.get("state") != "running" for c in pod.get("containers", [])):
             return False, f"Pod {pod_name} containers are not ready"
         return True, f"Pod {pod_name} is Running — validation passed"
+
+    if rules.get("require_secret_encrypted_at_rest"):
+        # Fail-CLOSED on purpose. The naive "fix" for this lab is to re-base64
+        # the value or re-apply the Secret manifest, which changes nothing about
+        # how etcd stores it — so we never look at the Secret's *encoding* or at
+        # its mere existence. Only two things count, and both are structural:
+        # an active non-identity encryption provider that the object was
+        # rewritten under, or an ExternalSecret that moves the value out of etcd
+        # entirely.
+        secret_name = rules["require_secret_encrypted_at_rest"]
+        namespace = rules.get("namespace", "production")
+        secret = _find_secret(state, secret_name, namespace)
+        if not secret:
+            return False, f"Secret {namespace}/{secret_name} not found — do not delete it, protect it"
+
+        if secret.get("source") == "external-secret" and secret.get("externalStore"):
+            return True, (
+                f"Secret {namespace}/{secret_name} is sourced from external store "
+                f"'{secret['externalStore']}' — the value no longer lives in etcd or git"
+            )
+
+        enc = state.get("encryption_config") or {}
+        providers = [str(p).lower() for p in (enc.get("providers") or [])]
+        if not enc.get("present") or not providers:
+            return False, (
+                "No EncryptionConfiguration on the API server — Secrets are still stored with the "
+                "identity provider. base64 in the manifest is encoding, not encryption."
+            )
+        if providers[0] == "identity":
+            return False, (
+                "'identity' is listed first in the EncryptionConfiguration, so writes are still "
+                "plaintext. Put a real provider (aescbc/aesgcm/secretbox/kms) first."
+            )
+        if "secrets" not in [str(r).lower() for r in (enc.get("resources") or [])]:
+            return False, "EncryptionConfiguration does not cover the 'secrets' resource"
+        if secret.get("storageEncoding", "base64") == "base64":
+            return False, (
+                f"Secret {namespace}/{secret_name} predates the encryption config and is still stored "
+                "in plaintext. Rewrite existing Secrets so they are re-encrypted."
+            )
+        return True, (
+            f"Secret {namespace}/{secret_name} is encrypted at rest with the "
+            f"{secret['storageEncoding']} provider — validation passed"
+        )
 
     if rules.get("require_pvc_bound"):
         pvc_name = rules["require_pvc_bound"]

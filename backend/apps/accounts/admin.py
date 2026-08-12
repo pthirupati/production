@@ -316,7 +316,14 @@ class EmailVerificationOTPAdmin(admin.ModelAdmin):
     list_display = ("email", "verified", "attempts", "created_at", "expires_at")
     list_filter = ("verified",)
     search_fields = ("email",)
-    readonly_fields = ("id", "email", "code", "session_token", "created_at", "expires_at", "attempts", "verified")
+    # Neither the code nor the session_token is displayed. `code` used to be a
+    # readonly_field, which meant any staff user could read a live OTP for any email
+    # and take over that account inside the validity window (audit Z4-11). It is
+    # hashed now, but a hash of a 6-digit number is trivially reversible offline, so
+    # it stays off the page — and session_token is a bearer credential for the same
+    # flow.
+    readonly_fields = ("id", "email", "created_at", "expires_at", "attempts", "verified")
+    exclude = ("code_hash", "session_token")
     date_hierarchy = "created_at"
 
 

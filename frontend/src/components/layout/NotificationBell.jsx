@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Check, CheckCheck, Award, Zap, AlertCircle, MessageCircle, Trash2, CreditCard, X } from 'lucide-react'
+import { Bell, CheckCheck, Award, Zap, AlertCircle, MessageCircle, Trash2, CreditCard, X } from '../../ui/eagerIcons'
 import { useNotificationStore } from '../../store/notificationStore'
 
 const TYPE_CONFIG = {
@@ -20,7 +20,10 @@ export default function NotificationBell({ variant = 'default' }) {
   const panelRef = useRef(null)
   const [pos, setPos] = useState({ top: 0, left: 0 })
 
-  // Poll every 60s
+  // Poll every 60s. `fetchNotifications` is a zustand action, so its identity is
+  // fixed at store creation and never changes across renders — listing it cannot
+  // recreate the interval or the listener, it just lets exhaustive-deps verify
+  // the effect instead of trusting a bare `[]`.
   useEffect(() => {
     fetchNotifications()
     const onVis = () => { if (document.visibilityState === 'visible') fetchNotifications() }
@@ -30,7 +33,7 @@ export default function NotificationBell({ variant = 'default' }) {
       clearInterval(interval)
       document.removeEventListener('visibilitychange', onVis)
     }
-  }, [])
+  }, [fetchNotifications])
 
   // Position the panel relative to the bell using a portal.
   // Right-aligned to the bell and clamped inside the viewport on both axes so
@@ -208,7 +211,7 @@ export default function NotificationBell({ variant = 'default' }) {
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); dismiss(n.id) }}
-                  className="p-1 text-surface-500 hover:text-surface-200 shrink-0"
+                  className="p-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-500 hover:text-surface-200 shrink-0"
                   aria-label="Dismiss notification"
                 >
                   <X size={14} />

@@ -15,39 +15,32 @@ description: 'CONTEXT: A team operating GPU operations has raised a ticket for `
   Bus`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline GPU node. The architecture is a single lab-primary
   node exposing nvidia-smi, drivers, CUDA, and container toolkit; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
 
   SYMPTOM / STARTING STATE: A node repeatedly logging Xid 79 (GPU has fallen off the bus); the affected
   GPU disappears from nvidia-smi and the run aborts each time it recurs. `dmesg | grep -i xid` shows `NVRM:
   Xid ... 79, GPU has fallen off the bus`. Xid 79 is the driver''s report that it lost PCIe communication
   with the GPU — usually power delivery, thermal, or a seating/link fault.
 
-
   OBJECTIVE: Confirm the Xid 79 events in dmesg and map them to the affected GPU; Investigate the likely
   cause (power, thermal, or PCIe link) behind the repeated Xid 79; Recover the GPU and confirm no further
   Xid 79 under load. Acceptance criteria: the change is minimal and reversible, and success means `nvidia-smi`
   includes `NVIDIA-SMI`.
-
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant nvidia-smi, drivers, CUDA, and container toolkit), changing one thing at a time.
   Check your work continuously against the objective — success means `nvidia-smi` includes `NVIDIA-SMI`.
 
-
   VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
   the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
   check, not just once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -98,7 +91,6 @@ hints:
 
     3. Confirm `nvidia-smi` shows the container Up.
 
-
     WHY: the checker validates the container is actually running.'
 summary: Diagnose and fix xid 79 gpu lost from the bus on a datacenter GPU node and verify with the checker
 estimated_minutes: 25
@@ -110,7 +102,7 @@ tags:
 - gpu
 - nvidia
 - hands-on
-linked_tutorial: gpu-fundamentals
+linked_tutorial: gpu-nvidia-zero-hero
 what_you_will_learn:
 - Confirm the Xid 79 events in dmesg and map them to the affected GPU
 - Investigate the likely cause (power, thermal, or PCIe link) behind the repeated Xid 79

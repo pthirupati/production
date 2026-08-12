@@ -73,6 +73,8 @@
   display: flex;
   flex: 1;
   min-height: 0;
+  /* Anchors the small-screen right-panel drawer + scrim below. */
+  position: relative;
 }
 
 .vsc-activity-bar {
@@ -277,6 +279,55 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+/*
+ * Below the lg breakpoint the right panel used to be plain `hidden`, which took
+ * the lab INSTRUCTIONS offline along with the Preview — on labs whose own text
+ * tells the learner to open Preview. Docking it as a side panel at this width
+ * would squeeze the editor to an unusable size, so on small screens it becomes
+ * an on-demand bottom sheet instead.
+ */
+.vsc-right-panel-drawer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: 25%;
+  width: auto;
+  z-index: 30;
+  border-left: none;
+  border-top: 1px solid var(--vsc-border);
+  box-shadow: 0 -8px 24px rgb(0 0 0 / 45%);
+}
+
+.vsc-right-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgb(0 0 0 / 45%);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.vsc-right-drawer-toggle {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  z-index: 25;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--vsc-border);
+  background: var(--vsc-accent);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 35%);
 }
 
 .vsc-right-header {

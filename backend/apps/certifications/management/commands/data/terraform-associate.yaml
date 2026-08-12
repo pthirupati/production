@@ -49,7 +49,6 @@ objectives:
     scenarios:
       - terraform-provider-version-conflict
       - terraform-provider-auth-expired
-      - terraform-module-version-pinning
 
   - code: terraform-associate.cli
     title: Use the Terraform CLI outside the core workflow
@@ -66,6 +65,10 @@ objectives:
     order: 5
     scenarios:
       - terraform-module-unpinned-broke
+      # Moved here from terraform-basics: it is a module-sourcing scenario, and
+      # basics had three refs while modules had one — below the two-scenario
+      # exam-pool floor, so every attempt served the same lab.
+      - terraform-module-version-pinning
 
   - code: terraform-associate.core-workflow
     title: Use the core Terraform workflow
@@ -73,6 +76,11 @@ objectives:
     order: 6
     scenarios:
       - terraform-plan-unexpected-destroy
+      # scenarios/devops/, not scenarios/terraform/ — both are core init/plan/
+      # apply-cycle labs and were the only live ones left outside the academy
+      # tracks. Needed to lift this objective off a single-scenario pool.
+      - terraform-drift-detected
+      - terraform-apply-failed
 
   - code: terraform-associate.state
     title: Implement and maintain state

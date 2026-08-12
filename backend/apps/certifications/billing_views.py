@@ -62,9 +62,9 @@ def fulfill_cert_track_subscription(*, user, track, amount_inr: int, razorpay_pa
     import hashlib
 
     from apps.billing.models import PaymentTransaction
-    from apps.billing.gst import compute_gst
+    from apps.billing.gst import compute_gst, place_of_supply_for
 
-    breakup = compute_gst(amount_inr)
+    breakup = compute_gst(amount_inr, place_of_supply=place_of_supply_for(user))
     # PaymentTransaction.idempotency_key is unique=True with no default. This
     # create() omitted it, so the FIRST certification purchase platform-wide
     # inserted "" and EVERY subsequent one raised IntegrityError — after Razorpay

@@ -131,12 +131,12 @@ LEARNING_PATH_LIMIT = 30
 _ACADEMY_SEQ = re.compile(r"academy-[\w-]+-(\d+)-")
 
 # Difficulty ordering for beginner learning paths: each tech's ordered lab list
-# ramps easy -> medium -> hard. Unknown/missing difficulty defaults to medium.
-DIFFICULTY_RANK = {"easy": 0, "medium": 1, "hard": 2}
+# ramps easy -> medium -> hard -> expert. Unknown/missing difficulty defaults to medium.
+DIFFICULTY_RANK = {"easy": 0, "medium": 1, "hard": 2, "expert": 3}
 
 
 def _difficulty_rank(meta_or_value) -> int:
-    """Return the difficulty rank (0=easy,1=medium,2=hard).
+    """Return the difficulty rank (0=easy … 3=expert).
 
     Accepts either a meta dict (with a ``difficulty`` key) or a raw string.
     Unknown/missing difficulty defaults to medium (1).

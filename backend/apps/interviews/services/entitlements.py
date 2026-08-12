@@ -118,10 +118,15 @@ def consume_interview_credit(user) -> bool:
         return True
     platform = get_platform_settings()
     limit = platform.free_campaigns_per_month
-    campaigns_this_month = user.interview_campaigns.filter(
+    from django.conf import settings as dj_settings
+    lifetime_cap = int(getattr(dj_settings, "INTERVIEW_FREE_CAMPAIGNS_LIFETIME", 3) or 0)
+    campaigns_qs = user.interview_campaigns.exclude(status="cancelled")
+    if lifetime_cap > 0 and campaigns_qs.count() >= lifetime_cap:
+        return False
+    campaigns_this_month = campaigns_qs.filter(
         created_at__month=timezone.now().month,
         created_at__year=timezone.now().year,
-    ).exclude(status="cancelled").count()
+    ).count()
     return campaigns_this_month < limit
 
 

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Loader2, Check, Play } from 'lucide-react'
+import { Loader2, Check, Play } from '../../../ui/eagerIcons'
 
 const HOSTS = [
   { name: 'esxi-01', color: '#4c9be8', width: '52%' },

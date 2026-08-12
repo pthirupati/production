@@ -161,17 +161,17 @@ function NewUserWizard({ ou, onClose, onDone }) {
       <div style={{ fontSize: 12, color: '#666', marginBottom: 10 }}>Create in: lab.local/Corp/{ou}</div>
       {page === 1 && (
         <div className="winos-grid2">
-          <span>First name:</span><input className="winos-input" value={first} onChange={(e) => { setFirst(e.target.value); setSam((e.target.value[0] || '' + last).toLowerCase() + last.toLowerCase()) }} />
-          <span>Last name:</span><input className="winos-input" value={last} onChange={(e) => { setLast(e.target.value); setSam(((first[0] || '') + e.target.value).toLowerCase()) }} />
-          <span>Full name:</span><input className="winos-input" value={display} readOnly />
-          <span>User logon name:</span><span><input className="winos-input" value={sam} onChange={(e) => setSam(e.target.value)} style={{ width: 130 }} /> @lab.local</span>
+          <span>First name:</span><input aria-label="First name" className="winos-input" value={first} onChange={(e) => { setFirst(e.target.value); setSam((e.target.value[0] || '' + last).toLowerCase() + last.toLowerCase()) }} />
+          <span>Last name:</span><input aria-label="Last name" className="winos-input" value={last} onChange={(e) => { setLast(e.target.value); setSam(((first[0] || '') + e.target.value).toLowerCase()) }} />
+          <span>Full name:</span><input aria-label="Full name" className="winos-input" value={display} readOnly />
+          <span>User logon name:</span><span><input aria-label="User logon name" className="winos-input" value={sam} onChange={(e) => setSam(e.target.value)} style={{ width: 130 }} /> @lab.local</span>
         </div>
       )}
       {page === 2 && (
         <div>
           <div className="winos-grid2" style={{ marginBottom: 12 }}>
-            <span>Password:</span><input className="winos-input" type="password" value={pw} onChange={(e) => setPw(e.target.value)} />
-            <span>Confirm password:</span><input className="winos-input" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} />
+            <span>Password:</span><input aria-label="Password" className="winos-input" type="password" value={pw} onChange={(e) => setPw(e.target.value)} />
+            <span>Confirm password:</span><input aria-label="Confirm password" className="winos-input" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} />
           </div>
           {pw && pw2 && pw !== pw2 && <div style={{ color: '#c42b1c', fontSize: 12, marginBottom: 8 }}>The passwords do not match.</div>}
           {[['mustChange', 'User must change password at next logon'], ['cantChange', 'User cannot change password'], ['neverExpire', 'Password never expires'], ['disabled', 'Account is disabled']].map(([k, l]) => (
@@ -216,14 +216,14 @@ function NewGroupWizard({ ou, onClose, onDone }) {
       footer={<><button className="winos-btn primary" disabled={!name.trim()} onClick={finish}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button></>}>
       <div style={{ fontSize: 12, color: '#666', marginBottom: 10 }}>Create in: lab.local/Corp/{ou}</div>
       <div className="winos-grid2" style={{ fontSize: 12.5 }}>
-        <span>Group name:</span><input className="winos-input" value={name} onChange={(e) => setName(e.target.value)} />
-        <span>Description:</span><input className="winos-input" value={desc} onChange={(e) => setDesc(e.target.value)} />
+        <span>Group name:</span><input aria-label="Group name" className="winos-input" value={name} onChange={(e) => setName(e.target.value)} />
+        <span>Description:</span><input aria-label="Description" className="winos-input" value={desc} onChange={(e) => setDesc(e.target.value)} />
         <span>Group scope:</span>
-        <select className="winos-input" value={scope} onChange={(e) => setScope(e.target.value)}>
+        <select aria-label="Group scope" className="winos-input" value={scope} onChange={(e) => setScope(e.target.value)}>
           {['DomainLocal', 'Global', 'Universal'].map((o) => <option key={o}>{o}</option>)}
         </select>
         <span>Group type:</span>
-        <select className="winos-input" value={category} onChange={(e) => setCategory(e.target.value)}>
+        <select aria-label="Group type" className="winos-input" value={category} onChange={(e) => setCategory(e.target.value)}>
           {['Security', 'Distribution'].map((o) => <option key={o}>{o}</option>)}
         </select>
       </div>
@@ -246,7 +246,7 @@ function AddToGroupDialog({ user, onClose, onDone }) {
     <Dialog title="Select Groups" onClose={onClose} width={420}
       footer={<><button className="winos-btn primary" disabled={!group} onClick={finish}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button></>}>
       <div style={{ fontSize: 12.5, marginBottom: 8 }}>Add {user.display || user.sam} to:</div>
-      <select className="winos-input" value={group} onChange={(e) => setGroup(e.target.value)} style={{ width: '100%' }}>
+      <select aria-label="Groups to add" className="winos-input" value={group} onChange={(e) => setGroup(e.target.value)} style={{ width: '100%' }}>
         {candidates.map((g) => <option key={g}>{g}</option>)}
       </select>
       {!candidates.length && <div style={{ color: '#888', marginTop: 8, fontSize: 12 }}>This user is already a member of all groups.</div>}
@@ -265,8 +265,8 @@ function ResetDialog({ user, onClose, onDone }) {
         onDone(); onClose()
       }}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button></>}>
       <div className="winos-grid2" style={{ fontSize: 12.5 }}>
-        <span>New password:</span><input className="winos-input" type="password" value={pw} onChange={(e) => setPw(e.target.value)} />
-        <span>Confirm password:</span><input className="winos-input" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} />
+        <span>New password:</span><input aria-label="New password" className="winos-input" type="password" value={pw} onChange={(e) => setPw(e.target.value)} />
+        <span>Confirm password:</span><input aria-label="Confirm password" className="winos-input" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} />
       </div>
       <label style={{ display: 'block', marginTop: 10, fontSize: 12.5 }}><input type="checkbox" defaultChecked /> User must change password at next logon</label>
       <label style={{ display: 'block', fontSize: 12.5 }}><input type="checkbox" defaultChecked /> Unlock the user's account</label>
@@ -282,7 +282,7 @@ function FindDialog({ onClose, onOpen }) {
     <Dialog title="Find Users, Contacts, and Groups" onClose={onClose} width={500}
       footer={<button className="winos-btn" onClick={onClose}>Close</button>}>
       <div style={{ fontSize: 12.5 }}>
-        <div style={{ marginBottom: 8 }}>Name: <input className="winos-input" style={{ width: 280 }} value={q} onChange={(e) => setQ(e.target.value)} autoFocus /> <button className="winos-btn primary">Find Now</button></div>
+        <div style={{ marginBottom: 8 }}>Name: <input aria-label="Name" className="winos-input" style={{ width: 280 }} value={q} onChange={(e) => setQ(e.target.value)} autoFocus /> <button className="winos-btn primary">Find Now</button></div>
         <div style={{ border: '1px solid #ddd', height: 220, overflow: 'auto' }}>
           <table className="winos-table"><thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
             <tbody>{results.map((u) => (<tr key={u.sam} onDoubleClick={() => onOpen(u)}><td><User size={12} /> {u.display}</td><td>User</td><td>{u.title}</td></tr>))}</tbody>
@@ -342,27 +342,27 @@ function UserProps({ user, onClose }) {
       <div style={{ paddingTop: 12, fontSize: 12.5, minHeight: 240 }}>
         {tab === 'General' && (
           <div className="winos-grid2">
-            <span>First name:</span><input className="winos-input" value={form.first} onChange={(e) => set('first', e.target.value)} />
-            <span>Last name:</span><input className="winos-input" value={form.last} onChange={(e) => set('last', e.target.value)} />
-            <span>Display name:</span><input className="winos-input" value={form.display} onChange={(e) => set('display', e.target.value)} />
-            <span>Description:</span><input className="winos-input" value={form.title} onChange={(e) => set('title', e.target.value)} />
-            <span>Office:</span><input className="winos-input" value={form.office} onChange={(e) => set('office', e.target.value)} />
-            <span>Telephone number:</span><input className="winos-input" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
-            <span>E-mail:</span><input className="winos-input" value={form.email} onChange={(e) => set('email', e.target.value)} />
+            <span>First name:</span><input aria-label="First name" className="winos-input" value={form.first} onChange={(e) => set('first', e.target.value)} />
+            <span>Last name:</span><input aria-label="Last name" className="winos-input" value={form.last} onChange={(e) => set('last', e.target.value)} />
+            <span>Display name:</span><input aria-label="Display name" className="winos-input" value={form.display} onChange={(e) => set('display', e.target.value)} />
+            <span>Description:</span><input aria-label="Description" className="winos-input" value={form.title} onChange={(e) => set('title', e.target.value)} />
+            <span>Office:</span><input aria-label="Office" className="winos-input" value={form.office} onChange={(e) => set('office', e.target.value)} />
+            <span>Telephone number:</span><input aria-label="Telephone number" className="winos-input" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+            <span>E-mail:</span><input aria-label="E-mail" className="winos-input" value={form.email} onChange={(e) => set('email', e.target.value)} />
           </div>
         )}
         {tab === 'Address' && (
           <div className="winos-grid2">
-            <span>Street:</span><textarea className="winos-input" rows={2} defaultValue="123 Lab Street" />
-            <span>City:</span><input className="winos-input" defaultValue="Metropolis" />
-            <span>State/province:</span><input className="winos-input" defaultValue="NY" />
-            <span>Zip/Postal Code:</span><input className="winos-input" defaultValue="10001" />
-            <span>Country/region:</span><select className="winos-input"><option>United States</option></select>
+            <span>Street:</span><textarea aria-label="Street" className="winos-input" rows={2} defaultValue="123 Lab Street" />
+            <span>City:</span><input aria-label="City" className="winos-input" defaultValue="Metropolis" />
+            <span>State/province:</span><input aria-label="State/province" className="winos-input" defaultValue="NY" />
+            <span>Zip/Postal Code:</span><input aria-label="Zip/Postal Code" className="winos-input" defaultValue="10001" />
+            <span>Country/region:</span><select aria-label="Country/region" className="winos-input"><option>United States</option></select>
           </div>
         )}
         {tab === 'Account' && (
           <div className="winos-grid2">
-            <span>User logon name:</span><span><input className="winos-input" value={form.sam} readOnly style={{ width: 120 }} /> @lab.local</span>
+            <span>User logon name:</span><span><input aria-label="User logon name" className="winos-input" value={form.sam} readOnly style={{ width: 120 }} /> @lab.local</span>
             <span>Logon Hours:</span><button className="winos-btn" style={{ width: 'fit-content' }}>Logon Hours…</button>
             <span>Log On To:</span><button className="winos-btn" style={{ width: 'fit-content' }}>Log On To…</button>
             <span style={{ alignSelf: 'start' }}>Account options:</span>
@@ -378,27 +378,27 @@ function UserProps({ user, onClose }) {
         )}
         {tab === 'Profile' && (
           <div className="winos-grid2">
-            <span>Profile path:</span><input className="winos-input" defaultValue={`\\\\server01\\profiles\\${form.sam}`} />
-            <span>Logon script:</span><input className="winos-input" defaultValue="logon.bat" />
-            <span>Home folder:</span><span><label><input type="radio" name="hf" defaultChecked /> Connect</label> <select className="winos-input"><option>Z:</option></select> to <input className="winos-input" defaultValue={`\\\\server01\\home\\${form.sam}`} style={{ width: 150 }} /></span>
+            <span>Profile path:</span><input aria-label="Profile path" className="winos-input" defaultValue={`\\\\server01\\profiles\\${form.sam}`} />
+            <span>Logon script:</span><input aria-label="Logon script" className="winos-input" defaultValue="logon.bat" />
+            <span>Home folder:</span><span><label><input type="radio" name="hf" defaultChecked /> Connect</label> <select aria-label="Home folder drive letter" className="winos-input"><option>Z:</option></select> to <input aria-label="Home folder path" className="winos-input" defaultValue={`\\\\server01\\home\\${form.sam}`} style={{ width: 150 }} /></span>
           </div>
         )}
         {tab === 'Telephones' && (
           <div className="winos-grid2">
-            <span>Home:</span><input className="winos-input" />
-            <span>Pager:</span><input className="winos-input" />
-            <span>Mobile:</span><input className="winos-input" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
-            <span>Fax:</span><input className="winos-input" />
-            <span>IP phone:</span><input className="winos-input" />
-            <span style={{ alignSelf: 'start' }}>Notes:</span><textarea className="winos-input" rows={3} />
+            <span>Home:</span><input aria-label="Home" className="winos-input" />
+            <span>Pager:</span><input aria-label="Pager" className="winos-input" />
+            <span>Mobile:</span><input aria-label="Mobile" className="winos-input" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+            <span>Fax:</span><input aria-label="Fax" className="winos-input" />
+            <span>IP phone:</span><input aria-label="IP phone" className="winos-input" />
+            <span style={{ alignSelf: 'start' }}>Notes:</span><textarea aria-label="Notes" className="winos-input" rows={3} />
           </div>
         )}
         {tab === 'Organization' && (
           <div className="winos-grid2">
-            <span>Title:</span><input className="winos-input" value={form.title} onChange={(e) => set('title', e.target.value)} />
-            <span>Department:</span><input className="winos-input" value={form.dept} onChange={(e) => set('dept', e.target.value)} />
-            <span>Company:</span><input className="winos-input" value={form.company} onChange={(e) => set('company', e.target.value)} />
-            <span>Manager:</span><span><input className="winos-input" value={form.manager} readOnly style={{ width: 180 }} /> <button className="winos-btn">Change…</button></span>
+            <span>Title:</span><input aria-label="Title" className="winos-input" value={form.title} onChange={(e) => set('title', e.target.value)} />
+            <span>Department:</span><input aria-label="Department" className="winos-input" value={form.dept} onChange={(e) => set('dept', e.target.value)} />
+            <span>Company:</span><input aria-label="Company" className="winos-input" value={form.company} onChange={(e) => set('company', e.target.value)} />
+            <span>Manager:</span><span><input aria-label="Manager" className="winos-input" value={form.manager} readOnly style={{ width: 180 }} /> <button className="winos-btn">Change…</button></span>
           </div>
         )}
         {tab === 'Member Of' && (
@@ -408,7 +408,7 @@ function UserProps({ user, onClose }) {
               {form.groups.map((g) => <div key={g} className="winos-tree-row"><Users size={12} /> {g}</div>)}
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
-              <select className="winos-input" id="grpadd" style={{ flex: 1 }}>{allGroups.filter((g) => !form.groups.includes(g)).map((g) => <option key={g}>{g}</option>)}</select>
+              <select aria-label="Group to add" className="winos-input" id="grpadd" style={{ flex: 1 }}>{allGroups.filter((g) => !form.groups.includes(g)).map((g) => <option key={g}>{g}</option>)}</select>
               <button className="winos-btn" onClick={addGroup}>Add…</button>
               <button className="winos-btn" onClick={removeGroup}>Remove</button>
             </div>

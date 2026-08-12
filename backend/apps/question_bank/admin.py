@@ -4,7 +4,6 @@ Question bank admin — Technology, Scenario, Tag.
 import csv
 
 from django.contrib import admin, messages
-from django.core.cache import cache
 from django.http import HttpResponse
 from django.utils.html import format_html
 
@@ -12,13 +11,16 @@ from .models import Scenario, Tag, Technology, Project, ProjectTask, UserProject
 
 
 def _clear_technology_caches():
-    """Bust all technology-related API caches so changes are reflected immediately."""
-    cache.delete("technologies_list")
-    cache.delete_many([
-        "technologies_list",
-        "scenarios_list_all",
-        "pricing_technologies",
-    ])
+    """Bust all technology-related API caches so changes are reflected immediately.
+
+    Delegates to `cache_utils` (audit Z5-14). This used to keep its own list, and
+    the two drifted: both deleted `technologies_list` while the view had moved to
+    `technologies_list_v2`, so neither invalidator actually cleared the technologies
+    list. One list, in one place, is the fix for that class of bug.
+    """
+    from .cache_utils import invalidate_technologies_cache
+
+    invalidate_technologies_cache()
 
 
 # ---------------------------------------------------------------------------
@@ -269,7 +271,7 @@ class ScenarioAdmin(admin.ModelAdmin):
 
     @admin.display(description="Difficulty")
     def difficulty_badge(self, obj):
-        colors = {"easy": "green", "medium": "orange", "hard": "red"}
+        colors = {"easy": "green", "medium": "orange", "hard": "red", "expert": "purple"}
         return format_html(
             '<span style="color:{};font-weight:bold;">{}</span>',
             colors.get(obj.difficulty, "black"),

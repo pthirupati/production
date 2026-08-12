@@ -34,6 +34,14 @@ export function LabChromeControls({
   hintsLabel = 'Hints',
   checkDisabled = false,
   extendDisabled = false,
+  // Why a control is greyed out. ~14 simulators pass checkDisabled/extendDisabled
+  // as bare booleans with no reason, so these default to a generic-but-true
+  // explanation rather than an empty tooltip (audit L2306). Callers that know
+  // more — LabRunner distinguishes "already solved" from "check in flight" —
+  // pass a specific string. The buttons stay `disabled`: an enabled button that
+  // only toasts would let a learner spam the rate-limited grader.
+  checkDisabledReason = 'Check is unavailable right now — a check is already running, or this lab is already solved.',
+  extendDisabledReason = 'You cannot extend right now — an extension is in flight, or you have used both of today\'s extensions.',
   backLabel = 'Back to terminal',
   showTimer = true,
   timeRemaining,
@@ -62,15 +70,34 @@ export function LabChromeControls({
           <Lightbulb size={13} className="text-[#F5A623]" /> {hintsLabel}
         </button>
       )}
+      {/* A `disabled` button does not fire pointer events, so its own title
+          never shows. The wrapper span is what the browser hovers, which is why
+          the tooltip lives there and not on the button. */}
       {onCheck && (
-        <button type="button" className={buttonClass} onClick={onCheck} disabled={checkDisabled}>
-          <CheckCircle2 size={13} className="text-[#56e0b0]" /> Check
-        </button>
+        <span title={checkDisabled ? checkDisabledReason : 'Grade your work against this lab\'s checks'} className="inline-flex">
+          <button
+            type="button"
+            className={buttonClass}
+            onClick={onCheck}
+            disabled={checkDisabled}
+            aria-label={checkDisabled ? `Check — ${checkDisabledReason}` : 'Check'}
+          >
+            <CheckCircle2 size={13} className="text-[#56e0b0]" /> Check
+          </button>
+        </span>
       )}
       {onExtend && (
-        <button type="button" className={buttonClass} onClick={onExtend} disabled={extendDisabled}>
-          <Clock size={13} /> +30m
-        </button>
+        <span title={extendDisabled ? extendDisabledReason : 'Add 30 minutes to this lab'} className="inline-flex">
+          <button
+            type="button"
+            className={buttonClass}
+            onClick={onExtend}
+            disabled={extendDisabled}
+            aria-label={extendDisabled ? `Add 30 minutes — ${extendDisabledReason}` : 'Add 30 minutes'}
+          >
+            <Clock size={13} /> +30m
+          </button>
+        </span>
       )}
       {onStop && (
         <button type="button" className={buttonClass} onClick={onStop}>
@@ -105,6 +132,8 @@ export default function LabChromeBar({
   hintsLabel,
   checkDisabled,
   extendDisabled,
+  checkDisabledReason,
+  extendDisabledReason,
   timeRemaining,
   showTimer = true,
   backLabel = 'Terminal',
@@ -131,6 +160,8 @@ export default function LabChromeBar({
           hintsLabel={hintsLabel}
           checkDisabled={checkDisabled}
           extendDisabled={extendDisabled}
+          checkDisabledReason={checkDisabledReason}
+          extendDisabledReason={extendDisabledReason}
           timeRemaining={timeRemaining}
           showTimer={showTimer}
           backLabel={backLabel}

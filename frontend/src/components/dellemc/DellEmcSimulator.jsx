@@ -6,7 +6,7 @@ import {
   Terminal, Eye, Link2, Boxes, Archive, Cpu, CircuitBoard,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
-import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession, SimLoginGateCard } from '../sim/shared'
 import { renderDellEmcV2Page } from './DellEmcV2Panels'
 import '../../styles/sim-products.css'
 import './dellemc.css'
@@ -95,7 +95,7 @@ export default function DellEmcSimulator({
       <div className={simPanelRoot(embedded, 'bg-[#04213f]')}>
         <LabChromeBar title="Dell EMC Unisphere" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
+          <SimLoginGateCard title="Sign in to Dell EMC" onClose={onExit} className="bg-white rounded-lg shadow-2xl w-full max-w-[400px] overflow-hidden">
             <div className="px-6 py-4 text-white font-semibold flex items-center gap-2" style={{ background: ACCENT }}>
               <HardDrive size={18} /> Unisphere for PowerMax
             </div>
@@ -128,7 +128,7 @@ export default function DellEmcSimulator({
                 Training credentials: <span className="font-mono text-slate-700">{DE_LAB_USER}</span> / <span className="font-mono text-slate-700">{DE_LAB_PASS}</span>
               </p>
             </form>
-          </div>
+          </SimLoginGateCard>
         </div>
       </div>
     )

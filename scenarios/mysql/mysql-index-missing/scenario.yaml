@@ -1,3 +1,4 @@
+is_active: true
 title: Add a missing index for slow queries
 slug: mysql-index-missing
 technology: mysql
@@ -6,36 +7,29 @@ description: 'CONTEXT: A team operating MySQL has raised a ticket for `Add a mis
   A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-
   ENVIRONMENT: You are working in FixitLab''s offline MySQL instance. The architecture is a single lab-primary
   node exposing mysql client, InnoDB, grants, and slow query log; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-
   SYMPTOM / STARTING STATE: A report query scans the full orders table. Add the correct index.
-
 
   OBJECTIVE: Understand the current failure mode affecting Add a missing index for slow queries; Restore
   expected service behavior with a minimal, documented change; Verify the fix holds under a realistic
   smoke test. Acceptance criteria: the change is minimal and reversible, and success means all hidden
   tests pass.
 
-
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant mysql client, InnoDB, grants, and slow query log), changing one thing at a time.
   Check your work continuously against the objective — success means all hidden tests pass.
 
-
   VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
   output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
   once.
 
-
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
   config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
   Never stack unverified changes.
-
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
@@ -100,23 +94,90 @@ hints:
 
     3. Confirm every test passes.
 
-
     WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: A report query scans the full orders table. Add the correct index.
+  instructions: 'A report query scans the whole orders table. Fix solution(conn) so it creates the index
+    the query actually needs and returns its name. The hot query filters on customer_id and then orders
+    by created_at, so a composite index on (customer_id, created_at) in that order is required - a single-column
+    index on customer_id alone still leaves a filesort. Name it ''idx_orders_customer_created''.
+
+    Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
+    content: "def solution(conn):\n    # BUG: indexes only the filter column, so MySQL still has to sort\
+      \ the\n    # matched rows by created_at.\n    conn.execute(\"CREATE INDEX idx_orders_customer_created\
+      \ ON orders(customer_id)\")\n    return 'idx_orders_customer_created'\n"
     readonly: false
   visible_tests:
-  - name: placeholder
-    code: assert callable(solution)
+  - name: index is created with the expected name
+    code: "import sqlite3\ndef _seed():\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, \"\n        \"created_at\
+      \ TEXT, total REAL);\")\n    conn.executemany(\n        \"INSERT INTO orders (customer_id, created_at,\
+      \ total) VALUES (?,?,?)\",\n        [(i % 10, '2026-01-%02d' % ((i % 28) + 1), i * 1.5) for i in\
+      \ range(200)])\n    return conn\ndef _indexes(conn):\n    return [r[0] for r in conn.execute(\n\
+      \        \"SELECT name FROM sqlite_master WHERE type='index' AND name IS NOT NULL\")]\ndef _index_cols(conn,\
+      \ name):\n    return [r[2] for r in conn.execute(\"PRAGMA index_info('%s')\" % name)]\ndef _plan(conn,\
+      \ sql):\n    return ' '.join(str(r) for r in conn.execute(\"EXPLAIN QUERY PLAN \" + sql))\nconn\
+      \ = _seed()\nassert solution(conn) == 'idx_orders_customer_created', solution(conn)\n"
+  - name: index exists on the orders table
+    code: "import sqlite3\ndef _seed():\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, \"\n        \"created_at\
+      \ TEXT, total REAL);\")\n    conn.executemany(\n        \"INSERT INTO orders (customer_id, created_at,\
+      \ total) VALUES (?,?,?)\",\n        [(i % 10, '2026-01-%02d' % ((i % 28) + 1), i * 1.5) for i in\
+      \ range(200)])\n    return conn\ndef _indexes(conn):\n    return [r[0] for r in conn.execute(\n\
+      \        \"SELECT name FROM sqlite_master WHERE type='index' AND name IS NOT NULL\")]\ndef _index_cols(conn,\
+      \ name):\n    return [r[2] for r in conn.execute(\"PRAGMA index_info('%s')\" % name)]\ndef _plan(conn,\
+      \ sql):\n    return ' '.join(str(r) for r in conn.execute(\"EXPLAIN QUERY PLAN \" + sql))\nconn\
+      \ = _seed()\nsolution(conn)\nassert 'idx_orders_customer_created' in _indexes(conn), _indexes(conn)\n"
   hidden_tests:
-  - name: placeholder_hidden
-    code: assert callable(solution)
+  - name: index covers both columns in order
+    code: "import sqlite3\ndef _seed():\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, \"\n        \"created_at\
+      \ TEXT, total REAL);\")\n    conn.executemany(\n        \"INSERT INTO orders (customer_id, created_at,\
+      \ total) VALUES (?,?,?)\",\n        [(i % 10, '2026-01-%02d' % ((i % 28) + 1), i * 1.5) for i in\
+      \ range(200)])\n    return conn\ndef _indexes(conn):\n    return [r[0] for r in conn.execute(\n\
+      \        \"SELECT name FROM sqlite_master WHERE type='index' AND name IS NOT NULL\")]\ndef _index_cols(conn,\
+      \ name):\n    return [r[2] for r in conn.execute(\"PRAGMA index_info('%s')\" % name)]\ndef _plan(conn,\
+      \ sql):\n    return ' '.join(str(r) for r in conn.execute(\"EXPLAIN QUERY PLAN \" + sql))\nconn\
+      \ = _seed()\nsolution(conn)\ncols = _index_cols(conn, 'idx_orders_customer_created')\nassert cols\
+      \ == ['customer_id','created_at'], cols\n"
+  - name: filter column leads the index
+    code: "import sqlite3\ndef _seed():\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, \"\n        \"created_at\
+      \ TEXT, total REAL);\")\n    conn.executemany(\n        \"INSERT INTO orders (customer_id, created_at,\
+      \ total) VALUES (?,?,?)\",\n        [(i % 10, '2026-01-%02d' % ((i % 28) + 1), i * 1.5) for i in\
+      \ range(200)])\n    return conn\ndef _indexes(conn):\n    return [r[0] for r in conn.execute(\n\
+      \        \"SELECT name FROM sqlite_master WHERE type='index' AND name IS NOT NULL\")]\ndef _index_cols(conn,\
+      \ name):\n    return [r[2] for r in conn.execute(\"PRAGMA index_info('%s')\" % name)]\ndef _plan(conn,\
+      \ sql):\n    return ' '.join(str(r) for r in conn.execute(\"EXPLAIN QUERY PLAN \" + sql))\nconn\
+      \ = _seed()\nsolution(conn)\nassert _index_cols(conn, 'idx_orders_customer_created')[0] == 'customer_id'\n"
+  - name: planner uses the index for the hot query
+    code: "import sqlite3\ndef _seed():\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, \"\n        \"created_at\
+      \ TEXT, total REAL);\")\n    conn.executemany(\n        \"INSERT INTO orders (customer_id, created_at,\
+      \ total) VALUES (?,?,?)\",\n        [(i % 10, '2026-01-%02d' % ((i % 28) + 1), i * 1.5) for i in\
+      \ range(200)])\n    return conn\ndef _indexes(conn):\n    return [r[0] for r in conn.execute(\n\
+      \        \"SELECT name FROM sqlite_master WHERE type='index' AND name IS NOT NULL\")]\ndef _index_cols(conn,\
+      \ name):\n    return [r[2] for r in conn.execute(\"PRAGMA index_info('%s')\" % name)]\ndef _plan(conn,\
+      \ sql):\n    return ' '.join(str(r) for r in conn.execute(\"EXPLAIN QUERY PLAN \" + sql))\nconn\
+      \ = _seed()\nsolution(conn)\nplan = _plan(conn, \"SELECT id FROM orders WHERE customer_id=3 ORDER\
+      \ BY created_at\")\nassert 'idx_orders_customer_created' in plan, plan\n"
+  - name: no separate sort step remains
+    code: "import sqlite3\ndef _seed():\n    conn = sqlite3.connect(':memory:')\n    conn.executescript(\n\
+      \        \"CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, \"\n        \"created_at\
+      \ TEXT, total REAL);\")\n    conn.executemany(\n        \"INSERT INTO orders (customer_id, created_at,\
+      \ total) VALUES (?,?,?)\",\n        [(i % 10, '2026-01-%02d' % ((i % 28) + 1), i * 1.5) for i in\
+      \ range(200)])\n    return conn\ndef _indexes(conn):\n    return [r[0] for r in conn.execute(\n\
+      \        \"SELECT name FROM sqlite_master WHERE type='index' AND name IS NOT NULL\")]\ndef _index_cols(conn,\
+      \ name):\n    return [r[2] for r in conn.execute(\"PRAGMA index_info('%s')\" % name)]\ndef _plan(conn,\
+      \ sql):\n    return ' '.join(str(r) for r in conn.execute(\"EXPLAIN QUERY PLAN \" + sql))\nconn\
+      \ = _seed()\nsolution(conn)\nplan = _plan(conn, \"SELECT id FROM orders WHERE customer_id=3 ORDER\
+      \ BY created_at\")\nassert 'TEMP B-TREE' not in plan.upper(), plan\n"
   timeout: 8
 summary: Complete the add a missing index for slow queries mysql lab and verify success with the checker
 estimated_minutes: 20
@@ -127,7 +188,7 @@ tags:
 - fix
 - hands-on
 - mysql
-linked_tutorial: mysql-fundamentals
+linked_tutorial: mysql-dba-zero-hero
 what_you_will_learn:
 - Understand the current failure mode affecting Add a missing index for slow queries
 - Restore expected service behavior with a minimal, documented change

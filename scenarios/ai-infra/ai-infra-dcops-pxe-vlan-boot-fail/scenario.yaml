@@ -15,14 +15,11 @@ description: 'CONTEXT: DCOps / Bare Metal ticket (PSINFRA board) — new nodes o
   fabric are failing PXE discovery because the wrong VLAN tag reaches the NIC. Enlist never
   starts, so the fleet bring-up queue is stalled behind this node.
 
-
   ENVIRONMENT: Bare Metal (MAAS) console + Lab Terminal + Datacenter twin for rack/PXE fabric
   context. Treat gpu-node-02 as the production canary for this incident.
 
-
   SYMPTOM / STARTING STATE: PXE discovery fails — the provisioning fabric is tagging the wrong
   VLAN, so gpu-node-02 never reaches the MAAS enlist path.
-
 
   OBJECTIVE: Open Bare Metal from the lab toolbar; fix the PXE VLAN configuration in the
   IPMI/MAAS view; verify the machine can enter commissioning; leave FIXED-OK once enlist
