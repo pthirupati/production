@@ -153,7 +153,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-smoke-report-${{ github.run_id }}
           path: playwright-report/
@@ -162,7 +162,7 @@ jobs:
 
       - name: Upload failure screenshots
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-screenshots-${{ github.run_id }}
           path: playwright-results/
@@ -351,7 +351,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: merge-gate-smoke-report-${{ github.run_id }}
           path: playwright-report/
@@ -360,7 +360,7 @@ jobs:
 
       - name: Upload failure screenshots
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: merge-gate-screenshots-${{ github.run_id }}
           path: playwright-results/

@@ -119,7 +119,7 @@ jobs:
 
       - name: Upload E2E logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-labs-logs-${{ github.run_id }}
           path: e2e-labs-output.log
@@ -171,7 +171,7 @@ jobs:
         run: python ../scripts/e2e_all_scenarios_labs.py
       - name: Upload simulation results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: simulation-labs-results-${{ github.run_id }}
           path: /tmp/e2e-simulation-*.log
@@ -207,14 +207,14 @@ jobs:
             --timeout=90000
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-lab-report-${{ github.run_id }}
           path: playwright-report/
           retention-days: 14
       - name: Upload failure screenshots
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lab-screenshots-${{ github.run_id }}
           path: playwright-lab-results/

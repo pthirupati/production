@@ -1073,7 +1073,7 @@ jobs:
           # USE_DOCKERHUB/IMAGE_TAG/FIXITLAB_IMAGE_NS here: cluster_ips.env never
           # carries pull config, and ci-cluster-deploy.sh leaves IMG_ENV empty.
           echo "wrote _cluster/cluster_ips.env ($(wc -l < _cluster/cluster_ips.env) lines)"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cluster-edge-host
           path: |
@@ -1123,7 +1123,7 @@ jobs:
           openssl enc -aes-256-cbc -pbkdf2 -salt -pass "pass:$ENC_PASS" \
             -in .env.cluster -out _cluster/cluster.env.enc
           echo "Encrypted wired env -> _cluster/cluster.env.enc ($(wc -c < _cluster/cluster.env.enc) bytes)"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cluster-env-enc
           path: _cluster/cluster.env.enc
