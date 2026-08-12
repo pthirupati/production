@@ -64,9 +64,10 @@ export function applyAuthHeaders(headers = {}, auth = { type: 'none' }) {
     out.Authorization = `Bearer ${auth.token}`
   } else if (type === 'basic' && (auth.username || auth.password) && !hasAuth) {
     const raw = `${auth.username || ''}:${auth.password || ''}`
+    // Prefer browser btoa; UTF-8-safe via encodeURIComponent (no Node Buffer).
     const b64 = typeof btoa === 'function'
-      ? btoa(raw)
-      : Buffer.from(raw, 'utf8').toString('base64')
+      ? btoa(unescape(encodeURIComponent(raw)))
+      : ''
     out.Authorization = `Basic ${b64}`
   } else if (type === 'apikey' && auth.key && auth.value) {
     const hk = auth.key
