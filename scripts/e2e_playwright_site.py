@@ -77,7 +77,10 @@ def register_test_user():
         otp = EmailVerificationOTP.objects.filter(email=email).order_by("-created_at").first()
         if not otp:
             return None, None
-        api_post("/auth/verify-otp/", {"session_token": otp.session_token, "code": otp.code})
+        code = EmailVerificationOTP.e2e_peek_code(otp.session_token)
+        if not code:
+            return None, None
+        api_post("/auth/verify-otp/", {"session_token": otp.session_token, "code": code})
         st, reg = api_post("/auth/register/", {
             "email": email, "password": password,
             "session_token": otp.session_token,

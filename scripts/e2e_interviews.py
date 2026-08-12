@@ -75,9 +75,12 @@ def run_interview_e2e(s: Suite) -> None:
             from apps.accounts.models import EmailVerificationOTP
             otp_obj = EmailVerificationOTP.objects.filter(email=user_email).order_by("-created_at").first()
             if otp_obj:
+                code = EmailVerificationOTP.e2e_peek_code(otp_obj.session_token)
+                if not code:
+                    raise RuntimeError("e2e OTP cache miss")
                 st, _ = api("POST", "/api/auth/verify-otp/", data={
                     "session_token": otp_obj.session_token,
-                    "code": otp_obj.code,
+                    "code": code,
                 })
                 st, reg = api("POST", "/api/auth/register/", data={
                     "email": user_email,
