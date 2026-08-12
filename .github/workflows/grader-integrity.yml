@@ -50,10 +50,10 @@ jobs:
   grader-integrity:
     name: Grader integrity (no fail-open labs)
     runs-on: ubuntu-latest
-    # The scan builds a simulation engine per scenario across ~7.3k scenarios, so it
-    # is minutes, not seconds. It had no timeout at all, which means a hang would sit
-    # on GitHub's 6-hour default; 30 gives generous headroom over the observed run.
-    timeout-minutes: 30
+    # The scan builds a simulation engine per scenario across ~7.3k scenarios.
+    # Observed GHA runs hit the 30m ceiling and cancel mid-scan; 60m gives
+    # headroom without approaching GitHub's 6h default hang limit.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
