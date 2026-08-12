@@ -77,7 +77,7 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node for Playwright
         uses: actions/setup-node@v4
@@ -209,7 +209,7 @@ jobs:
       STACK_URL: http://localhost:8080
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-python-backend
 
