@@ -151,7 +151,7 @@ coding_spec:
     code: 'assert json_status(200) == {''status'': 200, ''ok'': True}'
   hidden_tests:
   - name: nf
-    code: assert json_status(404) == {'status': 404, 'ok': False}
+    code: "assert json_status(404) == {'status': 404, 'ok': False}"
   - name: n
     code: assert json_status(204)['ok'] is True
   - name: s89_case_2
