@@ -53,7 +53,7 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
-    "@eslint/js": "^9.17.0",
+    "@eslint/js": "^10.0.1",
     "@mediapipe/selfie_segmentation": "0.1.1675465747",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
