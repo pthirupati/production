@@ -20,6 +20,16 @@ describe('public nav does not advertise authenticated routes', () => {
     expect(PUBLIC_NAV_SECONDARY.some((l) => l.to === '/#tech')).toBe(true)
   })
 
+  it('Pricing lives in secondary so the primary header stays one row', () => {
+    expect(PUBLIC_NAV_PRIMARY.some((l) => l.to === '/pricing')).toBe(false)
+    expect(PUBLIC_NAV_SECONDARY.some((l) => l.to === '/pricing')).toBe(true)
+  })
+
+  it('Verify uses a short label in the primary header', () => {
+    const verify = PUBLIC_NAV_PRIMARY.find((l) => l.to === '/verify-certificate')
+    expect(verify?.label).toBe('Verify')
+  })
+
   it('Journeys stays on the public (pre-login) primary nav', () => {
     expect(PUBLIC_NAV_PRIMARY.some((l) => l.to === '/journeys')).toBe(true)
   })

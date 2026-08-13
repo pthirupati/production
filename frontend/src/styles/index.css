@@ -3632,20 +3632,32 @@ body::after {
 .fx-marketing-nav-links {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 2px;
-  margin-left: 6px;
+  flex-wrap: nowrap;
+  gap: 0;
+  margin-left: 4px;
   min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.fx-marketing-nav-links::-webkit-scrollbar {
+  display: none;
 }
 .fx-marketing-nav-link {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.66);
   text-decoration: none;
-  padding: 7px 12px;
+  padding: 6px 8px;
   border-radius: 9px;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: color 0.18s, background 0.18s, box-shadow 0.18s;
+}
+@media (min-width: 1280px) {
+  .fx-marketing-nav-link {
+    font-size: 14px;
+    padding: 7px 10px;
+  }
 }
 .fx-marketing-nav-link:hover {
   color: #fff;

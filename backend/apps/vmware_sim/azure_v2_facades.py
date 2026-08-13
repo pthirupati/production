@@ -619,4 +619,36 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         state.setdefault("public_ips", []).append(item)
         return {"ok": True, "message": f"Created public IP {name}", "public_ip": item}
 
+    if action == "associate_public_ip":
+        pip_name = (payload.get("name") or payload.get("pip_name") or "").strip()
+        vm_name = (payload.get("vm_name") or payload.get("attached_to") or "").strip()
+        pip = next((p for p in (state.get("public_ips") or []) if p.get("name") == pip_name), None)
+        if not pip:
+            return {"ok": False, "error": f"Public IP '{pip_name}' not found"}
+        vm = next((v for v in (state.get("vms") or []) if v.get("name") == vm_name), None)
+        if not vm:
+            return {"ok": False, "error": f"VM '{vm_name}' not found"}
+        if pip.get("attached_to") and pip["attached_to"] != vm_name:
+            return {"ok": False, "error": f"Public IP already associated to {pip['attached_to']}"}
+        # Detach any prior PIP from this VM.
+        for other in state.get("public_ips") or []:
+            if other.get("attached_to") == vm_name and other.get("name") != pip_name:
+                other["attached_to"] = ""
+        pip["attached_to"] = vm_name
+        vm["public_ip"] = pip.get("ip") or ""
+        return {"ok": True, "message": f"Associated {pip_name} → {vm_name}", "public_ip": pip, "vm": vm}
+
+    if action == "disassociate_public_ip":
+        pip_name = (payload.get("name") or payload.get("pip_name") or "").strip()
+        pip = next((p for p in (state.get("public_ips") or []) if p.get("name") == pip_name), None)
+        if not pip:
+            return {"ok": False, "error": f"Public IP '{pip_name}' not found"}
+        vm_name = pip.get("attached_to") or ""
+        if vm_name:
+            vm = next((v for v in (state.get("vms") or []) if v.get("name") == vm_name), None)
+            if vm and vm.get("public_ip") == pip.get("ip"):
+                vm["public_ip"] = ""
+        pip["attached_to"] = ""
+        return {"ok": True, "message": f"Disassociated {pip_name}", "public_ip": pip}
+
     return None

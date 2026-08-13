@@ -46,6 +46,12 @@ services:
       DOCKER_SOCKET: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
       DOCKER_HOST: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
       SANDBOX_DOCKER: ${SANDBOX_DOCKER:-1}
+      # Optional self-hosted Whisper for interview STT (see docs/ops/VOICE_STACK_DEPLOY.md).
+      # When unset, interviews use browser Web Speech.
+      FIXITLAB_FASTER_WHISPER_URL: ${FIXITLAB_FASTER_WHISPER_URL:-}
+      FIXITLAB_FASTER_WHISPER_API: ${FIXITLAB_FASTER_WHISPER_API:-openai}
+      FIXITLAB_FASTER_WHISPER_MODEL: ${FIXITLAB_FASTER_WHISPER_MODEL:-small}
+      FIXITLAB_INDIC_WHISPER_URL: ${FIXITLAB_INDIC_WHISPER_URL:-}
       # Identify this node to the fleet monitor so it attaches its live host
       # metrics to the right card, and reads its own system containers from the
       # LOCAL daemon (mounted below) rather than the remote labs engine.
@@ -124,6 +130,10 @@ services:
       DOCKER_SOCKET: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
       DOCKER_HOST: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
       SANDBOX_DOCKER: ${SANDBOX_DOCKER:-1}
+      FIXITLAB_FASTER_WHISPER_URL: ${FIXITLAB_FASTER_WHISPER_URL:-}
+      FIXITLAB_FASTER_WHISPER_API: ${FIXITLAB_FASTER_WHISPER_API:-openai}
+      FIXITLAB_FASTER_WHISPER_MODEL: ${FIXITLAB_FASTER_WHISPER_MODEL:-small}
+      FIXITLAB_INDIC_WHISPER_URL: ${FIXITLAB_INDIC_WHISPER_URL:-}
     depends_on:
       backend:
         condition: service_healthy
@@ -165,6 +175,10 @@ services:
       DOCKER_SOCKET: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
       DOCKER_HOST: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
       SANDBOX_DOCKER: ${SANDBOX_DOCKER:-1}
+      FIXITLAB_FASTER_WHISPER_URL: ${FIXITLAB_FASTER_WHISPER_URL:-}
+      FIXITLAB_FASTER_WHISPER_API: ${FIXITLAB_FASTER_WHISPER_API:-openai}
+      FIXITLAB_FASTER_WHISPER_MODEL: ${FIXITLAB_FASTER_WHISPER_MODEL:-small}
+      FIXITLAB_INDIC_WHISPER_URL: ${FIXITLAB_INDIC_WHISPER_URL:-}
     depends_on:
       backend:
         condition: service_healthy
@@ -206,6 +220,10 @@ services:
       DOCKER_SOCKET: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
       DOCKER_HOST: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
       SANDBOX_DOCKER: ${SANDBOX_DOCKER:-1}
+      FIXITLAB_FASTER_WHISPER_URL: ${FIXITLAB_FASTER_WHISPER_URL:-}
+      FIXITLAB_FASTER_WHISPER_API: ${FIXITLAB_FASTER_WHISPER_API:-openai}
+      FIXITLAB_FASTER_WHISPER_MODEL: ${FIXITLAB_FASTER_WHISPER_MODEL:-small}
+      FIXITLAB_INDIC_WHISPER_URL: ${FIXITLAB_INDIC_WHISPER_URL:-}
     depends_on:
       backend:
         condition: service_healthy

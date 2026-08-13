@@ -174,6 +174,7 @@ class GradeResult:
     all_passed: bool                # did every REQUIRED test pass?
     needs_review: bool = False      # language can't be auto-graded -> manual
     error: str = ""                 # compile / runtime / harness error
+    error_code: str = ""            # machine-readable (e.g. sandbox_unavailable)
     stdout: str = ""
     outcomes: list[TestOutcome] = field(default_factory=list)
 
@@ -200,7 +201,7 @@ class GradeResult:
                     "message": (o.message or "")[:500],
                     "hidden": o.hidden,
                 })
-        return {
+        out = {
             "ran": self.ran,
             "all_passed": self.all_passed,
             "needs_review": self.needs_review,
@@ -210,6 +211,9 @@ class GradeResult:
             "passed_count": sum(1 for o in self.outcomes if o.passed),
             "total_count": len(self.outcomes),
         }
+        if self.error_code:
+            out["error_code"] = self.error_code
+        return out
 
 
 def language_runtime_available(language: str) -> bool:
@@ -759,10 +763,20 @@ def _execute(
             logger.warning(
                 "code_exec: container sandbox unavailable (%s).", exc,
             )
+            try:
+                sandbox_runner.invalidate_docker_probe_cache(str(exc))
+            except Exception:
+                pass
+            use_container = False
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning(
                 "code_exec: container sandbox raised %r.", exc,
             )
+            use_container = False
+            try:
+                sandbox_runner.invalidate_docker_probe_cache(repr(exc))
+            except Exception:
+                pass
 
     # Container backend not used or it failed. Decide whether the in-process
     # fallback is permitted.
@@ -774,7 +788,7 @@ def _execute(
         )
         # AUDIT L2690: emit a counter + (rate-limited) alert so this outage is
         # observable. Best-effort — never let monitoring change the verdict.
-        _record_failclosed_grading(sandbox_enabled, use_container)
+        _record_failclosed_grading(sandbox_enabled, False)
         raise InProcessExecutionForbidden(
             "container sandbox required in production; in-process grading refused"
         )
@@ -889,9 +903,9 @@ def grade_submission(
             )
             return GradeResult(
                 ran=False, all_passed=False, needs_review=True,
-                error="Code grading is temporarily unavailable. Your submission "
-                      "was saved for review and was not auto-graded. Please try "
-                      "again shortly, or contact support if this continues.",
+                error_code="sandbox_unavailable",
+                error="Code grading sandbox is offline. Your submission was not "
+                      "auto-graded and needs review. Retry in a few minutes.",
                 # Ops detail stays in logs (DOCKER_SOCKET / alpine images) — never
                 # leak infrastructure diagnostics into the learner UI.
             )

@@ -43,7 +43,14 @@ class STTTranscribeView(APIView):
 
         mime_type = request.data.get("mime_type", "audio/webm")
         prompt = request.data.get("prompt", "")
+        language = (request.data.get("language") or "en").strip() or "en"
 
         audio_bytes = audio_file.read()
-        result = transcribe_audio(audio_bytes, mime_type=mime_type, prompt=prompt)
+        result = transcribe_audio(
+            audio_bytes, mime_type=mime_type, prompt=prompt, language=language,
+        )
+        # When server STT is configured but Whisper failed, surface 503 so the
+        # FE can show a clear error instead of an empty transcript.
+        if result.get("error_code") == "stt_unavailable":
+            return JsonResponse(result, status=503)
         return JsonResponse(result)

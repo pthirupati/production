@@ -115,8 +115,33 @@ def transcribe_audio(
                     avg_logprob=data.get("avg_logprob"),
                     no_speech_prob=data.get("no_speech_prob"),
                 )
+            # URL is set but Whisper returned nothing / errored — fail closed
+            # so the FE does not treat empty browser_sim as a valid turn.
+            return {
+                "transcript": "",
+                "filtered_text": "",
+                "confidence": 0.0,
+                "is_final": False,
+                "provider": "faster_whisper",
+                "word_count": 0,
+                "duration_seconds": None,
+                "error_code": "stt_unavailable",
+                "message": "Speech recognition is temporarily unavailable. Retry in a moment.",
+            }
     except Exception:
         logger.warning("self-hosted STT failed; falling through", exc_info=True)
+        if _faster_whisper_ready() or _indic_whisper_ready():
+            return {
+                "transcript": "",
+                "filtered_text": "",
+                "confidence": 0.0,
+                "is_final": False,
+                "provider": "faster_whisper" if _faster_whisper_ready() else "indic_whisper",
+                "word_count": 0,
+                "duration_seconds": None,
+                "error_code": "stt_unavailable",
+                "message": "Speech recognition is temporarily unavailable. Retry in a moment.",
+            }
 
     if _vosk_enabled():
         try:

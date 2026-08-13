@@ -112,6 +112,7 @@ export default function GcpConsole({
   const [rulePort, setRulePort] = useState('22')
   const [rulePriority, setRulePriority] = useState(1000)
   const [ruleAction, setRuleAction] = useState('ALLOW')
+  const [ruleTargetTags, setRuleTargetTags] = useState('web')
   const [attachTarget, setAttachTarget] = useState(null)
   const [createDiskModal, setCreateDiskModal] = useState(false)
   const [newDiskName, setNewDiskName] = useState('disk-new')
@@ -325,9 +326,11 @@ export default function GcpConsole({
   }
 
   const submitRule = () => {
+    const tags = ruleTargetTags.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean)
     run(() => gcpApi.createFirewallRule(sessionId, {
       name: ruleName, priority: Number(rulePriority), protocols: `tcp:${rulePort}`,
       action: ruleAction, direction: 'INGRESS',
+      target_tags: tags,
     }), 'Firewall rule created')
     setRuleModalOpen(false)
   }
@@ -702,6 +705,10 @@ export default function GcpConsole({
             <option value="ALLOW">Allow</option>
             <option value="DENY">Deny</option>
           </select>
+        </label>
+        <label className="block text-sm mt-3">Target tags <span className="text-slate-500">(space/comma; empty = all VMs)</span>
+          <input className="w-full mt-1 border rounded px-2 py-1.5 font-mono text-xs" value={ruleTargetTags}
+            onChange={(e) => setRuleTargetTags(e.target.value)} placeholder="web http-server" />
         </label>
       </SimModal>
 

@@ -167,6 +167,12 @@ export const azureApi = {
   createPublicIp(sessionId, payload = {}) {
     return azureApi.action(sessionId, 'create_public_ip', payload)
   },
+  associatePublicIp(sessionId, pipName, vmName) {
+    return azureApi.action(sessionId, 'associate_public_ip', { name: pipName, vm_name: vmName })
+  },
+  disassociatePublicIp(sessionId, pipName) {
+    return azureApi.action(sessionId, 'disassociate_public_ip', { name: pipName })
+  },
 }
 
 export default azureApi

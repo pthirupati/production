@@ -677,18 +677,24 @@ class AudioRecorder {
 // Server STT (Vosk — active only when the backend reports uses_server_stt)
 // ---------------------------------------------------------------------------
 
-async function serverTranscribe(blob, mimeType, prompt = '') {
+async function serverTranscribe(blob, mimeType, prompt = '', language = 'en') {
   const form = new FormData()
   form.append('audio_blob', blob, `recording.${mimeType.split('/')[1]}`)
   form.append('mime_type', mimeType)
   if (prompt) form.append('prompt', prompt)
+  if (language) form.append('language', language)
 
   const res = await fetch('/api/interviews/stt/transcribe/', {
     method: 'POST',
     headers: { 'X-CSRFToken': getCsrfToken() },
     body: form,
   })
-  if (!res.ok) throw new Error('STT server error')
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    const err = new Error(body.message || 'STT server error')
+    err.code = body.error_code || 'stt_unavailable'
+    throw err
+  }
   return res.json()
 }
 
@@ -1030,6 +1036,7 @@ export function useInterviewVoice() {
             recording.blob,
             recording.mimeType,
             techPrompt,
+            (locale || 'en').split('-')[0],
           )
           return result
         }
@@ -1267,6 +1274,7 @@ export function useInterviewVoice() {
                 recording.blob,
                 recording.mimeType,
                 techPrompt,
+                (locale || 'en').split('-')[0],
               )
               const text = (result?.transcript || result?.filtered_text || '').trim()
               resolve({

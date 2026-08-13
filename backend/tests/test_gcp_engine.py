@@ -105,6 +105,28 @@ class FirewallRuleEvaluationTests(GcpEngineBase):
         ge.apply_action(self.sid, "stop_instance", {"instance_name": "web01"})
         self.assertFalse(ge.check_port_reachable(self.sid, "22"))
 
+    def test_firewall_target_tags_gate_reachability(self):
+        """Rules with target_tags only apply to VMs that carry a matching tag."""
+        self._login()
+        ge.apply_action(self.sid, "delete_firewall_rule", {"name": "allow-ssh"})
+        ge.apply_action(self.sid, "create_firewall_rule", {
+            "name": "allow-ssh-other",
+            "priority": 1000,
+            "protocols": "tcp:22",
+            "action": "ALLOW",
+            "target_tags": ["other"],
+        })
+        # web01 is tagged "web" — rule for "other" must not open SSH.
+        self.assertFalse(ge.check_port_reachable(self.sid, "22"))
+        ge.apply_action(self.sid, "create_firewall_rule", {
+            "name": "allow-ssh-web",
+            "priority": 900,
+            "protocols": "tcp:22",
+            "action": "ALLOW",
+            "target_tags": ["web"],
+        })
+        self.assertTrue(ge.check_port_reachable(self.sid, "22"))
+
 
 class PersistentDiskTests(GcpEngineBase):
     def test_attach_and_detach_disk(self):

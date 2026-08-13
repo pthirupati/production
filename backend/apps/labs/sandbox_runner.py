@@ -33,8 +33,10 @@ Integrity is preserved: this module only *runs* a program and returns
 a timeout, or unparseable output never becomes a pass).
 
 Enabled by ``settings.SANDBOX_DOCKER`` (default off so dev/CI keep using the
-in-process fallback). When enabled but the engine is unreachable, the caller
-falls back to the in-process grader so grading never hard-fails on infra.
+in-process fallback). When enabled but the engine is unreachable, production
+**fails closed** (``needs_review`` / ``InProcessExecutionForbidden``) — it does
+*not* fall back to in-process grading. In-process is only allowed when
+``SANDBOX_DOCKER`` is off (DEBUG/dev).
 """
 
 from __future__ import annotations
@@ -377,9 +379,17 @@ def _force_remove(container) -> None:
             pass
 
 
+def invalidate_docker_probe_cache(error: str = "sandbox unavailable mid-run") -> None:
+    """Force the next grade to re-probe Docker after a mid-run failure."""
+    _record_probe(False, error)
+    with _probe_lock:
+        _probe_cache["ok"] = False
+        _probe_cache["ts"] = _time.monotonic()
+
+
 class SandboxUnavailable(RuntimeError):
     """Raised when the container backend can't run a submission.
 
-    The grader catches this and falls back to the in-process sandbox so a
-    transient engine problem degrades gracefully instead of failing the grade.
+    Callers in production fail closed (``needs_review``). Dev/CI may fall back
+    to in-process grading only when ``SANDBOX_DOCKER`` is off.
     """
