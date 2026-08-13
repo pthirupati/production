@@ -360,7 +360,7 @@ export default function DellEmcSimulator({
         <main className="flex-1 overflow-auto p-5 bg-[#f2f5f9]">{renderContent()}</main>
       </div>
 
-      <SimModal open={sgModal} onClose={() => setSgModal(false)} title="Create Storage Group"
+      <SimModal shellClass="de-shell" open={sgModal} onClose={() => setSgModal(false)} title="Create Storage Group"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setSgModal(false)}>Cancel</button>
           <button type="button" className="de-btn-primary" disabled={busy} onClick={() => {
@@ -373,7 +373,7 @@ export default function DellEmcSimulator({
         </label>
       </SimModal>
 
-      <SimModal open={volModal} onClose={() => setVolModal(false)} title="Create Volume"
+      <SimModal shellClass="de-shell" open={volModal} onClose={() => setVolModal(false)} title="Create Volume"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setVolModal(false)}>Cancel</button>
           <button type="button" className="de-btn-primary" disabled={busy} onClick={() => {
@@ -392,7 +392,7 @@ export default function DellEmcSimulator({
         </label>
       </SimModal>
 
-      <SimModal open={!!mapTarget} onClose={() => setMapTarget(null)} title={`Map Volume ${mapTarget || ''}`}
+      <SimModal shellClass="de-shell" open={!!mapTarget} onClose={() => setMapTarget(null)} title={`Map Volume ${mapTarget || ''}`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setMapTarget(null)}>Cancel</button>
           <button type="button" className="de-btn-primary" disabled={busy} onClick={() => {
@@ -407,7 +407,7 @@ export default function DellEmcSimulator({
         </label>
       </SimModal>
 
-      <SimModal open={hostModal} onClose={() => setHostModal(false)} title="Register Host"
+      <SimModal shellClass="de-shell" open={hostModal} onClose={() => setHostModal(false)} title="Register Host"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setHostModal(false)}>Cancel</button>
           <button type="button" className="de-btn-primary" disabled={busy} onClick={() => {
@@ -420,7 +420,7 @@ export default function DellEmcSimulator({
         </label>
       </SimModal>
 
-      <SimModal open={mvModal} onClose={() => setMvModal(false)} title="Create Masking View"
+      <SimModal shellClass="de-shell" open={mvModal} onClose={() => setMvModal(false)} title="Create Masking View"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setMvModal(false)}>Cancel</button>
           <button type="button" className="de-btn-primary" disabled={busy} onClick={() => {

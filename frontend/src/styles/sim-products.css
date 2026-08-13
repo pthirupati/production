@@ -245,12 +245,14 @@
 .sim-modal-footer button.text-sm { color: #94a3b8; }
 .sim-modal-footer button.text-sm:hover { color: #fff; }
 
-/* Light Fluent / Material dialogs when a light portal shell is on screen */
+/* Light Fluent / Material dialogs — shell ancestor, portal data-sim-shell, or --light */
 .az-shell .sim-modal,
 .gcp-shell .sim-modal,
 .cv-shell .sim-modal,
 .na-shell .sim-modal,
-.de-shell .sim-modal {
+.de-shell .sim-modal,
+[data-sim-shell] .sim-modal,
+.sim-modal.sim-modal--light {
   background: #ffffff; border-color: #e1dfdd; color: #323130;
   box-shadow: 0 25px 50px rgba(0, 0, 0, 0.18);
 }
@@ -258,34 +260,46 @@
 .gcp-shell .sim-modal-head,
 .cv-shell .sim-modal-head,
 .na-shell .sim-modal-head,
-.de-shell .sim-modal-head {
+.de-shell .sim-modal-head,
+[data-sim-shell] .sim-modal-head,
+.sim-modal.sim-modal--light .sim-modal-head {
   border-bottom-color: #edebe9;
 }
 .az-shell .sim-modal-title,
 .gcp-shell .sim-modal-title,
 .cv-shell .sim-modal-title,
 .na-shell .sim-modal-title,
-.de-shell .sim-modal-title { color: #201f1e; }
+.de-shell .sim-modal-title,
+[data-sim-shell] .sim-modal-title,
+.sim-modal.sim-modal--light .sim-modal-title { color: #201f1e; }
 .az-shell .sim-modal-close,
 .gcp-shell .sim-modal-close,
 .cv-shell .sim-modal-close,
 .na-shell .sim-modal-close,
-.de-shell .sim-modal-close { color: #605e5c; }
+.de-shell .sim-modal-close,
+[data-sim-shell] .sim-modal-close,
+.sim-modal.sim-modal--light .sim-modal-close { color: #605e5c; }
 .az-shell .sim-modal-close:hover,
 .gcp-shell .sim-modal-close:hover,
 .cv-shell .sim-modal-close:hover,
 .na-shell .sim-modal-close:hover,
-.de-shell .sim-modal-close:hover { color: #201f1e; background: #f3f2f1; }
+.de-shell .sim-modal-close:hover,
+[data-sim-shell] .sim-modal-close:hover,
+.sim-modal.sim-modal--light .sim-modal-close:hover { color: #201f1e; background: #f3f2f1; }
 .az-shell .sim-modal-body,
 .gcp-shell .sim-modal-body,
 .cv-shell .sim-modal-body,
 .na-shell .sim-modal-body,
-.de-shell .sim-modal-body { color: #323130; }
+.de-shell .sim-modal-body,
+[data-sim-shell] .sim-modal-body,
+.sim-modal.sim-modal--light .sim-modal-body { color: #323130; }
 .az-shell .sim-modal-body label,
 .gcp-shell .sim-modal-body label,
 .cv-shell .sim-modal-body label,
 .na-shell .sim-modal-body label,
-.de-shell .sim-modal-body label { color: #323130; }
+.de-shell .sim-modal-body label,
+[data-sim-shell] .sim-modal-body label,
+.sim-modal.sim-modal--light .sim-modal-body label { color: #323130; }
 .az-shell .sim-modal-body input,
 .az-shell .sim-modal-body select,
 .az-shell .sim-modal-body textarea,
@@ -300,7 +314,13 @@
 .na-shell .sim-modal-body textarea,
 .de-shell .sim-modal-body input,
 .de-shell .sim-modal-body select,
-.de-shell .sim-modal-body textarea {
+.de-shell .sim-modal-body textarea,
+[data-sim-shell] .sim-modal-body input,
+[data-sim-shell] .sim-modal-body select,
+[data-sim-shell] .sim-modal-body textarea,
+.sim-modal.sim-modal--light .sim-modal-body input,
+.sim-modal.sim-modal--light .sim-modal-body select,
+.sim-modal.sim-modal--light .sim-modal-body textarea {
   background: #fff; color: #201f1e; border-color: #8a8886;
 }
 .az-shell .sim-modal-body p,
@@ -318,24 +338,40 @@
 .na-shell .sim-modal-body p,
 .na-shell .sim-modal-body .text-sm,
 .de-shell .sim-modal-body p,
-.de-shell .sim-modal-body .text-sm {
+.de-shell .sim-modal-body .text-sm,
+[data-sim-shell] .sim-modal-body p,
+[data-sim-shell] .sim-modal-body .text-slate-600,
+[data-sim-shell] .sim-modal-body .text-slate-400,
+[data-sim-shell] .sim-modal-body .text-slate-300,
+[data-sim-shell] .sim-modal-body .text-sm,
+.sim-modal.sim-modal--light .sim-modal-body p,
+.sim-modal.sim-modal--light .sim-modal-body .text-slate-600,
+.sim-modal.sim-modal--light .sim-modal-body .text-slate-400,
+.sim-modal.sim-modal--light .sim-modal-body .text-slate-300,
+.sim-modal.sim-modal--light .sim-modal-body .text-sm {
   color: #605e5c !important;
 }
 .az-shell .sim-modal-footer,
 .gcp-shell .sim-modal-footer,
 .cv-shell .sim-modal-footer,
 .na-shell .sim-modal-footer,
-.de-shell .sim-modal-footer { border-top-color: #edebe9; }
+.de-shell .sim-modal-footer,
+[data-sim-shell] .sim-modal-footer,
+.sim-modal.sim-modal--light .sim-modal-footer { border-top-color: #edebe9; }
 .az-shell .sim-modal-footer button.text-sm,
 .gcp-shell .sim-modal-footer button.text-sm,
 .cv-shell .sim-modal-footer button.text-sm,
 .na-shell .sim-modal-footer button.text-sm,
-.de-shell .sim-modal-footer button.text-sm { color: #605e5c; }
+.de-shell .sim-modal-footer button.text-sm,
+[data-sim-shell] .sim-modal-footer button.text-sm,
+.sim-modal.sim-modal--light .sim-modal-footer button.text-sm { color: #605e5c; }
 .az-shell .sim-modal-footer button.text-sm:hover,
 .gcp-shell .sim-modal-footer button.text-sm:hover,
 .cv-shell .sim-modal-footer button.text-sm:hover,
 .na-shell .sim-modal-footer button.text-sm:hover,
-.de-shell .sim-modal-footer button.text-sm:hover { color: #201f1e; }
+.de-shell .sim-modal-footer button.text-sm:hover,
+[data-sim-shell] .sim-modal-footer button.text-sm:hover,
+.sim-modal.sim-modal--light .sim-modal-footer button.text-sm:hover { color: #201f1e; }
 
 .sim-sidebar {
   width: 220px;

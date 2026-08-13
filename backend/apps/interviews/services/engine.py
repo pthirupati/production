@@ -685,17 +685,25 @@ def _should_reprompt_answer(score_result: dict, correctness: str) -> bool:
         return False
     if score_result.get("command_validated"):
         return False
-    hit_rate = float(score_result.get("keyword_hit_rate") or 0)
-    if hit_rate >= 0.45:
-        return False
-    if correctness == CORRECTNESS_PARTIAL and quality in ("strong", "adequate", "brief"):
-        return False
-    if score_result.get("topic_detected") and quality == "brief" and hit_rate >= 0.25:
-        return False
-    if quality == "weak":
+    # Soft "partial + adequate" used to skip probes even when the answer missed
+    # the question — that made wrong answers feel unchallenged. Always probe
+    # off-base / low-relevance; only skip probe when partial is clearly on-topic.
+    relevance = float(score_result.get("relevance_score") or score_result.get("relevance") or 0)
+    if correctness == CORRECTNESS_OFF_BASE:
         return True
-    if quality == "brief":
-        return correctness in (CORRECTNESS_OFF_BASE, CORRECTNESS_UNKNOWN)
+    if relevance and relevance < 0.35:
+        return True
+    hit_rate = float(score_result.get("keyword_hit_rate") or 0)
+    if hit_rate >= 0.45 and correctness == CORRECTNESS_PARTIAL:
+        return False
+    if correctness == CORRECTNESS_PARTIAL and quality in ("strong",) and hit_rate >= 0.3:
+        return False
+    if score_result.get("topic_detected") and quality == "brief" and hit_rate >= 0.35:
+        return False
+    if quality in ("weak", "brief"):
+        return True
+    if correctness in (CORRECTNESS_OFF_BASE, CORRECTNESS_UNKNOWN, CORRECTNESS_PARTIAL):
+        return True
     return False
 
 
@@ -916,6 +924,14 @@ def submit_answer(round_obj: InterviewRound, answer_text: str, metadata: dict | 
         last_q_kind = last_q_msg.metadata.get("kind") or ""
         last_q_difficulty = last_q_msg.metadata.get("difficulty") or last_q_difficulty
     meta["question_category"] = last_q_category
+    # Generated questions have question=None — without the spoken text in meta,
+    # semantic relevance always returns 0.5 and correctness becomes length theatre.
+    if question_text and not meta.get("question_text"):
+        meta["question_text"] = question_text
+    if last_q_msg and isinstance(last_q_msg.metadata, dict):
+        for key in ("expected_keywords", "expected_signals", "topic"):
+            if key in last_q_msg.metadata and key not in meta:
+                meta[key] = last_q_msg.metadata[key]
 
     from apps.interviews.services.realism.timing import wall_ms
 

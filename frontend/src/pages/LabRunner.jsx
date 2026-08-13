@@ -1973,10 +1973,10 @@ export default function LabRunner() {
   const canAwsConsole = userHasTechAccess(techSubs, 'aws')
   const canAzureConsole = userHasTechAccess(techSubs, 'azure')
   const canGcpConsole = userHasTechAccess(techSubs, 'gcp')
+  // AWX is Ansible's product surface — ai-infra alone must not unlock it (revenue).
   const canAwxConsole = userHasTechAccess(techSubs, 'ansible')
     || userHasTechAccess(techSubs, 'ansible-awx')
-    || userHasTechAccess(techSubs, 'ai-infra')
-    || techSlugLc === 'ai-infra'
+
   const showHostedAwsLink = !isAwsLab && canAwsConsole && (
     isAwsAcademyLab
     || hostPlatform === 'aws'
@@ -2073,6 +2073,14 @@ export default function LabRunner() {
         )
       )
     )
+  // Cross-tech labs (e.g. MAAS under ai-infra) mention AWX but must not open it
+  // without an Ansible subscription — show a subscribe affordance instead.
+  const wantsAwxCompanion = !isAwxLab && (
+    techSlugLc === 'ai-infra'
+    || consolesInclude(scenario?.consoles, 'awx')
+    || scenario?.awx_link === true
+  )
+  const showAwxSubscribeHint = wantsAwxCompanion && techSubs && !canAwxConsole
   // YAML-driven companion set (entitlements still gate the chips below).
   const yamlCompanionChips = companionChipsFromConsoles(scenario?.consoles, { techSlug: techSlugLc })
   const showVyosLink = isVyosLab || yamlCompanionChips.includes('vyos')
@@ -3497,6 +3505,15 @@ export default function LabRunner() {
             >
               <ExternalLink size={12} /> Open AWX
             </button>
+          )}
+          {showAwxSubscribeHint && (
+            <Link
+              to="/pricing?tech=ansible"
+              title="AWX requires an Ansible subscription"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold border-amber-500/40 text-amber-300 bg-amber-500/10"
+            >
+              Subscribe for AWX
+            </Link>
           )}
           {/* AWS for terraform / academy uses showHostedAwsLink ("Open AWS") — do not duplicate. */}
           {isTerraformSimLab && (

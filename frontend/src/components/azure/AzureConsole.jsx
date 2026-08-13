@@ -772,7 +772,7 @@ export default function AzureConsole({
         />
       )}
 
-      <SimModal open={!!vmDetail} onClose={() => setVmDetail(null)} title={`${vmDetail?.name || ''} — Size`}
+      <SimModal shellClass="az-shell" open={!!vmDetail} onClose={() => setVmDetail(null)} title={`${vmDetail?.name || ''} — Size`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setVmDetail(null)}>Cancel</button>
           <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
@@ -788,7 +788,7 @@ export default function AzureConsole({
         </label>
       </SimModal>
 
-      <SimModal open={!!ruleModalNsg} onClose={() => setRuleModalNsg(null)} title={`Add inbound security rule — ${ruleModalNsg || ''}`}
+      <SimModal shellClass="az-shell" open={!!ruleModalNsg} onClose={() => setRuleModalNsg(null)} title={`Add inbound security rule — ${ruleModalNsg || ''}`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setRuleModalNsg(null)}>Cancel</button>
           <button type="button" className="az-btn-primary" disabled={busy} onClick={submitRule}>Add</button>
@@ -810,7 +810,7 @@ export default function AzureConsole({
         </label>
       </SimModal>
 
-      <SimModal open={!!attachTarget} onClose={() => setAttachTarget(null)} title={`Attach disk — ${attachTarget || ''}`}
+      <SimModal shellClass="az-shell" open={!!attachTarget} onClose={() => setAttachTarget(null)} title={`Attach disk — ${attachTarget || ''}`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setAttachTarget(null)}>Cancel</button>
           <button type="button" className="az-btn-primary" disabled={busy || !vms.length} onClick={() => {
@@ -821,7 +821,7 @@ export default function AzureConsole({
         <p className="text-sm text-slate-300">Attach this managed disk to <span className="font-mono">{vms[0]?.name}</span>.</p>
       </SimModal>
 
-      <SimModal open={createDiskModal} onClose={() => setCreateDiskModal(false)} title="Create managed disk"
+      <SimModal shellClass="az-shell" open={createDiskModal} onClose={() => setCreateDiskModal(false)} title="Create managed disk"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setCreateDiskModal(false)}>Cancel</button>
           <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
@@ -837,7 +837,7 @@ export default function AzureConsole({
         </label>
       </SimModal>
 
-      <SimModal open={createRgOpen} onClose={() => setCreateRgOpen(false)} title="Create resource group"
+      <SimModal shellClass="az-shell" open={createRgOpen} onClose={() => setCreateRgOpen(false)} title="Create resource group"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setCreateRgOpen(false)}>Cancel</button>
           <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
@@ -850,7 +850,7 @@ export default function AzureConsole({
         </label>
       </SimModal>
 
-      <SimModal open={createSaOpen} onClose={() => setCreateSaOpen(false)} title="Create storage account"
+      <SimModal shellClass="az-shell" open={createSaOpen} onClose={() => setCreateSaOpen(false)} title="Create storage account"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setCreateSaOpen(false)}>Cancel</button>
           <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
@@ -863,7 +863,7 @@ export default function AzureConsole({
         </label>
       </SimModal>
 
-      <SimModal open={createVmOpen} onClose={() => setCreateVmOpen(false)} title="Create a virtual machine" width="max-w-2xl"
+      <SimModal shellClass="az-shell" open={createVmOpen} onClose={() => setCreateVmOpen(false)} title="Create a virtual machine" width="max-w-2xl"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setCreateVmOpen(false)}>Cancel</button>
           <button type="button" className="az-btn-primary" disabled={busy || !newVmName.trim()} onClick={submitCreateVm}>
@@ -955,7 +955,7 @@ export default function AzureConsole({
         </div>
       </SimModal>
 
-      <SimModal open={!!subnetModal} onClose={() => setSubnetModal(null)} title={`Add subnet — ${subnetModal || ''}`}
+      <SimModal shellClass="az-shell" open={!!subnetModal} onClose={() => setSubnetModal(null)} title={`Add subnet — ${subnetModal || ''}`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setSubnetModal(null)}>Cancel</button>
           <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
@@ -971,7 +971,7 @@ export default function AzureConsole({
         </label>
       </SimModal>
 
-      <SimModal open={!!secretModal} onClose={() => setSecretModal(null)} title={`Set secret — ${secretModal || ''}`}
+      <SimModal shellClass="az-shell" open={!!secretModal} onClose={() => setSecretModal(null)} title={`Set secret — ${secretModal || ''}`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setSecretModal(null)}>Cancel</button>
           <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
@@ -984,7 +984,7 @@ export default function AzureConsole({
         </label>
       </SimModal>
 
-      <SimModal open={roleModal} onClose={() => setRoleModal(false)} title="Add role assignment"
+      <SimModal shellClass="az-shell" open={roleModal} onClose={() => setRoleModal(false)} title="Add role assignment"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setRoleModal(false)}>Cancel</button>
           <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
@@ -1006,7 +1006,7 @@ export default function AzureConsole({
         </label>
       </SimModal>
 
-      <SimModal open={!!lbRuleModal} onClose={() => setLbRuleModal(null)} title={`Add LB rule — ${lbRuleModal || ''}`}
+      <SimModal shellClass="az-shell" open={!!lbRuleModal} onClose={() => setLbRuleModal(null)} title={`Add LB rule — ${lbRuleModal || ''}`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setLbRuleModal(null)}>Cancel</button>
           <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
@@ -1027,7 +1027,7 @@ export default function AzureConsole({
         </label>
       </SimModal>
 
-      <SimModal open={!!containerModal} onClose={() => setContainerModal(null)} title={`New container — ${containerModal || ''}`}
+      <SimModal shellClass="az-shell" open={!!containerModal} onClose={() => setContainerModal(null)} title={`New container — ${containerModal || ''}`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setContainerModal(null)}>Cancel</button>
           <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {

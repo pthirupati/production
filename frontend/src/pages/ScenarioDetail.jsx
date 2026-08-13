@@ -269,11 +269,11 @@ export default function ScenarioDetail() {
   // most recent reviews *with text*, so it was never the scenario's average.
   const avgRating = ratingSummary?.has_enough_ratings ? ratingSummary.average_score : null
 
-  const locked = scenario.is_accessible === false
+  const locked = scenario.is_accessible === false || scenario.subscription_required === true
   const simInfo = getScenarioSimInfo(scenario)
 
-  // When the user isn't subscribed, the scenario stays fully viewable but the
-  // "Start" action is replaced by a Subscribe CTA that routes to pricing.
+  // Locked paid labs keep marketing chrome (title / difficulty / tech) but the
+  // Start action and incident brief are paywalled — see backend ScenarioDetailView.
   const startButton = locked ? (
     <Link
       to={`/pricing?technology=${scenario.technology?.slug || ''}`}
@@ -502,7 +502,59 @@ export default function ScenarioDetail() {
         </div>
       )}
 
-      <ScenarioNarrative scenario={scenario} />
+      {locked ? (
+        <div className="relative overflow-hidden glass-card p-6 border-accent-purple/20">
+          <div className="select-none pointer-events-none blur-sm opacity-40 space-y-4" aria-hidden>
+            <h2 className="text-base font-semibold text-white">Incident briefing</h2>
+            <div className="space-y-3">
+              <div className="h-3 bg-surface-700 rounded w-full" />
+              <div className="h-3 bg-surface-700 rounded w-11/12" />
+              <div className="h-3 bg-surface-700 rounded w-4/5" />
+              <div className="h-3 bg-surface-700 rounded w-10/12" />
+            </div>
+            <h2 className="text-base font-semibold text-white pt-2">Expected outcome</h2>
+            <div className="space-y-2">
+              <div className="h-3 bg-surface-700 rounded w-3/4" />
+              <div className="h-3 bg-surface-700 rounded w-2/3" />
+            </div>
+          </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface-950/55 backdrop-blur-[1px] p-6 text-center">
+            <Lock size={22} className="text-accent-purple" />
+            <div>
+              <p className="text-base font-semibold text-white mb-1">Full incident brief locked</p>
+              <p className="text-sm text-surface-400 max-w-md mx-auto">
+                Subscribe to{' '}
+                <span className="text-white font-medium">{scenario.technology?.name || 'this technology'}</span>
+                {' '}to unlock the narrative, objectives, and lab briefing.
+              </p>
+            </div>
+            <Link
+              to={`/pricing?technology=${scenario.technology?.slug || ''}`}
+              className="btn-primary text-sm px-4 py-2 inline-flex items-center gap-1.5"
+            >
+              <Zap size={14} /> Subscribe to unlock
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <>
+          <ScenarioNarrative scenario={scenario} />
+
+          {objectives.length > 0 && (
+            <div className="glass-card p-6">
+              <h2 className="text-base font-semibold text-white mb-3">Expected outcome</h2>
+              <ul className="space-y-2">
+                {objectives.map((obj, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
+                    <CheckCircle2 size={14} className="text-accent-cyan mt-0.5 shrink-0" />
+                    <span>{typeof obj === 'string' ? obj : JSON.stringify(obj)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
 
       {scenario.linked_tutorial && (
         <div className="glass-card p-5 border-accent-cyan/20 bg-accent-cyan/5">
@@ -559,21 +611,6 @@ export default function ScenarioDetail() {
               </Link>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Expected outcome */}
-      {objectives.length > 0 && (
-        <div className="glass-card p-6">
-          <h2 className="text-base font-semibold text-white mb-3">Expected outcome</h2>
-          <ul className="space-y-2">
-            {objectives.map((obj, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
-                <CheckCircle2 size={14} className="text-accent-cyan mt-0.5 shrink-0" />
-                <span>{typeof obj === 'string' ? obj : JSON.stringify(obj)}</span>
-              </li>
-            ))}
-          </ul>
         </div>
       )}
 

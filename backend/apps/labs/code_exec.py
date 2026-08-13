@@ -881,13 +881,19 @@ def grade_submission(
             # SECURITY_AUDIT S-01: production has no usable container sandbox and
             # in-process grading is forbidden. Fail closed: never auto-pass,
             # never run on the host — route to manual review.
-            logger.error("code_exec: grading deferred to review (fail-closed): %s", exc)
+            logger.error(
+                "code_exec: grading deferred to review (fail-closed): %s — "
+                "Ops: ensure SANDBOX_DOCKER can reach DOCKER_SOCKET and images "
+                "python:3.12-alpine / node:20-alpine",
+                exc,
+            )
             return GradeResult(
                 ran=False, all_passed=False, needs_review=True,
-                error="Code grading is temporarily unavailable (container sandbox "
-                      "unreachable on the labs engine). Your submission was saved "
-                      "for review — it was not auto-graded. Ops: ensure SANDBOX_DOCKER "
-                      "can reach DOCKER_SOCKET and images python:3.12-alpine / node:20-alpine.",
+                error="Code grading is temporarily unavailable. Your submission "
+                      "was saved for review and was not auto-graded. Please try "
+                      "again shortly, or contact support if this continues.",
+                # Ops detail stays in logs (DOCKER_SOCKET / alpine images) — never
+                # leak infrastructure diagnostics into the learner UI.
             )
 
         if timed_out:

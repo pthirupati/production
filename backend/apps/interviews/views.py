@@ -727,12 +727,17 @@ class InterviewRoundStartView(APIView):
                 .first()
             )
         else:
-            try:
-                first_q = engine.ask_next_question(round_obj)
-            except Exception:  # noqa: BLE001
-                import logging
+            # Prefer the warm-up / first question already produced by start_round.
+            # Calling ask_next_question again orphans the warm-up and makes the
+            # room speak intro + a *second* question (feels like half/skipped Qs).
+            first_q = result.get("first_question")
+            if first_q is None:
+                try:
+                    first_q = engine.ask_next_question(round_obj)
+                except Exception:  # noqa: BLE001
+                    import logging
 
-                logging.getLogger(__name__).exception("ask_next_question failed for %s", round_id)
+                    logging.getLogger(__name__).exception("ask_next_question failed for %s", round_id)
 
         payload = safe_round_data(round_obj)
         if intro_msg is not None:
@@ -805,7 +810,11 @@ class InterviewRoundMessageView(APIView):
         next_q = result.get("next_question")
         score_result = result.get("score") or {}
         interviewer_reply = result.get("interviewer_reply")
-        advanced = bool(next_q) and not is_candidate_question
+        # Prefer engine's advanced flag (probe ladder) over recomputing from next_q.
+        if "advanced" in result:
+            advanced = bool(result.get("advanced"))
+        else:
+            advanced = bool(next_q) and not is_candidate_question
         correctness = self._correctness_for(score_result, round_obj, is_candidate_question)
         try:
             payload = {

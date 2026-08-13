@@ -410,7 +410,7 @@ export default function CommvaultSimulator({
         <main className="flex-1 overflow-auto p-5 bg-[#f4f6fa]">{renderContent()}</main>
       </div>
 
-      <SimModal open={!!backupModal} onClose={() => setBackupModal(null)} title={`Run Backup — ${backupModal || ''}`}
+      <SimModal shellClass="cv-shell" open={!!backupModal} onClose={() => setBackupModal(null)} title={`Run Backup — ${backupModal || ''}`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setBackupModal(null)}>Cancel</button>
           <button type="button" className="cv-btn-primary" disabled={busy} onClick={() => {
@@ -421,7 +421,7 @@ export default function CommvaultSimulator({
         <p className="text-sm text-slate-600">Runs a Full backup job against the default subclient of <strong>{backupModal}</strong> using its assigned storage policy.</p>
       </SimModal>
 
-      <SimModal open={!!restoreModal} onClose={() => setRestoreModal(null)} title={`Run Restore — ${restoreModal || ''}`}
+      <SimModal shellClass="cv-shell" open={!!restoreModal} onClose={() => setRestoreModal(null)} title={`Run Restore — ${restoreModal || ''}`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setRestoreModal(null)}>Cancel</button>
           <button type="button" className="cv-btn-primary" disabled={busy} onClick={() => {
@@ -432,7 +432,7 @@ export default function CommvaultSimulator({
         <p className="text-sm text-slate-600">Restores the most recent successful backup for <strong>{restoreModal}</strong> in place.</p>
       </SimModal>
 
-      <SimModal open={clientModal} onClose={() => setClientModal(false)} title="Add Client"
+      <SimModal shellClass="cv-shell" open={clientModal} onClose={() => setClientModal(false)} title="Add Client"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setClientModal(false)}>Cancel</button>
           <button type="button" className="cv-btn-primary" disabled={busy} onClick={() => {
@@ -453,7 +453,7 @@ export default function CommvaultSimulator({
         </label>
       </SimModal>
 
-      <SimModal open={subclientModal} onClose={() => setSubclientModal(false)} title="Create Subclient"
+      <SimModal shellClass="cv-shell" open={subclientModal} onClose={() => setSubclientModal(false)} title="Create Subclient"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setSubclientModal(false)}>Cancel</button>
           <button type="button" className="cv-btn-primary" disabled={busy} onClick={() => {

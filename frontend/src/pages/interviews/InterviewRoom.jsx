@@ -74,15 +74,13 @@ export function mergeStartTranscript(data) {
 // is 400–700 ms endpointing (was 2200). listenLive still GROWS this for
 // longer/multi-sentence answers and extends further when they trail off on a
 // connector ("and…", "so…"); endsOnConnector() remains the semantic override.
-const TURN_SILENCE_MS = 550
-// Mic energy (0–1, same scale as the preflight meter) that counts as "speaking"
-// for barge-in. Above this while the bot is talking → interrupt the bot.
-// Raised from 0.18 — speaker→mic bleed during TTS was cancelling the interviewer
-// immediately after Join (sound-test worked because VAD is off in preflight).
-const BARGE_IN_LEVEL = 0.32
-const BARGE_IN_FRAMES = 6
-// Mic energy that counts as the candidate actively speaking, used to glow their
-// tile as the active speaker (FIX 4). Lower than barge-in: any clear voice.
+const TURN_SILENCE_MS = 950
+// Mic energy (0–1) for barge-in. High threshold + many frames + grace period
+// so speaker→mic bleed cannot cancel the interviewer mid-question.
+const BARGE_IN_LEVEL = 0.48
+const BARGE_IN_FRAMES = 14
+const BARGE_IN_GRACE_MS = 1800
+// Mic energy for candidate active-speaker glow (lower than barge-in).
 const CANDIDATE_SPEAKING_LEVEL = 0.1
 
 // WS5 — lightweight client-side question classifier. The backend is the source
@@ -128,6 +126,7 @@ export default function InterviewRoom() {
   // True while Join bootstrap TTS is running — blocks VAD barge-in and host-sync
   // re-speak of the same first question (was the "sound dies after join" bug).
   const bootstrapVoiceRef = useRef(false)
+  const ttsStartedAtRef = useRef(0)
   const navigate = useNavigate()
   const { confirm, ConfirmPortal } = useConfirm()
 
@@ -409,10 +408,12 @@ export default function InterviewRoom() {
         analyser.getByteFrequencyData(data)
         const avg = data.reduce((s, v) => s + v, 0) / data.length
         const level = Math.min(1, avg / 80)
-        // Barge-in: require sustained loud frames. Skip entirely during Join
-        // bootstrap — speaker playback into the open mic was cancelling TTS.
+        // Barge-in: require sustained loud frames AFTER a half-duplex grace so
+        // speaker→mic bleed cannot cancel the interviewer mid-question.
+        const bargeGraceActive = Date.now() - (ttsStartedAtRef.current || 0) < BARGE_IN_GRACE_MS
         if (
           !bootstrapVoiceRef.current
+          && !bargeGraceActive
           && isSpeakingRef.current
           && !bargedInRef.current
           && level > BARGE_IN_LEVEL
@@ -422,7 +423,7 @@ export default function InterviewRoom() {
             bargedInRef.current = true
             bargeInHandlerRef.current?.()
           }
-        } else if (level <= BARGE_IN_LEVEL || bootstrapVoiceRef.current) {
+        } else if (level <= BARGE_IN_LEVEL || bootstrapVoiceRef.current || bargeGraceActive) {
           loudFrames = 0
         }
         // Active-speaker highlight (FIX 4): glow the candidate tile while they
@@ -1081,6 +1082,20 @@ export default function InterviewRoom() {
       // in that case — the question already on screen still stands.
       const advanced = res.advanced !== false && !!res.next_question
       setCoaching(res.coaching || null)
+      if (res.correctness && res.correctness !== 'unknown' && !res.host_mode) {
+        const label = ({
+          correct: 'Solid answer',
+          partial: 'Partially covered — expect a follow-up',
+          off_base: 'Off-base — clarifying / probing',
+          incorrect: 'Needs more depth',
+        })[res.correctness] || null
+        if (label) {
+          toast(label, {
+            icon: res.correctness === 'correct' ? '✅' : res.correctness === 'partial' ? '🟡' : '🔎',
+            duration: 2800,
+          })
+        }
+      }
       setMessages(m => [
         ...m,
         res.candidate_message,
@@ -1174,10 +1189,10 @@ export default function InterviewRoom() {
     const result = await listenLive(streamRef.current, {
       locale: interviewLocale(round?.language || interviewLanguage),
       silenceMs: TURN_SILENCE_MS,
-      minSpeechMs: 900,
-      maxSilenceMs: 5000,
-      perSentenceMs: 500,
-      minWordsForSilence: 1,
+      minSpeechMs: 1100,
+      maxSilenceMs: 5500,
+      perSentenceMs: 550,
+      minWordsForSilence: 3,
       onInterim: (txt) => setAnswer(txt),
       onSilenceCountdown: (remaining, total) => {
         setSilenceCountdown(remaining == null ? null : { remaining, total })
@@ -1293,8 +1308,10 @@ export default function InterviewRoom() {
     // Soft re-prime — silent SpeechSynthesis primes race with the real line.
     unlockSpeech({ soft: true })
     resumeSpeechSynthesis()
+    ttsStartedAtRef.current = Date.now()
     const vid = voiceId ?? round?.persona_voice_id
     const { spoken } = await speak(text, vid, speechOpts) || {}
+    ttsStartedAtRef.current = Date.now() // reset grace after TTS ends (echo tail)
     if (spoken === false) {
       pendingHearVoiceRef.current = vid
       setPendingHearText(text)
@@ -1450,9 +1467,13 @@ export default function InterviewRoom() {
   useEffect(() => {
     bargeInHandlerRef.current = () => {
       cancelSpeechRef.current()
-      if (!isListeningRef.current) {
-        voiceAnswerRef.current?.() // self-arms skip-on-silence
-      }
+      // Wait for echo to die before opening STT — otherwise TTS bleed becomes
+      // the "candidate answer" and clarity loops fire.
+      setTimeout(() => {
+        if (!isListeningRef.current) {
+          voiceAnswerRef.current?.()
+        }
+      }, 450)
     }
   })
 
