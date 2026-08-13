@@ -36,19 +36,23 @@ export default function LazySimPanel({
   const key = remountKey != null ? `${remountKey}:${localNonce}` : `${boundaryName}:${localNonce}`
 
   return (
-    <SimErrorBoundary
-      key={key}
-      name={boundaryName}
-      title={title}
-      message={message}
-      resetStorageKey={resetStorageKey}
-      onResetStorage={onResetStorage ? resetStorage : undefined}
-      onReset={bump}
-      autoResetStorageOnError={autoResetStorageOnError}
-    >
-      <Suspense fallback={<LabSimFallback label={`Loading ${label}…`} />}>
-        <Sim {...props} />
-      </Suspense>
-    </SimErrorBoundary>
+    <div className="flex-1 min-h-0 flex flex-col h-full w-full">
+      <SimErrorBoundary
+        key={key}
+        name={boundaryName}
+        title={title}
+        message={message}
+        resetStorageKey={resetStorageKey}
+        onResetStorage={onResetStorage ? resetStorage : undefined}
+        onReset={bump}
+        autoResetStorageOnError={autoResetStorageOnError}
+      >
+        <Suspense fallback={<LabSimFallback label={`Loading ${label}…`} />}>
+          <div className="flex-1 min-h-0 h-full w-full flex flex-col">
+            <Sim {...props} />
+          </div>
+        </Suspense>
+      </SimErrorBoundary>
+    </div>
   )
 }

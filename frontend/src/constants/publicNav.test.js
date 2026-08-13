@@ -3,10 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { PUBLIC_NAV_LINKS, PUBLIC_NAV_PRIMARY, PUBLIC_NAV_SECONDARY } from './publicNav'
 
 /**
- * Regression guard for "/simulators is reachable by nobody": the route sits
- * inside the authenticated MainLayout, but its only inbound link was in the
- * public nav, so anonymous visitors bounced to /login and authenticated users
- * had no link at all. Both halves are asserted here.
+ * Lab Consoles (/simulators) is retired from both public and authenticated nav —
+ * Technologies already covers the same destinations.
  */
 const readSrc = (rel) =>
   fs.readFile(new URL(rel, import.meta.url), 'utf8')
@@ -17,17 +15,24 @@ describe('public nav does not advertise authenticated routes', () => {
     expect(all.filter((l) => l.to === '/simulators')).toHaveLength(0)
   })
 
+  it('Technologies is in secondary/footer, not the primary header row', () => {
+    expect(PUBLIC_NAV_PRIMARY.some((l) => l.to === '/#tech')).toBe(false)
+    expect(PUBLIC_NAV_SECONDARY.some((l) => l.to === '/#tech')).toBe(true)
+  })
+
+  it('Journeys stays on the public (pre-login) primary nav', () => {
+    expect(PUBLIC_NAV_PRIMARY.some((l) => l.to === '/journeys')).toBe(true)
+  })
+
   it('every public nav destination is a route outside the authenticated MainLayout', async () => {
     const router = await readSrc('../router/AppRouter.jsx')
-    // The protected block starts at `<Route element={<ProtectedRoute><MainLayout />`
-    // and runs to the end of that element. Grab the paths declared inside it.
     const start = router.indexOf('<ProtectedRoute><MainLayout />')
     expect(start).toBeGreaterThan(-1)
     const protectedBlock = router.slice(start)
     const protectedPaths = new Set(
       [...protectedBlock.matchAll(/<Route path="([^"]+)"/g)].map((m) => m[1]),
     )
-    expect(protectedPaths.has('/dashboard')).toBe(true) // sanity: block was found
+    expect(protectedPaths.has('/dashboard')).toBe(true)
 
     const offenders = PUBLIC_NAV_LINKS
       .map((l) => l.to)
@@ -36,11 +41,13 @@ describe('public nav does not advertise authenticated routes', () => {
   })
 })
 
-describe('authenticated sidebar exposes /simulators', () => {
-  it('MainLayout navItems contains a /simulators entry', async () => {
+describe('authenticated sidebar does not duplicate Lab Consoles / Journeys', () => {
+  it('MainLayout navItems has no /simulators or /journeys entry', async () => {
     const src = await readSrc('../components/layout/MainLayout.jsx')
     const navBlock = src.slice(src.indexOf('const navItems = ['))
     const items = navBlock.slice(0, navBlock.indexOf(']'))
-    expect(items).toMatch(/path: '\/simulators'/)
+    expect(items).not.toMatch(/path: '\/simulators'/)
+    expect(items).not.toMatch(/path: '\/journeys'/)
+    expect(items).toMatch(/path: '\/technologies'/)
   })
 })

@@ -219,6 +219,56 @@ class AzureBridgePowerTests(AzureEngineBase):
         self.assertTrue(res2["ok"])
         self.assertEqual(len([v for v in ae.get_state(self.sid)["state"]["vms"] if v["name"] == "tf-web"]), 1)
 
+    def test_create_vm_portal_fields(self):
+        self._login()
+        res = ae.apply_action(self.sid, "create_vm", {
+            "name": "vm-portal",
+            "size": "Standard_D2s_v5",
+            "image": "Ubuntu 24.04 LTS",
+            "location": "westus2",
+            "resource_group": "rg-fixitlab-prod",
+            "vnet": "vnet-prod",
+            "subnet": "snet-web",
+            "assign_public_ip": False,
+            "admin_username": "labadmin",
+            "authentication_type": "password",
+            "os_disk_sku": "Standard_SSD_LRS",
+            "os_disk_gb": 64,
+        })
+        self.assertTrue(res["ok"], res)
+        vm = next(v for v in ae.get_state(self.sid)["state"]["vms"] if v["name"] == "vm-portal")
+        self.assertEqual(vm["location"], "westus2")
+        self.assertEqual(vm["os"], "Ubuntu 24.04 LTS")
+        self.assertEqual(vm["resource_group"], "rg-fixitlab-prod")
+        self.assertEqual(vm["vnet"], "vnet-prod")
+        self.assertEqual(vm["subnet"], "snet-web")
+        self.assertIsNone(vm["public_ip"])
+        self.assertEqual(vm["admin_username"], "labadmin")
+        self.assertEqual(vm["authentication_type"], "password")
+        self.assertTrue(vm["password_auth"])
+        self.assertEqual(vm["os_disk_sku"], "Standard_SSD_LRS")
+        disk = next(d for d in ae.get_state(self.sid)["state"]["disks"] if d["name"] == "vm-portal_OsDisk")
+        self.assertEqual(disk["size_gb"], 64)
+        self.assertEqual(disk["sku"], "Standard_SSD_LRS")
+
+    def test_create_vm_create_networking_defaults(self):
+        self._login()
+        res = ae.apply_action(self.sid, "create_vm", {
+            "name": "vm-newnet",
+            "create_networking": True,
+            "assign_public_ip": True,
+            "authentication_type": "sshPublicKey",
+            "ssh_public_key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC lab-key",
+        })
+        self.assertTrue(res["ok"], res)
+        vm = next(v for v in ae.get_state(self.sid)["state"]["vms"] if v["name"] == "vm-newnet")
+        self.assertEqual(vm["vnet"], "vnet-vm-newnet")
+        self.assertEqual(vm["subnet"], "default")
+        self.assertTrue(vm["public_ip"])
+        self.assertTrue(vm["ssh_key_configured"])
+        self.assertTrue(any(v["name"] == "vnet-vm-newnet" for v in ae.get_state(self.sid)["state"]["vnets"]))
+        self.assertTrue(any(p.get("attached_to") == "vm-newnet" for p in ae.get_state(self.sid)["state"]["public_ips"]))
+
 
 class AzureV2FacadeTests(AzureEngineBase):
     def test_seeded_v2_collections(self):

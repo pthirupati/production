@@ -132,7 +132,13 @@ export default function JiraTicketPanel({
 
       {pendingReply?.author && !infoMode && (
         <div className="mt-2 text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/25 rounded px-2.5 py-1.5">
-          {pendingReply.author} is responding… (~{pendingReply.delaySeconds || 30}s)
+          {pendingReply.author} is responding…
+          {' '}
+          <span className="tabular-nums font-semibold">
+            {typeof pendingReply.remainingSeconds === 'number'
+              ? `${pendingReply.remainingSeconds}s`
+              : `~${pendingReply.delaySeconds || 30}s`}
+          </span>
         </div>
       )}
 

@@ -30,24 +30,24 @@ def _user_has_free_lab_quota(user) -> bool:
 
 
 def _user_can_open_scenario_jira(user, scenario: Scenario) -> bool:
-    """Open the Jira incident ONLY when the user is *subscribed* (active tech
-    subscription, org grant, or complimentary/staff access) OR is a free-plan
-    user who still has daily free-lab access remaining. Once the free quota is
-    used up and the user is not subscribed, the ticket must NOT open.
+    """Open Jira when subscribed to the scenario's technology (or complimentary/staff).
 
-    This is the single enforcement point for the Jira-open rule and matches the
-    lab-start quota gate, so a free user who can't start a 6th lab today also
-    can't open a 6th incident ticket.
+    Free-plan daily quota only unlocks Jira for *free* scenarios. Paid scenarios
+    required a tech subscription — free quota alone was a revenue leak (ticket
+    copy + cross-tech companion links without buying the tech).
     """
     if not user or not user.is_authenticated:
         return False
-    # Subscribed / complimentary / staff → always allowed.
     if user_has_complimentary_access(user):
         return True
     if scenario.technology_id and user_has_technology_access(user, scenario.technology_id):
         return True
-    # Free plan: allowed only while the daily free-lab quota remains.
-    return _user_has_free_lab_quota(user)
+    if getattr(scenario, "is_free", False):
+        return _user_has_free_lab_quota(user)
+    tech = getattr(scenario, "technology", None)
+    if tech is not None and getattr(tech, "is_free", False):
+        return _user_has_free_lab_quota(user)
+    return False
 
 
 def _sync_ticket_status(ticket, client=None):

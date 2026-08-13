@@ -64,6 +64,34 @@ const VM_SIZE_OPTIONS = [
   { value: 'Standard_F2s_v2', label: 'Standard_F2s_v2 (2 vCPU, 4 GiB) — compute optimized' },
 ]
 
+const AZ_IMAGE_OPTIONS = [
+  { value: 'Ubuntu 22.04 LTS', label: 'Ubuntu Server 22.04 LTS — gen2' },
+  { value: 'Ubuntu 24.04 LTS', label: 'Ubuntu Server 24.04 LTS — gen2' },
+  { value: 'Debian 12', label: 'Debian 12 "bookworm" — gen2' },
+  { value: 'Red Hat Enterprise Linux 9', label: 'Red Hat Enterprise Linux 9 — gen2' },
+  { value: 'Windows Server 2022 Datacenter', label: 'Windows Server 2022 Datacenter — gen2' },
+]
+
+const AZ_LOCATION_OPTIONS = [
+  { value: 'eastus', label: 'East US' },
+  { value: 'eastus2', label: 'East US 2' },
+  { value: 'westus2', label: 'West US 2' },
+  { value: 'centralus', label: 'Central US' },
+  { value: 'westeurope', label: 'West Europe' },
+  { value: 'northeurope', label: 'North Europe' },
+  { value: 'southeastasia', label: 'Southeast Asia' },
+]
+
+const AZ_OS_DISK_SKU_OPTIONS = [
+  { value: 'Premium_SSD_LRS', label: 'Premium SSD (locally redundant)' },
+  { value: 'StandardSSD_LRS', label: 'Standard SSD (locally redundant)' },
+  { value: 'Standard_SSD_LRS', label: 'Standard SSD LRS' },
+  { value: 'Standard_LRS', label: 'Standard HDD (locally redundant)' },
+  { value: 'Premium_SSD_ZRS', label: 'Premium SSD (zone redundant)' },
+]
+
+const NET_CREATE_DEFAULTS = '__create_defaults__'
+
 function powerStatus(power) {
   if (power === 'running') return 'success'
   if (power === 'stopped') return 'error'
@@ -99,6 +127,17 @@ export default function AzureConsole({
   const [createVmOpen, setCreateVmOpen] = useState(false)
   const [newVmName, setNewVmName] = useState('vm-app01')
   const [newVmSize, setNewVmSize] = useState('Standard_B2s')
+  const [newVmImage, setNewVmImage] = useState('Ubuntu 22.04 LTS')
+  const [newVmLocation, setNewVmLocation] = useState('eastus')
+  const [newVmRg, setNewVmRg] = useState('')
+  const [newVmNet, setNewVmNet] = useState('')
+  const [newVmPublicIp, setNewVmPublicIp] = useState(true)
+  const [newVmAdmin, setNewVmAdmin] = useState('azureuser')
+  const [newVmAuth, setNewVmAuth] = useState('sshPublicKey')
+  const [newVmSshKey, setNewVmSshKey] = useState('')
+  const [newVmPassword, setNewVmPassword] = useState('')
+  const [newVmOsDiskSku, setNewVmOsDiskSku] = useState('Premium_SSD_LRS')
+  const [newVmOsDiskGb, setNewVmOsDiskGb] = useState(30)
   const [subnetModal, setSubnetModal] = useState(null)
   const [subnetName, setSubnetName] = useState('snet-app')
   const [subnetCidr, setSubnetCidr] = useState('10.10.2.0/24')
@@ -149,6 +188,71 @@ export default function AzureConsole({
   const publicIps = st.public_ips || EMPTY_ARR
   const activityLog = st.activity_log || st.events || EMPTY_ARR
   const snapshots = st.snapshots || EMPTY_ARR
+
+  const defaultRg = resourceGroups[0]?.name || 'rg-fixitlab-prod'
+  const netOptions = useMemo(() => {
+    const opts = []
+    for (const vn of vnets) {
+      for (const sn of (vn.subnets || [])) {
+        opts.push({
+          value: `${vn.name}/${sn.name}`,
+          label: `${vn.name} / ${sn.name}${sn.address_prefix ? ` (${sn.address_prefix})` : ''}`,
+          vnet: vn.name,
+          subnet: sn.name,
+        })
+      }
+    }
+    return opts
+  }, [vnets])
+  const defaultNet = netOptions[0]?.value || NET_CREATE_DEFAULTS
+
+  const openCreateVm = () => {
+    setNewVmName(`vm-app${Date.now().toString(36).slice(-3)}`)
+    setNewVmSize('Standard_B2s')
+    setNewVmImage('Ubuntu 22.04 LTS')
+    setNewVmLocation(resourceGroups[0]?.location || 'eastus')
+    setNewVmRg(defaultRg)
+    setNewVmNet(defaultNet)
+    setNewVmPublicIp(true)
+    setNewVmAdmin('azureuser')
+    setNewVmAuth('sshPublicKey')
+    setNewVmSshKey('')
+    setNewVmPassword('')
+    setNewVmOsDiskSku('Premium_SSD_LRS')
+    setNewVmOsDiskGb(30)
+    setCreateVmOpen(true)
+  }
+
+  const submitCreateVm = () => {
+    const payload = {
+      name: newVmName.trim(),
+      size: newVmSize,
+      image: newVmImage,
+      os: newVmImage,
+      location: newVmLocation,
+      resource_group: newVmRg || defaultRg,
+      assign_public_ip: !!newVmPublicIp,
+      admin_username: newVmAdmin.trim() || 'azureuser',
+      authentication_type: newVmAuth,
+      os_disk_sku: newVmOsDiskSku,
+      os_disk_gb: Number(newVmOsDiskGb) || 30,
+    }
+    if (newVmNet === NET_CREATE_DEFAULTS) {
+      payload.create_networking = true
+      payload.vnet = `vnet-${payload.name}`
+      payload.subnet = 'default'
+    } else {
+      const [vnet, subnet] = (newVmNet || defaultNet).split('/')
+      payload.vnet = vnet
+      payload.subnet = subnet
+    }
+    if (newVmAuth === 'sshPublicKey' && newVmSshKey.trim()) {
+      payload.ssh_public_key = newVmSshKey.trim()
+    }
+    // Password is never sent to the API as a real secret — engine only records auth type.
+    run(() => azureApi.createVm(sessionId, payload), 'VM created')
+    setCreateVmOpen(false)
+  }
 
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
@@ -302,7 +406,7 @@ export default function AzureConsole({
     <div className="space-y-3">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <h2 className="text-lg font-semibold">Virtual machines</h2>
-        <button type="button" className="az-btn-primary flex items-center gap-1" onClick={() => setCreateVmOpen(true)}>
+        <button type="button" className="az-btn-primary flex items-center gap-1" onClick={openCreateVm}>
           <Plus size={14} /> Create VM
         </button>
       </div>
@@ -759,22 +863,96 @@ export default function AzureConsole({
         </label>
       </SimModal>
 
-      <SimModal open={createVmOpen} onClose={() => setCreateVmOpen(false)} title="Create a virtual machine"
+      <SimModal open={createVmOpen} onClose={() => setCreateVmOpen(false)} title="Create a virtual machine" width="max-w-2xl"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setCreateVmOpen(false)}>Cancel</button>
-          <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
-            run(() => azureApi.createVm(sessionId, { name: newVmName, size: newVmSize }), 'VM created')
-            setCreateVmOpen(false)
-          }}>Create</button>
+          <button type="button" className="az-btn-primary" disabled={busy || !newVmName.trim()} onClick={submitCreateVm}>
+            Create
+          </button>
         </>}>
-        <label className="block text-sm">Name
-          <input className="w-full mt-1 border rounded px-2 py-1.5" value={newVmName} onChange={(e) => setNewVmName(e.target.value)} />
-        </label>
-        <label className="block text-sm mt-3">Size
-          <select className="w-full mt-1 border rounded px-2 py-1.5" value={newVmSize} onChange={(e) => setNewVmSize(e.target.value)}>
-            {VM_SIZE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </label>
+        <div className="space-y-3">
+          <p className="text-xs text-slate-500">Basics · Disks · Networking · Management (lab simulation)</p>
+          <label className="block text-sm">Virtual machine name
+            <input className="w-full mt-1 border rounded px-2 py-1.5" value={newVmName} onChange={(e) => setNewVmName(e.target.value)} />
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block text-sm">Region
+              <select className="w-full mt-1 border rounded px-2 py-1.5" value={newVmLocation} onChange={(e) => setNewVmLocation(e.target.value)}>
+                {AZ_LOCATION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            <label className="block text-sm">Resource group
+              <select className="w-full mt-1 border rounded px-2 py-1.5" value={newVmRg || defaultRg} onChange={(e) => setNewVmRg(e.target.value)}>
+                {resourceGroups.map((rg) => (
+                  <option key={rg.name} value={rg.name}>{rg.name} ({rg.location || '—'})</option>
+                ))}
+                {!resourceGroups.length && <option value={defaultRg}>{defaultRg}</option>}
+              </select>
+            </label>
+          </div>
+          <label className="block text-sm">Image
+            <select className="w-full mt-1 border rounded px-2 py-1.5" value={newVmImage} onChange={(e) => setNewVmImage(e.target.value)}>
+              {AZ_IMAGE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
+          <label className="block text-sm">Size
+            <select className="w-full mt-1 border rounded px-2 py-1.5" value={newVmSize} onChange={(e) => setNewVmSize(e.target.value)}>
+              {VM_SIZE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block text-sm">Administrator username
+              <input className="w-full mt-1 border rounded px-2 py-1.5" value={newVmAdmin} onChange={(e) => setNewVmAdmin(e.target.value)} />
+            </label>
+            <label className="block text-sm">Authentication type
+              <select className="w-full mt-1 border rounded px-2 py-1.5" value={newVmAuth} onChange={(e) => setNewVmAuth(e.target.value)}>
+                <option value="sshPublicKey">SSH public key</option>
+                <option value="password">Password</option>
+              </select>
+            </label>
+          </div>
+          {newVmAuth === 'sshPublicKey' ? (
+            <label className="block text-sm">SSH public key
+              <textarea
+                className="w-full mt-1 border rounded px-2 py-1.5 font-mono text-xs min-h-[72px]"
+                placeholder="ssh-rsa AAAA… (optional — lab uses a simulated fingerprint if empty)"
+                value={newVmSshKey}
+                onChange={(e) => setNewVmSshKey(e.target.value)}
+              />
+            </label>
+          ) : (
+            <label className="block text-sm">Password
+              <input
+                type="password"
+                className="w-full mt-1 border rounded px-2 py-1.5"
+                placeholder="Not stored — simulation only"
+                value={newVmPassword}
+                onChange={(e) => setNewVmPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </label>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block text-sm">OS disk type
+              <select className="w-full mt-1 border rounded px-2 py-1.5" value={newVmOsDiskSku} onChange={(e) => setNewVmOsDiskSku(e.target.value)}>
+                {AZ_OS_DISK_SKU_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            <label className="block text-sm">OS disk size (GiB)
+              <input type="number" min={30} className="w-full mt-1 border rounded px-2 py-1.5" value={newVmOsDiskGb} onChange={(e) => setNewVmOsDiskGb(e.target.value)} />
+            </label>
+          </div>
+          <label className="block text-sm">Virtual network / subnet
+            <select className="w-full mt-1 border rounded px-2 py-1.5" value={newVmNet || defaultNet} onChange={(e) => setNewVmNet(e.target.value)}>
+              {netOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              <option value={NET_CREATE_DEFAULTS}>Create new VNet + subnet (defaults)</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm mt-1">
+            <input type="checkbox" checked={newVmPublicIp} onChange={(e) => setNewVmPublicIp(e.target.checked)} />
+            Create and associate a public IP address
+          </label>
+        </div>
       </SimModal>
 
       <SimModal open={!!subnetModal} onClose={() => setSubnetModal(null)} title={`Add subnet — ${subnetModal || ''}`}

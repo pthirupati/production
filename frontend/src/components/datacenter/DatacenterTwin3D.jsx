@@ -12,7 +12,7 @@ import {
 import { Physics, RigidBody } from '@react-three/rapier'
 import { EffectComposer, Bloom, SSAO, Vignette, Noise } from '@react-three/postprocessing'
 import * as THREE from 'three'
-import { StatusLed, InteractiveCable, CablePhysicsBits } from './DcCableSystem'
+import { StatusLed, InteractiveCable, CablePhysicsBits, isPointerUnlockPauseSuppressed, suppressPointerUnlockPause } from './DcCableSystem'
 import { dcSfx } from './DcAmbientAudio'
 import PhysicsSafe from './PhysicsSafe'
 import { captureCanvasPng } from './DcShare'
@@ -36,6 +36,49 @@ export const EYE_Y = 1.55
  *  wall and rack in one frame. 0.1s ≈ 10fps — slow motion below that beats teleport. */
 export const MAX_FRAME_DT = 0.1
 export const clampDt = (dt) => (Number.isFinite(dt) ? Math.max(0, Math.min(MAX_FRAME_DT, dt)) : 0)
+
+/** Auto LOD when sustained FPS falls below this (TODO 449 — cut particles / Rapier). */
+export const FPS_LOD_THRESHOLD = 40
+export const FPS_LOD_ENTER_SAMPLES = 2
+export const FPS_LOD_EXIT_SAMPLES = 5
+
+/**
+ * Hysteresis helper for FPS-driven LOD. Pure so tests can drive consecutive samples
+ * without mounting Canvas. `state` shape: `{ low, high, active }`.
+ */
+export function nextFpsLodState(state, fps, threshold = FPS_LOD_THRESHOLD) {
+  const prev = state || { low: 0, high: 0, active: false }
+  const n = Number(fps)
+  if (!Number.isFinite(n)) return { ...prev }
+  if (n < threshold) {
+    const low = prev.low + 1
+    return {
+      low,
+      high: 0,
+      active: prev.active || low >= FPS_LOD_ENTER_SAMPLES,
+    }
+  }
+  const high = prev.high + 1
+  return {
+    low: 0,
+    high,
+    active: prev.active && high < FPS_LOD_EXIT_SAMPLES ? true : false,
+  }
+}
+
+/** Cut draw cost while fps LOD is active — particles + post + Rapier. */
+export function applyFpsLodCfg(qualityCfg, active) {
+  if (!active || !qualityCfg) return qualityCfg
+  return {
+    ...qualityCfg,
+    dust: Math.min(qualityCfg.dust ?? 40, 28),
+    anim: Math.min(qualityCfg.anim ?? 1, 0.45),
+    bloom: false,
+    ssao: false,
+    noise: false,
+    dpr: [1, 1],
+  }
+}
 
 /** Mouse-look tuning. Radians per pixel of `movementX/Y`; the historical hardcoded
  *  value was 0.0026 on both axes, which stays the default so existing muscle memory
@@ -2467,6 +2510,7 @@ function SceneContent({
             serverId: s.id,
             cableId: c.id,
             cableType: c.type || c.catalog_type || 'Cat6A',
+            bendRadiusMm: c.bend_radius_mm,
             from: port.clone().add(new THREE.Vector3(ci * 0.04, 0, 0)),
             to: new THREE.Vector3(sx + ci * 0.05, 1.5 + ci * 0.05, sz + RACK_D / 2 + 0.1),
             loose,
@@ -2616,6 +2660,7 @@ function SceneContent({
           cableId={c.cableId || c.id}
           serverId={c.serverId}
           cableType={c.cableType || 'Cat6A'}
+          bendRadiusMm={c.bendRadiusMm}
           label={c.label}
           onUnplug={c.interactive ? (payload) => onUnplugCable?.(payload) : undefined}
           onPlug={c.interactive ? (payload) => onPlugCable?.(payload) : undefined}
@@ -3120,8 +3165,15 @@ export default function DatacenterTwin3D({
   const [walkMode, setWalkMode] = useState(false)
   // FPS is written straight into a DOM text node — see fpsElRef usage below.
   const fpsElRef = useRef(null)
+  const fpsLodSamples = useRef({ low: 0, high: 0, active: false })
+  const [fpsLod, setFpsLod] = useState(false)
   const setFps = useMemo(() => (n) => {
-    if (fpsElRef.current) fpsElRef.current.textContent = String(n)
+    if (fpsElRef.current) {
+      fpsElRef.current.textContent = fpsLodSamples.current.active ? `${n}·LOD` : String(n)
+    }
+    const next = nextFpsLodState(fpsLodSamples.current, n)
+    fpsLodSamples.current = next
+    setFpsLod((cur) => (cur === next.active ? cur : next.active))
   }, [])
   // Steam-class default: start immersive (game view) — heavy chrome stays collapsed.
   const [immersive, setImmersive] = useState(true)
@@ -3267,14 +3319,32 @@ export default function DatacenterTwin3D({
   }, [gyroOn, inGame])
 
   const qualityCfg = useMemo(() => {
+    let cfg
     if (quality === 'low') {
-      return { dpr: [1, 1], dust: 40, shadows: false, anim: 0.65, shadowMap: 1024, bloom: false, ssao: false, vignette: false, noise: false }
+      cfg = { dpr: [1, 1], dust: 40, shadows: false, anim: 0.65, shadowMap: 1024, bloom: false, ssao: false, vignette: false, noise: false }
+    } else if (quality === 'high') {
+      cfg = { dpr: [1, 2], dust: 160, shadows: true, anim: 1, shadowMap: 2048, bloom: true, ssao: true, vignette: true, noise: true }
+    } else {
+      cfg = { dpr: [1, 1.5], dust: 90, shadows: true, anim: 1, shadowMap: 1024, bloom: true, ssao: false, vignette: true, noise: false }
     }
-    if (quality === 'high') {
-      return { dpr: [1, 2], dust: 160, shadows: true, anim: 1, shadowMap: 2048, bloom: true, ssao: true, vignette: true, noise: true }
-    }
-    return { dpr: [1, 1.5], dust: 90, shadows: true, anim: 1, shadowMap: 1024, bloom: true, ssao: false, vignette: true, noise: false }
-  }, [quality])
+    return applyFpsLodCfg(cfg, fpsLod)
+  }, [quality, fpsLod])
+
+  // Rapier off while FPS LOD is active (particles already cut via qualityCfg).
+  const effectivePhysics = physicsEnabled && !fpsLod
+
+  const selectedServerIdRef = useRef(selectedServerId)
+  selectedServerIdRef.current = selectedServerId
+
+  // Opening the field tablet must release the mouse without opening the pause menu,
+  // otherwise tablet + "Paused" stack and Walk/chrome feel dead.
+  useEffect(() => {
+    if (!selectedServerId) return undefined
+    suppressPointerUnlockPause(800)
+    try { document.exitPointerLock?.() } catch { /* */ }
+    setMenuOpen(false)
+    return undefined
+  }, [selectedServerId])
 
   const selectedServer = useMemo(() => {
     if (!selectedServerId) return null
@@ -3320,7 +3390,7 @@ export default function DatacenterTwin3D({
   // re-locking is what used to strand the player with live WASD and a dead mouse.
   const resumeWalking = () => {
     setMenuOpen(false)
-    if (inGame) engagePointerLock()
+    if (inGame && !selectedServerIdRef.current) engagePointerLock()
   }
 
   // Losing the pointer means losing mouse look, so surface the pause menu rather
@@ -3328,9 +3398,13 @@ export default function DatacenterTwin3D({
   // only ever OPENS the menu. Esc below is also open-only, and only `resumeWalking`
   // closes it — otherwise the unlock-triggered open and an Esc toggle race each
   // other and the menu reopens itself on every unlock.
+  // Cable drag + field tablet unlock intentionally suppress this (see DcCableSystem).
   const handlePointerLockChange = useMemo(() => (locked) => {
     setPointerLocked(locked)
-    if (!locked) setMenuOpen((m) => m || true)
+    if (!locked) {
+      if (isPointerUnlockPauseSuppressed() || selectedServerIdRef.current) return
+      setMenuOpen((m) => m || true)
+    }
   }, [])
 
   // In-world room hotkeys (1-4) + AR overlay cycle (V) + Esc pause menu — no tab bar needed while immersive.
@@ -3340,6 +3414,8 @@ export default function DatacenterTwin3D({
       if (e.code === 'Escape') {
         // Open-only. The browser has already released the pointer by the time we
         // see this; the menu is the click-to-resume surface.
+        // Field tablet owns Esc/chrome while open — don't bury it under Paused.
+        if (selectedServerIdRef.current) return
         setMenuOpen(true)
         return
       }
@@ -3372,8 +3448,9 @@ export default function DatacenterTwin3D({
             type="checkbox"
             checked={physicsEnabled}
             onChange={(e) => setPhysicsEnabled(e.target.checked)}
+            disabled={fpsLod}
           />
-          Rapier
+          Rapier{fpsLod ? ' (LOD)' : ''}
         </label>
         <label className="dc-3d-toggle">
           <input
@@ -3459,7 +3536,7 @@ export default function DatacenterTwin3D({
         {inGame && pointerLocked && !menuOpen && (
           <InteractPrompt prompt={interactPrompt} interactKey={codeLabel(binds.interact)} />
         )}
-        <ClickToPlay show={inGame && !pointerLocked && !menuOpen} onEngage={engagePointerLock} />
+        <ClickToPlay show={inGame && !pointerLocked && !menuOpen && !selectedServerId} onEngage={engagePointerLock} />
         {immersive && !intro && <ArModeChip mode={arMode} />}
         {immersive && !intro && (
           <FieldKitHud
@@ -3541,7 +3618,7 @@ export default function DatacenterTwin3D({
                   animBoost={animBoost * qualityCfg.anim}
                   intro={intro}
                   walkMode={walkMode}
-                  walkPaused={menuOpen}
+                  walkPaused={menuOpen || !!selectedServerId}
                   look={look}
                   binds={binds}
                   pointerLocked={pointerLocked}
@@ -3562,9 +3639,9 @@ export default function DatacenterTwin3D({
                 />
               )}
             >
-              {physicsEnabled ? (
+              {effectivePhysics ? (
                 <Suspense fallback={null}>
-                  <Physics gravity={[0, -9.81, 0]} colliders={false} paused={!physicsEnabled}>
+                  <Physics gravity={[0, -9.81, 0]} colliders={false} paused={!effectivePhysics}>
                     <SceneContent
                       racks={racks}
                       serversByRack={serversByRack}
@@ -3578,12 +3655,12 @@ export default function DatacenterTwin3D({
                       onOpenBmc={onOpenBmc}
                       onUnplugCable={onUnplugCable}
                       onPlugCable={onPlugCable}
-                      physicsEnabled={physicsEnabled}
+                      physicsEnabled={effectivePhysics}
                       onFps={setFps}
                       animBoost={animBoost * qualityCfg.anim}
                       intro={intro}
                       walkMode={walkMode}
-                      walkPaused={menuOpen}
+                      walkPaused={menuOpen || !!selectedServerId}
                       look={look}
                       binds={binds}
                       pointerLocked={pointerLocked}
@@ -3623,7 +3700,7 @@ export default function DatacenterTwin3D({
                   animBoost={animBoost * qualityCfg.anim}
                   intro={intro}
                   walkMode={walkMode}
-                  walkPaused={menuOpen}
+                  walkPaused={menuOpen || !!selectedServerId}
                   look={look}
                   binds={binds}
                   pointerLocked={pointerLocked}

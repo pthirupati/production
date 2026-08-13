@@ -184,6 +184,7 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   // can say so explicitly instead of leaving the learner with a bare stderr
   // line. Server grading is unaffected — Check Solution still works offline.
   const [runtimeMissing, setRuntimeMissing] = useState(false)
+  const [gradingUnavailable, setGradingUnavailable] = useState(null)
   const [solved, setSolved] = useState(solvedProp)
   const [savedAt, setSavedAt] = useState(null)   // last autosave timestamp (ms)
   // Guards so we only persist AFTER the spec has loaded + any draft restored,
@@ -543,10 +544,15 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       ))
 
       if (result.needs_review) {
-        appendTerminal('server: needs manual review')
-        toast(result.message || 'Submission needs manual review.', { icon: '🔎' })
+        appendTerminal('server: grading temporarily unavailable — submission saved for review')
+        setGradingUnavailable(
+          result.message
+          || 'Code grading is temporarily unavailable. Your submission was saved for review — it was not auto-graded.',
+        )
+        toast(result.message || 'Submission needs manual review.', { icon: '🔎', duration: 8000 })
         return
       }
+      setGradingUnavailable(null)
       if (result.passed) {
         setSolved(true)
         clearDraft(sessionId)  // solved — discard the autosaved draft
@@ -954,9 +960,21 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
   ]
 
   return (
+    <div className="flex flex-col flex-1 min-h-0 h-full">
+      {gradingUnavailable && (
+        <div
+          role="status"
+          className="shrink-0 mx-2 mt-2 px-3 py-2 rounded border border-amber-500/40 bg-amber-500/10 text-amber-100 text-xs leading-snug"
+          data-testid="coding-grading-unavailable"
+        >
+          <AlertTriangle size={13} className="inline mr-1 -mt-0.5" />
+          {gradingUnavailable}
+        </div>
+      )}
     <VsCodeWorkbench
       theme="app"
       className="flex-1 min-h-0"
+      rightPanelDefaultOpen
       title={`${langLabel} IDE`}
       subtitle={scenario?.title || 'Coding Lab'}
       toolbar={(
@@ -1353,5 +1371,6 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
     >
       <CommandPalette open={paletteOpen} commands={commands} onClose={() => setPaletteOpen(false)} />
     </VsCodeWorkbench>
+    </div>
   )
 }

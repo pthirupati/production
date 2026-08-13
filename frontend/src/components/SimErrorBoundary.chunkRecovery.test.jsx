@@ -3,14 +3,9 @@
  * REPRODUCTION + fix guard for the "Something went wrong loading this simulator"
  * that no store reset can fix: a ChunkLoadError from the lazy sim import.
  *
- * BEFORE the fix, the boundary's "Try again" re-rendered the SAME failed lazy
- * component (which re-throws the cached rejection) and "Reset saved state" only
- * cleared localStorage — neither can conjure a missing JS chunk, so the learner
- * was stuck on the error screen until they manually did a full reload.
- *
- * AFTER the fix, a ChunkLoadError makes the boundary do a one-shot hard reload
- * (loop-guarded) so the browser revalidates index.html and fetches the current
- * chunk — and it does NOT falsely reload for an ordinary render error.
+ * AFTER the fix, a ChunkLoadError surfaces a "Reload for update" recovery UI
+ * instead of auto-reloading the whole SPA (which flashed global CSS/fonts and
+ * felt like the site crashed). Ordinary render errors still recover in place.
  */
 import { Suspense } from 'react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -54,33 +49,28 @@ function ThrowsPlainRenderError() {
 }
 
 describe('SimErrorBoundary chunk-load recovery', () => {
-  it('ChunkLoadError: boundary auto-reloads once on catch (learner is not left stuck)', async () => {
-    // lazyWithRetry's OWN one-shot reload is already spent this session, so the
-    // lazy import re-throws the chunk error straight into the boundary (the real
-    // "stuck on the error screen" state the learner used to see).
+  it('ChunkLoadError: shows recovery UI without auto-reloading the SPA', async () => {
     sessionStorage.setItem('fixitlab-chunk-reload', '1')
     render(
       <SimErrorBoundary name="aws" title="Lab environment error">
         <LazyThatChunkFails />
       </SimErrorBoundary>,
     )
-    // The boundary catches the chunk error and hard-reloads automatically.
-    await waitFor(() => expect(reloadSpy).toHaveBeenCalledTimes(1), { timeout: 3000 })
+    await waitFor(() => expect(screen.getByText(/Reload for update/i)).toBeTruthy(), { timeout: 3000 })
+    expect(screen.getByText(/outdated lab console/i)).toBeTruthy()
+    expect(reloadSpy).not.toHaveBeenCalled()
   })
 
-  it('ChunkLoadError: reload is loop-guarded (only one reload per session window)', async () => {
+  it('ChunkLoadError: Reload for update is loop-guarded (only one reload per session window)', async () => {
     sessionStorage.setItem('fixitlab-chunk-reload', '1') // lazyWithRetry reload spent
-    // Simulate that the BOUNDARY reload already happened moments ago this session.
     sessionStorage.setItem('fixitlab-sim-chunk-reload', String(Date.now()))
     render(
       <SimErrorBoundary name="aws" title="Lab environment error">
         <LazyThatChunkFails />
       </SimErrorBoundary>,
     )
-    // The error screen shows and NO further reload fires (guard prevents a loop).
     await waitFor(() => expect(screen.getByText(/Reload for update/i)).toBeTruthy(), { timeout: 3000 })
     expect(screen.getByText(/outdated lab console/i)).toBeTruthy()
-    // Clicking the chunk-recovery button stays guarded (no second hard reload).
     fireEvent.click(screen.getByText(/Reload for update/i))
     expect(reloadSpy).not.toHaveBeenCalled()
   })
@@ -92,8 +82,6 @@ describe('SimErrorBoundary chunk-load recovery', () => {
       </SimErrorBoundary>,
     )
     expect(screen.queryByText(/Something went wrong/i)).not.toBeNull()
-    // A plain (non-chunk) error must NOT trigger a hard reload — it recovers in
-    // place via onReset / store reset, exactly as before this fix.
     fireEvent.click(screen.getByText(/Try again/i))
     expect(reloadSpy).not.toHaveBeenCalled()
   })

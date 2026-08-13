@@ -15,10 +15,13 @@ per-task validation gate, and that FLAT projects are entirely unchanged:
   - The seeded reference capstone CAP8 has its 7 stages wired to real labs.
 """
 
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
 
+from apps.billing.models import TechnologySubscription
 from apps.labs.models import LabSession
 from apps.question_bank.models import (
     Project,
@@ -28,6 +31,17 @@ from apps.question_bank.models import (
     Technology,
     UserTaskProgress,
 )
+
+
+def _grant_tech(user, tech):
+    """ProjectStartView requires an active technology subscription."""
+    TechnologySubscription.objects.create(
+        user=user,
+        technology=tech,
+        amount=Decimal("0.00"),
+        is_active=True,
+        payment_verified=True,
+    )
 
 User = get_user_model()
 
@@ -65,6 +79,7 @@ class FlatProjectUnchangedTests(TestCase):
             project=cls.project, jira_key="F-1", title="t1", description="d", order=1,
         )
         cls.user = User.objects.create_user(username="flatuser", password="pw")
+        _grant_tech(cls.user, cls.tech)
 
     def setUp(self):
         self.client = APIClient()
@@ -134,6 +149,7 @@ class StagedProjectStartTests(TestCase):
             order=3, stage=cls.s3,
         )
         cls.user = User.objects.create_user(username="stageduser", password="pw")
+        _grant_tech(cls.user, cls.tech)
 
     def setUp(self):
         self.client = APIClient()

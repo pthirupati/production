@@ -1898,7 +1898,7 @@ export default function LabRunner() {
   }
   // Companion overlays must sit above the lab sidebar (z-70) and keep Close +
   // Hints/Check/+30m/Stop — never pass embedded=true (that hid chrome).
-  const companionOverlayClass = 'fixed inset-0 z-[80] bg-surface-950 flex flex-col min-h-0'
+  const companionOverlayClass = 'fixed inset-0 z-[80] bg-surface-950 flex flex-col min-h-0 relative'
   const isCrossTechMonitoring = isCrossTech && (
     ['grafana', 'prometheus'].includes(scenario?.technology?.slug)
     || /monitor|grafana|prometheus/.test((scenario?.slug || '').toLowerCase())
@@ -1986,8 +1986,16 @@ export default function LabRunner() {
     || scenario?.aws_link === true
     || consolesInclude(scenario?.consoles, 'aws')
   )
-  // Terraform / ai-infra / VyOS apply can enlist MAAS / create LXD — surface companion.
-  const showHostedBaremetalLink = !isBaremetalGuiLab && (
+  // Companion MAAS/LXD only when entitled to baremetal OR to the owning lab tech
+  // (ai-infra / terraform / vyos). Scenario flags alone used to open unpaid consoles.
+  const canBaremetalCompanion = userHasTechAccess(techSubs, 'baremetal')
+    || userHasTechAccess(techSubs, 'ai-infra')
+    || techSlugLc === 'ai-infra'
+    || userHasTechAccess(techSubs, 'terraform')
+    || techSlugLc === 'terraform'
+    || isTerraformSimLab
+    || (isVyosLab && (userHasTechAccess(techSubs, 'vyos') || techSlugLc === 'vyos'))
+  const showHostedBaremetalLink = !isBaremetalGuiLab && canBaremetalCompanion && (
     techSlugLc === 'terraform'
     || isTerraformSimLab
     || techSlugLc === 'ai-infra'
@@ -2492,15 +2500,16 @@ export default function LabRunner() {
                   {session?.jira_issue_key && (
                     <JiraTicketPanel
                       compact
-                      labInfoMode
                       hideHistory
-                      hideComments
-                      hideStatus
                       ticket={jiraTicket || {
                         issue_key: session.jira_issue_key,
                         issue_url: session.jira_issue_url,
                         run_count: session.jira_run_count || 1,
                       }}
+                      comments={jiraComments}
+                      onComment={handleJiraComment}
+                      commenting={false}
+                      pendingReply={jiraPendingReply}
                     />
                   )}
                   <div>
@@ -3980,11 +3989,9 @@ export default function LabRunner() {
           Check Solution (graded via validate_windows_lab on the engine). */}
       {isWindowsGuiLab && !isSimPrimaryLab && showWindowsSim && (
         <div className={companionOverlayClass}>
-          <div className="h-full overflow-auto">
-            <LazySimPanel Sim={LazyWindowsServerSimulator} label="Windows Server" sessionId={sessionId} scenario={scenario} embedded={false}
+          <LazySimPanel Sim={LazyWindowsServerSimulator} label="Windows Server" sessionId={sessionId} scenario={scenario} embedded
             onExit={() => setShowWindowsSim(false)}
             onToggleTerminal={() => setShowWindowsSim(false)} {...simChromeProps} />
-          </div>
         </div>
       )}
 
@@ -4003,7 +4010,9 @@ export default function LabRunner() {
             label="AWX"
             sessionId={sessionId}
             scenario={scenario}
-            embedded={false}
+            // Fill the overlay flex column — nested `fixed` inside MAAS/lab chrome
+            // was clipping Lab buttons to half the viewport on companion open.
+            embedded
             onExit={() => setShowAwxSim(false)}
             onToggleTerminal={() => setShowAwxSim(false)}
             {...simChromeProps}

@@ -33,9 +33,11 @@ export default function VsCodeWorkbench({
   statusBar,
   footer,
   rightPanelLabel = 'Instructions',
+  /** Open the mobile instructions drawer on first paint (coding labs). */
+  rightPanelDefaultOpen = false,
   children,
 }) {
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(Boolean(rightPanelDefaultOpen))
   const style = {
     ...(accent ? { '--vsc-accent': accent, '--vsc-status': accent } : {}),
     ...(sidebarWidth ? { '--vsc-sidebar-w': `${sidebarWidth}px` } : {}),

@@ -145,14 +145,23 @@ describe('Dashboard fetch failure vs empty data', () => {
     expect(screen.getByText(/Don't purchase again/i)).toBeTruthy()
   })
 
-  it('raises a partial-failure banner for a non-progress fetch failure', async () => {
-    // Pre-fix this was completely silent: only getProgress could set loadError.
-    getBookmarks.mockRejectedValue(new Error('503'))
+  it('raises a partial-failure banner for a subscriptions fetch failure', async () => {
+    // Banner is reserved for activeLabs / subscriptions — not every flaky side panel.
+    getMySubscriptions.mockRejectedValue(new Error('503'))
     renderDash()
 
     await waitFor(() =>
       expect(screen.getByTestId('dashboard-partial-error')).toBeTruthy()
     )
+  })
+
+  it('does not raise the page banner for bookmarks or jira-list blips', async () => {
+    getBookmarks.mockRejectedValue(new Error('503'))
+    getUserTickets.mockRejectedValue(new Error('503'))
+    renderDash()
+
+    await waitFor(() => expect(screen.getByText('No active subscriptions')).toBeTruthy())
+    expect(screen.queryByTestId('dashboard-partial-error')).toBeNull()
   })
 
   it('stays silent for a genuinely empty but healthy account', async () => {
@@ -311,8 +320,9 @@ describe('Dashboard next journey step', () => {
     )
     expect(screen.queryByTestId('dashboard-journey-card')).toBeNull()
     expect(screen.getByText(/your progress is intact/i)).toBeTruthy()
-    // And it counts as a partial failure, rather than failing silently.
-    expect(screen.getByTestId('dashboard-partial-error')).toBeTruthy()
+    // Journey failures get a dedicated card — not the page-level partial banner
+    // (that banner is reserved for primary cards: labs/subs/jira/bookmarks/etc.).
+    expect(screen.queryByTestId('dashboard-partial-error')).toBeNull()
   })
 
   it('shows neither card nor error when the user has not started a journey', async () => {

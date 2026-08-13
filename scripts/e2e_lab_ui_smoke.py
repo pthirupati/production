@@ -90,6 +90,7 @@ def _setup_user_token() -> str | None:
             "password": password,
             "username": f"e2e_lab_ui_{uuid.uuid4().hex[:6]}",
             "session_token": otp.session_token,
+            "accepted_legal": True,
         })
         if st not in (200, 201):
             return None

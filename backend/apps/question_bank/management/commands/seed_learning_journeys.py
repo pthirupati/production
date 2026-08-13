@@ -382,6 +382,77 @@ JOURNEYS = [
              "description": "You can load datasets, clean tabular data, build basic features, and follow a simple training path."},
         ],
     },
+    {
+        "slug": "azure-cloud-administrator",
+        "title": "Azure Cloud Administrator",
+        "role_label": "Junior Azure Admin",
+        "level": "beginner",
+        "primary_tech": "azure",
+        "description": (
+            "Operate Azure like a day-one cloud admin: VMs, disks, networking, "
+            "and identity — then prove it with hands-on labs and a guided "
+            "project before the Azure Administrator Associate track."
+        ),
+        "steps": [
+            {"kind": "tutorial_course", "title": "Learn the platform: Azure Cloud Zero-to-Hero",
+             "ref": "azure-cloud-zero-hero", "est": 540,
+             "description": "Core Azure: subscriptions, resource groups, VNets, VMs, storage, and IAM."},
+            {"kind": "scenarios", "title": "Warm-up labs: VMs → disks → NSG",
+             "refs": ["academy-azure-001-learn-virtual-machines",
+                      "academy-azure-002-build-managed-disks",
+                      "academy-azure-003-operate-nsg"], "est": 120,
+             "description": "Difficulty-ordered starter labs across compute, disks, and network security groups."},
+            {"kind": "scenarios", "title": "Level up: VNet, resource groups & identity",
+             "refs": ["academy-azure-004-troubleshoot-vnet",
+                      "academy-azure-005-production-resource-groups",
+                      "academy-azure-006-security-identity"], "est": 120,
+             "description": "Troubleshoot VNets, structure resource groups, and lock down identity."},
+            {"kind": "project", "title": "Build a secure VNet baseline",
+             "ref": "azure-secure-vnet-baseline", "est": 180,
+             "description": "Guided project: stand up a small, correctly networked Azure environment."},
+            {"kind": "certification", "title": "Earn it: Azure Administrator Associate",
+             "ref": "azure-administrator-associate", "est": 180,
+             "description": "Run the objective-mapped Azure Admin labs and take the timed mock exam."},
+            {"kind": "milestone", "title": "Milestone: Azure Cloud Administrator",
+             "est": None,
+             "description": "You can provision and operate core Azure resources with baseline security controls."},
+        ],
+    },
+    {
+        "slug": "gcp-cloud-operator",
+        "title": "GCP Cloud Operator",
+        "role_label": "Junior GCP Operator",
+        "level": "beginner",
+        "primary_tech": "gcp",
+        "description": (
+            "Run Google Cloud day-to-day: Compute Engine, disks, VPC, and IAM — "
+            "with labs that force real operator muscle memory, then certify."
+        ),
+        "steps": [
+            {"kind": "tutorial_course", "title": "Learn the platform: GCP Cloud Zero-to-Hero",
+             "ref": "gcp-cloud-zero-hero", "est": 540,
+             "description": "Core GCP: projects, IAM, VPC, GCE, and Cloud Storage."},
+            {"kind": "scenarios", "title": "Warm-up labs: GCE → disks → VPC",
+             "refs": ["academy-gcp-001-learn-compute-engine",
+                      "academy-gcp-002-build-persistent-disks",
+                      "academy-gcp-003-operate-vpc"], "est": 120,
+             "description": "Difficulty-ordered starter labs across compute, disks, and VPC networking."},
+            {"kind": "scenarios", "title": "Level up: firewall, IAM & GKE security",
+             "refs": ["academy-gcp-004-troubleshoot-firewall-rules",
+                      "academy-gcp-005-production-iam",
+                      "academy-gcp-006-security-gke"], "est": 120,
+             "description": "Fix firewall rules, apply production IAM, and harden GKE basics."},
+            {"kind": "project", "title": "Build a VPC + GKE foundation",
+             "ref": "gcp-vpc-gke-foundation", "est": 180,
+             "description": "Guided project: deploy and operate a small GCP networking/compute foundation."},
+            {"kind": "certification", "title": "Earn it: Associate Cloud Engineer",
+             "ref": "gcp-associate-cloud-engineer", "est": 180,
+             "description": "Run the objective-mapped GCP ACE labs and take the timed mock exam."},
+            {"kind": "milestone", "title": "Milestone: GCP Cloud Operator",
+             "est": None,
+             "description": "You can operate core GCP networking, compute, and identity with confidence."},
+        ],
+    },
 ]
 
 

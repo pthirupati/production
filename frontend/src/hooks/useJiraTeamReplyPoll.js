@@ -2,14 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
  * After a Jira comment schedules a delayed team bot reply, show a pending chip
- * and poll until comments grow (audit §X2a).
+ * with a live countdown and poll until comments grow (audit §X2a).
  *
- * Gated on document.visibilityState so background tabs do not hammer the API.
+ * When the tab is hidden we keep counting down but defer API reloads; on focus
+ * we immediately reload so a reply delivered while the full Jira view was open
+ * still appears on the lab panel.
  */
 export function useJiraTeamReplyPoll() {
   const [pending, setPending] = useState(null)
   const timerRef = useRef(null)
+  const countdownRef = useRef(null)
   const stopAtRef = useRef(0)
+  const expectAtRef = useRef(0)
   const baselineCountRef = useRef(0)
   const reloadRef = useRef(null)
 
@@ -17,6 +21,10 @@ export function useJiraTeamReplyPoll() {
     if (timerRef.current) {
       clearTimeout(timerRef.current)
       timerRef.current = null
+    }
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current)
+      countdownRef.current = null
     }
   }, [])
 
@@ -28,35 +36,63 @@ export function useJiraTeamReplyPoll() {
       setPending(null)
       return
     }
-    const delaySec = Number(teamReply.delay_seconds) || 30
+    const delaySec = Math.max(1, Number(teamReply.delay_seconds) || 30)
     const author = teamReply.pending_author || 'Team'
+    const now = Date.now()
     baselineCountRef.current = commentCount
     reloadRef.current = reload
-    setPending({ author, delaySeconds: delaySec })
-    stopAtRef.current = Date.now() + delaySec * 1000 + 12_000
+    expectAtRef.current = now + delaySec * 1000
+    // Beat sweeper is ~every 15s; allow well past countdown so a delayed
+    // worker delivery still lands in the chip + comment list.
+    stopAtRef.current = expectAtRef.current + 90_000
+    setPending({ author, delaySeconds: delaySec, remainingSeconds: delaySec })
+
+    countdownRef.current = setInterval(() => {
+      const left = Math.max(0, Math.ceil((expectAtRef.current - Date.now()) / 1000))
+      setPending((prev) => (prev ? { ...prev, remainingSeconds: left } : prev))
+    }, 250)
 
     const tick = async () => {
       if (Date.now() > stopAtRef.current) {
+        clearTimers()
         setPending(null)
         return
       }
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-        timerRef.current = setTimeout(tick, 4000)
+        timerRef.current = setTimeout(tick, 2000)
         return
       }
       try {
         const nextCount = await reloadRef.current()
         if (typeof nextCount === 'number' && nextCount > baselineCountRef.current) {
+          clearTimers()
           setPending(null)
           return
         }
       } catch { /* keep polling */ }
-      timerRef.current = setTimeout(tick, 4000)
+      const afterExpect = Date.now() >= expectAtRef.current
+      timerRef.current = setTimeout(tick, afterExpect ? 1200 : 2000)
     }
 
-    // Start polling a little before the expected delay so the reply appears promptly.
-    timerRef.current = setTimeout(tick, Math.max(1500, delaySec * 1000 - 2500))
+    // Start polling a few seconds before expect so we catch early delivery.
+    timerRef.current = setTimeout(tick, Math.max(800, delaySec * 1000 - 5000))
   }, [clearTimers])
+
+  useEffect(() => {
+    if (!pending) return undefined
+    const onVisible = async () => {
+      if (document.visibilityState !== 'visible' || !reloadRef.current) return
+      try {
+        const nextCount = await reloadRef.current()
+        if (typeof nextCount === 'number' && nextCount > baselineCountRef.current) {
+          clearTimers()
+          setPending(null)
+        }
+      } catch { /* ignore */ }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [pending, clearTimers])
 
   return {
     pending,

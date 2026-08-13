@@ -47,6 +47,10 @@ const DEEP_LINK_ONLY = {
   '/support':
     'Legacy inbound URL kept as a <Navigate> alias to /contact so old links and printed '
     + 'material do not 404. Intentionally unlinked — new links should point at /contact.',
+  '/simulators':
+    'Retired Lab Consoles page kept for bookmarks and printed links; public + auth nav '
+    + 'no longer advertise it (every card redirected to /technologies/:slug). '
+    + 'Intentionally unlinked — new entry is Technologies.',
 }
 
 /** Longest leading static prefix: '/interviews/round/:id/report' -> '/interviews/round'. */

@@ -86,6 +86,7 @@ def run_interview_e2e(s: Suite) -> None:
                     "email": user_email,
                     "password": user_password,
                     "session_token": otp_obj.session_token,
+                    "accepted_legal": True,
                 })
                 user_token = reg.get("access") if st in (200, 201) else None
         except Exception as exc:

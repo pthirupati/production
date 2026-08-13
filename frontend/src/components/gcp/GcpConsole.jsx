@@ -63,6 +63,31 @@ const MACHINE_TYPE_OPTIONS = [
   { value: 'c2-standard-4', label: 'c2-standard-4 (4 vCPU, 16 GiB) — compute optimized' },
 ]
 
+const GCP_ZONE_OPTIONS = [
+  { value: 'us-central1-a', label: 'us-central1-a (Iowa)' },
+  { value: 'us-central1-b', label: 'us-central1-b (Iowa)' },
+  { value: 'us-east1-b', label: 'us-east1-b (South Carolina)' },
+  { value: 'us-west1-a', label: 'us-west1-a (Oregon)' },
+  { value: 'europe-west1-b', label: 'europe-west1-b (Belgium)' },
+  { value: 'asia-southeast1-a', label: 'asia-southeast1-a (Singapore)' },
+]
+
+const GCP_IMAGE_FAMILY_OPTIONS = [
+  { value: 'debian-12', label: 'Debian 12 (bookworm)', os: 'Debian GNU/Linux 12' },
+  { value: 'debian-11', label: 'Debian 11 (bullseye)', os: 'Debian GNU/Linux 11' },
+  { value: 'ubuntu-2204-lts', label: 'Ubuntu 22.04 LTS', os: 'Ubuntu 22.04 LTS' },
+  { value: 'ubuntu-2404-lts', label: 'Ubuntu 24.04 LTS', os: 'Ubuntu 24.04 LTS' },
+  { value: 'rhel-9', label: 'Red Hat Enterprise Linux 9', os: 'Red Hat Enterprise Linux 9' },
+  { value: 'cos-stable', label: 'Container-Optimized OS', os: 'Container-Optimized OS' },
+]
+
+const GCP_DISK_TYPE_OPTIONS = [
+  { value: 'pd-balanced', label: 'Balanced persistent disk' },
+  { value: 'pd-ssd', label: 'SSD persistent disk' },
+  { value: 'pd-standard', label: 'Standard persistent disk' },
+  { value: 'pd-extreme', label: 'Extreme persistent disk' },
+]
+
 function statusBadge(status) {
   if (status === 'RUNNING') return 'success'
   if (status === 'TERMINATED') return 'error'
@@ -112,6 +137,14 @@ export default function GcpConsole({
   const [createVmOpen, setCreateVmOpen] = useState(false)
   const [vmName, setVmName] = useState('lab-vm')
   const [vmMachineType, setVmMachineType] = useState('e2-medium')
+  const [vmZone, setVmZone] = useState('us-central1-a')
+  const [vmImageFamily, setVmImageFamily] = useState('debian-12')
+  const [vmNetwork, setVmNetwork] = useState('')
+  const [vmExternalIp, setVmExternalIp] = useState(true)
+  const [vmDiskGb, setVmDiskGb] = useState(20)
+  const [vmDiskType, setVmDiskType] = useState('pd-balanced')
+  const [vmStartupScript, setVmStartupScript] = useState('')
+  const [vmLabels, setVmLabels] = useState('')
 
   const st = state?.state || EMPTY_OBJ
   const loggedIn = st?.session?.logged_in
@@ -132,6 +165,58 @@ export default function GcpConsole({
     [],
   )
   const searchResources = useMemo(() => indexGcpState(st), [st])
+
+  const subnetOptions = useMemo(() => {
+    const opts = []
+    for (const net of networks) {
+      for (const sn of (net.subnets || [])) {
+        opts.push({
+          value: `${net.name}/${sn.name}`,
+          label: `${net.name} / ${sn.name}${sn.range ? ` (${sn.range})` : ''}`,
+          network: net.name,
+          subnet: sn.name,
+        })
+      }
+    }
+    return opts
+  }, [networks])
+  const defaultSubnet = subnetOptions[0]?.value || 'vpc-prod/subnet-us-central1'
+
+  const openCreateInstance = () => {
+    setVmName(`lab-vm-${Date.now().toString(36).slice(-4)}`)
+    setVmMachineType('e2-medium')
+    setVmZone('us-central1-a')
+    setVmImageFamily('debian-12')
+    setVmNetwork(defaultSubnet)
+    setVmExternalIp(true)
+    setVmDiskGb(20)
+    setVmDiskType('pd-balanced')
+    setVmStartupScript('')
+    setVmLabels('')
+    setCreateVmOpen(true)
+  }
+
+  const submitCreateInstance = () => {
+    const img = GCP_IMAGE_FAMILY_OPTIONS.find((o) => o.value === vmImageFamily) || GCP_IMAGE_FAMILY_OPTIONS[0]
+    const [network, subnet] = (vmNetwork || defaultSubnet).split('/')
+    const payload = {
+      name: vmName.trim(),
+      machine_type: vmMachineType,
+      zone: vmZone,
+      image_family: img.value,
+      os: img.os,
+      network,
+      subnet,
+      assign_external_ip: !!vmExternalIp,
+      boot_disk_gb: Number(vmDiskGb) || 20,
+      boot_disk_type: vmDiskType,
+    }
+    if (vmStartupScript.trim()) payload.startup_script = vmStartupScript
+    if (vmLabels.trim()) payload.labels = vmLabels.trim()
+    run(() => gcpApi.createInstance(sessionId, payload), 'Instance created')
+    setCreateVmOpen(false)
+  }
+
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
     onBackToTerminal: onExit || onToggleTerminal,
@@ -265,7 +350,7 @@ export default function GcpConsole({
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-semibold">VM instances</h2>
         <button type="button" className="gcp-btn-primary flex items-center gap-1" disabled={busy}
-          onClick={() => { setVmName(`lab-vm-${Date.now().toString(36).slice(-4)}`); setCreateVmOpen(true) }}>
+          onClick={openCreateInstance}>
           <Plus size={14} /> Create instance
         </button>
       </div>
@@ -643,25 +728,72 @@ export default function GcpConsole({
         </label>
       </SimModal>
 
-      <SimModal open={createVmOpen} onClose={() => setCreateVmOpen(false)} title="Create VM instance"
+      <SimModal open={createVmOpen} onClose={() => setCreateVmOpen(false)} title="Create a VM instance" width="max-w-2xl"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setCreateVmOpen(false)}>Cancel</button>
-          <button type="button" className="gcp-btn-primary" disabled={busy || !vmName.trim()} onClick={() => {
-            run(() => gcpApi.createInstance(sessionId, {
-              name: vmName.trim(),
-              machine_type: vmMachineType,
-            }), 'Instance created')
-            setCreateVmOpen(false)
-          }}>Create</button>
+          <button type="button" className="gcp-btn-primary" disabled={busy || !vmName.trim()} onClick={submitCreateInstance}>
+            Create
+          </button>
         </>}>
-        <label className="block text-sm">Name
-          <input className="w-full mt-1 border rounded px-2 py-1.5" value={vmName} onChange={(e) => setVmName(e.target.value)} />
-        </label>
-        <label className="block text-sm mt-3">Machine type
-          <select className="w-full mt-1 border rounded px-2 py-1.5" value={vmMachineType} onChange={(e) => setVmMachineType(e.target.value)}>
-            {MACHINE_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </label>
+        <div className="space-y-3">
+          <p className="text-xs text-slate-500">Name and region · Machine configuration · Boot disk · Networking (lab simulation)</p>
+          <label className="block text-sm">Name
+            <input className="w-full mt-1 border rounded px-2 py-1.5" value={vmName} onChange={(e) => setVmName(e.target.value)} />
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block text-sm">Region / zone
+              <select className="w-full mt-1 border rounded px-2 py-1.5" value={vmZone} onChange={(e) => setVmZone(e.target.value)}>
+                {GCP_ZONE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            <label className="block text-sm">Machine type
+              <select className="w-full mt-1 border rounded px-2 py-1.5" value={vmMachineType} onChange={(e) => setVmMachineType(e.target.value)}>
+                {MACHINE_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+          </div>
+          <label className="block text-sm">Boot disk image / family
+            <select className="w-full mt-1 border rounded px-2 py-1.5" value={vmImageFamily} onChange={(e) => setVmImageFamily(e.target.value)}>
+              {GCP_IMAGE_FAMILY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block text-sm">Boot disk type
+              <select className="w-full mt-1 border rounded px-2 py-1.5" value={vmDiskType} onChange={(e) => setVmDiskType(e.target.value)}>
+                {GCP_DISK_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            <label className="block text-sm">Boot disk size (GB)
+              <input type="number" min={10} className="w-full mt-1 border rounded px-2 py-1.5" value={vmDiskGb} onChange={(e) => setVmDiskGb(e.target.value)} />
+            </label>
+          </div>
+          <label className="block text-sm">VPC network / subnet
+            <select className="w-full mt-1 border rounded px-2 py-1.5" value={vmNetwork || defaultSubnet} onChange={(e) => setVmNetwork(e.target.value)}>
+              {subnetOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              {!subnetOptions.length && <option value={defaultSubnet}>{defaultSubnet}</option>}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={vmExternalIp} onChange={(e) => setVmExternalIp(e.target.checked)} />
+            Ephemeral external IP
+          </label>
+          <label className="block text-sm">Labels <span className="text-slate-500">(optional, key=value …)</span>
+            <input
+              className="w-full mt-1 border rounded px-2 py-1.5 font-mono text-xs"
+              placeholder="env=lab team=sre"
+              value={vmLabels}
+              onChange={(e) => setVmLabels(e.target.value)}
+            />
+          </label>
+          <label className="block text-sm">Startup script <span className="text-slate-500">(optional)</span>
+            <textarea
+              className="w-full mt-1 border rounded px-2 py-1.5 font-mono text-xs min-h-[80px]"
+              placeholder="#!/bin/bash&#10;apt-get update -y"
+              value={vmStartupScript}
+              onChange={(e) => setVmStartupScript(e.target.value)}
+            />
+          </label>
+        </div>
       </SimModal>
 
       <SimModal open={createBucketOpen} onClose={() => setCreateBucketOpen(false)} title="Create bucket"

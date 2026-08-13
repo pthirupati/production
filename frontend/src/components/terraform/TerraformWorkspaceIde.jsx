@@ -17,6 +17,59 @@ import {
 import '../../styles/vscode-workbench.css'
 
 const DEFAULT_FILES = ['main.tf', 'variables.tf', 'outputs.tf']
+const STARTER_FILES = {
+  'main.tf': `terraform {
+  required_version = ">= 1.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+}
+
+resource "aws_instance" "web" {
+  ami           = var.ami_id
+  instance_type = var.instance_type
+
+  tags = {
+    Name = "web-server"
+  }
+}
+`,
+  'variables.tf': `variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "ap-south-1"
+}
+
+variable "ami_id" {
+  description = "AMI for the web server"
+  type        = string
+  default     = "ami-0c55b159cbfafe1f0"
+}
+
+variable "instance_type" {
+  description = "EC2 instance type"
+  type        = string
+  default     = "t3.medium"
+}
+`,
+  'outputs.tf': `output "instance_id" {
+  description = "ID of the web EC2 instance"
+  value       = aws_instance.web.id
+}
+
+output "public_ip" {
+  description = "Public IP of the web server"
+  value       = aws_instance.web.public_ip
+}
+`,
+}
 const IDE_THEMES = [
   { id: 'vscode', label: 'Dark+' },
   { id: 'light', label: 'Light+' },
@@ -37,7 +90,7 @@ export default function TerraformWorkspaceIde({
   const { confirm, ConfirmPortal } = useConfirm()
   const profile = getIacProfile()
   const cli = 'terraform'
-  const [files, setFiles] = useState({})
+  const [files, setFiles] = useState(() => ({ ...STARTER_FILES }))
   const [activeFile, setActiveFile] = useState('main.tf')
   const [bottomTab, setBottomTab] = useState('output')
   const [output, setOutput] = useState('')
@@ -102,7 +155,22 @@ export default function TerraformWorkspaceIde({
   useEffect(() => {
     const remoteFiles = state?.state?.files || {}
     setFiles((prev) => {
-      const next = Object.keys(prev).length && dirty ? prev : remoteFiles
+      // Prefer dirty local edits; otherwise hydrate from server; if the server
+      // never seeded files (or only empty strings), fall back to editable
+      // starter HCL so the IDE is never an empty pane with no way to write code.
+      let next = Object.keys(prev).length && dirty ? prev : remoteFiles
+      const bodies = Object.values(next || {})
+      const allEmpty = !next || !Object.keys(next).length
+        || (bodies.length > 0 && bodies.every((v) => !String(v || '').trim()))
+      if (allEmpty) {
+        next = { ...STARTER_FILES }
+      } else {
+        // Fill any blank file bodies from starters when present.
+        next = { ...next }
+        for (const [k, v] of Object.entries(STARTER_FILES)) {
+          if (!(k in next) || !String(next[k] || '').trim()) next[k] = v
+        }
+      }
       filesRef.current = next
       return next
     })
@@ -453,7 +521,7 @@ export default function TerraformWorkspaceIde({
       )}
       sidebar={(
         <IdeExplorer
-          files={Object.keys(files).length ? files : Object.fromEntries(DEFAULT_FILES.map((f) => [f, '']))}
+          files={Object.keys(files).length ? files : STARTER_FILES}
           activePath={activeFile}
           dirtyPaths={dirty ? new Set([activeFile]) : new Set()}
           expandedDirs={expandedDirs}
@@ -537,7 +605,7 @@ export default function TerraformWorkspaceIde({
         </>
       )}
       editor={(
-        <CodeEditor key={activeFile} value={files[activeFile] || ''} onChange={handleFileChange}
+        <CodeEditor key={activeFile} value={files[activeFile] ?? STARTER_FILES[activeFile] ?? ''} onChange={handleFileChange}
           language={editorLang} fontSize={13} formatOnSave />
       )}
       bottomPanel={{

@@ -15,9 +15,17 @@ function makeNoiseBuffer(ctx) {
   return buf
 }
 
-function startBed(ctx, { muted }) {
+/** Base master gain when unmuted at full volume (proximity / slider scale on top). */
+export const AMBIENT_BASE_GAIN = 0.045
+
+function startBed(ctx, { muted, volume = 1 }) {
+  // Mutable flags — one-shots close over these objects, not the create-time booleans,
+  // so mute/unmute and the volume slider take effect without remounting the bed.
+  const flags = { muted: !!muted, volume: Math.max(0, Math.min(1, Number(volume) || 0)) }
+  const masterGainFor = () => (flags.muted ? 0 : AMBIENT_BASE_GAIN * flags.volume)
+
   const master = ctx.createGain()
-  master.gain.value = muted ? 0 : 0.045
+  master.gain.value = masterGainFor()
   master.connect(ctx.destination)
 
   const noiseBuffer = makeNoiseBuffer(ctx)
@@ -100,28 +108,34 @@ function startBed(ctx, { muted }) {
 
   return {
     master,
+    flags,
     stop() {
       try { osc1.stop(); osc2.stop(); osc3.stop(); hvac.stop() } catch { /* */ }
       try { klaxon?.stop() } catch { /* */ }
       try { master.disconnect() } catch { /* */ }
     },
     setMuted(m) {
-      master.gain.setTargetAtTime(m ? 0 : 0.045, ctx.currentTime, 0.08)
+      flags.muted = !!m
+      master.gain.setTargetAtTime(masterGainFor(), ctx.currentTime, 0.08)
+    },
+    setVolume(v) {
+      flags.volume = Math.max(0, Math.min(1, Number(v) || 0))
+      master.gain.setTargetAtTime(masterGainFor(), ctx.currentTime, 0.08)
     },
     /** Raised-floor tile under a boot: a low thud plus the hollow tile ring above it. */
     footstep(sprinting = false) {
-      if (muted) return
+      if (flags.muted || flags.volume <= 0) return
       noiseHit({ freq: sprinting ? 165 : 130, q: 1.4, peak: sprinting ? 0.5 : 0.32, decay: 0.075 })
       noiseHit({ freq: sprinting ? 2600 : 2100, q: 2.2, peak: sprinting ? 0.1 : 0.06, decay: 0.045 })
     },
     /** Breaker / PDU relay — a hard high-Q click, near-instant decay. */
     relayClack() {
-      if (muted) return
+      if (flags.muted || flags.volume <= 0) return
       noiseHit({ freq: 1650, q: 9, peak: 0.55, decay: 0.05 })
     },
     /** Mantrap door cycle — a longer low sweep under a latch click. */
     doorCycle() {
-      if (muted) return
+      if (flags.muted || flags.volume <= 0) return
       noiseHit({ freq: 240, q: 0.8, peak: 0.3, decay: 0.55, type: 'lowpass' })
       noiseHit({ freq: 1900, q: 7, peak: 0.35, decay: 0.06 })
     },
@@ -160,7 +174,7 @@ function startBed(ctx, { muted }) {
       }
     },
     alertStinger() {
-      if (muted) return
+      if (flags.muted || flags.volume <= 0) return
       const o = ctx.createOscillator()
       const g = ctx.createGain()
       o.type = 'square'
@@ -169,7 +183,7 @@ function startBed(ctx, { muted }) {
       o.connect(g)
       g.connect(master)
       const t = ctx.currentTime
-      g.gain.exponentialRampToValueAtTime(0.08, t + 0.02)
+      g.gain.exponentialRampToValueAtTime(0.08 * flags.volume, t + 0.02)
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45)
       o.start(t)
       o.stop(t + 0.5)
@@ -188,6 +202,20 @@ const PROXIMITY_MAX_DIST = 9
 let sfxBus = null
 export function dcSfx() { return sfxBus }
 
+const VOLUME_STORAGE_KEY = 'fixitlab-dc-ambient-volume'
+
+export function readAmbientVolume(storage = typeof sessionStorage !== 'undefined' ? sessionStorage : null) {
+  try {
+    const raw = storage?.getItem?.(VOLUME_STORAGE_KEY)
+    if (raw == null) return 0.7
+    const n = Number(raw)
+    if (!Number.isFinite(n)) return 0.7
+    return Math.max(0, Math.min(1, n))
+  } catch {
+    return 0.7
+  }
+}
+
 export default function DcAmbientAudio({
   enabled = true,
   alert = false,
@@ -199,6 +227,7 @@ export default function DcAmbientAudio({
   const [muted, setMuted] = useState(() => {
     try { return sessionStorage.getItem(storageKey) === '1' } catch { return false }
   })
+  const [volume, setVolume] = useState(() => readAmbientVolume())
   const [armed, setArmed] = useState(false)
   const bedRef = useRef(null)
   const ctxRef = useRef(null)
@@ -210,6 +239,11 @@ export default function DcAmbientAudio({
     try { sessionStorage.setItem(storageKey, muted ? '1' : '0') } catch { /* */ }
     if (!hasProximity) bedRef.current?.setMuted?.(muted)
   }, [muted, storageKey, hasProximity])
+
+  useEffect(() => {
+    try { sessionStorage.setItem(VOLUME_STORAGE_KEY, String(volume)) } catch { /* */ }
+    bedRef.current?.setVolume?.(volume)
+  }, [volume])
 
   useEffect(() => {
     if (!armed || !enabled || !hasProximity) return undefined
@@ -227,14 +261,14 @@ export default function DcAmbientAudio({
           dist = distanceToHall
         }
         const proximity = 1 - Math.min(1, Math.max(0, dist) / PROXIMITY_MAX_DIST)
-        const target = muted ? 0 : 0.045 * (0.35 + proximity * 0.65)
+        const target = muted ? 0 : AMBIENT_BASE_GAIN * volume * (0.35 + proximity * 0.65)
         bed.master.gain.setTargetAtTime(target, ctx.currentTime, 0.3)
       }
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [armed, enabled, hasProximity, posRef, distanceToHall, muted])
+  }, [armed, enabled, hasProximity, posRef, distanceToHall, muted, volume])
 
   useEffect(() => {
     if (!enabled || !armed) return undefined
@@ -242,9 +276,9 @@ export default function DcAmbientAudio({
     if (!AC) return undefined
     const ctx = new AC()
     ctxRef.current = ctx
-    const bed = startBed(ctx, { muted })
+    const bed = startBed(ctx, { muted, volume })
     bedRef.current = bed
-    sfxBus = bed
+    sfxBus = muted || volume <= 0 ? null : bed
     if (ctx.state === 'suspended') ctx.resume().catch(() => {})
     return () => {
       sfxBus = null
@@ -256,19 +290,25 @@ export default function DcAmbientAudio({
   }, [enabled, armed]) // eslint-disable-line react-hooks/exhaustive-deps -- remount bed when armed
 
   useEffect(() => {
-    if (alert && armed && !muted) bedRef.current?.alertStinger?.()
-  }, [alert, armed, muted])
+    if (alert && armed && !muted && volume > 0) bedRef.current?.alertStinger?.()
+  }, [alert, armed, muted, volume])
 
   // Klaxon follows the hall alarm state, and stops the moment the player mutes.
   useEffect(() => {
-    bedRef.current?.setKlaxon?.(!!alarm && armed && !muted)
+    bedRef.current?.setKlaxon?.(!!alarm && armed && !muted && volume > 0)
     return () => bedRef.current?.setKlaxon?.(false)
-  }, [alarm, armed, muted])
+  }, [alarm, armed, muted, volume])
 
-  // Muting must also silence one-shots fired from inside the Canvas.
+  // Muting / zero volume must also silence one-shots fired from inside the Canvas.
   useEffect(() => {
-    sfxBus = armed && !muted ? bedRef.current : null
-  }, [armed, muted])
+    sfxBus = armed && !muted && volume > 0 ? bedRef.current : null
+  }, [armed, muted, volume])
+
+  const armFromGesture = () => {
+    setArmed(true)
+    // Resume any suspended context created on a prior Enable click.
+    try { ctxRef.current?.resume?.() } catch { /* */ }
+  }
 
   if (!enabled) return null
 
@@ -279,20 +319,43 @@ export default function DcAmbientAudio({
           type="button"
           className="dc-btn-outline dc-btn-xs"
           title="Enable facility ambience (browser requires a click)"
-          onClick={() => setArmed(true)}
+          onClick={armFromGesture}
         >
           <Volume2 size={11} /> Enable sound
         </button>
       ) : (
-        <button
-          type="button"
-          className="dc-btn-outline dc-btn-xs"
-          title={muted ? 'Unmute CRAC / fan bed' : 'Mute facility ambience'}
-          onClick={() => setMuted((m) => !m)}
-        >
-          {muted ? <VolumeX size={11} /> : <Volume2 size={11} />}
-          {muted ? 'Muted' : 'Ambience'}
-        </button>
+        <>
+          <button
+            type="button"
+            className="dc-btn-outline dc-btn-xs"
+            title={muted ? 'Unmute CRAC / fan bed' : 'Mute facility ambience'}
+            onClick={() => {
+              armFromGesture()
+              setMuted((m) => !m)
+            }}
+          >
+            {muted ? <VolumeX size={11} /> : <Volume2 size={11} />}
+            {muted ? 'Muted' : 'Ambience'}
+          </button>
+          <label className="dc-ambient-volume" title="Facility ambience volume">
+            <span className="sr-only">Volume</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={volume}
+              aria-label="Ambience volume"
+              onPointerDown={armFromGesture}
+              onChange={(e) => {
+                const next = Number(e.target.value)
+                setVolume(next)
+                if (next > 0) setMuted(false)
+                armFromGesture()
+              }}
+            />
+          </label>
+        </>
       )}
     </div>
   )

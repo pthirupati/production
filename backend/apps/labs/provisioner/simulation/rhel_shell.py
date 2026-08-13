@@ -413,6 +413,7 @@ class RHELShell:
             "df": self._cmd_df,
             "free": self._cmd_free,
             "uptime": self._cmd_uptime,
+            "dmidecode": self._cmd_dmidecode,
             "date": self._cmd_date,
             "which": self._cmd_which,
             "type": self._cmd_which,
@@ -1524,7 +1525,8 @@ class RHELShell:
         # Actions that operate on the whole system (no unit) or that we resolve
         # before requiring a known unit.
         if action in ("", "list-units") or (not action and want_failed):
-            return self._systemctl_list_units(failed_only=want_failed)
+            want_all = any(o in ("-a", "--all") for o in opts)
+            return self._systemctl_list_units(failed_only=want_failed, include_inactive=want_all)
         if action == "list-unit-files":
             return self._systemctl_list_unit_files()
         if action == "daemon-reload":
@@ -1572,14 +1574,23 @@ class RHELShell:
             elif svc.active == "failed":
                 active = "failed (Result: exit-code)"
             else:
-                active = f"inactive (dead)"
-            main = f"   Main PID: 891 ({unit})\n" if svc.active == "active" else ""
+                active = "inactive (dead)"
+            pid = 891 if svc.active == "active" else None
+            main = f"   Main PID: {pid} ({unit})\n" if pid else ""
+            # Real systemctl status shows a CGroup process tree under the unit.
+            tree = ""
+            if svc.active == "active" and pid:
+                tree = (
+                    f"   CGroup: /system.slice/{unit}.service\n"
+                    f"           └─{pid} /usr/sbin/{unit}\n"
+                )
             self.state.last_exit_code = 0 if svc.active == "active" else 3
             return (
                 f"{dot} {unit}.service - {svc.description}\n"
                 f"   Loaded: {svc.loaded} (/usr/lib/systemd/system/{unit}.service; {svc.enabled}; preset: enabled)\n"
                 f"   Active: {active} since Fri 2026-06-14 10:00:00 UTC; 1h ago\n"
                 f"{main}"
+                f"{tree}"
             )
         if action == "start":
             failure = self._nginx_config_failure(unit)
@@ -1790,14 +1801,16 @@ class RHELShell:
             f"{out}"
         )
 
-    def _systemctl_list_units(self, failed_only: bool = False) -> str:
+    def _systemctl_list_units(self, failed_only: bool = False, include_inactive: bool = False) -> str:
         header = ("UNIT                       LOAD   ACTIVE   SUB     DESCRIPTION")
         rows = []
         count = 0
         for n, s in self.state.services.items():
             if failed_only and s.active != "failed":
                 continue
-            if not failed_only and s.active not in ("active", "failed"):
+            # Default list-units hides inactive (like real systemd). Pass -a/--all
+            # after a package install so newly registered units are discoverable.
+            if not failed_only and not include_inactive and s.active not in ("active", "failed"):
                 continue
             bullet = "●" if s.active == "failed" else " "
             rows.append(f"{bullet} {n + '.service':<25} {s.loaded:<6} {s.active:<8} {s.sub_state:<7} {s.description}")
@@ -2462,6 +2475,12 @@ class RHELShell:
     def _cmd_uptime(self, p: list[str]) -> str:
         now = time.time()
         up = max(0, int(now - self.state.boot_time))
+        # Keep /proc/uptime honest with wall-clock so `cat /proc/uptime` matches.
+        try:
+            idle = max(0.0, float(up) * 0.98)
+            self.state._write_file("/proc/uptime", f"{float(up):.2f} {idle:.2f}\n")
+        except Exception:
+            pass
         days, rem = divmod(up, 86400)
         h, rem = divmod(rem, 3600)
         m, _ = divmod(rem, 60)
@@ -2483,6 +2502,60 @@ class RHELShell:
         if "-s" in p:
             return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(self.state.boot_time))
         return f" {clock} up {up_str},  1 user,  load average: 0.08, 0.04, 0.01"
+
+    def _cmd_dmidecode(self, p: list[str]) -> str:
+        """SMBIOS / DMI decode — always available on Lab Server shells."""
+        mfr = getattr(self.state, "dmi_manufacturer", None) or "Dell Inc."
+        prod = getattr(self.state, "dmi_product", None) or "PowerEdge R750"
+        serial = getattr(self.state, "dmi_serial", None) or "CN7293672A"
+        uuid = getattr(self.state, "dmi_uuid", None) or "4C4C4544-0058-3010-8058-B4C04F583232"
+        # Parse `-t TYPE` / `--type TYPE` (dmidecode -t system, -t 1, …).
+        type_tok = None
+        for i, tok in enumerate(p[1:], start=1):
+            if tok in ("-t", "--type") and i + 1 < len(p):
+                type_tok = p[i + 1].lower()
+                break
+            if tok.startswith("--type="):
+                type_tok = tok.split("=", 1)[1].lower()
+                break
+            if tok.startswith("-t") and len(tok) > 2:
+                type_tok = tok[2:].lower()
+                break
+        bios = (
+            "BIOS Information\n"
+            "\tVendor: American Megatrends Inc.\n"
+            "\tVersion: 2.14.0\n"
+            "\tRelease Date: 03/15/2024\n"
+        )
+        system = (
+            "System Information\n"
+            f"\tManufacturer: {mfr}\n"
+            f"\tProduct Name: {prod}\n"
+            f"\tVersion: Not Specified\n"
+            f"\tSerial Number: {serial}\n"
+            f"\tUUID: {uuid}\n"
+            "\tWake-up Type: Power Switch\n"
+            "\tSKU Number: SKU=NotSpecified\n"
+            "\tFamily: PowerEdge\n"
+        )
+        baseboard = (
+            "Base Board Information\n"
+            f"\tManufacturer: {mfr}\n"
+            f"\tProduct Name: {prod}\n"
+            f"\tSerial Number: {serial}\n"
+        )
+        if type_tok in (None, "", "0", "bios"):
+            if type_tok in ("0", "bios"):
+                return bios
+        if type_tok in (None, "", "1", "system"):
+            if type_tok in ("1", "system"):
+                return system
+        if type_tok in ("2", "baseboard", "board"):
+            return baseboard
+        if type_tok:
+            # Unknown type — still return something recognizable rather than empty.
+            return system
+        return f"{bios}\n{system}\n{baseboard}"
 
     def _cmd_date(self, p: list[str]) -> str:
         return "Fri Jun 14 10:00:00 UTC 2026"

@@ -934,6 +934,159 @@ function seedServices() {
 }
 
 /* ------------------------------------------------------------------ *
+ * Package install → systemd unit registration (rhel_os.register_package_service)
+ * ------------------------------------------------------------------ *
+ * After dnf/yum/apt/rpm/dpkg install succeeds, register matching units as
+ * known (stopped, disabled) so systemctl start/status works. Existing units
+ * are left untouched — an install never stops a running service.
+ */
+const PACKAGE_SERVICES = {
+  nginx: [['nginx', 'The nginx HTTP and reverse proxy server']],
+  httpd: [['httpd', 'The Apache HTTP Server']],
+  apache2: [['httpd', 'The Apache HTTP Server']],
+  postgresql: [['postgresql', 'PostgreSQL database server']],
+  'postgresql-server': [['postgresql', 'PostgreSQL database server']],
+  redis: [['redis', 'Redis persistent key-value database']],
+  'redis-server': [['redis', 'Redis persistent key-value database']],
+  docker: [['docker', 'Docker Application Container Engine']],
+  'docker-ce': [['docker', 'Docker Application Container Engine']],
+  'docker.io': [['docker', 'Docker Application Container Engine']],
+  'openssh-server': [['sshd', 'OpenSSH server daemon']],
+  ssh: [['sshd', 'OpenSSH server daemon']],
+  chrony: [['chronyd', 'NTP client/server']],
+  firewalld: [['firewalld', 'firewalld - dynamic firewall daemon']],
+  'mysql-server': [['mysqld', 'MySQL Server']],
+  'mariadb-server': [['mariadb', 'MariaDB 10.5 database server']],
+  haproxy: [['haproxy', 'HAProxy Load Balancer']],
+  memcached: [['memcached', 'memcached daemon']],
+  podman: [['podman', 'Podman API Service']],
+}
+
+/** Register systemd unit(s) shipped by `pkg` into `services` (inactive/disabled). */
+function registerPackageService(pkg, services) {
+  const units = PACKAGE_SERVICES[pkg]
+  if (!units) return []
+  const registered = []
+  for (const [name, desc] of units) {
+    if (services[name]) continue
+    services[name] = {
+      active: 'inactive',
+      enabled: 'disabled',
+      desc,
+      pid: null,
+      since: 'dead',
+    }
+    registered.push(name)
+  }
+  return registered
+}
+
+/** After a successful install of `names` (+ catalog deps), register their units. */
+function registerPackagesServices(names, services) {
+  const seen = new Set()
+  names.forEach((n) => {
+    if (!seen.has(n)) { seen.add(n); registerPackageService(n, services) }
+    pkgInfo(n).deps.forEach((d) => {
+      if (!seen.has(d)) { seen.add(d); registerPackageService(d, services) }
+    })
+  })
+}
+
+/** Keep /proc/uptime honest with wall-clock relative to bootEpoch (rhel_shell parity). */
+function syncProcUptime(vfs, bootEpoch) {
+  const up = Math.max(0, (Date.now() - (bootEpoch || Date.now())) / 1000)
+  const idle = up * 0.98
+  try {
+    vfs.writeFile('/proc/uptime', `${up.toFixed(2)} ${idle.toFixed(2)}\n`)
+  } catch (_) { /* VFS write should not break uptime/cat */ }
+}
+
+/** SMBIOS / DMI decode — mirrors rhel_shell._cmd_dmidecode (+ memory/processor). */
+function dmidecodeOutput(args, vm) {
+  const mfr = vm?.dmi_manufacturer || 'VMware, Inc.'
+  const prod = vm?.dmi_product || 'VMware Virtual Platform'
+  const serial = vm?.dmi_serial || 'VMware-56 4d 2a 1b 3c 4d 5e 6f-70 81 92 a3 b4 c5 d6 e7'
+  const uuid = vm?.dmi_uuid || '564D2A1B-3C4D-5E6F-7081-92A3B4C5D6E7'
+  const memMb = vm?.memory_mb || 4096
+  const cpu = vm?.cpu || 2
+  let typeTok = null
+  for (let i = 0; i < args.length; i++) {
+    const tok = args[i]
+    if ((tok === '-t' || tok === '--type') && args[i + 1]) {
+      typeTok = String(args[i + 1]).toLowerCase()
+      break
+    }
+    if (tok.startsWith('--type=')) {
+      typeTok = tok.split('=', 2)[1].toLowerCase()
+      break
+    }
+    if (tok.startsWith('-t') && tok.length > 2) {
+      typeTok = tok.slice(2).toLowerCase()
+      break
+    }
+  }
+  const bios = [
+    'BIOS Information',
+    '\tVendor: Phoenix Technologies LTD',
+    '\tVersion: 6.00',
+    '\tRelease Date: 12/12/2018',
+    '\tAddress: 0xEA5E0',
+    '\tRuntime Size: 88896 bytes',
+    '\tROM Size: 64 kB',
+  ].join('\n')
+  const system = [
+    'System Information',
+    `\tManufacturer: ${mfr}`,
+    `\tProduct Name: ${prod}`,
+    '\tVersion: None',
+    `\tSerial Number: ${serial}`,
+    `\tUUID: ${uuid}`,
+    '\tWake-up Type: Power Switch',
+    '\tSKU Number: Not Specified',
+    '\tFamily: Not Specified',
+  ].join('\n')
+  const baseboard = [
+    'Base Board Information',
+    `\tManufacturer: ${mfr}`,
+    '\tProduct Name: 440BX Desktop Reference Platform',
+    '\tVersion: None',
+    `\tSerial Number: ${serial}`,
+  ].join('\n')
+  const processor = [
+    'Processor Information',
+    '\tSocket Designation: CPU #000',
+    '\tType: Central Processor',
+    '\tFamily: Other',
+    '\tManufacturer: GenuineIntel',
+    '\tSignature: Type 0, Family 6, Model 85, Stepping 7',
+    '\tVersion: Intel(R) Xeon(R) Gold 6248 CPU @ 2.50GHz',
+    `\tCore Count: ${cpu}`,
+    `\tCore Enabled: ${cpu}`,
+    `\tThread Count: ${cpu}`,
+  ].join('\n')
+  const dimmMb = Math.max(512, Math.round(memMb / Math.max(1, Math.min(cpu, 4))))
+  const memory = [
+    'Memory Device',
+    '\tTotal Width: 72 bits',
+    '\tData Width: 64 bits',
+    `\tSize: ${dimmMb} MB`,
+    '\tForm Factor: DIMM',
+    '\tLocator: RAM slot #0',
+    '\tBank Locator: RAM slot #0',
+    '\tType: DRAM',
+    '\tSpeed: 2933 MT/s',
+    `\tManufacturer: ${mfr}`,
+  ].join('\n')
+  if (typeTok === '0' || typeTok === 'bios') return bios
+  if (typeTok === '1' || typeTok === 'system') return system
+  if (typeTok === '2' || typeTok === 'baseboard' || typeTok === 'board') return baseboard
+  if (typeTok === '4' || typeTok === 'processor') return processor
+  if (typeTok === '17' || typeTok === 'memory') return memory
+  if (typeTok) return system
+  return [bios, '', system, '', baseboard, '', processor, '', memory].join('\n')
+}
+
+/* ------------------------------------------------------------------ *
  * nginx config checking (backs `nginx -t` and the systemctl start gate)
  * ------------------------------------------------------------------ */
 
@@ -1779,7 +1932,10 @@ export function createLinuxShell(vm, opts = {}) {
     else if (lc === 'cat' || lc === 'more' || lc === 'less' || lc === 'bat') {
       if (!positional.length) emit('')
       else positional.forEach(f => {
-        const node = vfs.resolveNode(abs(f))
+        const p = abs(f)
+        // Keep /proc/uptime in sync before reading so cat matches `uptime`.
+        if (p === '/proc/uptime' || f === '/proc/uptime') syncProcUptime(vfs, shared.bootEpoch)
+        const node = vfs.resolveNode(p)
         if (!node) emit(`${lc}: ${f}: No such file or directory`)
         else if (node.type === 'dir') emit(`${lc}: ${f}: Is a directory`)
         else emit(node.content.replace(/\n$/, '') || '')
@@ -2161,6 +2317,7 @@ export function createLinuxShell(vm, opts = {}) {
     }
     else if (lc === 'arch') emit('x86_64')
     else if (lc === 'uptime') {
+      syncProcUptime(vfs, shared.bootEpoch)
       const ms = Date.now() - (shared.bootEpoch || Date.now())
       const sec = Math.floor(ms / 1000)
       const days = Math.floor(sec / 86400)
@@ -2168,8 +2325,23 @@ export function createLinuxShell(vm, opts = {}) {
       const mins = Math.floor((sec % 3600) / 60)
       const load = '0.08, 0.12, 0.09'
       const t = new Date().toTimeString().slice(0, 8)
-      if (has('-p')) emit(`up ${days} days, ${hrs} hours, ${mins} minutes`)
-      else emit(` ${t} up ${days} days, ${hrs}:${String(mins).padStart(2, '0')},  1 user,  load average: ${load}`)
+      if (has('-p')) {
+        const parts = []
+        if (days) parts.push(`${days} day${days === 1 ? '' : 's'}`)
+        if (hrs) parts.push(`${hrs} hour${hrs === 1 ? '' : 's'}`)
+        parts.push(`${mins} minute${mins === 1 ? '' : 's'}`)
+        emit(`up ${parts.join(', ')}`)
+      } else if (has('-s')) {
+        emit(new Date(shared.bootEpoch || Date.now()).toISOString().replace('T', ' ').slice(0, 19))
+      } else {
+        const upStr = days > 0
+          ? `${days} day${days === 1 ? '' : 's'}, ${hrs}:${String(mins).padStart(2, '0')}`
+          : (hrs > 0 ? `${hrs}:${String(mins).padStart(2, '0')}` : `${mins} min`)
+        emit(` ${t} up ${upStr},  1 user,  load average: ${load}`)
+      }
+    }
+    else if (lc === 'dmidecode') {
+      emit(dmidecodeOutput(args, vmRef.current))
     }
     else if (lc === 'date') {
       if (positional[0]?.startsWith('+')) emit(new Date().toISOString())
@@ -2337,11 +2509,12 @@ export function createLinuxShell(vm, opts = {}) {
       let host = ''
       const pos = [...positional]
       if (has('-c') && pos.length && /^\d+$/.test(pos[0])) {
-        count = Math.max(1, Math.min(10, Number(pos.shift())))
+        count = Math.max(1, Math.min(20, Number(pos.shift())))
       }
       host = pos[0] || ''
       if (!host) {
         emit('Usage: ping [-c count] destination')
+        setExit(2)
       } else {
         const linkUp = primaryNicUp(vmRef.current)
         const { ip: nIp, gw: nGw } = primaryNicL3(vmRef.current, ip, gw)
@@ -2359,17 +2532,34 @@ export function createLinuxShell(vm, opts = {}) {
             `--- ${host} ping statistics ---`,
             `1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms`,
           ])
+          setExit(1)
         } else {
-          const lines = [`PING ${host} (${resolved}) 56(84) bytes of data.`]
+          const header = `PING ${host} (${resolved}) 56(84) bytes of data.`
+          const rtts = []
+          const seqLines = []
           for (let i = 1; i <= count; i += 1) {
-            const ms = (0.35 + (i % 3) * 0.03).toFixed(3)
-            lines.push(`64 bytes from ${resolved}: icmp_seq=${i} ttl=64 time=${ms} ms`)
+            const ms = +(0.2 + i * 0.05 + ((i * 7) % 5) * 0.03).toFixed(3)
+            rtts.push(ms)
+            seqLines.push(`64 bytes from ${resolved}: icmp_seq=${i} ttl=64 time=${ms.toFixed(3)} ms`)
           }
-          lines.push('')
-          lines.push(`--- ${host} ping statistics ---`)
-          lines.push(`${count} packets transmitted, ${count} received, 0% packet loss, time ${count * 1000}ms`)
-          lines.push(`rtt min/avg/max/mdev = 0.350/0.380/0.410/0.025 ms`)
-          emit(lines)
+          const avg = rtts.reduce((a, b) => a + b, 0) / rtts.length
+          const stats = [
+            '',
+            `--- ${host} ping statistics ---`,
+            `${count} packets transmitted, ${count} received, 0% packet loss, time ${count * 1000 - 1}ms`,
+            `rtt min/avg/max/mdev = ${Math.min(...rtts).toFixed(3)}/${avg.toFixed(3)}/${Math.max(...rtts).toFixed(3)}/0.020 ms`,
+          ]
+          // Console supports stream chunks (paced like real icmp); redirect/sync gets full output.
+          if (redirect) {
+            emit([header, ...seqLines, ...stats])
+          } else {
+            return {
+              lines: [header],
+              prompt: prompt(),
+              stream: { chunks: seqLines.map((l) => [l]), doneLines: stats },
+              exitCode: 0,
+            }
+          }
         }
       }
     }
@@ -2441,8 +2631,29 @@ export function createLinuxShell(vm, opts = {}) {
       else if (sub === 'poweroff' || sub === 'halt') return { lines: ['Powering off…'], prompt: prompt(), poweroff: true }
       else if (sub === 'rescue' || sub === 'emergency') return { lines: [`Reaching ${sub}.target…`], prompt: prompt(), reboot: { single: true } }
       else if (!sub || sub === 'list-units') {
-        emit(['  UNIT                LOAD   ACTIVE   SUB     DESCRIPTION',
-          ...Object.entries(services).map(([n, v]) => `  ${(n + '.service').padEnd(20)}loaded ${v.active.padEnd(8)}${v.active === 'active' ? 'running' : 'dead   '} ${v.desc}`)])
+        // Default list-units hides inactive (like real systemd). Pass -a/--all
+        // so newly registered (inactive) units after a package install are visible.
+        const wantAll = has('-a') || has('--all')
+        const wantFailed = has('--failed')
+        const rows = Object.entries(services)
+          .filter(([, v]) => {
+            if (wantFailed) return v.active === 'failed'
+            if (!wantAll && v.active !== 'active' && v.active !== 'failed') return false
+            return true
+          })
+          .map(([n, v]) => {
+            const bullet = v.active === 'failed' ? '●' : ' '
+            const subState = v.active === 'active' ? 'running' : (v.active === 'failed' ? 'failed' : 'dead')
+            return `${bullet} ${(n + '.service').padEnd(25)} loaded ${v.active.padEnd(8)}${subState.padEnd(7)} ${v.desc}`
+          })
+        if (wantFailed && !rows.length) emit('0 loaded units listed.')
+        else emit([
+          'UNIT                       LOAD   ACTIVE   SUB     DESCRIPTION',
+          ...rows,
+          '',
+          'LEGEND omitted.',
+          `${rows.length} loaded units listed.`,
+        ])
       } else if (sub === 'status') {
         if (!s) { emit(`Unit ${rawSvc || svc}.service could not be found.`); setExit(4) }
         else {
@@ -2450,16 +2661,23 @@ export function createLinuxShell(vm, opts = {}) {
           const unitFile = findUnitFile(svc)
           const parsedUnit = unitFile ? parseUnitFile(unitFile.src) : null
           const execStart = (parsedUnit && !parsedUnit.error && parsedUnit.sections.Service?.ExecStart) || `/usr/sbin/${svc}`
-          emit([
+          const statusLines = [
             `${dot} ${svc}.service - ${s.desc}`,
             `     Loaded: loaded (${unitFile ? unitFile.path : `/usr/lib/systemd/system/${svc}.service`}; ${s.enabled}; preset: enabled)`,
             `     Active: ${s.active} (${s.active === 'active' ? 'running' : s.active === 'failed' ? 'failed' : 'dead'}) since ${s.since}`,
             ...(s.pid ? [`   Main PID: ${s.pid} (${svc})`, `      Tasks: 3 (limit: 4915)`, `     Memory: 12.4M`] : []),
+            // Real systemctl status shows a CGroup process tree under the unit.
+            ...(s.active === 'active' && s.pid ? [
+              `   CGroup: /system.slice/${svc}.service`,
+              `           └─${s.pid} /usr/sbin/${svc}`,
+            ] : []),
             // Derive the failure line from live state rather than hardcoding an
             // nginx bind error onto every failed unit (L978).
             ...(s.active === 'failed' ? [`    Process: 3122 ExecStart=${execStart} (code=exited, status=1/FAILURE)`,
               `${svc}[3122]: ${unitFailureReason(svc)}`] : []),
-          ])
+          ]
+          emit(statusLines)
+          if (s.active !== 'active') setExit(3)
         }
       } else if (['start', 'stop', 'restart', 'reload', 'enable', 'disable', 'mask', 'unmask'].includes(sub)) {
         if (!s) emit(`Failed to ${sub} ${svc}.service: Unit ${svc}.service not found.`)
@@ -2686,7 +2904,10 @@ export function createLinuxShell(vm, opts = {}) {
         } else {
           const resolve = dnfResolveLines(lc, targets, 'install')
           const chunks = dnfProgressChunks(targets, 'install')
-          const commit = () => pkgs.install(targets)
+          const commit = () => {
+            pkgs.install(targets)
+            registerPackagesServices(targets, services)
+          }
           if (has('-y') || has('--assumeyes')) {
             // proceed immediately, but still stream the progress
             return { lines: resolve, prompt: prompt(), stream: { chunks, doneLines: [], commit } }
@@ -2749,7 +2970,10 @@ export function createLinuxShell(vm, opts = {}) {
         } else {
           const resolve = aptResolveLines(targets, 'install')
           const chunks = aptProgressChunks(targets, 'install')
-          const commit = () => pkgs.install(targets)
+          const commit = () => {
+            pkgs.install(targets)
+            registerPackagesServices(targets, services)
+          }
           if (has('-y') || has('--yes') || has('--assume-yes')) {
             return { lines: resolve, prompt: prompt(), stream: { chunks, doneLines: [], commit } }
           }
@@ -2796,6 +3020,7 @@ export function createLinuxShell(vm, opts = {}) {
         const file = positional.find(a => a.endsWith('.rpm')) || positional[0] || ''
         const name = basename(file).replace(/\.rpm$/, '').replace(/-[0-9].*$/, '') || 'package'
         pkgs.install([name])
+        registerPackagesServices([name], services)
         emit('')
       }
       else if (has('-e') || has('--erase')) {
@@ -2819,7 +3044,12 @@ export function createLinuxShell(vm, opts = {}) {
         else emit(`dpkg-query: package '${positional[0] || ''}' is not installed and no information is available`)
       }
       else if (has('-L')) emit(pkgs.has(positional[0]) ? ['/.', '/usr', '/usr/bin', '/usr/bin/' + (positional[0] || 'pkg')] : [`dpkg-query: package '${positional[0] || ''}' is not installed`])
-      else if (has('-i') || has('--install')) { const name = basename(positional.find(a => a.endsWith('.deb')) || positional[0] || '').replace(/_.*$/, '') || 'package'; pkgs.install([name]); emit([`Selecting previously unselected package ${name}.`, `Unpacking ${name} ...`, `Setting up ${name} ...`]) }
+      else if (has('-i') || has('--install')) {
+        const name = basename(positional.find(a => a.endsWith('.deb')) || positional[0] || '').replace(/_.*$/, '') || 'package'
+        pkgs.install([name])
+        registerPackagesServices([name], services)
+        emit([`Selecting previously unselected package ${name}.`, `Unpacking ${name} ...`, `Setting up ${name} ...`])
+      }
       else if (has('-r') || has('-P') || has('--remove') || has('--purge')) { const removed = pkgs.remove(positional); emit(removed ? [`Removing ${positional[0]} ...`] : `dpkg: warning: ignoring request to remove ${positional[0] || 'package'} which isn't installed`) }
       else emit("Debian 'dpkg' package management program version 1.21.1")
     }
@@ -3132,6 +3362,7 @@ export function createLinuxShell(vm, opts = {}) {
         'grep', 'sed', 'awk', 'find', 'ps', 'top', 'kill', 'systemctl', 'ip', 'ping', 'ssh',
         'vi', 'vim', 'nano', 'tar', 'gzip', 'df', 'du', 'free', 'uname', 'sudo', 'su', 'chmod',
         'chown', 'ln', 'touch', 'head', 'tail', 'wc', 'sort', 'uniq', 'cut', 'curl', 'python3',
+        'dmidecode', 'uptime',
         isRhel ? 'dnf' : 'apt', isRhel ? 'yum' : 'apt-get', isRhel ? 'rpm' : 'dpkg'])
       const known = !!t && (ALWAYS.has(t) || pkgs.has(t) || !!vfs.resolveNode(`/usr/bin/${t}`) || !!vfs.resolveNode(`/usr/sbin/${t}`))
       if (!t) emit('')
@@ -3408,8 +3639,8 @@ function buildHelp(isRhel) {
   Files     ls (-l -a) cd pwd cat head tail echo (> >>) touch mkdir (-p) rm (-rf) cp (-r) mv
             find grep (-r -i -v -n) wc chmod chown ln -s stat file tree du df ln readlink
   Editors   vi / vim / nano  (open, edit, and SAVE files back to the filesystem)
-  System    uname -a uptime date id whoami hostnamectl lscpu lsmem free top ps vmstat dmesg
-  Services  systemctl (start|stop|restart|status|enable) service journalctl -u <unit>
+  System    uname -a uptime date id whoami hostnamectl lscpu lsmem free top ps vmstat dmesg dmidecode
+  Services  systemctl (start|stop|restart|status|enable|-a) service journalctl -u <unit>
   Network   ip addr/route/link  ifconfig  ping  ss  netstat  nmcli  ss  dig  traceroute  ssh
   Packages  ${isRhel ? 'dnf / yum / rpm' : 'apt / apt-get / dpkg'}  (install update remove list)
   Users     useradd usermod passwd id groups su sudo who w last
