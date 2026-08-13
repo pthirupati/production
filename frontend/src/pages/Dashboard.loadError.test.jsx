@@ -145,14 +145,23 @@ describe('Dashboard fetch failure vs empty data', () => {
     expect(screen.getByText(/Don't purchase again/i)).toBeTruthy()
   })
 
-  it('raises a partial-failure banner for a non-progress fetch failure', async () => {
-    // Pre-fix this was completely silent: only getProgress could set loadError.
-    getBookmarks.mockRejectedValue(new Error('503'))
+  it('raises a partial-failure banner for a subscriptions fetch failure', async () => {
+    // Banner is reserved for activeLabs / subscriptions — not every flaky side panel.
+    getMySubscriptions.mockRejectedValue(new Error('503'))
     renderDash()
 
     await waitFor(() =>
       expect(screen.getByTestId('dashboard-partial-error')).toBeTruthy()
     )
+  })
+
+  it('does not raise the page banner for bookmarks or jira-list blips', async () => {
+    getBookmarks.mockRejectedValue(new Error('503'))
+    getUserTickets.mockRejectedValue(new Error('503'))
+    renderDash()
+
+    await waitFor(() => expect(screen.getByText('No active subscriptions')).toBeTruthy())
+    expect(screen.queryByTestId('dashboard-partial-error')).toBeNull()
   })
 
   it('stays silent for a genuinely empty but healthy account', async () => {

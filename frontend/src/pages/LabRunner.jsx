@@ -1898,7 +1898,7 @@ export default function LabRunner() {
   }
   // Companion overlays must sit above the lab sidebar (z-70) and keep Close +
   // Hints/Check/+30m/Stop — never pass embedded=true (that hid chrome).
-  const companionOverlayClass = 'fixed inset-0 z-[80] bg-surface-950 flex flex-col min-h-0'
+  const companionOverlayClass = 'fixed inset-0 z-[80] bg-surface-950 flex flex-col min-h-0 relative'
   const isCrossTechMonitoring = isCrossTech && (
     ['grafana', 'prometheus'].includes(scenario?.technology?.slug)
     || /monitor|grafana|prometheus/.test((scenario?.slug || '').toLowerCase())
@@ -2500,15 +2500,16 @@ export default function LabRunner() {
                   {session?.jira_issue_key && (
                     <JiraTicketPanel
                       compact
-                      labInfoMode
                       hideHistory
-                      hideComments
-                      hideStatus
                       ticket={jiraTicket || {
                         issue_key: session.jira_issue_key,
                         issue_url: session.jira_issue_url,
                         run_count: session.jira_run_count || 1,
                       }}
+                      comments={jiraComments}
+                      onComment={handleJiraComment}
+                      commenting={false}
+                      pendingReply={jiraPendingReply}
                     />
                   )}
                   <div>
@@ -3988,11 +3989,9 @@ export default function LabRunner() {
           Check Solution (graded via validate_windows_lab on the engine). */}
       {isWindowsGuiLab && !isSimPrimaryLab && showWindowsSim && (
         <div className={companionOverlayClass}>
-          <div className="h-full overflow-auto">
-            <LazySimPanel Sim={LazyWindowsServerSimulator} label="Windows Server" sessionId={sessionId} scenario={scenario} embedded={false}
+          <LazySimPanel Sim={LazyWindowsServerSimulator} label="Windows Server" sessionId={sessionId} scenario={scenario} embedded
             onExit={() => setShowWindowsSim(false)}
             onToggleTerminal={() => setShowWindowsSim(false)} {...simChromeProps} />
-          </div>
         </div>
       )}
 

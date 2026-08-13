@@ -304,16 +304,49 @@ def check_port_reachable(session_id: str, port: str = "22") -> bool:
     return _fw_allows(state, port)
 
 
+# Public image families available in the Create instance portal (no prior import required).
+PUBLIC_IMAGE_FAMILIES: dict[str, dict[str, Any]] = {
+    "debian-12": {"os": "Debian GNU/Linux 12", "signed": True},
+    "debian-11": {"os": "Debian GNU/Linux 11", "signed": True},
+    "ubuntu-2204-lts": {"os": "Ubuntu 22.04 LTS", "signed": True},
+    "ubuntu-2404-lts": {"os": "Ubuntu 24.04 LTS", "signed": True},
+    "rhel-9": {"os": "Red Hat Enterprise Linux 9", "signed": True},
+    "cos-stable": {"os": "Container-Optimized OS", "signed": True},
+}
+
+
 def _resolve_image(state: dict, *, image: str | None = None, family: str | None = None) -> dict | None:
     images = state.get("images") or []
     if image:
-        return next((i for i in images if i.get("name") == image or i.get("id") == image), None)
+        found = next((i for i in images if i.get("name") == image or i.get("id") == image), None)
+        if found:
+            return found
+        # Allow selecting a public family name via --image as well.
+        if image in PUBLIC_IMAGE_FAMILIES:
+            meta = PUBLIC_IMAGE_FAMILIES[image]
+            return {
+                "name": f"{image}-v20240101",
+                "family": image,
+                "digest": f"sha256:{_hex(32)}",
+                "signed": meta["signed"],
+                "public": True,
+            }
+        return None
     if family:
         family_imgs = [i for i in images if i.get("family") == family and not i.get("deprecated")]
-        if not family_imgs:
-            return None
-        family_imgs.sort(key=lambda i: i.get("created") or "", reverse=True)
-        return family_imgs[0]
+        if family_imgs:
+            family_imgs.sort(key=lambda i: i.get("created") or "", reverse=True)
+            return family_imgs[0]
+        if family in PUBLIC_IMAGE_FAMILIES:
+            meta = PUBLIC_IMAGE_FAMILIES[family]
+            return {
+                "name": f"{family}-v20240101",
+                "family": family,
+                "digest": f"sha256:{_hex(32)}",
+                "signed": meta["signed"],
+                "public": True,
+            }
+        return None
     return None
 
 
@@ -499,9 +532,14 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         machine_type = payload.get("machine_type") or "e2-medium"
         if machine_type not in MACHINE_TYPES:
             machine_type = "e2-medium"
-        zone = payload.get("zone") or "us-central1-a"
-        network = (state.get("networks") or [{}])[0].get("name") or "default"
-        subnet = ((state.get("networks") or [{}])[0].get("subnets") or [{}])[0].get("name") or "default"
+        zone = (payload.get("zone") or "us-central1-a").strip()
+        network = (payload.get("network") or payload.get("vpc") or "").strip() or (
+            (state.get("networks") or [{}])[0].get("name") or "default"
+        )
+        subnet = (payload.get("subnet") or "").strip()
+        if not subnet:
+            matched = next((n for n in (state.get("networks") or []) if n.get("name") == network), None)
+            subnet = ((matched or {}).get("subnets") or (state.get("networks") or [{}])[0].get("subnets") or [{}])[0].get("name") or "default"
         image_name = payload.get("image")
         image_family = payload.get("image_family") or payload.get("family")
         resolved = _resolve_image(state, image=image_name, family=image_family)
@@ -523,22 +561,71 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 "ok": False,
                 "error": f"The resource 'images/{image_name or image_family}' was not found",
             }
+        if resolved and resolved.get("family") in PUBLIC_IMAGE_FAMILIES and not payload.get("os"):
+            os_label = PUBLIC_IMAGE_FAMILIES[resolved["family"]]["os"]
+        else:
+            os_label = payload.get("os") or (resolved and PUBLIC_IMAGE_FAMILIES.get(
+                (resolved or {}).get("family") or "", {}
+            ).get("os")) or "Debian GNU/Linux 12"
+
+        # External IP: prefer assign_external_ip; else honor external_ip; default on.
+        if "assign_external_ip" in payload:
+            assign_ext = bool(payload.get("assign_external_ip"))
+        elif "external_ip" in payload:
+            ext_raw = payload.get("external_ip")
+            assign_ext = bool(ext_raw) and ext_raw not in (False, "false", "False", "none", "None", "No", "no")
+        else:
+            assign_ext = True
+        if assign_ext:
+            if isinstance(payload.get("external_ip"), str) and payload["external_ip"] not in ("", "none", "None"):
+                external_ip = payload["external_ip"]
+            else:
+                external_ip = f"34.{random.randint(1, 200)}.{random.randint(1, 200)}.{random.randint(1, 200)}"
+        else:
+            external_ip = None
+
+        boot_disk_gb = int(payload.get("boot_disk_gb") or payload.get("disk_size_gb") or 20)
+        boot_disk_type = (payload.get("boot_disk_type") or payload.get("disk_type") or "pd-balanced").strip()
+        labels = payload.get("labels")
+        if isinstance(labels, str):
+            # "env=lab,team=sre" or "env=lab team=sre"
+            parsed = {}
+            for part in labels.replace(",", " ").split():
+                if "=" in part:
+                    k, v = part.split("=", 1)
+                    if k.strip():
+                        parsed[k.strip()] = v.strip()
+            labels = parsed
+        if not isinstance(labels, dict):
+            labels = {}
+
+        startup_script = payload.get("startup_script") or payload.get("metadata_startup_script") or ""
+        if startup_script is None:
+            startup_script = ""
+        else:
+            startup_script = str(startup_script)
+
         inst = {
             "id": f"vm-{_hex(8)}", "name": name, "zone": zone,
-            "machine_type": machine_type, "os": payload.get("os") or "Debian GNU/Linux 12",
+            "machine_type": machine_type, "os": os_label,
             "status": "RUNNING",
             "internal_ip": payload.get("internal_ip") or f"10.128.0.{random.randint(10, 250)}",
-            "external_ip": payload.get("external_ip") or f"34.{random.randint(1, 200)}.{random.randint(1, 200)}.{random.randint(1, 200)}",
+            "external_ip": external_ip,
             "network": network, "subnet": subnet, "tags": payload.get("tags") or ["web"],
             "boot_disk": name, "extra_disks": [], "_transition": None,
             "lab_managed": True,
             "source_image": (resolved or {}).get("name"),
+            "image_family": (resolved or {}).get("family") or image_family,
             "image_digest": (resolved or {}).get("digest"),
             "shielded_secure_boot": secure_boot,
+            "boot_disk_gb": boot_disk_gb,
+            "boot_disk_type": boot_disk_type,
+            "labels": labels,
+            "startup_script": startup_script or None,
         }
         state.setdefault("disks", []).append({
             "id": f"disk-{_hex(8)}", "name": name, "zone": zone,
-            "size_gb": int(payload.get("boot_disk_gb") or 20), "type": "pd-balanced",
+            "size_gb": boot_disk_gb, "type": boot_disk_type,
             "state": "READY", "attached_to": name, "boot": True,
         })
         state.setdefault("instances", []).append(inst)

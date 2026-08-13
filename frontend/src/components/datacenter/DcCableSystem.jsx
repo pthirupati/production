@@ -118,11 +118,54 @@ function cableColor(cableType = '', loose = false) {
 const RECOIL_DECAY = 2.2
 const SNAP_DECAY = 3
 
+/** Default minimum bend radius (mm) when the cable catalog does not specify one. */
+export const DEFAULT_MIN_BEND_RADIUS_MM = 25
+
+/**
+ * Brief window after an intentional unlock (cable drag / tablet) during which
+ * WalkController's pointerlockchange must NOT open the Esc pause menu — otherwise
+ * drag/plug UI is buried under "Paused".
+ */
+let _suppressPauseUntil = 0
+export function suppressPointerUnlockPause(ms = 600) {
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+  _suppressPauseUntil = now + Math.max(0, ms || 0)
+}
+export function isPointerUnlockPauseSuppressed() {
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+  return now < _suppressPauseUntil
+}
+
 /** Frame-rate independent decay, clamped at 0. Pure so it can be tested. */
 export function decay(value, dt, rate) {
   if (!(value > 0)) return 0
   const next = value - (Number.isFinite(dt) ? dt : 0) * rate
   return next > 0 ? next : 0
+}
+
+/**
+ * Approximate bend radius (mm) from span chord + mid sag (metres).
+ * Uses sag/chord sharpness rather than a full-span circumcircle — a jacket kink
+ * is local, and the circle-through-endpoints formula never drops near Cat6's
+ * 25mm floor for hall-scale distances.
+ */
+export function estimateBendRadiusMm(chordM, sagM) {
+  const chord = Math.max(0.01, Math.abs(Number(chordM) || 0))
+  const sag = Math.max(0.01, Math.abs(Number(sagM) || 0))
+  const ratio = sag / chord
+  // ratio ≈ 3.2 → ~25mm (warn); ratio ≈ 1 → ~80mm (fine).
+  return 80 / Math.max(0.25, ratio)
+}
+
+/** Catalog floor for bend radius by connector family. */
+export function minBendRadiusMm(cableType = '', catalogMm) {
+  const fromCatalog = Number(catalogMm)
+  if (Number.isFinite(fromCatalog) && fromCatalog > 0) return fromCatalog
+  const t = String(cableType).toLowerCase()
+  if (t.includes('fiber') || t.includes('lc') || t.includes('mpo')) return 30
+  if (t.includes('dac') || t.includes('qsfp') || t.includes('aoc')) return 35
+  if (t.includes('power') || t.includes('c13')) return 40
+  return DEFAULT_MIN_BEND_RADIUS_MM
 }
 
 /**
@@ -174,6 +217,7 @@ export function InteractiveCable({
   cableId,
   serverId,
   cableType = 'Cat6A',
+  bendRadiusMm,
   onUnplug,
   onPlug,
   label,
@@ -184,6 +228,7 @@ export function InteractiveCable({
   const tipRef = useRef()
   const [dragging, setDragging] = useState(false)
   const [tipOffset, setTipOffset] = useState(() => new THREE.Vector3())
+  const [bendWarn, setBendWarn] = useState(false)
   // recoil/snapFlash decay every frame. They are refs, not state, because as
   // state each tick re-rendered the cable and rebuilt curve + TubeGeometry(36x8)
   // — a new GPU buffer per frame per cable, none of them disposed.
@@ -201,6 +246,7 @@ export function InteractiveCable({
   const camDir = useMemo(() => new THREE.Vector3(), [])
   const kind = connectorKind(cableType)
   const color = cableColor(cableType, loose)
+  const minBend = minBendRadiusMm(cableType, bendRadiusMm)
 
   // One curve and one tube for the life of the cable. Both are mutated in place
   // below; `curve.points` are pre-allocated so no frame ever allocates a Vector3.
@@ -310,6 +356,13 @@ export function InteractiveCable({
     return hit.clone()
   }
 
+  const refreshBendWarn = (tip) => {
+    const chord = from.distanceTo(tip)
+    const sag = Math.max(0.05, Math.abs(from.y - tip.y) * 0.55 + (loose || dragging ? 0.35 : 0.12))
+    const radius = estimateBendRadiusMm(chord, sag)
+    setBendWarn(Number.isFinite(radius) && radius < minBend)
+  }
+
   const endDrag = (clientX, clientY) => {
     if (!dragStart.current) return
     const started = dragStart.current
@@ -319,7 +372,10 @@ export function InteractiveCable({
     document.body.style.cursor = 'default'
 
     const distMoved = Math.hypot(clientX - started.x, clientY - started.y)
-    if (distMoved < 18) return
+    if (distMoved < 18) {
+      setBendWarn(false)
+      return
+    }
 
     if (!loose && onUnplug) {
       recoil.current = 1
@@ -332,7 +388,10 @@ export function InteractiveCable({
       if (tip.distanceTo(from) < 0.55) {
         setTipOffset(new THREE.Vector3())
         snapFlash.current = 1
+        setBendWarn(false)
         onPlug({ serverId, cableId })
+      } else {
+        refreshBendWarn(tip)
       }
     }
   }
@@ -365,6 +424,10 @@ export function InteractiveCable({
         position={tipWorld}
         onPointerDown={(e) => {
           e.stopPropagation()
+          // Pointer-lock freezes clientX/Y near canvas center — exit so drag works,
+          // and suppress the Esc pause menu that unlock would otherwise open.
+          suppressPointerUnlockPause(700)
+          try { document.exitPointerLock?.() } catch { /* */ }
           dragStart.current = { x: e.clientX, y: e.clientY }
           setDragging(true)
           if (controls) controls.enabled = false
@@ -379,6 +442,7 @@ export function InteractiveCable({
             ? to.clone().add(new THREE.Vector3(0.22, -0.55, 0))
             : to.clone()
           setTipOffset(p.clone().sub(base))
+          refreshBendWarn(p)
         }}
         onPointerUp={(e) => {
           e.stopPropagation()
@@ -414,8 +478,12 @@ export function InteractiveCable({
       </mesh>
       {(loose || dragging) && (
         <Html position={tipWorld} center distanceFactor={9} style={{ pointerEvents: 'none' }}>
-          <div className="dc-3d-chip">
-            {dragging ? (loose ? 'Drop on port to plug' : 'Release to unplug') : 'Drag connector'}
+          <div className={`dc-3d-chip${bendWarn ? ' dc-3d-chip-warn' : ''}`}>
+            {bendWarn
+              ? `Bend < ${minBend}mm — ease the pull`
+              : dragging
+                ? (loose ? 'Drop on port to plug' : 'Release to unplug')
+                : 'Drag connector'}
           </div>
         </Html>
       )}

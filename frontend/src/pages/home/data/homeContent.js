@@ -4,7 +4,7 @@ import {
 } from '../../../ui/eagerIcons'
 
 export const features = [
-  { icon: Terminal, title: 'Real Terminal & Lab Consoles', desc: 'Full bash shell via WebSocket plus Grafana, AWX, VMware vCenter, Terraform, and Windows Server — each lab runs in your own isolated environment.', color: 'cyan' },
+  { icon: Terminal, title: 'Real Terminal & Technology Labs', desc: 'Full bash shell via WebSocket plus Grafana, AWX, VMware vCenter, Terraform, and Windows Server — each lab runs in your own isolated environment under Technologies.', color: 'cyan' },
   { icon: Ticket, title: 'Jira & ITSM Workflow', desc: 'Every scenario opens with a realistic Jira ticket — incident narrative, priority, environment state, and resolution criteria. Practice the way platform teams actually work.', color: 'amber' },
   { icon: Mic2, title: 'AI Interview Studio', desc: 'Multi-round voice interviews — technical, behavioral, system design, and hands-on lab rounds with resume-aware questions and FIXIT-INT certificates.', color: 'purple' },
   { icon: Shield, title: 'Per-User Lab Isolation', desc: 'Every session gets its own Docker network and container. Your lab cannot see or affect another user\'s environment — safe for teams training together.', color: 'purple' },

@@ -362,8 +362,10 @@ def run_auth_registration(s: Suite) -> tuple[str | None, str, str]:
             "session_token": session_token,
             "first_name": "E2E",
             "last_name": "User",
+            "accepted_legal": True,
         })
-        s.record("POST /api/auth/register/", status in (200, 201), status, str(data.get("error", "")))
+        err = data.get("error") or data.get("accepted_legal") or data
+        s.record("POST /api/auth/register/", status in (200, 201), status, str(err)[:160])
         if data.get("access"):
             return data["access"], email, data.get("refresh", "")
 
@@ -659,6 +661,7 @@ def run_concurrent_users(s: Suite, n: int = 3):
             st, reg = api("POST", "/api/auth/register/", data={
                 "email": email, "password": password,
                 "session_token": otp.session_token,
+                "accepted_legal": True,
             })
             return st in (200, 201) and bool(reg.get("access"))
         except Exception:

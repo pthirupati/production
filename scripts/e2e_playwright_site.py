@@ -85,6 +85,7 @@ def register_test_user():
             "email": email, "password": password,
             "session_token": otp.session_token,
             "first_name": "PW", "last_name": "Test",
+            "accepted_legal": True,
         })
         if st in (200, 201) and reg.get("access"):
             return reg["access"], email

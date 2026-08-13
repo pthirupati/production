@@ -42,7 +42,9 @@ export function useJiraTeamReplyPoll() {
     baselineCountRef.current = commentCount
     reloadRef.current = reload
     expectAtRef.current = now + delaySec * 1000
-    stopAtRef.current = expectAtRef.current + 12_000
+    // Beat sweeper is ~every 15s; allow well past countdown so a delayed
+    // worker delivery still lands in the chip + comment list.
+    stopAtRef.current = expectAtRef.current + 90_000
     setPending({ author, delaySeconds: delaySec, remainingSeconds: delaySec })
 
     countdownRef.current = setInterval(() => {
@@ -69,10 +71,11 @@ export function useJiraTeamReplyPoll() {
         }
       } catch { /* keep polling */ }
       const afterExpect = Date.now() >= expectAtRef.current
-      timerRef.current = setTimeout(tick, afterExpect ? 1500 : 2500)
+      timerRef.current = setTimeout(tick, afterExpect ? 1200 : 2000)
     }
 
-    timerRef.current = setTimeout(tick, Math.max(1200, delaySec * 1000 - 2500))
+    // Start polling a few seconds before expect so we catch early delivery.
+    timerRef.current = setTimeout(tick, Math.max(800, delaySec * 1000 - 5000))
   }, [clearTimers])
 
   useEffect(() => {

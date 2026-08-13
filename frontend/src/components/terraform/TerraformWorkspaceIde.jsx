@@ -90,7 +90,7 @@ export default function TerraformWorkspaceIde({
   const { confirm, ConfirmPortal } = useConfirm()
   const profile = getIacProfile()
   const cli = 'terraform'
-  const [files, setFiles] = useState({})
+  const [files, setFiles] = useState(() => ({ ...STARTER_FILES }))
   const [activeFile, setActiveFile] = useState('main.tf')
   const [bottomTab, setBottomTab] = useState('output')
   const [output, setOutput] = useState('')
@@ -156,11 +156,20 @@ export default function TerraformWorkspaceIde({
     const remoteFiles = state?.state?.files || {}
     setFiles((prev) => {
       // Prefer dirty local edits; otherwise hydrate from server; if the server
-      // never seeded files, fall back to editable starter HCL so the IDE is
-      // never an empty pane with no way to write code.
+      // never seeded files (or only empty strings), fall back to editable
+      // starter HCL so the IDE is never an empty pane with no way to write code.
       let next = Object.keys(prev).length && dirty ? prev : remoteFiles
-      if (!next || !Object.keys(next).length) {
+      const bodies = Object.values(next || {})
+      const allEmpty = !next || !Object.keys(next).length
+        || (bodies.length > 0 && bodies.every((v) => !String(v || '').trim()))
+      if (allEmpty) {
         next = { ...STARTER_FILES }
+      } else {
+        // Fill any blank file bodies from starters when present.
+        next = { ...next }
+        for (const [k, v] of Object.entries(STARTER_FILES)) {
+          if (!(k in next) || !String(next[k] || '').trim()) next[k] = v
+        }
       }
       filesRef.current = next
       return next
@@ -596,7 +605,7 @@ export default function TerraformWorkspaceIde({
         </>
       )}
       editor={(
-        <CodeEditor key={activeFile} value={files[activeFile] || ''} onChange={handleFileChange}
+        <CodeEditor key={activeFile} value={files[activeFile] ?? STARTER_FILES[activeFile] ?? ''} onChange={handleFileChange}
           language={editorLang} fontSize={13} formatOnSave />
       )}
       bottomPanel={{

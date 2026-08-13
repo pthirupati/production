@@ -13,7 +13,7 @@
 import { describe, expect, it } from 'vitest'
 import { promises as fs } from 'fs'
 import * as THREE from 'three'
-import { decay, computeTipWorld, updateCurvePoints } from './DcCableSystem'
+import { decay, computeTipWorld, updateCurvePoints, estimateBendRadiusMm, minBendRadiusMm, suppressPointerUnlockPause, isPointerUnlockPauseSuppressed } from './DcCableSystem'
 import {
   MAX_FRAME_DT,
   clampDt,
@@ -67,6 +67,9 @@ import {
   SAFE_SPAWN,
   captureCanvasPng,
   renderFloorPlanPng,
+  nextFpsLodState,
+  applyFpsLodCfg,
+  FPS_LOD_THRESHOLD,
 } from './DatacenterTwin3D'
 
 const readSource = (name) => fs.readFile(new URL(`./${name}`, import.meta.url), 'utf8')
@@ -467,7 +470,7 @@ describe('D2 — pointer lock is observed, not assumed', () => {
     const marker = 'Open-only. The browser has already released'
     const at = src.indexOf(marker)
     expect(at).toBeGreaterThan(0)
-    const esc = src.slice(at - 120, at + 220)
+    const esc = src.slice(at - 120, at + 420)
     // A plain toggle fights the unlock-triggered open and makes the menu reopen
     // itself on every unlock (the risk called out in the audit).
     expect(esc).not.toContain('setMenuOpen((m) => !m)')
@@ -789,6 +792,91 @@ describe('D13 — onboarding and audio', () => {
     expect(src).toContain('dcSfx()?.footstep')
     // A second AudioContext ignored the mute toggle.
     expect(src).not.toContain('WalkController._ac')
+  })
+
+  it('exposes a volume slider and keeps mute flags mutable after arm', async () => {
+    const src = await readSource('DcAmbientAudio.jsx')
+    expect(src).toContain('aria-label="Ambience volume"')
+    expect(src).toContain('setVolume')
+    // Stale create-time `muted` broke unmute for footsteps — flags object is required.
+    expect(src).toContain('flags.muted')
+    expect(src).toContain('AMBIENT_BASE_GAIN')
+  })
+})
+
+describe('FPS LOD — cut particles / Rapier under 40fps', () => {
+  it('enters LOD after consecutive low samples and exits after sustained recovery', () => {
+    let s = { low: 0, high: 0, active: false }
+    s = nextFpsLodState(s, 55)
+    expect(s.active).toBe(false)
+    s = nextFpsLodState(s, 30)
+    expect(s.active).toBe(false) // first sample only
+    s = nextFpsLodState(s, 28)
+    expect(s.active).toBe(true)
+    expect(s.low).toBeGreaterThanOrEqual(2)
+    // One good frame is not enough to leave LOD.
+    s = nextFpsLodState(s, 60)
+    expect(s.active).toBe(true)
+    for (let i = 0; i < 5; i += 1) s = nextFpsLodState(s, 60)
+    expect(s.active).toBe(false)
+  })
+
+  it(`thresholds at ${FPS_LOD_THRESHOLD}fps and strips expensive post when active`, () => {
+    const high = {
+      dpr: [1, 2], dust: 160, shadows: true, anim: 1, shadowMap: 2048,
+      bloom: true, ssao: true, vignette: true, noise: true,
+    }
+    const lod = applyFpsLodCfg(high, true)
+    expect(lod.dust).toBeLessThanOrEqual(28)
+    expect(lod.anim).toBeLessThanOrEqual(0.45)
+    expect(lod.bloom).toBe(false)
+    expect(lod.ssao).toBe(false)
+    expect(lod.noise).toBe(false)
+    expect(applyFpsLodCfg(high, false)).toEqual(high)
+  })
+
+  it('wires setFps into nextFpsLodState and gates Rapier on effectivePhysics', async () => {
+    const src = await readSource('DatacenterTwin3D.jsx')
+    expect(src).toContain('nextFpsLodState')
+    expect(src).toContain('effectivePhysics')
+    expect(src).toContain('applyFpsLodCfg')
+  })
+})
+
+describe('tablet z-index / pointer unlock', () => {
+  it('lets twin chrome receive clicks while the field tablet is open', async () => {
+    const css = await readSource('DatacenterSimulator.css')
+    expect(css).toMatch(/\.dc-tablet-backdrop\s*\{[^}]*pointer-events:\s*none/s)
+    expect(css).toContain('.dc-tablet-backdrop > .dc-tablet')
+    expect(css).toMatch(/pointer-events:\s*auto/)
+  })
+
+  it('suppresses pause-menu open for cable drag and tablet unlock', async () => {
+    suppressPointerUnlockPause(50)
+    expect(isPointerUnlockPauseSuppressed()).toBe(true)
+    const src = await readSource('DatacenterTwin3D.jsx')
+    expect(src).toContain('isPointerUnlockPauseSuppressed()')
+    expect(src).toContain('suppressPointerUnlockPause')
+    const cable = await readSource('DcCableSystem.jsx')
+    expect(cable).toContain('document.exitPointerLock')
+    expect(cable).toContain('suppressPointerUnlockPause')
+  })
+})
+
+describe('cable bend-radius warn', () => {
+  it('estimates tighter bends for short chords with deep sag', () => {
+    const loose = estimateBendRadiusMm(0.15, 0.5)
+    const gentle = estimateBendRadiusMm(2.0, 0.12)
+    expect(loose).toBeLessThan(gentle)
+    expect(loose).toBeLessThan(minBendRadiusMm('Cat6A'))
+    expect(gentle).toBeGreaterThan(minBendRadiusMm('Fiber-LC'))
+  })
+
+  it('surfaces bend feedback on InteractiveCable drag', async () => {
+    const src = await readSource('DcCableSystem.jsx')
+    expect(src).toContain('estimateBendRadiusMm')
+    expect(src).toContain('Bend <')
+    expect(src).toContain('dc-3d-chip-warn')
   })
 })
 

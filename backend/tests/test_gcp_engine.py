@@ -248,6 +248,38 @@ class GcpBridgePowerTests(GcpEngineBase):
         self.assertTrue(res2["ok"])
         self.assertEqual(len([i for i in ge.get_state(self.sid)["state"]["instances"] if i["name"] == "tf-web"]), 1)
 
+    def test_create_instance_portal_fields(self):
+        self._login()
+        res = ge.apply_action(self.sid, "create_instance", {
+            "name": "portal-web",
+            "machine_type": "n2-standard-2",
+            "zone": "us-west1-a",
+            "image_family": "ubuntu-2204-lts",
+            "network": "vpc-prod",
+            "subnet": "subnet-us-central1",
+            "assign_external_ip": False,
+            "boot_disk_gb": 50,
+            "boot_disk_type": "pd-ssd",
+            "startup_script": "#!/bin/bash\necho hi",
+            "labels": "env=lab team=sre",
+        })
+        self.assertTrue(res["ok"], res)
+        inst = next(i for i in ge.get_state(self.sid)["state"]["instances"] if i["name"] == "portal-web")
+        self.assertEqual(inst["zone"], "us-west1-a")
+        self.assertEqual(inst["machine_type"], "n2-standard-2")
+        self.assertEqual(inst["image_family"], "ubuntu-2204-lts")
+        self.assertEqual(inst["os"], "Ubuntu 22.04 LTS")
+        self.assertEqual(inst["network"], "vpc-prod")
+        self.assertEqual(inst["subnet"], "subnet-us-central1")
+        self.assertIsNone(inst["external_ip"])
+        self.assertEqual(inst["boot_disk_type"], "pd-ssd")
+        self.assertEqual(inst["boot_disk_gb"], 50)
+        self.assertEqual(inst["labels"], {"env": "lab", "team": "sre"})
+        self.assertIn("echo hi", inst["startup_script"])
+        disk = next(d for d in ge.get_state(self.sid)["state"]["disks"] if d["name"] == "portal-web")
+        self.assertEqual(disk["size_gb"], 50)
+        self.assertEqual(disk["type"], "pd-ssd")
+
 
 class GcpV2FacadeTests(GcpEngineBase):
     def test_seeded_v2_collections(self):

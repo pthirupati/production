@@ -10,10 +10,11 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(minute="*"),
     },
     # Durable Jira @team reply sweeper (audit X2b). Celery countdown can drop on
-    # worker restart; pending rows in cache are re-delivered here every minute.
-    "sweep-pending-team-replies-every-minute": {
+    # worker restart; pending rows in cache are re-delivered here every 15s so
+    # learners see replies near the advertised ~30s delay (not ~60s+).
+    "sweep-pending-team-replies": {
         "task": "celery_app.tasks.sweep_pending_team_replies",
-        "schedule": crontab(minute="*"),
+        "schedule": 15.0,
     },
     "cleanup-expired-labs-every-5-mins": {
         "task": "celery_app.tasks.cleanup_expired_labs",

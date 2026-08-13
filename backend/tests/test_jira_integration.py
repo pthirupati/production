@@ -238,7 +238,15 @@ class JiraSubscriptionGateTests(TestCase):
         resp = self.client.get(f"/api/jira/tickets/scenario/{self.scenario.id}/")
         self.assertEqual(resp.status_code, 403)
 
-    def test_open_allowed_with_free_labs_remaining(self):
-        """Free-plan user with daily free labs left → ticket may open."""
+    def test_open_blocked_for_paid_scenario_even_with_free_quota(self):
+        """Paid scenarios need a tech subscription — free daily quota is not enough."""
+        resp = self.client.post(f"/api/jira/tickets/scenario/{self.scenario.id}/")
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.json().get("code"), "SUBSCRIPTION_REQUIRED")
+
+    def test_open_allowed_for_free_scenario_with_quota(self):
+        """Free scenarios still open with remaining free-plan daily lab quota."""
+        self.scenario.is_free = True
+        self.scenario.save(update_fields=["is_free"])
         resp = self.client.post(f"/api/jira/tickets/scenario/{self.scenario.id}/")
         self.assertNotEqual(resp.status_code, 403)

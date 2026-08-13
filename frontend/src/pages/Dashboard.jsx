@@ -327,11 +327,11 @@ export default function Dashboard() {
   }
 
   // Only surface the scary banner for loads that blank primary dashboard cards.
-  // Flaky interview/journey/tutorial endpoints used to force a full-page reload
-  // prompt even when progress + labs rendered fine.
+  // Flaky interview/journey/tutorial/jira ticket list endpoints used to force a
+  // full-page reload prompt even when progress + labs rendered fine.
   const partialFailure = Object.entries(failed)
     .some(([key, didFail]) => didFail && [
-      'achievements', 'activeLabs', 'subscriptions', 'jira', 'bookmarks',
+      'activeLabs', 'subscriptions',
     ].includes(key))
 
   // Weakest competency, from the interview radar — the only real per-skill score

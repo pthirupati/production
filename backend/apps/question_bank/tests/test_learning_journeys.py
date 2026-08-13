@@ -84,8 +84,8 @@ class LearningJourneySeedTests(TestCase):
         call_command("seed_learning_journeys")
 
     def test_seeds_exactly_ten_active_journeys(self):
-        self.assertEqual(LearningJourney.objects.count(), 10)
-        self.assertEqual(LearningJourney.objects.filter(is_active=True).count(), 10)
+        self.assertEqual(LearningJourney.objects.count(), 12)
+        self.assertEqual(LearningJourney.objects.filter(is_active=True).count(), 12)
         slugs = set(LearningJourney.objects.values_list("slug", flat=True))
         self.assertEqual(
             slugs,
@@ -105,7 +105,7 @@ class LearningJourneySeedTests(TestCase):
 
     def test_seed_is_idempotent(self):
         call_command("seed_learning_journeys")  # second run
-        self.assertEqual(LearningJourney.objects.count(), 10)
+        self.assertEqual(LearningJourney.objects.count(), 12)
         # Steps rebuilt, not duplicated.
         journey = LearningJourney.objects.get(slug="junior-linux-admin-rhcsa")
         self.assertEqual(journey.steps.count(), 7)

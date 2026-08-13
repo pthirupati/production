@@ -377,33 +377,109 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return {"ok": False, "error": "Sign in to the Azure portal first"}
 
     if action == "create_vm":
-        rg = (state.get("resource_groups") or [{}])[0].get("name") or "rg-lab"
+        rg = (
+            (payload.get("resource_group") or "").strip()
+            or (state.get("resource_groups") or [{}])[0].get("name")
+            or "rg-lab"
+        )
         name = (payload.get("name") or f"vm-{_hex(4)}").strip()
         if any(v.get("name") == name for v in state.get("vms") or []):
             return {"ok": True, "message": "VM already exists", "vm": next(v for v in state["vms"] if v["name"] == name)}
         size = payload.get("size") or "Standard_B2s"
         if size not in VM_SIZES:
             size = "Standard_B2s"
-        vnet = (state.get("vnets") or [{}])[0].get("name") or "vnet-lab"
-        subnet = ((state.get("vnets") or [{}])[0].get("subnets") or [{}])[0].get("name") or "subnet-web"
-        nsg = (state.get("nsgs") or [{}])[0].get("name") or "nsg-web"
+        location = (payload.get("location") or payload.get("region") or "eastus").strip()
+        image = (payload.get("image") or payload.get("os") or "Ubuntu 22.04 LTS").strip()
+
+        # Optional: create a default VNet + subnet when the portal asks for new networking.
+        if payload.get("create_networking"):
+            vnet_name = (payload.get("vnet") or f"vnet-{name}").strip()
+            subnet_name = (payload.get("subnet") or "default").strip()
+            if not any(v.get("name") == vnet_name for v in state.get("vnets") or []):
+                state.setdefault("vnets", []).append({
+                    "name": vnet_name, "resource_group": rg, "location": location,
+                    "address_space": payload.get("address_space") or "10.20.0.0/16",
+                    "subnets": [{
+                        "name": subnet_name,
+                        "address_prefix": payload.get("subnet_prefix") or "10.20.1.0/24",
+                        "nsg": "",
+                    }],
+                })
+            else:
+                vnet_obj = next(v for v in state["vnets"] if v["name"] == vnet_name)
+                if not any(s.get("name") == subnet_name for s in (vnet_obj.get("subnets") or [])):
+                    vnet_obj.setdefault("subnets", []).append({
+                        "name": subnet_name,
+                        "address_prefix": payload.get("subnet_prefix") or "10.20.1.0/24",
+                        "nsg": "",
+                    })
+            vnet, subnet = vnet_name, subnet_name
+        else:
+            vnet = (payload.get("vnet") or "").strip() or (state.get("vnets") or [{}])[0].get("name") or "vnet-lab"
+            subnet = (payload.get("subnet") or "").strip()
+            if not subnet:
+                matched = next((v for v in (state.get("vnets") or []) if v.get("name") == vnet), None)
+                subnet = ((matched or {}).get("subnets") or (state.get("vnets") or [{}])[0].get("subnets") or [{}])[0].get("name") or "subnet-web"
+
+        nsg = (payload.get("nsg") or "").strip() or (state.get("nsgs") or [{}])[0].get("name") or "nsg-web"
         os_disk = f"{name}_OsDisk"
+        os_disk_sku = (payload.get("os_disk_sku") or payload.get("os_disk_type") or "Premium_SSD_LRS").strip()
+        os_disk_gb = int(payload.get("os_disk_gb") or payload.get("os_disk_size_gb") or 30)
+
+        # Public IP: prefer explicit assign_public_ip; else honor public_ip string/bool; default on.
+        if "assign_public_ip" in payload:
+            assign_pip = bool(payload.get("assign_public_ip"))
+        elif "public_ip" in payload:
+            pip_raw = payload.get("public_ip")
+            assign_pip = bool(pip_raw) and pip_raw not in (False, "false", "False", "none", "None", "No", "no")
+        else:
+            assign_pip = True
+        if assign_pip:
+            if isinstance(payload.get("public_ip"), str) and payload["public_ip"] not in ("", "none", "None"):
+                public_ip = payload["public_ip"]
+            else:
+                public_ip = f"20.{random.randint(1, 200)}.{random.randint(1, 200)}.{random.randint(1, 200)}"
+        else:
+            public_ip = None
+
+        admin_username = (payload.get("admin_username") or "azureuser").strip()
+        auth_type = (payload.get("authentication_type") or payload.get("auth_type") or "sshPublicKey").strip()
+        if auth_type in ("password", "Password"):
+            auth_type = "password"
+        else:
+            auth_type = "sshPublicKey"
+
         vm = {
             "id": f"vm-{_hex(8)}", "name": name, "resource_group": rg,
-            "location": payload.get("location") or "eastus",
-            "size": size, "os": payload.get("os") or "Ubuntu 22.04 LTS",
+            "location": location,
+            "size": size, "os": image, "image": image,
             "power_state": "running", "provisioning_state": "Succeeded",
             "private_ip": payload.get("private_ip") or f"10.10.1.{random.randint(10, 250)}",
-            "public_ip": payload.get("public_ip") or f"20.{random.randint(1, 200)}.{random.randint(1, 200)}.{random.randint(1, 200)}",
+            "public_ip": public_ip,
             "vnet": vnet, "subnet": subnet, "nsg": nsg,
-            "os_disk": os_disk, "data_disks": [], "_transition": None,
+            "os_disk": os_disk, "os_disk_sku": os_disk_sku, "os_disk_gb": os_disk_gb,
+            "data_disks": [], "_transition": None,
             "lab_managed": True,
+            "admin_username": admin_username,
+            "authentication_type": auth_type,
+            # Sim only: never persist passwords; fingerprint is a lab marker.
+            "ssh_key_configured": auth_type == "sshPublicKey",
+            "password_auth": auth_type == "password",
         }
+        if auth_type == "sshPublicKey":
+            key_src = (payload.get("ssh_public_key") or payload.get("ssh_key") or "").strip()
+            vm["ssh_key_fingerprint"] = f"sha256:{_hex(16)}" if key_src else f"sha256:lab-{_hex(8)}"
+
         state.setdefault("disks", []).append({
             "id": f"disk-{_hex(8)}", "name": os_disk, "resource_group": rg,
-            "size_gb": int(payload.get("os_disk_gb") or 30), "sku": "Premium_SSD_LRS",
+            "size_gb": os_disk_gb, "sku": os_disk_sku,
             "state": "Attached", "attached_to": name, "os_disk": True,
         })
+        if assign_pip and public_ip:
+            state.setdefault("public_ips", []).append({
+                "id": f"pip-{_hex(8)}", "name": f"pip-{name}", "resource_group": rg,
+                "ip": public_ip, "sku": "Standard", "allocation": "Static", "attached_to": name,
+            })
         state.setdefault("vms", []).append(vm)
         try:
             from apps.labs.provisioner.simulation.server_identity import new_trace_id, sync_azure_vm

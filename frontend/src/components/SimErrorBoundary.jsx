@@ -27,9 +27,9 @@ export default class SimErrorBoundary extends Component {
       componentStack: info?.componentStack,
       kind: `sim_error:${this.props.name || 'lab'}`,
     })
-    // Missing-chunk failures cannot be recovered in place — auto-reload once.
+    // Missing-chunk failures: do NOT auto-reload the whole SPA (that flashes
+    // global fonts/CSS and feels like the site crashed). Show recovery UI.
     if (isChunkLoadError(error)) {
-      this.hardReloadForChunk()
       return
     }
     // AWS/Terraform often crash from a corrupt persisted Zustand blob after a
