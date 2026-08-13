@@ -975,7 +975,6 @@ export default function CodingIDE({ sessionId, scenario, onSolved, solved: solve
       theme="app"
       className="flex-1 min-h-0"
       rightPanelDefaultOpen
-      rightPanelLabel="Instructions"
       title={`${langLabel} IDE`}
       subtitle={scenario?.title || 'Coding Lab'}
       toolbar={(
