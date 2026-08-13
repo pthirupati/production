@@ -19,4 +19,17 @@ describe('SimModal accessibility', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()
   })
+
+  it('applies light portal theme from shellClass without body:has', () => {
+    render(
+      <SimModal open title="Create a virtual machine" onClose={() => {}} shellClass="az-shell">
+        <p className="text-sm">Fluent create form</p>
+      </SimModal>,
+    )
+    const dialog = screen.getByRole('dialog', { name: 'Create a virtual machine' })
+    expect(dialog.className).toContain('sim-modal--light')
+    const portal = dialog.parentElement
+    expect(portal?.getAttribute('data-sim-shell')).toBe('az')
+    expect(portal?.className).toContain('az-shell')
+  })
 })

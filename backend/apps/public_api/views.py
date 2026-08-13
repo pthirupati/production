@@ -806,8 +806,19 @@ class ScenarioDetailView(APIView):
             data["user_progress"] = None
             data["solution_explanation"] = None
 
+        # Revenue: unpaid / locked detail stays marketing-only (title, slug,
+        # difficulty, tech). Free scenarios keep full briefs via is_accessible.
         if not data.get("is_accessible", True):
+            data["description"] = ""
+            data["objectives"] = []
             data["initial_state"] = None
+            data["solution_explanation"] = None
+            data["hints_count"] = 0
+            data["blocked_commands"] = []
+            data["consoles"] = []
+            data["lab_servers"] = []
+            if not data.get("coming_soon"):
+                data["subscription_required"] = True
 
         try:
             from apps.tutorials.models import Tutorial

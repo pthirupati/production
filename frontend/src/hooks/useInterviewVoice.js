@@ -524,61 +524,81 @@ function speakBrowserUtterance(seg, { voice, locale, rate, pitch }) {
   return new Promise((resolve) => {
     let settled = false
     let started = false
-    const done = () => {
+    let stuckTimer
+    let earlyStartTimer
+    let speakingPoll
+    let endWatch
+    let hardCap
+
+    const finish = (ok) => {
       if (settled) return
       settled = true
       clearTimeout(stuckTimer)
       clearTimeout(earlyStartTimer)
+      clearTimeout(hardCap)
       clearInterval(speakingPoll)
+      clearInterval(endWatch)
       if (!started && window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) {
         started = true
       }
-      resolve(started)
+      resolve(ok ?? started)
     }
+
     const u = new SpeechSynthesisUtterance(seg)
     u.lang = (voice && voice.lang) || locale || 'en-US'
     u.rate = rate
     u.pitch = pitch
-    // Soft AEC half: slightly below unity reduces speaker→mic bleed into STT
-    // without muting the track (barge-in VAD needs the mic open).
+    // Soft AEC half: slightly below unity reduces speaker→mic bleed into STT.
     u.volume = 0.82
     if (voice) u.voice = voice
     u.onstart = () => { started = true }
-    u.onend = done
-    u.onerror = () => { started = started || !!(window.speechSynthesis?.speaking || window.speechSynthesis?.pending); done() }
-    const speakingPoll = setInterval(() => {
+    u.onend = () => finish(true)
+    u.onerror = () => {
+      started = started || !!(window.speechSynthesis?.speaking || window.speechSynthesis?.pending)
+      finish(started)
+    }
+    speakingPoll = setInterval(() => {
       if (window.speechSynthesis?.speaking || window.speechSynthesis?.pending) started = true
     }, 80)
-    // Fast fail/retry path: if onstart never fires within 900ms, resume and
-    // re-speak once — Chrome often queues then never starts after cancel().
-    const earlyStartTimer = setTimeout(() => {
+
+    // If onstart is late, resume only — never re-speak the same Utterance object
+    // (Chrome footgun that races/cancels mid-question).
+    earlyStartTimer = setTimeout(() => {
       if (started || settled) return
       try {
         if (window.speechSynthesis?.paused) window.speechSynthesis.resume()
-        if (!window.speechSynthesis?.speaking && !window.speechSynthesis?.pending) {
-          window.speechSynthesis.speak(u)
-        } else {
-          window.speechSynthesis.resume?.()
-        }
+        else window.speechSynthesis?.resume?.()
       } catch { /* */ }
     }, 900)
-    const stuckMs = Math.min(20000, Math.max(2500, 1200 + seg.length * 65))
-    const stuckTimer = setTimeout(() => {
+
+    const stuckMs = Math.min(45000, Math.max(4000, 1500 + seg.length * 85))
+    stuckTimer = setTimeout(() => {
+      if (settled) return
       if (!started && window.speechSynthesis?.paused) {
         try { window.speechSynthesis.resume() } catch { /* */ }
-        try { window.speechSynthesis.speak(u) } catch { done() }
-        return
       }
       if (window.speechSynthesis?.speaking || window.speechSynthesis?.pending) {
         started = true
+        // Still speaking — do not finish mid-utterance.
+        return
       }
-      done()
+      finish(started)
     }, stuckMs)
+
+    endWatch = setInterval(() => {
+      if (settled) return
+      if (started && !(window.speechSynthesis?.speaking || window.speechSynthesis?.pending)) {
+        finish(true)
+      }
+    }, 200)
+
+    hardCap = setTimeout(() => finish(started), Math.min(90000, stuckMs + 15000))
+
     try {
       window.speechSynthesis.resume?.()
       window.speechSynthesis.speak(u)
     } catch {
-      done()
+      finish(false)
     }
   })
 }
@@ -929,7 +949,7 @@ export function useInterviewVoice() {
           if (clean) {
             unlockSpeech({ soft: true })
             resumeSpeechSynthesis()
-            spoken = await speakBrowserUtterance(clean.slice(0, 500), utterOpts)
+            spoken = await speakBrowserUtterance(clean, utterOpts)
           }
         }
       } finally {

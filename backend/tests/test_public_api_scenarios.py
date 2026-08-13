@@ -185,12 +185,21 @@ class ScenarioDetailAccessTests(TestCase):
         cls.tech = Technology.objects.create(name="Kubernetes", slug="kubernetes", is_active=True)
         cls.free = Scenario.objects.create(
             technology=cls.tech, slug="k8s-pod-pending", title="Pod Pending",
-            category="scheduling", difficulty="easy", description="x",
+            category="scheduling", difficulty="easy",
+            description="CONTEXT: pods stuck Pending.\nOBJECTIVE: get the pod Running.",
+            objectives=["Pod reaches Running", "Service endpoints healthy"],
+            initial_state="Pending: Insufficient cpu",
             is_free=True, is_active=True,
         )
         cls.paid = Scenario.objects.create(
             technology=cls.tech, slug="k8s-crashloop", title="CrashLoop",
-            category="workloads", difficulty="hard", description="x",
+            category="workloads", difficulty="hard",
+            description="CONTEXT: CrashLoopBackOff on payment-api.\nSYMPTOM: OOMKilled.",
+            objectives=["payment-api stays Running", "No CrashLoopBackOff events"],
+            initial_state="CrashLoopBackOff x12",
+            blocked_commands=["rm"],
+            consoles=[{"type": "terminal"}],
+            lab_servers=[{"role": "worker"}],
             is_free=False, is_active=True,
         )
 
@@ -207,6 +216,62 @@ class ScenarioDetailAccessTests(TestCase):
         resp = self.client.get("/api/scenarios/k8s-pod-pending/")
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(resp.data["is_accessible"])
+
+    def test_locked_paid_detail_redacts_brief_keeps_marketing(self):
+        resp = self.client.get("/api/scenarios/k8s-crashloop/")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.data
+        self.assertFalse(data["is_accessible"])
+        self.assertTrue(data.get("subscription_required"))
+        # Marketing surface stays
+        self.assertEqual(data["title"], "CrashLoop")
+        self.assertEqual(data["slug"], "k8s-crashloop")
+        self.assertEqual(data["difficulty"], "hard")
+        self.assertEqual(data["technology"]["slug"], "kubernetes")
+        # Incident brief / lab internals stripped
+        self.assertEqual(data["description"], "")
+        self.assertEqual(data["objectives"], [])
+        self.assertIsNone(data["initial_state"])
+        self.assertEqual(data["hints_count"], 0)
+        self.assertEqual(data["blocked_commands"], [])
+        self.assertEqual(data["consoles"], [])
+        self.assertEqual(data["lab_servers"], [])
+
+    def test_free_detail_keeps_full_brief(self):
+        resp = self.client.get("/api/scenarios/k8s-pod-pending/")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.data
+        self.assertTrue(data["is_accessible"])
+        self.assertNotIn("subscription_required", data)
+        self.assertIn("pods stuck Pending", data["description"])
+        self.assertIn("CONTEXT:", data["description"])
+        self.assertTrue(len(data["objectives"]) >= 1)
+        self.assertEqual(data["initial_state"], "Pending: Insufficient cpu")
+
+    def test_subscribed_user_sees_paid_brief(self):
+        from decimal import Decimal
+
+        from django.contrib.auth import get_user_model
+
+        from apps.billing.models import TechnologySubscription
+
+        user = get_user_model().objects.create_user(username="subber", password="x")
+        TechnologySubscription.objects.create(
+            user=user,
+            technology=self.tech,
+            amount=Decimal("99.00"),
+            is_active=True,
+            payment_verified=True,
+        )
+        self.client.force_authenticate(user=user)
+        resp = self.client.get("/api/scenarios/k8s-crashloop/")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.data
+        self.assertTrue(data["is_accessible"])
+        self.assertNotIn("subscription_required", data)
+        self.assertIn("CrashLoopBackOff", data["description"])
+        self.assertTrue(len(data["objectives"]) >= 1)
+        self.assertEqual(data["initial_state"], "CrashLoopBackOff x12")
 
     def test_detail_unknown_slug_404s(self):
         resp = self.client.get("/api/scenarios/nope/")

@@ -660,7 +660,7 @@ export default function GcpConsole({
         />
       )}
 
-      <SimModal open={!!instanceDetail} onClose={() => setInstanceDetail(null)} title={`${instanceDetail?.name || ''} — Machine type`}
+      <SimModal shellClass="gcp-shell" open={!!instanceDetail} onClose={() => setInstanceDetail(null)} title={`${instanceDetail?.name || ''} — Machine type`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setInstanceDetail(null)}>Cancel</button>
           <button type="button" className="gcp-btn-primary" disabled={busy} onClick={() => {
@@ -679,7 +679,7 @@ export default function GcpConsole({
         </label>
       </SimModal>
 
-      <SimModal open={ruleModalOpen} onClose={() => setRuleModalOpen(false)} title="Create firewall rule"
+      <SimModal shellClass="gcp-shell" open={ruleModalOpen} onClose={() => setRuleModalOpen(false)} title="Create firewall rule"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setRuleModalOpen(false)}>Cancel</button>
           <button type="button" className="gcp-btn-primary" disabled={busy} onClick={submitRule}>Create</button>
@@ -701,7 +701,7 @@ export default function GcpConsole({
         </label>
       </SimModal>
 
-      <SimModal open={!!attachTarget} onClose={() => setAttachTarget(null)} title={`Attach disk — ${attachTarget || ''}`}
+      <SimModal shellClass="gcp-shell" open={!!attachTarget} onClose={() => setAttachTarget(null)} title={`Attach disk — ${attachTarget || ''}`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setAttachTarget(null)}>Cancel</button>
           <button type="button" className="gcp-btn-primary" disabled={busy || !instances.length} onClick={() => {
@@ -712,7 +712,7 @@ export default function GcpConsole({
         <p className="text-sm text-slate-300">Attach this persistent disk to the instance <span className="font-mono">{instances[0]?.name}</span>.</p>
       </SimModal>
 
-      <SimModal open={createDiskModal} onClose={() => setCreateDiskModal(false)} title="Create persistent disk"
+      <SimModal shellClass="gcp-shell" open={createDiskModal} onClose={() => setCreateDiskModal(false)} title="Create persistent disk"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setCreateDiskModal(false)}>Cancel</button>
           <button type="button" className="gcp-btn-primary" disabled={busy} onClick={() => {
@@ -728,7 +728,7 @@ export default function GcpConsole({
         </label>
       </SimModal>
 
-      <SimModal open={createVmOpen} onClose={() => setCreateVmOpen(false)} title="Create a VM instance" width="max-w-2xl"
+      <SimModal shellClass="gcp-shell" open={createVmOpen} onClose={() => setCreateVmOpen(false)} title="Create a VM instance" width="max-w-2xl"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setCreateVmOpen(false)}>Cancel</button>
           <button type="button" className="gcp-btn-primary" disabled={busy || !vmName.trim()} onClick={submitCreateInstance}>
@@ -796,7 +796,7 @@ export default function GcpConsole({
         </div>
       </SimModal>
 
-      <SimModal open={createBucketOpen} onClose={() => setCreateBucketOpen(false)} title="Create bucket"
+      <SimModal shellClass="gcp-shell" open={createBucketOpen} onClose={() => setCreateBucketOpen(false)} title="Create bucket"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setCreateBucketOpen(false)}>Cancel</button>
           <button type="button" className="gcp-btn-primary" disabled={busy} onClick={() => {
@@ -809,7 +809,7 @@ export default function GcpConsole({
         </label>
       </SimModal>
 
-      <SimModal open={iamOpen} onClose={() => setIamOpen(false)} title="Grant access"
+      <SimModal shellClass="gcp-shell" open={iamOpen} onClose={() => setIamOpen(false)} title="Grant access"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setIamOpen(false)}>Cancel</button>
           <button type="button" className="gcp-btn-primary" disabled={busy} onClick={() => {

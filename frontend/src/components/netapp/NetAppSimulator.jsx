@@ -378,7 +378,7 @@ export default function NetAppSimulator({
         <main className="flex-1 overflow-auto p-5 bg-[#f2f7f6]">{renderContent()}</main>
       </div>
 
-      <SimModal open={volModal} onClose={() => setVolModal(false)} title="Create Volume"
+      <SimModal shellClass="na-shell" open={volModal} onClose={() => setVolModal(false)} title="Create Volume"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setVolModal(false)}>Cancel</button>
           <button type="button" className="na-btn-primary" disabled={busy} onClick={() => {
@@ -404,7 +404,7 @@ export default function NetAppSimulator({
         </label>
       </SimModal>
 
-      <SimModal open={!!resizeTarget} onClose={() => setResizeTarget(null)} title={`Resize Volume — ${resizeTarget || ''}`}
+      <SimModal shellClass="na-shell" open={!!resizeTarget} onClose={() => setResizeTarget(null)} title={`Resize Volume — ${resizeTarget || ''}`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setResizeTarget(null)}>Cancel</button>
           <button type="button" className="na-btn-primary" disabled={busy} onClick={() => {
@@ -417,7 +417,7 @@ export default function NetAppSimulator({
         </label>
       </SimModal>
 
-      <SimModal open={smModal} onClose={() => setSmModal(false)} title="Create SnapMirror Relationship"
+      <SimModal shellClass="na-shell" open={smModal} onClose={() => setSmModal(false)} title="Create SnapMirror Relationship"
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setSmModal(false)}>Cancel</button>
           <button type="button" className="na-btn-primary" disabled={busy} onClick={() => {
@@ -433,7 +433,7 @@ export default function NetAppSimulator({
         </label>
       </SimModal>
 
-      <SimModal open={!!lunTarget} onClose={() => setLunTarget(null)} title={`Map LUN — ${lunTarget || ''}`}
+      <SimModal shellClass="na-shell" open={!!lunTarget} onClose={() => setLunTarget(null)} title={`Map LUN — ${lunTarget || ''}`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setLunTarget(null)}>Cancel</button>
           <button type="button" className="na-btn-primary" disabled={busy} onClick={() => {
