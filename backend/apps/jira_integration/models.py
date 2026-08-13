@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 
@@ -116,3 +118,24 @@ class JiraWebhookEvent(models.Model):
         indexes = [
             models.Index(fields=["jira_issue_key", "processed"], name="jira_webhook_issue_proc_idx"),
         ]
+
+
+class PendingTeamReply(models.Model):
+    """DB-durable pending Jira @team reply awaiting beat delivery."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    issue_key = models.CharField(max_length=50, db_index=True)
+    session_id = models.CharField(max_length=64, blank=True, default="")
+    author = models.TextField()
+    message = models.TextField()
+    actions = models.JSONField(default=list)
+    scenario_slug = models.CharField(max_length=255, blank=True, default="")
+    deliver_at = models.DateTimeField(db_index=True)
+    attempts = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["deliver_at"]
+
+    def __str__(self):
+        return f"{self.issue_key} @ {self.deliver_at}"

@@ -9,24 +9,31 @@ class AuthPage {
 
   // ── OTP-based registration ───────────────────────────────────────────────
   async sendOtp(email) {
-    const resp = await this.page.request.post(`${this.baseUrl}/api/auth/otp/send/`, {
+    const resp = await this.page.request.post(`${this.baseUrl}/api/auth/send-otp/`, {
       data: { email },
       headers: { 'X-Forwarded-Proto': 'https' },
     });
     return resp;
   }
 
-  async verifyOtp(email, otp) {
-    const resp = await this.page.request.post(`${this.baseUrl}/api/auth/otp/verify/`, {
-      data: { email, otp },
+  async verifyOtp(sessionToken, code) {
+    const resp = await this.page.request.post(`${this.baseUrl}/api/auth/verify-otp/`, {
+      data: { session_token: sessionToken, code },
       headers: { 'X-Forwarded-Proto': 'https' },
     });
     return resp;
   }
 
-  async register({ email, name, password }) {
+  async register({ email, password, sessionToken, firstName = 'E2E', lastName = 'User' }) {
     const resp = await this.page.request.post(`${this.baseUrl}/api/auth/register/`, {
-      data: { email, name, password },
+      data: {
+        email,
+        password,
+        session_token: sessionToken,
+        first_name: firstName,
+        last_name: lastName,
+        accepted_legal: true,
+      },
       headers: { 'X-Forwarded-Proto': 'https' },
     });
     return resp;

@@ -1,27 +1,13 @@
 """Durable pending Jira @team replies (audit X2b)."""
 
-from django.core.cache import cache
-from django.test import SimpleTestCase, override_settings
+from django.test import TestCase
+from django.utils import timezone
 
 from apps.jira_integration import pending_team_replies as ptr
+from apps.jira_integration.models import PendingTeamReply
 
 
-LOCMEM = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "pending-team-reply-tests",
-    }
-}
-
-
-@override_settings(CACHES=LOCMEM)
-class PendingTeamReplyTests(SimpleTestCase):
-    def setUp(self):
-        cache.clear()
-
-    def tearDown(self):
-        cache.clear()
-
+class PendingTeamReplyTests(TestCase):
     def test_enqueue_and_list(self):
         row = ptr.enqueue_pending_team_reply(
             issue_key="LAB-1",
@@ -35,6 +21,8 @@ class PendingTeamReplyTests(SimpleTestCase):
         pending = ptr.list_pending()
         self.assertEqual(len(pending), 1)
         self.assertEqual(pending[0]["issue_key"], "LAB-1")
+        self.assertEqual(PendingTeamReply.objects.count(), 1)
+        self.assertTrue(timezone.is_aware(PendingTeamReply.objects.get().deliver_at))
 
     def test_sweep_delivers_due_rows(self):
         ptr.enqueue_pending_team_reply(
@@ -44,7 +32,6 @@ class PendingTeamReplyTests(SimpleTestCase):
             message="done",
             delay_seconds=0,
         )
-        # deliver_team_reply_now needs a ticket — stub via monkeypatch.
         delivered = []
 
         def fake_deliver(issue_key, session_id, author, message, actions, scenario_slug=""):
@@ -61,6 +48,7 @@ class PendingTeamReplyTests(SimpleTestCase):
         self.assertEqual(result["delivered"], 1)
         self.assertEqual(delivered, ["LAB-DUE"])
         self.assertEqual(ptr.list_pending(), [])
+        self.assertEqual(PendingTeamReply.objects.count(), 0)
 
     def test_cancel_for_issue(self):
         ptr.enqueue_pending_team_reply(
@@ -68,3 +56,4 @@ class PendingTeamReplyTests(SimpleTestCase):
         )
         self.assertEqual(ptr.cancel_pending_for_issue("LAB-X"), 1)
         self.assertEqual(ptr.list_pending(), [])
+        self.assertEqual(PendingTeamReply.objects.count(), 0)

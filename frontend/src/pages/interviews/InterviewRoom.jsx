@@ -1164,7 +1164,8 @@ export default function InterviewRoom() {
   // candidate just SPEAK; when they STOP (DYNAMIC trailing silence detected by
   // the hook) the turn AUTO-SUBMITS and the AI responds. A second click of the
   // mic button (or Enter / the Done button) finalizes early as an accessibility
-  // fallback. Uses browser SpeechRecognition only — zero paid STT.
+  // fallback. Browser SpeechRecognition by default; when uses_server_stt is on,
+  // listenLive records + transcribes via /stt/transcribe/ (no paid STT).
   const voiceAnswer = async () => {
     if (isListening) {
       // Manual "done" affordance — finalize the current capture immediately.

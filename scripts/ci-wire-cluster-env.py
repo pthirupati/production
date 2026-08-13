@@ -153,6 +153,7 @@ def main() -> int:
     # ── Labs droplet (D4): remote docker engine ──
     set_val(lines, "DOCKER_SOCKET", f"ssh://root@{labs}")
     set_val(lines, "DOCKER_HOST", f"ssh://root@{labs}")
+    set_val(lines, "SANDBOX_DOCKER", "1")
     set_val(lines, "DOCKER_NETWORK", get_val(lines, "DOCKER_NETWORK") or "fixitlab_labs")
     set_val(lines, "LAB_PROVIDER", "docker")
 
@@ -167,6 +168,7 @@ def main() -> int:
     summary_keys = [
         "POSTGRES_HOST", "PGBOUNCER_HOST", "PGBOUNCER_PORT", "REDIS_HOST",
         "CELERY_BROKER_URL", "CELERY_RESULT_BACKEND", "DOCKER_SOCKET",
+        "SANDBOX_DOCKER",
         "VAULT_ADDR", "EDGE_BIND_IP", "APP_PRIVATE_IP", "DJANGO_ALLOWED_HOSTS",
     ]
 

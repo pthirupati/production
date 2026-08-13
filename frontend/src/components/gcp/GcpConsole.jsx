@@ -145,6 +145,7 @@ export default function GcpConsole({
   const [vmDiskType, setVmDiskType] = useState('pd-balanced')
   const [vmStartupScript, setVmStartupScript] = useState('')
   const [vmLabels, setVmLabels] = useState('')
+  const [vmTags, setVmTags] = useState('web')
 
   const st = state?.state || EMPTY_OBJ
   const loggedIn = st?.session?.logged_in
@@ -213,6 +214,9 @@ export default function GcpConsole({
     }
     if (vmStartupScript.trim()) payload.startup_script = vmStartupScript
     if (vmLabels.trim()) payload.labels = vmLabels.trim()
+    if (vmTags.trim()) {
+      payload.tags = vmTags.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean)
+    }
     run(() => gcpApi.createInstance(sessionId, payload), 'Instance created')
     setCreateVmOpen(false)
   }
@@ -776,6 +780,14 @@ export default function GcpConsole({
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={vmExternalIp} onChange={(e) => setVmExternalIp(e.target.checked)} />
             Ephemeral external IP
+          </label>
+          <label className="block text-sm">Network tags <span className="text-slate-500">(space/comma separated)</span>
+            <input
+              className="w-full mt-1 border rounded px-2 py-1.5 font-mono text-xs"
+              placeholder="web http-server"
+              value={vmTags}
+              onChange={(e) => setVmTags(e.target.value)}
+            />
           </label>
           <label className="block text-sm">Labels <span className="text-slate-500">(optional, key=value …)</span>
             <input
