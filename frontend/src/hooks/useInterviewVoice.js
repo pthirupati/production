@@ -1112,14 +1112,19 @@ export function useInterviewVoice() {
   // ------------------------------------------------------------------
   // listenLive() — TRUE hands-free turn (FIX 1 / WS1)
   //
-  // Continuous browser SpeechRecognition + interim results + a DYNAMIC
+  // Browser path: continuous SpeechRecognition + interim results + a DYNAMIC
   // trailing-SILENCE timer that AUTO-FINALIZES the turn after the candidate
   // stops talking. This is what removes the send button: the candidate just
   // speaks, stops, and their answer submits itself — but only once we're
   // confident they're actually done, not mid-thought.
   //
-  // WS1 — don't cut people off:
-  //   * The silence window is NOT armed until we've both landed at least one
+  // Server path (when uses_server_stt && mediaStream): MediaRecorder capture +
+  // /stt/transcribe/, with a simple mic-energy trailing-silence detector (and
+  // optional browser interim captions if SpeechRecognition is available).
+  // Settles on silence / stopListening (manual) / maxDuration, then transcribes.
+  //
+  // WS1 — don't cut people off (browser path; server approximates via energy):
+  //   * The silence timer is NOT armed until we've both landed at least one
   //     FINAL result AND heard >~1.2s of real speech. A short "uh, well…" or a
   //     single early interim never self-submits.
   //   * The window GROWS with the answer: base + ~400ms per sentence boundary,
@@ -1147,7 +1152,8 @@ export function useInterviewVoice() {
   // had_speech }. ``reason`` is 'silence' | 'manual' | 'timeout' | 'error' |
   // 'unsupported' so the room can decide whether to submit.
   //
-  // 100% browser-native — no paid STT.
+  // Browser-native by default; when the backend reports uses_server_stt the
+  // live turn records audio and POSTs to /stt/transcribe/ (no paid STT).
   // ------------------------------------------------------------------
   const listenLive = useCallback((mediaStream, options = {}) => {
     const {
@@ -1160,10 +1166,15 @@ export function useInterviewVoice() {
       minWordsForSilence = 2,     // minimum words before trailing silence auto-submits
       onInterim = null,
       onSilenceCountdown = null,  // (remainingMs|null, totalMs) for the affordance
+      techPrompt = '',            // vocabulary hint for server STT
     } = options
 
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) {
+    const useServer = !!(configRef.current.uses_server_stt && mediaStream)
+
+    // Server STT does not need SpeechRecognition. Only unsupported when neither
+    // path is available.
+    if (!useServer && !SR) {
       return Promise.resolve({
         transcript: '', filtered_text: '', confidence: 0,
         provider: 'none', reason: 'unsupported', had_speech: false,
@@ -1173,6 +1184,262 @@ export function useInterviewVoice() {
     setIsListening(true)
     setInterimTranscript('')
 
+    // ---- Server STT live turn (record → energy silence / manual / timeout → transcribe) ----
+    if (useServer) {
+      return new Promise((resolve) => {
+        let settled = false
+        let hadSpeech = false
+        let speechStartedAt = 0
+        let silenceTimer = null
+        let countdownInterval = null
+        let energyRaf = 0
+        let energyCtx = null
+        let captionRecognizer = null
+        let interimText = ''
+        let capTimer = null
+
+        // Energy thresholds (0–1, same scale as InterviewRoom's mic meter).
+        const SPEECH_LEVEL = 0.12
+        const QUIET_LEVEL = 0.08
+        const LOUD_FRAMES_NEEDED = 3
+        const QUIET_FRAMES_RESET = 2
+        let loudFrames = 0
+        let quietWhileArmed = 0
+
+        const clearSilence = () => {
+          if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null }
+          if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null }
+        }
+
+        const stopEnergy = () => {
+          if (energyRaf) { cancelAnimationFrame(energyRaf); energyRaf = 0 }
+          try { energyCtx?.close?.() } catch { /* */ }
+          energyCtx = null
+        }
+
+        const stopCaptions = () => {
+          if (!captionRecognizer) return
+          const cr = captionRecognizer
+          captionRecognizer = null
+          cr.onresult = null
+          cr.onend = null
+          cr.onerror = null
+          try { cr.stop() } catch { /* */ }
+          try { cr.abort?.() } catch { /* */ }
+        }
+
+        const discard = () => {
+          // Unmount / abort: release hardware without resolving (StrictMode-safe).
+          if (settled) return
+          settled = true
+          clearSilence()
+          if (capTimer) clearTimeout(capTimer)
+          stopEnergy()
+          stopCaptions()
+          if (recognizerRef.current?._finishLive) recognizerRef.current = null
+          try { audioRecorder.current?.stop?.() } catch { /* */ }
+          setInterimTranscript('')
+          setIsListening(false)
+          if (onSilenceCountdown) onSilenceCountdown(null, 0)
+        }
+
+        const settle = async (reason) => {
+          if (settled) return
+          settled = true
+          clearSilence()
+          if (capTimer) clearTimeout(capTimer)
+          stopEnergy()
+          stopCaptions()
+          recognizerRef.current = null
+          setInterimTranscript('')
+          if (onSilenceCountdown) onSilenceCountdown(null, 0)
+
+          let recording = null
+          try {
+            recording = await audioRecorder.current.stop()
+          } catch { /* not recording */ }
+
+          setIsListening(false)
+
+          if (recording?.blob?.size > 500) {
+            try {
+              const result = await serverTranscribe(
+                recording.blob,
+                recording.mimeType,
+                techPrompt,
+              )
+              const text = (result?.transcript || result?.filtered_text || '').trim()
+              resolve({
+                ...result,
+                transcript: text || result?.transcript || '',
+                filtered_text: text || result?.filtered_text || '',
+                reason,
+                had_speech: hadSpeech || !!text,
+                is_final: true,
+                word_count: text ? text.split(/\s+/).length : (result?.word_count || 0),
+              })
+              return
+            } catch {
+              resolve({
+                transcript: '', filtered_text: '', confidence: 0,
+                provider: 'none', reason: 'error', had_speech: hadSpeech,
+                is_final: true, word_count: 0,
+              })
+              return
+            }
+          }
+
+          resolve({
+            transcript: '', filtered_text: '', confidence: 0,
+            provider: configRef.current.stt_provider || 'server',
+            reason,
+            had_speech: hadSpeech,
+            is_final: true,
+            word_count: 0,
+          })
+        }
+
+        // Dynamic window when we have interim caption text; otherwise base silenceMs.
+        const computeSilenceWindow = () => {
+          const text = (interimText || '').trim()
+          if (!text) return Math.min(maxSilenceMs, silenceMs)
+          const sentences = (text.match(/[.!?]+/g) || []).length
+          let win = silenceMs + sentences * perSentenceMs
+          if (endsOnConnector(text)) win += perSentenceMs * 2
+          return Math.min(maxSilenceMs, win)
+        }
+
+        const armSilence = () => {
+          clearSilence()
+          if (!hadSpeech) return
+          if (speechStartedAt && Date.now() - speechStartedAt < minSpeechMs) return
+          // Prefer word-count gate when captions gave us text; otherwise energy-
+          // only path arms once minSpeechMs of real speech has elapsed.
+          const words = (interimText || '').trim().split(/\s+/).filter(Boolean).length
+          if (words > 0 && words < minWordsForSilence
+              && Date.now() - speechStartedAt < minSpeechMs * 2) return
+          const total = computeSilenceWindow()
+          const startedAt = Date.now()
+          silenceTimer = setTimeout(() => { settle('silence') }, total)
+          if (onSilenceCountdown) {
+            onSilenceCountdown(total, total)
+            countdownInterval = setInterval(() => {
+              const remaining = Math.max(0, total - (Date.now() - startedAt))
+              onSilenceCountdown(remaining, total)
+              if (remaining <= 0 && countdownInterval) {
+                clearInterval(countdownInterval); countdownInterval = null
+              }
+            }, 150)
+          }
+        }
+
+        // Session controller so stopListening() / unmount teardown share the
+        // same finish/abort hooks as the browser recognizer path.
+        const session = {
+          onresult: null,
+          onend: null,
+          onerror: null,
+          onspeechstart: null,
+          _finishLive: () => { settle('manual') },
+          abort: discard,
+          stop: () => { settle('manual') },
+        }
+        recognizerRef.current = session
+
+        // Optional browser interim captions while we record for server STT.
+        if (SR && onInterim) {
+          try {
+            captionRecognizer = new SR()
+            captionRecognizer.lang = locale
+            captionRecognizer.continuous = true
+            captionRecognizer.interimResults = true
+            captionRecognizer.onresult = (e) => {
+              const interim = Array.from(e.results)
+                .map(r => r[0].transcript)
+                .join(' ')
+              interimText = interim.trim()
+              setInterimTranscript(interimText)
+              onInterim(interimText)
+              // Caption tokens also reset the trailing-silence window.
+              if (interimText) {
+                hadSpeech = true
+                if (!speechStartedAt) speechStartedAt = Date.now()
+                if (onSilenceCountdown) onSilenceCountdown(null, 0)
+                armSilence()
+              }
+            }
+            captionRecognizer.onerror = () => { /* captions are best-effort */ }
+            captionRecognizer.onend = () => {
+              // Keep captions alive until settle/discard stops them.
+              if (settled || !captionRecognizer) return
+              try { captionRecognizer.start() } catch { /* */ }
+            }
+            captionRecognizer.start()
+          } catch {
+            captionRecognizer = null
+          }
+        }
+
+        // Simple energy VAD for trailing silence when SpeechRecognition is absent
+        // (or as a parallel signal even when captions are on).
+        try {
+          const Ctx = window.AudioContext || window.webkitAudioContext
+          if (Ctx) {
+            energyCtx = new Ctx()
+            const source = energyCtx.createMediaStreamSource(mediaStream)
+            const analyser = energyCtx.createAnalyser()
+            analyser.fftSize = 256
+            source.connect(analyser)
+            const data = new Uint8Array(analyser.frequencyBinCount)
+            const tick = () => {
+              if (settled) return
+              analyser.getByteFrequencyData(data)
+              const avg = data.reduce((s, v) => s + v, 0) / data.length
+              const level = Math.min(1, avg / 80)
+              if (level > SPEECH_LEVEL) {
+                loudFrames += 1
+                quietWhileArmed = 0
+                if (loudFrames >= LOUD_FRAMES_NEEDED) {
+                  const wasSpeaking = hadSpeech
+                  hadSpeech = true
+                  if (!speechStartedAt) speechStartedAt = Date.now()
+                  // New speech → cancel countdown and re-arm after the burst.
+                  if (wasSpeaking || loudFrames === LOUD_FRAMES_NEEDED) {
+                    if (onSilenceCountdown) onSilenceCountdown(null, 0)
+                    clearSilence()
+                  }
+                }
+              } else if (level <= QUIET_LEVEL) {
+                loudFrames = 0
+                if (hadSpeech) {
+                  quietWhileArmed += 1
+                  if (quietWhileArmed >= QUIET_FRAMES_RESET && !silenceTimer) {
+                    armSilence()
+                  }
+                }
+              } else {
+                // Hysteresis band — don't reset loudFrames to 0 instantly.
+                quietWhileArmed = 0
+              }
+              energyRaf = requestAnimationFrame(tick)
+            }
+            energyRaf = requestAnimationFrame(tick)
+          }
+        } catch { /* energy VAD unavailable — manual / timeout only */ }
+
+        audioRecorder.current.start(mediaStream).then(() => {
+          if (settled) {
+            try { audioRecorder.current.stop() } catch { /* */ }
+          }
+        }).catch(() => {
+          settle('error')
+        })
+
+        capTimer = setTimeout(() => { settle('timeout') }, maxDuration)
+      })
+    }
+
+    // ---- Browser SpeechRecognition live turn ----
     return new Promise((resolve) => {
       const r = new SR()
       r.lang = locale

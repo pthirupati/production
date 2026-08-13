@@ -42,7 +42,10 @@ services:
       # Heavy tutorial seed runs in platform-start.sh after health — not at boot.
       SKIP_STARTUP_TUTORIAL_SEED: "1"
       # Remote lab Docker engine on D4 (set by ci-wire-cluster-env.py)
+      # Django sandbox_runner reads DOCKER_SOCKET (not only DOCKER_HOST).
+      DOCKER_SOCKET: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
       DOCKER_HOST: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
+      SANDBOX_DOCKER: ${SANDBOX_DOCKER:-1}
       # Identify this node to the fleet monitor so it attaches its live host
       # metrics to the right card, and reads its own system containers from the
       # LOCAL daemon (mounted below) rather than the remote labs engine.
@@ -117,7 +120,10 @@ services:
     env_file:
       - .env.production
     environment:
+      # Django sandbox_runner reads DOCKER_SOCKET (not only DOCKER_HOST).
+      DOCKER_SOCKET: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
       DOCKER_HOST: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
+      SANDBOX_DOCKER: ${SANDBOX_DOCKER:-1}
     depends_on:
       backend:
         condition: service_healthy
@@ -155,7 +161,10 @@ services:
     env_file:
       - .env.production
     environment:
+      # Django sandbox_runner reads DOCKER_SOCKET (not only DOCKER_HOST).
+      DOCKER_SOCKET: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
       DOCKER_HOST: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
+      SANDBOX_DOCKER: ${SANDBOX_DOCKER:-1}
     depends_on:
       backend:
         condition: service_healthy
@@ -193,7 +202,10 @@ services:
     env_file:
       - .env.production
     environment:
+      # Django sandbox_runner reads DOCKER_SOCKET (not only DOCKER_HOST).
+      DOCKER_SOCKET: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
       DOCKER_HOST: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
+      SANDBOX_DOCKER: ${SANDBOX_DOCKER:-1}
     depends_on:
       backend:
         condition: service_healthy
