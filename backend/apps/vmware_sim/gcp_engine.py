@@ -278,18 +278,31 @@ def drop_session(session_id: str) -> None:
     cache.delete(_session_key(str(session_id)))
 
 
-def _fw_allows(state: dict, port: str) -> bool:
+def _fw_allows(state: dict, port: str, instance: dict | None = None) -> bool:
     """Real allow/deny evaluation: GCP evaluates firewall rules by priority,
     lowest number first, first match wins — mirrors real Console behavior,
-    not a scripted "blocked" flag."""
+    not a scripted "blocked" flag.
+
+    When ``instance`` is provided, rules with ``target_tags`` only apply if the
+    instance carries at least one matching network tag (GCP semantics). Empty
+    ``target_tags`` means the rule applies to all instances. When ``instance``
+    is omitted (legacy callers / unit tests of protocol matching), tag filters
+    are skipped.
+    """
     rules = sorted(
         (f for f in state.get("firewall_rules", []) if f.get("direction") == "INGRESS"),
         key=lambda f: f.get("priority", 65535),
     )
     for rule in rules:
         protocols = rule.get("protocols", "")
-        if protocols == "all" or f":{port}" in protocols or protocols == f"tcp:{port}":
-            return rule.get("action") == "ALLOW"
+        if not (protocols == "all" or f":{port}" in protocols or protocols == f"tcp:{port}"):
+            continue
+        tags = rule.get("target_tags") or []
+        if tags and instance is not None:
+            inst_tags = set(instance.get("tags") or [])
+            if not inst_tags.intersection(tags):
+                continue
+        return rule.get("action") == "ALLOW"
     return False
 
 
@@ -301,7 +314,7 @@ def check_port_reachable(session_id: str, port: str = "22") -> bool:
     vm = state["instances"][0] if state.get("instances") else None
     if not vm or vm.get("status") != "RUNNING":
         return False
-    return _fw_allows(state, port)
+    return _fw_allows(state, port, instance=vm)
 
 
 # Public image families available in the Create instance portal (no prior import required).

@@ -131,6 +131,43 @@ def grant_test_subscriptions(email: str) -> bool:
         return False
 
 
+def _seed_scenario_completion_for_rating(*, scenario_id, email: str = "", token: str = "") -> bool:
+    """Mark a finalized LabSession so Z3-10 rating gate allows the E2E POST."""
+    try:
+        import sys
+        sys.path.insert(0, "/app")
+        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+        import django
+        django.setup()
+        from django.contrib.auth import get_user_model
+        from apps.labs.models import LabSession
+        from apps.question_bank.models import Scenario
+
+        User = get_user_model()
+        user = None
+        if email:
+            user = User.objects.filter(email=email).first()
+        if user is None and token:
+            # Best-effort: last-created non-staff test user with recent sessions.
+            user = User.objects.filter(is_staff=False).order_by("-id").first()
+        if user is None:
+            return False
+        scenario = Scenario.objects.filter(pk=int(scenario_id)).first()
+        if scenario is None:
+            return False
+        LabSession.objects.create(
+            user=user,
+            scenario=scenario,
+            status="COMPLETED",
+            provider="simulation",
+            completion_finalized=True,
+            validation_passed=True,
+        )
+        return True
+    except Exception:
+        return False
+
+
 def run_search_and_public_extras(s):
     print("\n=== [Public] Search & certificate ===")
     _batch(s, "Public", [
@@ -247,7 +284,7 @@ def run_technologies_tab(s, token: str):
             )
 
 
-def run_scenarios_tab(s, token: str) -> dict | None:
+def run_scenarios_tab(s, token: str, email: str = "") -> dict | None:
     print("\n=== [Tab] Scenarios (filters, detail, bookmark, ratings) ===")
     _batch(s, "Scenarios", [
         ("GET", "/api/scenarios/?difficulty=easy", None, (200,), "filter easy"),
@@ -275,6 +312,8 @@ def run_scenarios_tab(s, token: str) -> dict | None:
 
     st, _ = api("GET", f"/api/ratings/?type=scenario&scenario={sid}", token=token)
     s.record("Ratings list scenario", st == 200, st)
+    # Z3-10: scenario ratings require a finalized lab completion.
+    _seed_scenario_completion_for_rating(email=email, scenario_id=sid)
     st, _ = api("POST", "/api/ratings/rate/", token=token, data={
         "rating_type": "scenario", "scenario": sid, "score": 5, "review": "E2E test review",
     })
@@ -912,7 +951,7 @@ def run_full_ui_coverage(s, token: str, email: str, password: str, refresh: str 
     run_search_and_public_extras(s)
     run_dashboard_tab(s, token)
     run_technologies_tab(s, token)
-    scenario = run_scenarios_tab(s, token)
+    scenario = run_scenarios_tab(s, token, email=email)
     run_leaderboard_tab(s, token)
     run_bookmarks_tab(s, token)
     run_lab_history_tab(s, token)

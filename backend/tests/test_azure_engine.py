@@ -269,8 +269,26 @@ class AzureBridgePowerTests(AzureEngineBase):
         self.assertTrue(any(v["name"] == "vnet-vm-newnet" for v in ae.get_state(self.sid)["state"]["vnets"]))
         self.assertTrue(any(p.get("attached_to") == "vm-newnet" for p in ae.get_state(self.sid)["state"]["public_ips"]))
 
-
-class AzureV2FacadeTests(AzureEngineBase):
+    def test_associate_and_disassociate_public_ip(self):
+        self._login()
+        # Create an unattached PIP, then associate to an existing VM.
+        pip = ae.apply_action(self.sid, "create_public_ip", {"name": "pip-lab"})
+        self.assertTrue(pip["ok"], pip)
+        vm_name = ae.get_state(self.sid)["state"]["vms"][0]["name"]
+        assoc = ae.apply_action(self.sid, "associate_public_ip", {
+            "name": "pip-lab", "vm_name": vm_name,
+        })
+        self.assertTrue(assoc["ok"], assoc)
+        st = ae.get_state(self.sid)["state"]
+        pip_row = next(p for p in st["public_ips"] if p["name"] == "pip-lab")
+        self.assertEqual(pip_row["attached_to"], vm_name)
+        vm = next(v for v in st["vms"] if v["name"] == vm_name)
+        self.assertEqual(vm["public_ip"], pip_row["ip"])
+        dis = ae.apply_action(self.sid, "disassociate_public_ip", {"name": "pip-lab"})
+        self.assertTrue(dis["ok"], dis)
+        st = ae.get_state(self.sid)["state"]
+        pip_row = next(p for p in st["public_ips"] if p["name"] == "pip-lab")
+        self.assertEqual(pip_row["attached_to"], "")
     def test_seeded_v2_collections(self):
         self._login()
         st = ae.get_state(self.sid)["state"]

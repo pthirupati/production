@@ -80,9 +80,11 @@ export default function PublicLayout({ children }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[68px] flex items-center justify-between gap-4">
           <FixitLogo to="/" size="sm" />
 
-          <div className="hidden lg:flex items-center justify-center gap-0.5 flex-1 min-w-0 px-2">
+          <div className="hidden lg:flex items-center justify-center gap-0 flex-nowrap flex-1 min-w-0 px-1 overflow-x-auto scrollbar-none">
             {PUBLIC_NAV_PRIMARY.map(({ to, label }) => (
-              <BubbleNavLink key={to} to={to} active={isActive(to)} size="md">{label}</BubbleNavLink>
+              <BubbleNavLink key={to} to={to} active={isActive(to)} size="sm" className="shrink-0 px-2 py-1.5 text-xs xl:text-sm">
+                {label}
+              </BubbleNavLink>
             ))}
           </div>
 

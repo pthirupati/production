@@ -1651,6 +1651,32 @@ class AdminSystemHealthView(APIView):
                 result["labs_engine"] = {"status": "healthy", "details": probe(labs_sock)}
             except Exception as e:
                 result["labs_engine"] = {"status": "unhealthy", "error": str(e)[:160]}
+        # Coding sandbox probe (SANDBOX_DOCKER + fail-closed grading stats).
+        try:
+            from apps.labs import sandbox_runner
+            from apps.labs import code_exec
+            sh = sandbox_runner.sandbox_health()
+            fc = {}
+            try:
+                fc = code_exec.failclosed_grading_stats()
+            except Exception:
+                fc = {}
+            coding = {
+                "enabled": sh.get("enabled"),
+                "last_ok": sh.get("last_ok"),
+                "last_error": (sh.get("last_error") or "")[:160],
+                "consecutive_failures": sh.get("consecutive_failures"),
+                "failclosed": fc,
+            }
+            if sh.get("enabled") and sh.get("last_ok") is False:
+                coding["status"] = "unhealthy"
+            elif sh.get("enabled") and sh.get("last_ok") is True:
+                coding["status"] = "healthy"
+            else:
+                coding["status"] = "unknown"
+            result["coding_sandbox"] = coding
+        except Exception as e:
+            result["coding_sandbox"] = {"status": "unknown", "error": str(e)[:120]}
         return result
 
     def _check_email(self):

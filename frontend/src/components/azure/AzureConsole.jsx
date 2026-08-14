@@ -398,6 +398,27 @@ export default function AzureConsole({
         { key: 'sku', label: 'SKU' },
         { key: 'allocation', label: 'Allocation' },
         { key: 'attached_to', label: 'Associated to', render: (r) => r.attached_to || '—' },
+        { key: 'actions', label: 'Actions', render: (r) => (
+          <div className="flex items-center gap-1 flex-wrap">
+            {r.attached_to ? (
+              <button type="button" className="az-btn-sm" onClick={(e) => {
+                e.stopPropagation()
+                run(() => azureApi.disassociatePublicIp(sessionId, r.name), 'Public IP disassociated')
+              }}>
+                Disassociate
+              </button>
+            ) : (
+              <button type="button" className="az-btn-sm" disabled={!vms.length} onClick={(e) => {
+                e.stopPropagation()
+                const vmName = vms[0]?.name
+                if (!vmName) return
+                run(() => azureApi.associatePublicIp(sessionId, r.name, vmName), `Associated to ${vmName}`)
+              }}>
+                Associate
+              </button>
+            )}
+          </div>
+        ) },
       ]} searchKeys={['name', 'ip', 'sku', 'allocation', 'attached_to']} rows={publicIps} />
     </div>
   )

@@ -10,6 +10,7 @@ import ssl
 import subprocess
 import tempfile
 import threading
+import time
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
@@ -172,17 +173,25 @@ class _TLSServer:
         self.received["sni"] = name
 
     def __enter__(self):
+        self._sock.settimeout(5)
         self._thread = threading.Thread(target=self._serve, daemon=True)
         self._thread.start()
+        # Give the accept() a beat so the client does not race the listener.
+        time.sleep(0.05)
         return self
 
     def __exit__(self, *exc):
-        self._sock.close()
+        try:
+            self._sock.close()
+        except OSError:
+            pass
+        self._thread.join(timeout=3)
 
     def _serve(self):
         try:
             raw, _ = self._sock.accept()
-        except OSError:
+        except OSError as exc:
+            self.received["error"] = repr(exc)
             return
         try:
             tls = self._ctx.wrap_socket(raw, server_side=True)
@@ -240,14 +249,21 @@ class PinnedRequestTests(SimpleTestCase):
 
         session = requests.Session()
         session.mount("https://", _LoopbackPinAdapter(["127.0.0.1"], server.port))
+        last_exc = None
         with session:
-            return session.post(
-                f"https://{self.HOSTNAME}/hook",
-                data=b"{}",
-                verify=server.cert,
-                timeout=10,
-                allow_redirects=False,
-            )
+            for _ in range(3):
+                try:
+                    return session.post(
+                        f"https://{self.HOSTNAME}/hook",
+                        data=b"{}",
+                        verify=server.cert,
+                        timeout=10,
+                        allow_redirects=False,
+                    )
+                except (requests.exceptions.ConnectionError, requests.exceptions.SSLError) as exc:
+                    last_exc = exc
+                    time.sleep(0.05)
+            raise last_exc
 
     def test_connects_to_the_pinned_address_not_the_hostname(self):
         """The socket goes to the vetted IP; the name is never resolved again.
