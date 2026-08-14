@@ -32,10 +32,22 @@ def _vosk_enabled() -> bool:
 
 
 def _faster_whisper_ready() -> bool:
+    try:
+        from django.conf import settings
+        if getattr(settings, "FIXITLAB_FASTER_WHISPER_URL", ""):
+            return True
+    except Exception:
+        pass
     return bool(os.environ.get("FIXITLAB_FASTER_WHISPER_URL"))
 
 
 def _indic_whisper_ready() -> bool:
+    try:
+        from django.conf import settings
+        if getattr(settings, "FIXITLAB_INDIC_WHISPER_URL", ""):
+            return True
+    except Exception:
+        pass
     return bool(os.environ.get("FIXITLAB_INDIC_WHISPER_URL"))
 
 

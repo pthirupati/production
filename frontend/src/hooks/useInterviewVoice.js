@@ -1287,11 +1287,13 @@ export function useInterviewVoice() {
                 word_count: text ? text.split(/\s+/).length : (result?.word_count || 0),
               })
               return
-            } catch {
+            } catch (err) {
               resolve({
                 transcript: '', filtered_text: '', confidence: 0,
                 provider: 'none', reason: 'error', had_speech: hadSpeech,
                 is_final: true, word_count: 0,
+                error_code: err?.code || 'stt_unavailable',
+                message: err?.message || 'Speech recognition unavailable',
               })
               return
             }

@@ -1205,6 +1205,11 @@ export default function InterviewRoom() {
       toast('Voice input is not supported in this browser — switched to Type mode', { icon: '⌨️' })
       return
     }
+    if (result?.error_code === 'stt_unavailable' || (result?.reason === 'error' && !result?.transcript)) {
+      setTypingAnswer(true)
+      toast.error(result?.message || 'Speech recognition unavailable — switched to Type mode')
+      return
+    }
     const text = (result?.transcript || result?.filtered_text || '').trim()
     // If the skip-silence timer (or a manual skip / barge-in) already resolved
     // this turn, awaitingAnswerRef is false — don't submit again even if late

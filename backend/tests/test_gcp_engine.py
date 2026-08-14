@@ -127,6 +127,27 @@ class FirewallRuleEvaluationTests(GcpEngineBase):
         })
         self.assertTrue(ge.check_port_reachable(self.sid, "22"))
 
+    def test_set_network_tags_affects_firewall_reachability(self):
+        self._login()
+        ge.apply_action(self.sid, "delete_firewall_rule", {"name": "allow-ssh"})
+        ge.apply_action(self.sid, "create_firewall_rule", {
+            "name": "allow-ssh-web-only",
+            "priority": 900,
+            "protocols": "tcp:22",
+            "action": "ALLOW",
+            "target_tags": ["web"],
+        })
+        self.assertTrue(ge.check_port_reachable(self.sid, "22"))
+        res = ge.apply_action(self.sid, "set_network_tags", {
+            "instance_name": "web01", "tags": ["other"],
+        })
+        self.assertTrue(res["ok"], res)
+        self.assertFalse(ge.check_port_reachable(self.sid, "22"))
+        ge.apply_action(self.sid, "set_network_tags", {
+            "instance_name": "web01", "tags": ["web"],
+        })
+        self.assertTrue(ge.check_port_reachable(self.sid, "22"))
+
 
 class PersistentDiskTests(GcpEngineBase):
     def test_attach_and_detach_disk(self):
