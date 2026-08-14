@@ -20,18 +20,22 @@ describe('public nav does not advertise authenticated routes', () => {
     expect(PUBLIC_NAV_SECONDARY.some((l) => l.to === '/#tech')).toBe(true)
   })
 
-  it('Pricing lives in secondary so the primary header stays one row', () => {
-    expect(PUBLIC_NAV_PRIMARY.some((l) => l.to === '/pricing')).toBe(false)
-    expect(PUBLIC_NAV_SECONDARY.some((l) => l.to === '/pricing')).toBe(true)
+  it('Pricing is on the primary header row', () => {
+    expect(PUBLIC_NAV_PRIMARY.some((l) => l.to === '/pricing')).toBe(true)
   })
 
-  it('Verify uses a short label in the primary header', () => {
+  it('AI Interviews is on the primary header row', () => {
+    expect(PUBLIC_NAV_PRIMARY.some((l) => l.to === '/mock-interviews')).toBe(true)
+  })
+
+  it('Verify uses Certificate Verify label', () => {
     const verify = PUBLIC_NAV_PRIMARY.find((l) => l.to === '/verify-certificate')
-    expect(verify?.label).toBe('Verify')
+    expect(verify?.label).toBe('Certificate Verify')
   })
 
-  it('Journeys stays on the public (pre-login) primary nav', () => {
-    expect(PUBLIC_NAV_PRIMARY.some((l) => l.to === '/journeys')).toBe(true)
+  it('Journeys route is labeled Roadmap on the primary nav', () => {
+    const journeys = PUBLIC_NAV_PRIMARY.find((l) => l.to === '/journeys')
+    expect(journeys?.label).toBe('Roadmap')
   })
 
   it('every public nav destination is a route outside the authenticated MainLayout', async () => {

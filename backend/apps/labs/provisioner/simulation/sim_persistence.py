@@ -199,6 +199,16 @@ def snapshot_engine(engine: UnifiedSimulationEngine) -> dict:
         },
         "boot": asdict(boot) if boot else None,
         "docker": engine.docker.to_dict() if getattr(engine, "docker", None) else None,
+        # Networking / DevOps / k8s world-model — without these, persist+restore
+        # (and cache-authority refresh after E2E fix) re-seeds Idle BGP / failed
+        # pipelines / Pending pods and validate PASS regresses.
+        "networking": (
+            engine.networking.to_dict()
+            if getattr(engine, "networking", None) is not None
+            else None
+        ),
+        "devops": _devops_to_dict(getattr(engine, "devops", None)),
+        "cluster": _cluster_to_dict(getattr(engine, "cluster", None)),
         "engine_flags": {
             "ssh_key_fixed": getattr(engine, "_ssh_key_fixed", False),
             "ansible_playbook_ok": getattr(engine, "_ansible_playbook_ok", False),
@@ -207,6 +217,46 @@ def snapshot_engine(engine: UnifiedSimulationEngine) -> dict:
             "patch_hint_shown": getattr(engine, "_patch_hint_shown", False),
             "grub_countdown_token": getattr(engine, "_grub_countdown_token", 0),
         },
+    }
+
+
+def _devops_to_dict(devops) -> dict | None:
+    if devops is None:
+        return None
+    return {
+        "scenario_slug": getattr(devops, "scenario_slug", ""),
+        "pipeline_status": getattr(devops, "pipeline_status", "success"),
+        "helm_release_status": getattr(devops, "helm_release_status", "deployed"),
+        "helm_revision": getattr(devops, "helm_revision", 3),
+        "kubeconfig_valid": getattr(devops, "kubeconfig_valid", True),
+        "image_tag": getattr(devops, "image_tag", "v1.2.0"),
+    }
+
+
+def _cluster_to_dict(cluster) -> dict | None:
+    if cluster is None:
+        return None
+    return {
+        "session_id": getattr(cluster, "session_id", ""),
+        "pods": [
+            {
+                "name": p.name,
+                "status": p.status,
+                "namespace": getattr(p, "namespace", "default"),
+                "node": getattr(p, "node", ""),
+            }
+            for p in (getattr(cluster, "pods", None) or [])
+        ],
+        "nodes": [
+            {
+                "name": n.name,
+                "status": n.status,
+                "schedulable": getattr(n, "schedulable", True),
+                "vm_hung": getattr(n, "vm_hung", False),
+                "gpu_allocatable": getattr(n, "gpu_allocatable", 0),
+            }
+            for n in (getattr(cluster, "nodes", None) or [])
+        ],
     }
 
 
@@ -362,6 +412,28 @@ def restore_engine(data: dict) -> UnifiedSimulationEngine | None:
         from .docker_state import DockerState
         engine.docker = DockerState.from_dict(docker_data)
 
+    net_data = data.get("networking")
+    if isinstance(net_data, dict):
+        from .networking_state import NetworkingState
+        engine.networking = NetworkingState.from_dict(net_data)
+
+    devops_data = data.get("devops")
+    if isinstance(devops_data, dict):
+        from .devops_state import DevOpsState
+        devops = DevOpsState(devops_data.get("scenario_slug") or slug)
+        devops.pipeline_status = devops_data.get("pipeline_status", devops.pipeline_status)
+        devops.helm_release_status = devops_data.get(
+            "helm_release_status", devops.helm_release_status
+        )
+        devops.helm_revision = devops_data.get("helm_revision", devops.helm_revision)
+        devops.kubeconfig_valid = devops_data.get("kubeconfig_valid", devops.kubeconfig_valid)
+        devops.image_tag = devops_data.get("image_tag", devops.image_tag)
+        engine.devops = devops
+
+    cluster_data = data.get("cluster")
+    if isinstance(cluster_data, dict) and getattr(engine, "cluster", None) is not None:
+        _apply_cluster_overlay(engine.cluster, cluster_data)
+
     flags = data.get("engine_flags", {})
     engine._ssh_key_fixed = flags.get("ssh_key_fixed", False)
     engine._ansible_playbook_ok = flags.get("ansible_playbook_ok", False)
@@ -374,15 +446,48 @@ def restore_engine(data: dict) -> UnifiedSimulationEngine | None:
     return engine
 
 
+def _apply_cluster_overlay(cluster, data: dict) -> None:
+    """Re-apply pod/node health from a snapshot onto a freshly seeded cluster."""
+    if data.get("session_id"):
+        cluster.session_id = data["session_id"]
+    by_pod = {p.name: p for p in (cluster.pods or [])}
+    for row in data.get("pods") or []:
+        if not isinstance(row, dict):
+            continue
+        name = row.get("name")
+        pod = by_pod.get(name) if name else None
+        if pod is None:
+            continue
+        if row.get("status"):
+            pod.status = row["status"]
+        if row.get("node") is not None:
+            pod.node = row["node"]
+    by_node = {n.name: n for n in (cluster.nodes or [])}
+    for row in data.get("nodes") or []:
+        if not isinstance(row, dict):
+            continue
+        name = row.get("name")
+        node = by_node.get(name) if name else None
+        if node is None:
+            continue
+        if row.get("status"):
+            node.status = row["status"]
+        if "schedulable" in row:
+            node.schedulable = bool(row["schedulable"])
+        if "vm_hung" in row:
+            node.vm_hung = bool(row["vm_hung"])
+        if "gpu_allocatable" in row:
+            node.gpu_allocatable = int(row["gpu_allocatable"] or 0)
+
+
 def persist_session_snapshot(session_id: str) -> None:
     """Save engine state to LabSession.simulation_snapshot (best-effort)."""
     from apps.labs.models import LabSession
-    from .shell import get_sim_session
+    from .shell import get_local_sim_engine, mark_sim_engine_mutated
 
-    entry = get_sim_session(str(session_id))
-    if not entry:
-        return
-    engine = entry.get("state", {}).get("engine")
+    # Never go through get_sim_session here — cache-authority refresh can replace
+    # a just-repaired live engine with an older incomplete snapshot first.
+    engine = get_local_sim_engine(str(session_id))
     if not isinstance(engine, UnifiedSimulationEngine):
         return
     try:
@@ -392,6 +497,10 @@ def persist_session_snapshot(session_id: str) -> None:
         # in `_SIM_SESSIONS`; this blob lets another worker rehydrate without waiting
         # on Postgres JSONB when the local dict misses. Same TTL shape as vmware_sim.
         cache_put_engine_snapshot(str(session_id), snap)
+        # Keep local authority timestamp in sync so the next get_sim_session does
+        # not treat this write as a *foreign* newer snapshot and replace the live
+        # engine with a restore that drops un-snapshotted fields.
+        mark_sim_engine_mutated(str(session_id))
     except Exception:
         pass
 
