@@ -33,6 +33,9 @@ export const gcpApi = {
   setMachineType(sessionId, name, machineType) {
     return gcpApi.action(sessionId, 'set_machine_type', { instance_name: name, machine_type: machineType })
   },
+  setNetworkTags(sessionId, name, tags) {
+    return gcpApi.action(sessionId, 'set_network_tags', { instance_name: name, tags })
+  },
   createFirewallRule(sessionId, rule) {
     return gcpApi.action(sessionId, 'create_firewall_rule', rule)
   },

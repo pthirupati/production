@@ -803,6 +803,13 @@ INTERVIEW_FREE_CAMPAIGNS_PER_MONTH = env.int("INTERVIEW_FREE_CAMPAIGNS_PER_MONTH
 # still needs fingerprinting / payment instrument — out of scope here.
 INTERVIEW_FREE_CAMPAIGNS_LIFETIME = env.int("INTERVIEW_FREE_CAMPAIGNS_LIFETIME", default=3)
 
+# Optional self-hosted Whisper / IndicWhisper (see docs/ops/VOICE_STACK_DEPLOY.md).
+# When unset, interviews use browser Web Speech. Compose passes these through.
+FIXITLAB_FASTER_WHISPER_URL = env("FIXITLAB_FASTER_WHISPER_URL", default="")
+FIXITLAB_FASTER_WHISPER_API = env("FIXITLAB_FASTER_WHISPER_API", default="openai")
+FIXITLAB_FASTER_WHISPER_MODEL = env("FIXITLAB_FASTER_WHISPER_MODEL", default="small")
+FIXITLAB_INDIC_WHISPER_URL = env("FIXITLAB_INDIC_WHISPER_URL", default="")
+
 # Marketing nurture emails (sample → subscribe, no-sub → technology benefits)
 MARKETING_EMAILS_ENABLED = env.bool("MARKETING_EMAILS_ENABLED", default=True)
 MARKETING_NUDGE_INTERVAL_DAYS = env.int("MARKETING_NUDGE_INTERVAL_DAYS", default=5)

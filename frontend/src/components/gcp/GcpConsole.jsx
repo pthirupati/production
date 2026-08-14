@@ -107,6 +107,7 @@ export default function GcpConsole({
   const [loginError, setLoginError] = useState('')
   const [instanceDetail, setInstanceDetail] = useState(null)
   const [resizeTo, setResizeTo] = useState('')
+  const [editTags, setEditTags] = useState('')
   const [ruleModalOpen, setRuleModalOpen] = useState(false)
   const [ruleName, setRuleName] = useState('allow-rule')
   const [rulePort, setRulePort] = useState('22')
@@ -392,14 +393,18 @@ export default function GcpConsole({
             <button type="button" className="gcp-btn-sm" onClick={(e) => { e.stopPropagation(); instancePower(r, 'reset') }}>
               <RotateCw size={11} /> Reset
             </button>
-            <button type="button" className="gcp-btn-sm" disabled={r.status === 'RUNNING'}
-              title={r.status === 'RUNNING' ? 'Stop the instance to change its machine type' : ''}
-              onClick={(e) => { e.stopPropagation(); setInstanceDetail(r); setResizeTo(r.machine_type) }}>
-              <Settings2 size={11} /> Machine type
+            <button type="button" className="gcp-btn-sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                setInstanceDetail(r)
+                setResizeTo(r.machine_type)
+                setEditTags((r.tags || []).join(' '))
+              }}>
+              <Settings2 size={11} /> Edit
             </button>
           </div>
         ) },
-      ]} searchKeys={['name', 'status', 'machine_type', 'internal_ip', 'zone']} rows={instances} onRowClick={(r) => { setInstanceDetail(r); setResizeTo(r.machine_type) }} />
+      ]} searchKeys={['name', 'status', 'machine_type', 'internal_ip', 'zone']} rows={instances} onRowClick={(r) => { setInstanceDetail(r); setResizeTo(r.machine_type); setEditTags((r.tags || []).join(' ')) }} />
     </div>
   )
 
@@ -667,11 +672,18 @@ export default function GcpConsole({
         />
       )}
 
-      <SimModal shellClass="gcp-shell" open={!!instanceDetail} onClose={() => setInstanceDetail(null)} title={`${instanceDetail?.name || ''} — Machine type`}
+      <SimModal shellClass="gcp-shell" open={!!instanceDetail} onClose={() => setInstanceDetail(null)} title={`${instanceDetail?.name || ''} — Edit`}
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setInstanceDetail(null)}>Cancel</button>
           <button type="button" className="gcp-btn-primary" disabled={busy} onClick={() => {
-            run(() => gcpApi.setMachineType(sessionId, instanceDetail.name, resizeTo), 'Machine type changed')
+            const tags = editTags.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean)
+            const name = instanceDetail.name
+            run(async () => {
+              if (resizeTo && resizeTo !== instanceDetail.machine_type) {
+                await gcpApi.setMachineType(sessionId, name, resizeTo)
+              }
+              await gcpApi.setNetworkTags(sessionId, name, tags)
+            }, 'Instance updated')
             setInstanceDetail(null)
           }}>Save</button>
         </>}>
@@ -683,6 +695,10 @@ export default function GcpConsole({
           <select className="w-full mt-1 border rounded px-2 py-1.5 text-slate-900" value={resizeTo} onChange={(e) => setResizeTo(e.target.value)}>
             {MACHINE_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
+        </label>
+        <label className="block text-sm mt-3">Network tags <span className="text-slate-500">(space/comma)</span>
+          <input className="w-full mt-1 border rounded px-2 py-1.5 font-mono text-xs" value={editTags}
+            onChange={(e) => setEditTags(e.target.value)} placeholder="web http-server" />
         </label>
       </SimModal>
 

@@ -1667,10 +1667,12 @@ class AdminSystemHealthView(APIView):
                 "last_error": (sh.get("last_error") or "")[:160],
                 "consecutive_failures": sh.get("consecutive_failures"),
                 "failclosed": fc,
+                "images": sh.get("images") or {},
             }
-            if sh.get("enabled") and sh.get("last_ok") is False:
+            imgs = coding.get("images") or {}
+            if sh.get("enabled") and (sh.get("last_ok") is False or imgs.get("ok") is False):
                 coding["status"] = "unhealthy"
-            elif sh.get("enabled") and sh.get("last_ok") is True:
+            elif sh.get("enabled") and sh.get("last_ok") is True and imgs.get("ok") is not False:
                 coding["status"] = "healthy"
             else:
                 coding["status"] = "unknown"

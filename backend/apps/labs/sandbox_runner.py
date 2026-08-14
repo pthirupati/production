@@ -106,13 +106,40 @@ def _record_probe(ok: bool, error: str = "") -> None:
             _health["last_error"] = error or "docker engine unreachable"
 
 
+def sandbox_images_present() -> dict:
+    """Check whether grader base images exist on the configured Docker engine.
+
+    Returns ``{ok, images, missing}``. When ``SANDBOX_DOCKER`` is off, ``ok`` is
+    True (images are irrelevant for the in-process path).
+    """
+    py = getattr(settings, "SANDBOX_PYTHON_IMAGE", None) or _DEFAULT_PYTHON_IMAGE
+    node = getattr(settings, "SANDBOX_NODE_IMAGE", None) or _DEFAULT_NODE_IMAGE
+    images = {"python": py, "node": node}
+    if not docker_sandbox_enabled():
+        return {"ok": True, "images": images, "missing": [], "skipped": True}
+    client = _get_client()
+    if client is None:
+        return {"ok": False, "images": images, "missing": [py, node], "skipped": False}
+    missing: list[str] = []
+    try:
+        for img in (py, node):
+            try:
+                client.images.get(img)
+            except Exception:
+                missing.append(img)
+    finally:
+        _close(client)
+    return {"ok": not missing, "images": images, "missing": missing, "skipped": False}
+
+
 def sandbox_health() -> dict:
     """Snapshot of container-sandbox reachability for monitoring.
 
     Returns a plain dict (safe to JSON-encode) so an ops endpoint or an alert
     payload can report *why* coding labs are being deferred to review. Keys:
     ``enabled``, ``last_ok``, ``last_error``, ``consecutive_failures``,
-    ``seconds_since_ok`` (None when never seen healthy this process).
+    ``seconds_since_ok`` (None when never seen healthy this process),
+    ``images`` (presence of grader base images when enabled).
     """
     with _health_lock:
         snapshot = dict(_health)
@@ -121,6 +148,10 @@ def sandbox_health() -> dict:
     snapshot["seconds_since_ok"] = (
         None if last_ok_mono is None else round(_time.monotonic() - float(last_ok_mono), 1)
     )
+    try:
+        snapshot["images"] = sandbox_images_present()
+    except Exception as exc:
+        snapshot["images"] = {"ok": False, "missing": [], "error": str(exc)[:120]}
     return snapshot
 
 

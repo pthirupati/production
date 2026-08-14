@@ -729,6 +729,23 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             pass
         return {"ok": True, "message": "Machine type changed", "machine_type": new_type}
 
+    if action == "set_network_tags":
+        inst = _find_instance(state, payload.get("instance_name") or payload.get("name"))
+        if not inst:
+            return {"ok": False, "error": "Instance not found"}
+        raw = payload.get("tags")
+        if isinstance(raw, str):
+            tags = [t.strip() for t in raw.replace(",", " ").split() if t.strip()]
+        elif isinstance(raw, list):
+            tags = [str(t).strip() for t in raw if str(t).strip()]
+        else:
+            tags = []
+        old = list(inst.get("tags") or [])
+        inst["tags"] = tags
+        _event(state, f"Updated network tags on {inst['name']}: {old} → {tags}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Network tags updated", "tags": tags, "instance": inst}
+
     # ── Firewall rules ────────────────────────────────────────────────────
     if action == "create_firewall_rule":
         rule = {
@@ -1071,6 +1088,24 @@ def _gc_instances(state: dict, session_id: str, args: list[str], opts: dict) -> 
             return _gc_error("argument --machine-type: Must be specified.")
         return apply_action(session_id, "set_machine_type",
                             {"instance_name": name, "machine_type": machine_type})
+
+    if verb in ("add-tags", "remove-tags"):
+        if not name:
+            return _gc_error("argument INSTANCE_NAME: Must be specified.")
+        inst = _find_instance(state, name)
+        if not inst:
+            return _gc_error(f"Instance '{name}' was not found.")
+        current = list(inst.get("tags") or [])
+        delta = []
+        if opts.get("tags"):
+            delta = [t.strip() for t in str(opts["tags"]).replace(",", " ").split() if t.strip()]
+        if verb == "add-tags":
+            merged = list(dict.fromkeys(current + delta))
+        else:
+            drop = set(delta)
+            merged = [t for t in current if t not in drop]
+        return apply_action(session_id, "set_network_tags",
+                            {"instance_name": name, "tags": merged})
 
     if verb in ("attach-disk", "detach-disk"):
         if not name:

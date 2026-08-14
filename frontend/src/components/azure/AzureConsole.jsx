@@ -116,6 +116,8 @@ export default function AzureConsole({
   const [rulePort, setRulePort] = useState('22')
   const [rulePriority, setRulePriority] = useState(200)
   const [ruleAccess, setRuleAccess] = useState('Allow')
+  const [ruleProtocol, setRuleProtocol] = useState('TCP')
+  const [ruleSource, setRuleSource] = useState('*')
   const [attachTarget, setAttachTarget] = useState(null)
   const [createDiskModal, setCreateDiskModal] = useState(false)
   const [newDiskName, setNewDiskName] = useState('disk-new')
@@ -356,8 +358,9 @@ export default function AzureConsole({
 
   const submitRule = () => {
     run(() => azureApi.addNsgRule(sessionId, ruleModalNsg, {
-      name: ruleName, priority: Number(rulePriority), protocol: 'TCP',
+      name: ruleName, priority: Number(rulePriority), protocol: ruleProtocol,
       destination_port: rulePort, access: ruleAccess, direction: 'Inbound',
+      source: ruleSource || '*',
     }), 'Rule added')
     setRuleModalNsg(null)
   }
@@ -506,7 +509,10 @@ export default function AzureConsole({
           <div key={nsg.name} className="az-panel mb-3">
             <div className="flex items-center justify-between mb-2">
               <span className="font-semibold text-sm flex items-center gap-1.5"><Shield size={14} /> {nsg.name}</span>
-              <button type="button" className="az-btn-sm" onClick={() => { setRuleModalNsg(nsg.name); setRuleName('AllowRule'); setRulePort('22'); setRulePriority(200); setRuleAccess('Allow') }}>
+              <button type="button" className="az-btn-sm" onClick={() => {
+                setRuleModalNsg(nsg.name); setRuleName('AllowRule'); setRulePort('22')
+                setRulePriority(200); setRuleAccess('Allow'); setRuleProtocol('TCP'); setRuleSource('*')
+              }}>
                 <Plus size={11} /> Add inbound rule
               </button>
             </div>
@@ -515,6 +521,7 @@ export default function AzureConsole({
               { key: 'name', label: 'Name', sortable: true },
               { key: 'direction', label: 'Direction', sortable: true },
               { key: 'protocol', label: 'Protocol', sortable: true },
+              { key: 'source', label: 'Source', sortable: true, render: (r) => r.source || '*' },
               { key: 'destination_port', label: 'Port', sortable: true },
               { key: 'access', label: 'Action', render: (r) => <SimStatusBadge status={r.access === 'Allow' ? 'success' : 'error'} label={r.access} /> },
               { key: 'actions', label: '', render: (r) => !r.system && (
@@ -523,7 +530,7 @@ export default function AzureConsole({
                   Remove
                 </button>
               ) },
-            ]} searchKeys={['priority', 'name', 'direction', 'protocol', 'destination_port', 'access']} rows={nsg.rules || []} pageSize={20} />
+            ]} searchKeys={['priority', 'name', 'direction', 'protocol', 'source', 'destination_port', 'access']} rows={nsg.rules || []} pageSize={20} />
           </div>
         ))}
       </div>
@@ -816,6 +823,17 @@ export default function AzureConsole({
         </>}>
         <label className="block text-sm">Name
           <input className="w-full mt-1 border rounded px-2 py-1.5" value={ruleName} onChange={(e) => setRuleName(e.target.value)} />
+        </label>
+        <label className="block text-sm mt-3">Protocol
+          <select className="w-full mt-1 border rounded px-2 py-1.5" value={ruleProtocol} onChange={(e) => setRuleProtocol(e.target.value)}>
+            <option value="TCP">TCP</option>
+            <option value="UDP">UDP</option>
+            <option value="*">Any</option>
+          </select>
+        </label>
+        <label className="block text-sm mt-3">Source <span className="text-slate-500">(* or CIDR)</span>
+          <input className="w-full mt-1 border rounded px-2 py-1.5 font-mono text-xs" value={ruleSource}
+            onChange={(e) => setRuleSource(e.target.value)} placeholder="*" />
         </label>
         <label className="block text-sm mt-3">Destination port
           <input className="w-full mt-1 border rounded px-2 py-1.5" value={rulePort} onChange={(e) => setRulePort(e.target.value)} />

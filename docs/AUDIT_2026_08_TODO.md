@@ -3724,7 +3724,9 @@ still needs a visual pass behind auth.
 - [x] Polling gated on `document.visibilityState` via `useJiraTeamReplyPoll`.
 
 ## X2b. Celery-queued replies can be silently dropped
-- [ ] Full durable `pending_team_reply` + beat still open (Phase-scale).
+- [x] Full durable `pending_team_reply` + beat sweeper shipped (PR #175):
+  `PendingTeamReply` model + migration `0004`, ORM in `pending_team_replies.py`,
+  Celery `sweep_pending_team_replies`.
 - [x] `deliver_team_reply_now` missing-ticket path now logs WARNING.
 - [x] Successful Celery enqueue logs issue/author/delay at INFO.
 - [x] UI surfaces the delay so 30s of silence reads as waiting.
@@ -4304,7 +4306,7 @@ high-visibility, and independent of everything else:
 - **X1a/X1b — datacenter sticky-2D trap** (transient fallback + versioned key + `Suspense` outside
   the boundary + self-host the HDRI). Small fix, and it is the reason the 3D work looks absent.
 - **X2a — Jira comment polling + pending-reply indicator.** Fixes "No reply is coming" outright.
-- **X2b — durable team-reply delivery** (pending row + beat sweeper) and log every drop path.
+- **X2b — durable team-reply delivery** ✅ (PR #175 — `PendingTeamReply` + beat sweeper).
 
 **Phase 4 (3D datacenter)** — prepend **X1c** (extend 3D to all 10 rooms) as the first task; walking
 the facility is prerequisite to game feel. Keep §D1–D13. Append **X6e** presentation work.

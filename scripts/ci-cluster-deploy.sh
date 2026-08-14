@@ -145,36 +145,44 @@ bash scripts/validate-scenario-images.sh"
 
 prepull_grader_images() {
   # Pre-pull the code-exec grader's tiny base images onto the D4 Labs engine.
-  # Runs on EVERY deploy (independent of BUILD_SCENARIOS): the grader launches
-  # short-lived python/node sandbox containers on D4 over ssh://; if the image
-  # isn't already present, the first grade has to pull at request time and the
-  # fail-closed gate reports "code grading temporarily unavailable". Pre-pulling
-  # here makes the first grade succeed. NON-FATAL: if the D2->D4 ssh path is
-  # unreachable this must never red the deploy (grading just stays in its
-  # current saved-for-review state, no regression).
-  echo "[grader] Pre-pull sandbox base images on D4 Labs (non-fatal)"
-  # docker-over-ssh from the D2 HOST root uses the host's default key, which is
-  # NOT authorized on D4 (that is the "Permission denied (publickey)" seen in
-  # the pre-pull). Point ssh at the dedicated labs key that ci-setup-labs-ssh.sh
-  # installed at /opt/fixitlab/deploy/labs_ssh/id_ed25519 (the same key the
-  # backend container uses) via a host-scoped ssh config block — only for the
-  # labs host, so it can't affect the deploy's other SSH. Fully non-fatal.
+  # Runs on EVERY deploy (independent of BUILD_SCENARIOS). Fail-closed by
+  # default: if images are still missing after pull, the deploy fails so coding
+  # labs do not silently soft-fail into needs_review. Ops escape hatch:
+  # ALLOW_MISSING_SANDBOX_IMAGES=1.
+  echo "[grader] Pre-pull sandbox base images on D4 Labs"
   remote "$APP_PRIVATE_IP" via-edge \
-    "set +e
+    "set -e
 LK=/opt/fixitlab/deploy/labs_ssh/id_ed25519
-if [ ! -f \"\$LK\" ]; then echo '  labs key missing on D2 — skipping prepull'; exit 0; fi
+if [ ! -f \"\$LK\" ]; then
+  echo '  labs key missing on D2 — cannot prepull sandbox images'
+  if [ \"\${ALLOW_MISSING_SANDBOX_IMAGES:-0}\" = 1 ]; then exit 0; fi
+  exit 1
+fi
 install -m 700 -d /root/.ssh
 sed -i '/# fixitlab-labs-docker/,+5d' /root/.ssh/config 2>/dev/null || true
 printf '# fixitlab-labs-docker\nHost ${LABS_PRIVATE_IP}\n  IdentityFile %s\n  IdentitiesOnly yes\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n  ConnectTimeout 10\n  ServerAliveInterval 10\n  ServerAliveCountMax 3\n' \"\$LK\" >> /root/.ssh/config
 chmod 600 /root/.ssh/config
 export DOCKER_HOST=ssh://root@${LABS_PRIVATE_IP}
-# Bound every D2->D4 docker-over-ssh op with a hard timeout: a flaky/hung labs
-# SSH must NEVER stall the deploy. The runner->edge->app tunnel has SSH keepalive
-# (so it won't broken-pipe), which means a hung inner pull would otherwise block
-# until the 55-min job timeout. This step is non-fatal — a timeout just skips it.
-timeout 90 docker pull ${SANDBOX_PYTHON_IMAGE:-python:3.12-alpine} || echo '  [grader] python sandbox pre-pull skipped (timeout/err)'
-timeout 90 docker pull ${SANDBOX_NODE_IMAGE:-node:20-alpine} || echo '  [grader] node sandbox pre-pull skipped (timeout/err)'
-timeout 30 docker images | grep -E 'python:3.12-alpine|node:20-alpine' && echo '[grader] sandbox images present on D4' || echo '[grader] WARN: images still absent on D4'" || true
+export SANDBOX_PYTHON_IMAGE=\${SANDBOX_PYTHON_IMAGE:-python:3.12-alpine}
+export SANDBOX_NODE_IMAGE=\${SANDBOX_NODE_IMAGE:-node:20-alpine}
+export ALLOW_MISSING_SANDBOX_IMAGES=\${ALLOW_MISSING_SANDBOX_IMAGES:-0}
+if [ -x /opt/fixitlab/scripts/ensure-sandbox-images.sh ]; then
+  bash /opt/fixitlab/scripts/ensure-sandbox-images.sh
+elif [ -x ./scripts/ensure-sandbox-images.sh ]; then
+  bash ./scripts/ensure-sandbox-images.sh
+else
+  timeout 120 docker pull \"\$SANDBOX_PYTHON_IMAGE\" || true
+  timeout 120 docker pull \"\$SANDBOX_NODE_IMAGE\" || true
+  missing=0
+  docker image inspect \"\$SANDBOX_PYTHON_IMAGE\" >/dev/null 2>&1 || missing=1
+  docker image inspect \"\$SANDBOX_NODE_IMAGE\" >/dev/null 2>&1 || missing=1
+  if [ \"\$missing\" = 1 ]; then
+    echo '[grader] sandbox images still absent on D4'
+    if [ \"\$ALLOW_MISSING_SANDBOX_IMAGES\" = 1 ]; then exit 0; fi
+    exit 1
+  fi
+  echo '[grader] sandbox images present on D4'
+fi"
 }
 
 main() {

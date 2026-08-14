@@ -265,10 +265,22 @@ def transcribe_faster_whisper(
 ) -> dict | None:
     """faster-whisper HTTP adapter — JSON blob or OpenAI-compatible multipart."""
     url = os.environ.get("FIXITLAB_FASTER_WHISPER_URL") or ""
+    if not url:
+        try:
+            from django.conf import settings
+            url = getattr(settings, "FIXITLAB_FASTER_WHISPER_URL", "") or ""
+        except Exception:
+            url = ""
     if not url or not audio_wav:
         return None
     init_prompt = prompt if prompt is not None else domain_vocab_prompt()
-    model = os.environ.get("FIXITLAB_FASTER_WHISPER_MODEL") or "small"
+    model = os.environ.get("FIXITLAB_FASTER_WHISPER_MODEL") or ""
+    if not model:
+        try:
+            from django.conf import settings
+            model = getattr(settings, "FIXITLAB_FASTER_WHISPER_MODEL", "") or "small"
+        except Exception:
+            model = "small"
     mode = _whisper_api_mode(url)
     if mode == "openai":
         data = _post_multipart_transcription(
