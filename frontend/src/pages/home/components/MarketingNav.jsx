@@ -4,7 +4,7 @@ import { Terminal, ArrowRight, Menu, X, Sun, Moon } from '../../../ui/eagerIcons
 import { useAuthStore } from '../../../store/authStore'
 import { useThemeStore } from '../../../store/themeStore'
 import { PlatformBanners } from '../../../components/PlatformBanners'
-import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_LINKS } from '../../../constants/publicNav'
+import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_SECONDARY } from '../../../constants/publicNav'
 
 export default function MarketingNav({ navRef, platformConfig }) {
   const { isAuthenticated } = useAuthStore()
@@ -26,7 +26,7 @@ export default function MarketingNav({ navRef, platformConfig }) {
             </span>
           </Link>
 
-          <nav className="fx-marketing-nav-links hidden lg:flex" aria-label="Main navigation">
+          <nav className="fx-marketing-nav-links" aria-label="Main navigation">
             {PUBLIC_NAV_PRIMARY.map(({ to, label }) => (
               <Link
                 key={to}
@@ -38,35 +38,33 @@ export default function MarketingNav({ navRef, platformConfig }) {
             ))}
           </nav>
 
-          <div className="flex-1" />
-
           <button
             type="button"
-            className="lg:hidden p-2 text-white/60"
+            className="p-2 text-white/60 shrink-0"
             onClick={() => setMobileNavOpen(v => !v)}
-            aria-label="Menu"
+            aria-label="More links"
           >
             {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-all"
+            className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-all shrink-0"
             aria-label="Toggle theme"
           >
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
           {isAuthenticated ? (
-            <Link to="/dashboard" className="fx-marketing-nav-cta">
+            <Link to="/dashboard" className="fx-marketing-nav-cta shrink-0">
               Dashboard <ArrowRight size={15} />
             </Link>
           ) : (
             <>
-              <Link to="/login" className="hidden sm:inline text-sm font-medium text-white/70 px-3 py-2 no-underline">
+              <Link to="/login" className="hidden sm:inline text-sm font-medium text-white/70 px-3 py-2 no-underline shrink-0">
                 Sign in
               </Link>
-              <Link to="/register" data-magnetic className="fx-marketing-nav-cta">
+              <Link to="/register" data-magnetic className="fx-marketing-nav-cta shrink-0">
                 Start free <ArrowRight size={15} />
               </Link>
             </>
@@ -75,8 +73,8 @@ export default function MarketingNav({ navRef, platformConfig }) {
       </header>
 
       {mobileNavOpen && (
-        <div className="lg:hidden border-t border-white/10 px-4 py-3 flex flex-col gap-2 bg-surface-950/95 dark:bg-[#080a16]/95 max-h-[70vh] overflow-y-auto">
-          {PUBLIC_NAV_LINKS.map(({ to, label }) => (
+        <div className="border-t border-white/10 px-4 py-3 flex flex-col gap-2 bg-surface-950/95 dark:bg-[#080a16]/95 max-h-[70vh] overflow-y-auto">
+          {PUBLIC_NAV_SECONDARY.map(({ to, label }) => (
             <Link
               key={to}
               to={to}

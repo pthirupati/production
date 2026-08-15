@@ -13,7 +13,7 @@ import { useDataStore } from '../store/dataStore'
 import { subscriptionApi } from '../api/subscriptions'
 import { interviewsApi } from '../api/interviews'
 import { PlatformBanners } from '../components/PlatformBanners'
-import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_LINKS } from '../constants/publicNav'
+import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_SECONDARY } from '../constants/publicNav'
 import MarketingFooter from './home/components/MarketingFooter'
 import { mergeTechnologies } from '../constants/techCatalog'
 import { PageHeader, FixitPanel } from '../components/design'
@@ -472,9 +472,13 @@ export default function Pricing() {
               </div>
               <span className="text-xl font-bold text-white">FixitLab</span>
             </Link>
-            <div className="hidden lg:flex items-center gap-4 min-w-0">
+            <div className="flex items-center gap-0.5 sm:gap-2 min-w-0 flex-1 overflow-x-auto scrollbar-none">
               {PUBLIC_NAV_PRIMARY.map(({ to, label }) => (
-                <Link key={to} to={to} className="text-sm text-surface-400 hover:text-white transition-colors relative group whitespace-nowrap">
+                <Link
+                  key={to}
+                  to={to}
+                  className="text-[11px] sm:text-xs xl:text-sm text-surface-400 hover:text-white transition-colors relative group whitespace-nowrap shrink-0 px-1.5 py-1"
+                >
                   {label}
                   <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-accent-cyan to-accent-purple group-hover:w-full transition-all duration-300" />
                 </Link>
@@ -482,9 +486,9 @@ export default function Pricing() {
             </div>
             <button
               type="button"
-              className="lg:hidden p-2 text-surface-400 hover:text-white shrink-0"
+              className="p-2 text-surface-400 hover:text-white shrink-0"
               onClick={() => setMobileNavOpen(v => !v)}
-              aria-label="Menu"
+              aria-label="More links"
             >
               {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
@@ -535,8 +539,8 @@ export default function Pricing() {
         </nav>
         <PlatformBanners config={platformConfig} showMaintenance showPromo />
         {mobileNavOpen && (
-          <div className="lg:hidden border-t border-surface-800/50 bg-surface-950/95 backdrop-blur-xl px-4 py-3 flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
-            {PUBLIC_NAV_LINKS.map(({ to, label }) => (
+          <div className="border-t border-surface-800/50 bg-surface-950/95 backdrop-blur-xl px-4 py-3 flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
+            {PUBLIC_NAV_SECONDARY.map(({ to, label }) => (
               <Link key={to} to={to} onClick={() => setMobileNavOpen(false)} className="text-sm text-surface-300 py-2">
                 {label}
               </Link>

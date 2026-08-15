@@ -518,6 +518,20 @@ def get_sim_session(session_id: str) -> dict | None:
         return _touch(entry) if entry is not None else None
 
 
+def get_local_sim_engine(session_id: str):
+    """Return the process-local engine only — never hydrate/replace from cache.
+
+    Used by persist paths that must snapshot the live in-memory repair without
+    letting cache-authority refresh clobber it first.
+    """
+    sid = str(session_id)
+    with _SIM_LOCK:
+        entry = _SIM_SESSIONS.get(sid)
+        if entry is None:
+            return None
+        return (entry.get("state") or {}).get("engine")
+
+
 def mark_sim_engine_mutated(session_id: str) -> None:
     """Bump local ``engine_mutated_at`` after a write-through (keeps authority honest)."""
     sid = str(session_id)

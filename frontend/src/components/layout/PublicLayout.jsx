@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import SupportBotWidget from '../SupportBotWidget'
 import { PlatformBanners } from '../PlatformBanners'
 import api from '../../api/client'
-import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_LINKS } from '../../constants/publicNav'
+import { PUBLIC_NAV_PRIMARY, PUBLIC_NAV_SECONDARY } from '../../constants/publicNav'
 import BubbleNavLink from '../BubbleNavLink'
 import { FixitLogo } from '../design'
 import { useModalA11y } from '../ConfirmModal'
@@ -78,17 +78,23 @@ export default function PublicLayout({ children }) {
       </a>
       <nav className="fixed top-0 w-full z-50 border-b border-white/[0.07] bg-surface-950/[0.88] backdrop-blur-[18px]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[68px] flex items-center justify-between gap-4">
-          <FixitLogo to="/" size="sm" />
+          <FixitLogo to="/" size="sm" className="shrink-0" />
 
-          <div className="hidden lg:flex items-center justify-center gap-0 flex-nowrap flex-1 min-w-0 px-1 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-0 flex-nowrap flex-1 min-w-0 overflow-x-auto scrollbar-none px-1">
             {PUBLIC_NAV_PRIMARY.map(({ to, label }) => (
-              <BubbleNavLink key={to} to={to} active={isActive(to)} size="sm" className="shrink-0 px-2 py-1.5 text-xs xl:text-sm">
+              <BubbleNavLink
+                key={to}
+                to={to}
+                active={isActive(to)}
+                size="sm"
+                className="shrink-0 px-1.5 py-1 text-[11px] sm:px-2 sm:text-xs xl:text-sm"
+              >
                 {label}
               </BubbleNavLink>
             ))}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <button
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent('fixitlab-support-open'))}
@@ -107,7 +113,7 @@ export default function PublicLayout({ children }) {
                 <Link to="/register" className="btn-primary text-sm">Sign Up</Link>
               </div>
             )}
-            <button type="button" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400" aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}>
+            <button type="button" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-surface-400" aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}>
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
@@ -123,7 +129,7 @@ export default function PublicLayout({ children }) {
             className="lg:hidden border-t border-surface-700/50 bg-surface-950/95 backdrop-blur-xl max-h-[70vh] overflow-y-auto outline-none"
           >
             <div className="px-4 py-4 space-y-1">
-              {PUBLIC_NAV_LINKS.map(({ to, label }) => (
+              {PUBLIC_NAV_SECONDARY.map(({ to, label }) => (
                 <Link
                   key={to}
                   to={to}
